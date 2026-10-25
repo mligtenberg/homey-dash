@@ -29,7 +29,18 @@ public sealed class LocalHomey(
     {
         http.BaseAddress = new Uri(options.Address!);
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
-        http.Timeout = TimeSpan.FromSeconds(10);
+        // Actions answer only once Homey has carried them out; a mood that sets many lights takes about 9 s.
+        http.Timeout = TimeSpan.FromSeconds(30);
+    }
+
+    // Reads answer within milliseconds, so they give up sooner than actions.
+    private static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(10);
+
+    private static CancellationTokenSource ReadCancellation(CancellationToken ct)
+    {
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(ReadTimeout);
+        return cts;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -210,11 +221,12 @@ public sealed class LocalHomey(
         var path = $"api/manager/insights/log/{Uri.EscapeDataString(uri)}/{Uri.EscapeDataString(logId)}/entry?resolution={Uri.EscapeDataString(resolution)}";
         try
         {
-            using var response = await Http().GetAsync(path, ct);
+            using var read = ReadCancellation(ct);
+            using var response = await Http().GetAsync(path, read.Token);
             if (response.StatusCode == HttpStatusCode.NotFound)
                 throw new HomeyNotFoundException($"Insight log {logId} not found in Homey");
             response.EnsureSuccessStatusCode();
-            return HomeyMapper.InsightEntries(await response.Content.ReadFromJsonAsync<JsonElement>(ct));
+            return HomeyMapper.InsightEntries(await response.Content.ReadFromJsonAsync<JsonElement>(read.Token));
         }
         catch (HttpRequestException e)
         {
@@ -226,9 +238,10 @@ public sealed class LocalHomey(
 
     private async Task<JsonElement> GetJsonAsync(string path, CancellationToken ct)
     {
-        using var response = await Http().GetAsync(path, ct);
+        using var read = ReadCancellation(ct);
+        using var response = await Http().GetAsync(path, read.Token);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        return await response.Content.ReadFromJsonAsync<JsonElement>(read.Token);
     }
 
     private async Task SendAsync(HttpMethod method, string path, object? body, CancellationToken ct)

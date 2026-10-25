@@ -12,7 +12,7 @@ abstract class ActionTile extends TileView {
 
   protected override tap() {
     const target = this.settings().target;
-    if (target) this.send(() => this.run(target));
+    if (target) this.send(() => this.run(target), 'early');
   }
 
   protected withFlash(face: TileFace, done: string, failed: string): TileFace {

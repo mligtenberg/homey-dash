@@ -164,7 +164,7 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
   protected set(capability: string, value: CapabilityValue) {
     const id = this.settings().target;
     // The tile changes when Homey reports the new value, not before.
-    if (id) return this.send(() => this.realtime.setCapability(id, capability, value), true);
+    if (id) return this.send(() => this.realtime.setCapability(id, capability, value), 'quiet');
     return Promise.resolve();
   }
 

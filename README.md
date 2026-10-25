@@ -24,9 +24,12 @@ The API talks to a Homey Pro over its local API. Create an API key in the Homey 
 (Settings → API keys) and give the API its address and key, for example with user-secrets:
 
 ```sh
-dotnet user-secrets --project apps/api set Homey:Address http://192.168.1.10
+dotnet user-secrets --project apps/api set Homey:Address http://homey-<id>.local
 dotnet user-secrets --project apps/api set Homey:ApiKey <key>
 ```
+
+Prefer the Homey's `.local` name over its IP address: the name keeps working when the router gives the Homey a
+new address.
 
 Without an address the API runs against a built-in fake Homey with a few sample devices,
 flows and moods.

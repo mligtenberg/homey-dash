@@ -71,15 +71,21 @@ export abstract class TileView<TSettings extends TileSettings = TileSettings> {
     // Not tappable by default.
   }
 
-  /** Runs a command against Homey, flashing its outcome; `quiet` skips the flash on success. */
-  protected async send(command: () => Promise<unknown>, quiet = false) {
-    let outcome: 'ok' | 'error' = 'ok';
+  /**
+   * Runs a command against Homey, flashing its outcome. `success` says when a success shows: `quiet` never,
+   * `early` on press, since Homey can take seconds to answer (a mood waits for all its devices).
+   */
+  protected async send(command: () => Promise<unknown>, success: 'answered' | 'early' | 'quiet' = 'answered') {
+    if (success === 'early') this.showFlash('ok');
     try {
       await command();
+      if (success === 'answered') this.showFlash('ok');
     } catch {
-      outcome = 'error';
+      this.showFlash('error');
     }
-    if (quiet && outcome === 'ok') return;
+  }
+
+  private showFlash(outcome: 'ok' | 'error') {
     clearTimeout(this.flashTimer);
     this.flash.set(outcome);
     this.flashTimer = setTimeout(() => this.flash.set(null), FLASH_MS);

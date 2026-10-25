@@ -153,6 +153,13 @@ Built in vertical slices; each ends with something that works and has tests. Dom
   Homey" and Management's sidebar flags the dashboard; the statistic settings show the time window.
 - Against the real Homey (read-only, through the running instance): insight entries load for device logs,
   `energy_power` logs and Homey's own logs (`homey:manager:weather:temperature`), as 5-minute points.
+- Tiles live on the real Homey (2026-10-25): the Papagaai lamp turned off on tap, the tile changing only when Homey
+  reported it, and on again in about 150 ms (it came back at 27% instead of 39%, its own fade, so a dimmer's level
+  is not kept across off and on). Moods Hemels dag and Hawaii avond activate; Homey takes about 9 s to answer, so
+  flow and mood tiles now confirm on press and switch to the error text if Homey refuses. Requests to Homey that
+  perform an action may take 30 s (reads still give up after 10 s), so a slow mood no longer shows as failed. The heating statistic
+  loads its history.
+- The Homey is addressed by its `.local` name instead of its IP, which had moved from .242 to .244 (README updated).
 - Follow-ups: logs Homey keeps itself no longer count as missing; `energy_power` logs follow the device's
   `measure_power` live; statistic history reloads after a reconnect; the dashboard list push is coalesced (250 ms);
   the slider and segmented buttons get a 44 px touch area through a transparent border; Management's bundle
@@ -164,14 +171,13 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 - Verified on the real Homey Pro (firmware 13.5.3): handshake, namespace, subscriptions and live `capability`
   events work; 116 devices, 33 flows, 24 moods and 427 insight logs load. Not yet seen live: flow and mood
   events, and `device.update` (whether it carries the full device).
-- Give the Homey a fixed IP (DHCP reservation): it moved from .242 to .244, which broke the configured address.
 - The local `apps/api/homey-dash.db` still has the empty `Tiles` table and the `InitialCreate` history row from the
   removed scaffold. Harmless; drop them (or delete the file, losing its dashboards) when convenient.
 - The API does not check that a tile's size is supported by its kind: kinds are declared in front-end modules
   (ADR-0003), so Management checks that against the `TileKindRegistry`.
 - No concurrency check on saving drafts (last write wins); fine while one person edits at a time.
 - Not yet checked in the browser with live Homey data: picking targets, moving and resizing, Publish and Preview,
-  and operating tiles (needs someone at home: it switches real devices and runs real flows).
+  and a flow tile.
 - The segmented control's larger touch area is not seen in the browser yet (FakeHomey has no cover).
 
 ## To do

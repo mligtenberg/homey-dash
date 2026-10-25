@@ -197,6 +197,17 @@ describe('core tiles', () => {
       expect(tile.querySelector('.hd-tile__detail')?.textContent).toBe('Flow');
     });
 
+    it('says so on press, without waiting for Homey to answer', async () => {
+      const tile = await flowTile();
+      vi.spyOn(realtime, 'triggerFlow').mockReturnValue(new Promise(() => undefined));
+
+      tile.click();
+      TestBed.tick();
+
+      expect(tile.classList).toContain('is-feedback');
+      expect(tile.textContent).toContain('Started');
+    });
+
     it('shows an error when the flow could not start', async () => {
       const tile = await flowTile();
       realtime.failCommands = true;
