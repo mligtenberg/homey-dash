@@ -10,7 +10,7 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 | 2. Dashboards, drafts and publishing | Done (API and api-client; UI comes in slice 3) |
 | 3. Management editor | Done (first version) |
 | 4. Displays and setup | Done |
-| 5. Realtime and display status | To do |
+| 5. Realtime and display status | Done |
 | 6. Tile modules | To do |
 | 7. Packaging | To do |
 
@@ -99,39 +99,55 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 - 51 API tests (9 new), 4 display app tests. Checked in the browser: setup, waiting, assignment, takeover both
   ways, connection lost.
 
-### Open from slices 0 to 4
+### 5. Realtime and display status
+
+- `RealtimeHub` (SignalR, `/api/realtime`), one connection per app. Every connection gets Homey's changes
+  (`DeviceChanged`, `DeviceRemoved`, `Catalog`, `HomeyStatus`, passed on by `HomeyBroadcaster`) and can ask for a
+  `Homey` snapshot and perform `SetCapability`, `TriggerFlow` and `ActivateMood` (failures come back as `HubException`).
+- A screen calls `JoinScreen` with its screen id and gets its `ScreenView` (null: setup); afterwards `Screen` is pushed
+  whenever it changes: setup, takeover (the previous screen gets null), rename, assignment, removal, and publishing
+  or deleting its dashboard. Publishing therefore switches every display on the dashboard at once. The screen
+  reports what it shows with `Showing(version)`.
+- Display status: `DisplayPresence` counts open connections per screen (so it follows a takeover); `LastSeenAt` and
+  `ShownVersion` are stored on the display (migration `AddDisplayStatus`; reset on takeover and reassignment).
+  Management calls `JoinManagement` and gets `Displays` with every display's `DisplayStatus` (connected, held,
+  last seen, shown and latest version). REST display endpoints return the same `DisplayInfo`.
+- `libs/api-client`: `Realtime`, which reconnects forever (0 s to 30 s) and runs `whenConnected` callbacks after every
+  reconnect, so state is loaded again and a version published while a display was cut off is picked up.
+- `libs/tiles`: `RealtimeTileData` replaces `RestTileData` in both apps: a snapshot on each connect, changes in
+  between (changes arriving while a snapshot loads are applied after it). Insight logs still load over REST.
+- Display app: no more polling. Connection lost when the realtime connection is down or HomeyDash's Homey connection
+  is `disconnected`: tiles desaturated and blocked (horizontal scroll still works), "Reconnecting…" pill.
+- Management displays page: Connected / Last seen … / Never connected / No screen, and "Shows version x of y" when a
+  display is behind. Delete dashboard now names the displays that will go back to waiting.
+- Socket.IO requests to Homey fail as soon as the connection drops instead of waiting for their 10 s timeout.
+- `libs/tiles` has a unit-test target (`@angular/build:unit-test`, borrowing `display:build:development`).
+- Both apps' proxy configs pass WebSockets through (`ws: true`).
+- 58 API tests (7 new), 7 display app tests, 3 Management displays-page tests, 2 tiles tests. Checked in the browser
+  with FakeHomey: publish switches the display live, API stopped → connection lost → recovers on its own, Management
+  status goes Connected → Last seen just now when the display closes.
+
+### Open
 
 - Verified on the real Homey Pro (firmware 13.5.3): handshake, namespace, subscriptions and live `capability`
   events work; 116 devices, 33 flows, 24 moods and 427 insight logs load. Not yet seen live: flow and mood
-  events, and `device.update` (whether it carries the full device).
+  events, and `device.update` (whether it carries the full device). Realtime (slice 5) has not run against it yet.
 - Insight log ids include the owner URI (`homey:device:<id>:energy_power`); account for this when fetching entries in slice 6.
 - Give the Homey a fixed IP (DHCP reservation): it moved from .242 to .244, which broke the configured address.
-- Angular libraries have no unit-test runner (Nx needs them buildable or Analog for Vitest); add one when they get components.
-- Pending socket acks wait for their 10 s timeout after a disconnect instead of failing at once.
-- Delete the old local `apps/api/homey-dash.db`; it still has the removed `Tiles` table.
+- The local `apps/api/homey-dash.db` still has the empty `Tiles` table and the `InitialCreate` history row from the
+  removed scaffold. Harmless; drop them (or delete the file, losing its dashboards) when convenient.
 - The API does not check that a tile's size is supported by its kind: kinds are declared in front-end modules
-  (ADR-0003), so Management checks that against the `TileKindRegistry` in slice 3.
+  (ADR-0003), so Management checks that against the `TileKindRegistry`.
 - No concurrency check on saving drafts (last write wins); fine while one person edits at a time.
 - Kind-specific settings (which capabilities a device tile shows, a statistic's time window) need a settings
   component per kind in `TileKind`; add it with the full tile modules in slice 6.
 - The sidebar's warning dot for dashboards with missing tiles needs the API to know about targets; slice 6.
-- Management reads Homey data by polling REST every 10 s; switch to the realtime connection in slice 5.
 - Not yet checked in the browser with live Homey data: picking targets, moving and resizing, Publish and Preview.
-- Displays poll REST for their dashboard and tile data; slice 5 replaces both with SignalR. Tiles on displays
-  cannot be operated yet (slice 6).
-- A display no screen holds any more (after its screen was given to another display) still shows in Management;
-  display status in slice 5 will show it as never connected.
-- The editor's Delete dashboard does not say which displays will go back to waiting.
+- Tiles on displays cannot be operated yet; the hub's actions are ready for slice 6.
+- `Showing` is reported when the screen receives a version, not after it has rendered.
+- Management's dashboard list is not pushed: a dashboard published from another Management window shows up after a reload.
 
 ## To do
-
-### 5. Realtime and display status
-
-- SignalR hub: displays join with their identity, receive the published version and device state, and send actions.
-- Publishing switches every display on that dashboard at once.
-- Display status in Management: connected, last seen, on the latest version or not.
-- Connection lost on displays: desaturated, taps blocked, horizontal scroll still works, "Reconnecting…" pill,
-  picks up the latest published version on recovery.
 
 ### 6. Tile modules
 

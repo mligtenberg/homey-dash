@@ -17,6 +17,10 @@ public sealed class Display
     // The id the holding screen keeps in its localStorage. Null once no screen holds this display.
     public Guid? ScreenId { get; set; }
 
+    // Display status, as reported by the screen: when it was last connected, and which published version it shows.
+    public DateTimeOffset? LastSeenAt { get; set; }
+    public int? ShownVersion { get; set; }
+
     public DisplaySummary ToSummary() => new(Id, Name, DashboardId);
 
     public static string? ValidateName(string? name) =>
@@ -26,6 +30,15 @@ public sealed class Display
 }
 
 public sealed record DisplaySummary(Guid Id, string Name, Guid? DashboardId);
+
+/// <summary>
+/// What Management knows about a display beyond its configuration. <see cref="LatestVersion"/> is its dashboard's
+/// published version; it is on the latest version when <see cref="ShownVersion"/> equals it.
+/// </summary>
+public sealed record DisplayStatus(bool Connected, bool Held, DateTimeOffset? LastSeenAt, int? ShownVersion, int? LatestVersion);
+
+/// <summary>A display as Management lists it.</summary>
+public sealed record DisplayInfo(Guid Id, string Name, Guid? DashboardId, DisplayStatus Status);
 
 /// <summary>The published version a display shows.</summary>
 public sealed record ShownDashboard(Guid Id, string Name, int Version, DashboardLayout Layout);

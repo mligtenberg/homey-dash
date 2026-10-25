@@ -1,15 +1,9 @@
-import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DisplaysApi, ScreenView } from '@homey-dash/api-client';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { Realtime, ScreenView } from '@homey-dash/api-client';
 import { cellSize } from '@homey-dash/layout';
-import { DashboardView } from '@homey-dash/tiles';
-import { catchError, interval, map, merge, of, startWith, Subject, switchMap } from 'rxjs';
+import { DashboardView, RealtimeTileData } from '@homey-dash/tiles';
 import { screenId } from './screen-id';
 import { Setup } from './setup';
-
-// Until realtime arrives, a display asks every few seconds whether its dashboard or assignment changed.
-const REFRESH_MS = 10_000;
 
 type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; view: ScreenView };
 
@@ -27,7 +21,7 @@ type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; 
   template: `
     @switch (state().kind) {
       @case ('setup') {
-        <hd-setup [screenId]="screenId" (done)="refresh.next()" />
+        <hd-setup [screenId]="screenId" (done)="join()" />
       }
       @case ('display') {
         @if (view(); as view) {
@@ -57,15 +51,18 @@ type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; 
   `,
 })
 export class App {
-  private readonly api = inject(DisplaysApi);
+  private readonly realtime = inject(Realtime);
+  private readonly homey = inject(RealtimeTileData);
 
   protected readonly screenId = screenId();
-  protected readonly refresh = new Subject<void>();
-  // Compared by value, so a poll that finds nothing new leaves the dashboard untouched.
+  // Compared by value, so joining again after a reconnect leaves an unchanged dashboard untouched.
   protected readonly state = signal<ScreenState>({ kind: 'loading' }, {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
-  protected readonly lost = signal(false);
+  // Connection lost: HomeyDash cannot be reached, or HomeyDash cannot reach Homey. What is shown stays.
+  protected readonly lost = computed(
+    () => !this.realtime.connected() || this.homey.status()?.connection === 'disconnected',
+  );
   protected readonly view = computed(() => {
     const state = this.state();
     return state.kind === 'display' ? state.view : null;
@@ -75,21 +72,23 @@ export class App {
   protected readonly cell = computed(() => cellSize(this.height(), this.view()?.dashboard?.layout.rows));
 
   constructor() {
-    merge(interval(REFRESH_MS).pipe(startWith(0)), this.refresh)
-      .pipe(
-        switchMap(() =>
-          this.api.screen(this.screenId).pipe(
-            map((view): ScreenState => ({ kind: 'display', view })),
-            catchError((error: HttpErrorResponse) => of<ScreenState | null>(error.status === 404 ? { kind: 'setup' } : null)),
-          ),
-        ),
-        takeUntilDestroyed(),
-      )
-      .subscribe((state) => {
-        // null: HomeyDash could not be reached, so the last known state stays on screen.
-        this.lost.set(state === null);
-        if (state) this.state.set(state);
-      });
+    // Joining again on every reconnect picks up a version published while the connection was lost.
+    const stops = [this.realtime.on('Screen', (view) => this.show(view)), this.realtime.whenConnected(() => this.join())];
+    inject(DestroyRef).onDestroy(() => stops.forEach((stop) => stop()));
+  }
+
+  protected async join() {
+    try {
+      this.show(await this.realtime.joinScreen(this.screenId));
+    } catch {
+      // The connection dropped again; joining happens again on reconnect.
+    }
+  }
+
+  // null: this screen is not (or no longer) a display.
+  private show(view: ScreenView | null) {
+    this.state.set(view ? { kind: 'display', view } : { kind: 'setup' });
+    if (view) this.realtime.showing(view.dashboard?.version ?? null).catch(() => undefined);
   }
 
   protected onResize() {

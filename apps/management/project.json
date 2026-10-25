@@ -54,12 +54,6 @@
       "readyWhen": {
         "signal": true
       },
-      "dependsOn": [
-        {
-          "projects": ["api"],
-          "target": "serve"
-        }
-      ],
       "executor": "@angular/build:dev-server",
       "defaultConfiguration": "development",
       "options": {

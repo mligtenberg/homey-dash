@@ -1,5 +1,6 @@
 using System.Text.Json;
 using HomeyDash.Api.Data;
+using HomeyDash.Api.Realtime;
 using Microsoft.EntityFrameworkCore;
 
 namespace HomeyDash.Api.Dashboards;
@@ -42,11 +43,14 @@ public static class DashboardEndpoints
                 return null;
             }));
 
-        dashboards.MapDelete("/{id:guid}", async (Guid id, HomeyDashDbContext db, CancellationToken ct) =>
+        // Its displays go back to waiting.
+        dashboards.MapDelete("/{id:guid}", async (Guid id, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct) =>
         {
             if (await db.Dashboards.FindAsync([id], ct) is not { } dashboard) return NotFound(id);
+            var screens = await ScreensShowingAsync(db, id, ct);
             db.Dashboards.Remove(dashboard);
             await db.SaveChangesAsync(ct);
+            await notifier.ScreensChangedAsync(db, screens, ct);
             return Results.NoContent();
         });
 
@@ -59,13 +63,23 @@ public static class DashboardEndpoints
                 return null;
             }));
 
-        dashboards.MapPost("/{id:guid}/publish", (Guid id, HomeyDashDbContext db, TimeProvider time, CancellationToken ct) =>
-            Change(id, db, ct, dashboard =>
+        // Every display showing the dashboard switches to the new version at once.
+        dashboards.MapPost("/{id:guid}/publish",
+            async (Guid id, HomeyDashDbContext db, RealtimeNotifier notifier, TimeProvider time, CancellationToken ct) =>
             {
-                dashboard.Publish(time.GetUtcNow());
-                return null;
-            }));
+                var result = await Change(id, db, ct, dashboard =>
+                {
+                    dashboard.Publish(time.GetUtcNow());
+                    return null;
+                });
+                await notifier.ScreensChangedAsync(db, await ScreensShowingAsync(db, id, ct), ct);
+                return result;
+            });
     }
+
+    // The screens of the displays assigned this dashboard.
+    private static async Task<List<Guid?>> ScreensShowingAsync(HomeyDashDbContext db, Guid id, CancellationToken ct) =>
+        await db.Displays.Where(d => d.DashboardId == id).Select(d => d.ScreenId).ToListAsync(ct);
 
     // Loads a dashboard, applies a change (which returns a problem to refuse it) and answers with the result.
     private static async Task<IResult> Change(

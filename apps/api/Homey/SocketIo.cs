@@ -88,7 +88,7 @@ public sealed class SocketIoClient : IAsyncDisposable
     {
         var connected = _namespaces.GetOrAdd(ns, _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
         await SendAsync("4" + SocketIoPacket.Encode(SocketIoPacketType.Connect, ns), ct);
-        await connected.Task.WaitAsync(RequestTimeout, ct);
+        await WaitForAnswerAsync(connected.Task, ct);
     }
 
     // Emits an event and returns the arguments the server acknowledged it with.
@@ -100,12 +100,21 @@ public sealed class SocketIoClient : IAsyncDisposable
         try
         {
             await SendAsync("4" + SocketIoPacket.Encode(SocketIoPacketType.Event, ns, id, new object?[] { name }.Concat(args)), ct);
-            return await ack.Task.WaitAsync(RequestTimeout, ct);
+            await WaitForAnswerAsync(ack.Task, ct);
+            return await ack.Task;
         }
         finally
         {
             _acks.TryRemove(id, out _);
         }
+    }
+
+    // Waits for Homey to answer, failing at once (with the reason) when the connection is lost.
+    private async Task WaitForAnswerAsync(Task answer, CancellationToken ct)
+    {
+        if (await Task.WhenAny(answer, Completion).WaitAsync(RequestTimeout, ct) == answer) return;
+        await Completion;
+        throw new WebSocketException("Homey closed the realtime connection");
     }
 
     private async Task ReceiveLoopAsync()

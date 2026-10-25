@@ -34,7 +34,8 @@ flows and moods.
 ## Running
 
 ```sh
-npx nx serve display      # display app, also starts the API
-npx nx serve management   # Management, also starts the API
+npx nx serve api          # API on :5112, which both apps proxy /api to
+npx nx serve display      # display app on :4200
+npx nx serve management   # Management on :4201
 npx nx run-many -t test lint
 ```

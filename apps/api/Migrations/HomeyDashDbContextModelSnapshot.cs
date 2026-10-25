@@ -55,6 +55,9 @@ namespace HomeyDash.Api.Migrations
                     b.Property<Guid?>("DashboardId")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTimeOffset?>("LastSeenAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -62,6 +65,9 @@ namespace HomeyDash.Api.Migrations
 
                     b.Property<Guid?>("ScreenId")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("ShownVersion")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 

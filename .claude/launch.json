@@ -42,12 +42,14 @@
     },
     {
       "name": "display",
-      "runtimeExecutable": "npx",
+      "runtimeExecutable": "env",
       "runtimeArgs": [
+        "NX_WORKSPACE_DATA_DIRECTORY=tmp/claude/nx",
+        "NX_DAEMON=false",
+        "npx",
         "nx",
         "serve",
         "display",
-        "--excludeTaskDependencies",
         "--port",
         "4300",
         "--proxy-config",
@@ -57,12 +59,14 @@
     },
     {
       "name": "management",
-      "runtimeExecutable": "npx",
+      "runtimeExecutable": "env",
       "runtimeArgs": [
+        "NX_WORKSPACE_DATA_DIRECTORY=tmp/claude/nx",
+        "NX_DAEMON=false",
+        "npx",
         "nx",
         "serve",
         "management",
-        "--excludeTaskDependencies",
         "--port",
         "4301",
         "--proxy-config",

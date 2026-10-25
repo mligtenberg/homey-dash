@@ -4,6 +4,7 @@ using HomeyDash.Api.Dashboards;
 using HomeyDash.Api.Data;
 using HomeyDash.Api.Displays;
 using HomeyDash.Api.Homey;
+using HomeyDash.Api.Realtime;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddDbContext<HomeyDashDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("HomeyDash")));
 builder.Services.AddHomey(builder.Configuration);
+builder.Services.AddRealtime();
 
 var app = builder.Build();
 
@@ -33,5 +35,6 @@ api.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 api.MapHomey();
 api.MapDashboards();
 api.MapDisplays();
+app.MapHub<RealtimeHub>(RealtimeHub.Path);
 
 app.Run();

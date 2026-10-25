@@ -10,7 +10,7 @@ import {
   viewChildren,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { DashboardDetail, DashboardLayout, DashboardsApi, Tile } from '@homey-dash/api-client';
+import { DashboardDetail, DashboardLayout, DashboardsApi, DisplaysApi, Tile } from '@homey-dash/api-client';
 import { TilePosition, TileSize } from '@homey-dash/layout';
 import { TileHost, TileKind, TileKindRegistry, TileSettings } from '@homey-dash/tiles';
 import { LucideChevronLeft, LucideChevronRight, LucideDynamicIcon, LucidePlus, LucideTrash } from '@lucide/angular';
@@ -44,6 +44,7 @@ export class EditorPage {
   readonly id = input.required<string>();
 
   private readonly api = inject(DashboardsApi);
+  private readonly displays = inject(DisplaysApi);
   private readonly store = inject(DashboardsStore);
   private readonly router = inject(Router);
   protected readonly kinds = inject(TileKindRegistry);
@@ -247,9 +248,13 @@ export class EditorPage {
     });
   }
 
-  protected deleteDashboard() {
+  protected async deleteDashboard() {
     const dashboard = this.loadedDashboard();
-    if (!confirm(`Delete the dashboard "${dashboard.name}"? This can't be undone.`)) return;
+    const showing = (await firstValueFrom(this.displays.list())).filter((d) => d.dashboardId === dashboard.id);
+    const waiting = showing.length
+      ? ` ${showing.map((d) => `"${d.name}"`).join(', ')} will wait for another dashboard.`
+      : '';
+    if (!confirm(`Delete the dashboard "${dashboard.name}"? This can't be undone.${waiting}`)) return;
     clearTimeout(this.saveTimer);
     this.saveState.set('saved');
     this.api.delete(dashboard.id).subscribe(() => {

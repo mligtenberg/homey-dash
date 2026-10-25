@@ -10,6 +10,24 @@ export interface DisplaySummary {
   dashboardId: string | null;
 }
 
+/**
+ * What Management knows about a display beyond its configuration. It is on the latest version when
+ * `shownVersion` equals `latestVersion`, its dashboard's published version.
+ */
+export interface DisplayStatus {
+  connected: boolean;
+  /** False once its screen was given to another display; a screen in setup can take it over. */
+  held: boolean;
+  lastSeenAt: string | null;
+  shownVersion: number | null;
+  latestVersion: number | null;
+}
+
+/** A display as Management lists it. */
+export interface DisplayInfo extends DisplaySummary {
+  status: DisplayStatus;
+}
+
 /** The published version a display shows. */
 export interface ShownDashboard {
   id: string;
@@ -33,7 +51,7 @@ export class DisplaysApi {
   private readonly http = inject(HttpClient);
 
   list() {
-    return this.http.get<DisplaySummary[]>('/api/displays');
+    return this.http.get<DisplayInfo[]>('/api/displays');
   }
 
   setUp(name: string, screenId: string) {
@@ -41,15 +59,15 @@ export class DisplaysApi {
   }
 
   takeOver(id: string, screenId: string) {
-    return this.http.post<DisplaySummary>(`/api/displays/${id}/takeover`, { screenId });
+    return this.http.post<DisplayInfo>(`/api/displays/${id}/takeover`, { screenId });
   }
 
   rename(id: string, name: string) {
-    return this.http.patch<DisplaySummary>(`/api/displays/${id}`, { name });
+    return this.http.patch<DisplayInfo>(`/api/displays/${id}`, { name });
   }
 
   assign(id: string, dashboardId: string | null) {
-    return this.http.put<DisplaySummary>(`/api/displays/${id}/dashboard`, { dashboardId });
+    return this.http.put<DisplayInfo>(`/api/displays/${id}/dashboard`, { dashboardId });
   }
 
   delete(id: string) {
