@@ -6,8 +6,8 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 | Slice | Status |
 | --- | --- |
 | 0. Foundations | Done |
-| 1. Homey connection | Done, not yet verified against a real Homey Pro |
-| 2. Dashboards, drafts and publishing | To do |
+| 1. Homey connection | Done, verified against the real Homey Pro (2026-10-25) |
+| 2. Dashboards, drafts and publishing | Done (API and api-client; UI comes in slice 3) |
 | 3. Management editor | To do |
 | 4. Displays and setup | To do |
 | 5. Realtime and display status | To do |
@@ -45,24 +45,37 @@ Built in vertical slices; each ends with something that works and has tests. Dom
   `PUT devices/{id}/capabilities/{cap}`, `POST flows/{id}/trigger`, `POST moods/{id}/activate`.
 - 23 API tests, including the real client against `ScriptedHomeyServer`.
 
-### Open from slices 0 and 1
+### 2. Dashboards, drafts and publishing
 
-- Run against the real Homey Pro and check the log (`Connected to Homey … N devices`, then
-  `Homey event homey:device:… capability` when a light is switched). Likely differences from the scripted server:
-  flow and mood event names, and whether `device.update` carries the full device.
+- `Dashboard` (`apps/api/Dashboards`): name, a draft and at most one published version, `publishedVersion`
+  (counts publishes, 0 = never; for display status in slice 5) and `publishedAt`.
+- A version is a `DashboardLayout` JSON document: `rows` (default 4, 1 to 12) and sections, each with tiles
+  (`id`, `kind`, `size`, `position`, `settings`). Rows live in the version, not on the dashboard, so changing
+  them in the draft cannot break the published layout. Tile settings are stored without being interpreted.
+- `DashboardValidator`: tiles inside the grid, no overlap, known size, unique section and tile ids, a kind.
+  Problems come back as a 400 validation problem keyed like `sections[0].tiles[1]`.
+- First EF migration `AddDashboards` (one table; versions in text columns).
+- Endpoints under `/api/dashboards`: list, get, create, `PATCH` rename, delete, `PUT {id}/draft`,
+  `POST {id}/publish`. `hasUnpublishedChanges` compares the draft with the published version.
+- `DashboardsApi` and the dashboard types in `libs/api-client`, reusing `TileSize` and `TilePosition` from `libs/layout`.
+- 42 API tests (19 new).
+
+### Open from slices 0 to 2
+
+- Verified on the real Homey Pro (firmware 13.5.3): handshake, namespace, subscriptions and live `capability`
+  events work; 116 devices, 33 flows, 24 moods and 427 insight logs load. Not yet seen live: flow and mood
+  events, and `device.update` (whether it carries the full device).
+- Insight log ids include the owner URI (`homey:device:<id>:energy_power`); account for this when fetching entries in slice 6.
+- Give the Homey a fixed IP (DHCP reservation): it moved from .242 to .244, which broke the configured address.
 - Angular libraries have no unit-test runner (Nx needs them buildable or Analog for Vitest); add one when they get components.
 - Pending socket acks wait for their 10 s timeout after a disconnect instead of failing at once.
 - Delete the old local `apps/api/homey-dash.db`; it still has the removed `Tiles` table.
+- The API does not check that a tile's size is supported by its kind: kinds are declared in front-end modules
+  (ADR-0003), so Management checks that against the `TileKindRegistry` in slice 3.
+- Deleting a dashboard does not yet consider displays; decide in slice 4 what happens to displays showing it.
+- No concurrency check on saving drafts (last write wins); fine while one person edits at a time.
 
 ## To do
-
-### 2. Dashboards, drafts and publishing
-
-- `Dashboard`: name, rows (default 4), one draft and one published version.
-- A version is a JSON document of sections and tiles (kind, size, position, settings).
-- Server-side validation: tiles in bounds and not overlapping, size supported by the kind.
-- First real EF migration.
-- `PUT /api/dashboards/{id}/draft`, `POST /api/dashboards/{id}/publish`, plus list, create, rename and delete.
 
 ### 3. Management editor
 
