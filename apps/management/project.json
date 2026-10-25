@@ -8,9 +8,7 @@
   "targets": {
     "build": {
       "executor": "@angular/build:application",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
         "outputPath": "dist/apps/management",
@@ -24,6 +22,7 @@
           }
         ],
         "styles": [
+          "libs/design-system/src/index.css",
           "apps/management/src/styles.scss"
         ]
       },
@@ -57,9 +56,7 @@
       },
       "dependsOn": [
         {
-          "projects": [
-            "api"
-          ],
+          "projects": ["api"],
           "target": "serve"
         }
       ],
@@ -92,9 +89,7 @@
       "readyWhen": {
         "signal": true
       },
-      "dependsOn": [
-        "build"
-      ],
+      "dependsOn": ["build"],
       "executor": "@nx/web:file-server",
       "options": {
         "buildTarget": "management:build",
@@ -103,5 +98,6 @@
         "spa": true
       }
     }
-  }
+  },
+  "implicitDependencies": ["design-system"]
 }

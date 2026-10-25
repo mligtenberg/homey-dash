@@ -21,7 +21,10 @@
             "input": "apps/display/public"
           }
         ],
-        "styles": ["apps/display/src/styles.scss"]
+        "styles": [
+          "libs/design-system/src/index.css",
+          "apps/display/src/styles.scss"
+        ]
       },
       "configurations": {
         "production": {
@@ -94,5 +97,6 @@
         "watch": false
       }
     }
-  }
+  },
+  "implicitDependencies": ["design-system"]
 }
