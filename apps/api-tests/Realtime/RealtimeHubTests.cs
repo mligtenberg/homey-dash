@@ -140,6 +140,25 @@ public sealed class RealtimeHubTests(ApiFactory factory) : IClassFixture<ApiFact
     }
 
     [Fact]
+    public async Task DashboardChanges_ReachManagement()
+    {
+        var management = await ConnectAsync();
+        var dashboards = Listen(management, "Dashboards");
+        await management.InvokeAsync<JsonElement>("JoinManagement");
+        static Func<JsonElement, bool> Where(string id, Func<JsonElement, bool> match) => list =>
+            list.EnumerateArray().Any(d => d.GetProperty("id").GetString() == id && match(d));
+
+        var id = await PublishedDashboardAsync();
+        await NextAsync(dashboards, Where(id, d => d.GetProperty("publishedVersion").GetInt32() == 1));
+
+        await _client.PatchAsJsonAsync($"/api/dashboards/{id}", new { name = "Pantry" });
+        await NextAsync(dashboards, Where(id, d => d.GetProperty("name").GetString() == "Pantry"));
+
+        await _client.DeleteAsync($"/api/dashboards/{id}");
+        await NextAsync(dashboards, list => list.EnumerateArray().All(d => d.GetProperty("id").GetString() != id));
+    }
+
+    [Fact]
     public async Task HomeyChanges_ReachEveryConnection()
     {
         var hub = await ConnectAsync();

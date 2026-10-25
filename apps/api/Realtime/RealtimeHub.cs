@@ -10,7 +10,8 @@ namespace HomeyDash.Api.Realtime;
 /// <summary>
 /// The realtime connection both apps keep open. Every connection receives Homey's changes (<c>DeviceChanged</c>,
 /// <c>DeviceRemoved</c>, <c>Catalog</c>, <c>HomeyStatus</c>). A screen joins with its screen id and is told which
-/// display it is with <c>Screen</c>; Management joins to receive <c>Displays</c> with every display's status.
+/// display it is with <c>Screen</c>; Management joins to receive <c>Displays</c> with every display's status and
+/// <c>Dashboards</c> with the dashboard list.
 /// Mirrored in libs/api-client/src/lib/realtime.ts.
 /// </summary>
 public sealed class RealtimeHub(

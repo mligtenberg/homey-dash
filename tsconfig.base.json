@@ -17,7 +17,8 @@
     "paths": {
       "@homey-dash/layout": ["./libs/layout/src/index.ts"],
       "@homey-dash/tiles": ["./libs/tiles/src/index.ts"],
-      "@homey-dash/api-client": ["./libs/api-client/src/index.ts"]
+      "@homey-dash/api-client": ["./libs/api-client/src/index.ts"],
+      "@homey-dash/api-client/testing": ["./libs/api-client/src/testing.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

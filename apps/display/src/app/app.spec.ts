@@ -1,45 +1,10 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { ApplicationRef, signal } from '@angular/core';
+import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { HomeySnapshot, Realtime, RealtimeMessages, ScreenView } from '@homey-dash/api-client';
+import { Realtime, ScreenView } from '@homey-dash/api-client';
+import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { App } from './app';
-
-/** Stands in for the realtime connection: answers joins with `screen` and lets a test push messages. */
-class FakeRealtime {
-  readonly connected = signal(true);
-  screen: ScreenView | null = null;
-  readonly joined: string[] = [];
-  readonly shown: (number | null)[] = [];
-  private readonly handlers = new Map<string, ((message: unknown) => void)[]>();
-
-  whenConnected(join: () => void) {
-    join();
-    return () => undefined;
-  }
-
-  on<K extends keyof RealtimeMessages>(name: K, handler: (message: RealtimeMessages[K]) => void) {
-    this.handlers.set(name, [...(this.handlers.get(name) ?? []), handler as (message: unknown) => void]);
-    return () => undefined;
-  }
-
-  push<K extends keyof RealtimeMessages>(name: K, message: RealtimeMessages[K]) {
-    this.handlers.get(name)?.forEach((handler) => handler(message));
-  }
-
-  async homey(): Promise<HomeySnapshot> {
-    return { status: { connection: 'connected', lastError: null, since: '', fake: true }, devices: [], flows: [], moods: [] };
-  }
-
-  async joinScreen(screenId: string) {
-    this.joined.push(screenId);
-    return this.screen;
-  }
-
-  async showing(version: number | null) {
-    this.shown.push(version);
-  }
-}
 
 const hallway = { id: 'd1', name: 'Hallway', dashboardId: null };
 const published = (version: number): ScreenView => ({
@@ -94,14 +59,26 @@ describe('App', () => {
     expect(realtime.shown).toEqual([null]);
   });
 
-  it('switches to a newly published version and reports it', async () => {
-    const root = await start(published(1));
+  it('switches to a newly published version and reports it once it is on screen', async () => {
+    const onScreen: boolean[] = [];
+    realtime.onShowing = () => onScreen.push(document.querySelector('hd-dashboard-view') !== null);
+    await start({ display: hallway, dashboard: null });
 
     realtime.push('Screen', published(2));
     await stable();
 
-    expect(root.querySelector('hd-dashboard-view')).not.toBeNull();
-    expect(realtime.shown).toEqual([1, 2]);
+    expect(realtime.shown).toEqual([null, 2]);
+    expect(onScreen).toEqual([false, true]);
+  });
+
+  it('reports what it shows again after a reconnect', async () => {
+    await start(published(1));
+
+    realtime.connected.set(false);
+    realtime.reconnect();
+    await stable();
+
+    expect(realtime.shown).toEqual([1, 1]);
   });
 
   it('returns to setup when another screen takes the display over', async () => {

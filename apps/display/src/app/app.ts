@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import {
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  Injector,
+  signal,
+} from '@angular/core';
 import { Realtime, ScreenView } from '@homey-dash/api-client';
 import { cellSize } from '@homey-dash/layout';
 import { DashboardView, RealtimeTileData } from '@homey-dash/tiles';
@@ -53,6 +62,7 @@ type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; 
 export class App {
   private readonly realtime = inject(Realtime);
   private readonly homey = inject(RealtimeTileData);
+  private readonly injector = inject(Injector);
 
   protected readonly screenId = screenId();
   // Compared by value, so joining again after a reconnect leaves an unchanged dashboard untouched.
@@ -85,10 +95,14 @@ export class App {
     }
   }
 
-  // null: this screen is not (or no longer) a display.
+  // null: this screen is not (or no longer) a display. The version is reported once it is on screen.
   private show(view: ScreenView | null) {
     this.state.set(view ? { kind: 'display', view } : { kind: 'setup' });
-    if (view) this.realtime.showing(view.dashboard?.version ?? null).catch(() => undefined);
+    if (!view) return;
+    afterNextRender(
+      { read: () => void this.realtime.showing(view.dashboard?.version ?? null).catch(() => undefined) },
+      { injector: this.injector },
+    );
   }
 
   protected onResize() {

@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import { DashboardSummary } from './dashboards';
 import { DisplayInfo, ScreenView } from './displays';
 import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyMood, HomeyStatus } from './homey';
 
@@ -27,6 +28,8 @@ export interface RealtimeMessages {
   Screen: ScreenView | null;
   /** Every display with its status, for Management. */
   Displays: DisplayInfo[];
+  /** Every dashboard, for Management's sidebar. */
+  Dashboards: DashboardSummary[];
 }
 
 // Displays run unattended, so reconnecting never gives up; it just slows down.
@@ -89,7 +92,7 @@ export class Realtime {
     return this.hub.invoke<void>('Showing', version);
   }
 
-  /** Joins as Management, to receive `Displays`; answers with the current list. */
+  /** Joins as Management, to receive `Displays` and `Dashboards`; answers with the current display list. */
   joinManagement() {
     return this.hub.invoke<DisplayInfo[]>('JoinManagement');
   }

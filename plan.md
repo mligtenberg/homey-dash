@@ -123,9 +123,14 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 - Socket.IO requests to Homey fail as soon as the connection drops instead of waiting for their 10 s timeout.
 - `libs/tiles` has a unit-test target (`@angular/build:unit-test`, borrowing `display:build:development`).
 - Both apps' proxy configs pass WebSockets through (`ws: true`).
-- 58 API tests (7 new), 7 display app tests, 3 Management displays-page tests, 2 tiles tests. Checked in the browser
+- Management's dashboard list follows `Dashboards`, pushed on create, rename, draft save, publish and delete, so
+  changes from another Management window show up without a reload.
+- A display reports `Showing` after the version is on screen (`afterNextRender`), and again after every reconnect.
+- `FakeRealtime` in `@homey-dash/api-client/testing` stands in for the connection in the apps' specs.
+- 59 API tests (8 new), 8 display app tests, 5 Management tests besides the draft edits, 2 tiles tests. Checked in the browser
   with FakeHomey: publish switches the display live, API stopped → connection lost → recovers on its own, Management
-  status goes Connected → Last seen just now when the display closes.
+  status goes Connected → Last seen just now when the display closes, a rename in one Management window shows in
+  another.
 
 ### Open
 
@@ -144,8 +149,6 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 - The sidebar's warning dot for dashboards with missing tiles needs the API to know about targets; slice 6.
 - Not yet checked in the browser with live Homey data: picking targets, moving and resizing, Publish and Preview.
 - Tiles on displays cannot be operated yet; the hub's actions are ready for slice 6.
-- `Showing` is reported when the screen receives a version, not after it has rendered.
-- Management's dashboard list is not pushed: a dashboard published from another Management window shows up after a reload.
 
 ## To do
 

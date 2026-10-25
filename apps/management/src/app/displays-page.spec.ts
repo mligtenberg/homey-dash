@@ -2,7 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { DisplayInfo, DisplayStatus, Realtime, RealtimeMessages } from '@homey-dash/api-client';
+import { DisplayInfo, DisplayStatus, Realtime } from '@homey-dash/api-client';
+import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { DisplaysPage, timeAgo } from './displays-page';
 
 const status = (change: Partial<DisplayStatus>): DisplayStatus => ({
@@ -15,17 +16,11 @@ const status = (change: Partial<DisplayStatus>): DisplayStatus => ({
 });
 
 describe('DisplaysPage', () => {
-  let push: (list: DisplayInfo[]) => void = () => undefined;
+  let realtime: FakeRealtime;
 
   async function render(list: DisplayInfo[]) {
-    const realtime: Partial<Realtime> = {
-      whenConnected: (join) => (join(), () => true),
-      on: <K extends keyof RealtimeMessages>(_: K, handler: (message: RealtimeMessages[K]) => void) => {
-        push = handler as (list: DisplayInfo[]) => void;
-        return () => undefined;
-      },
-      joinManagement: async () => list,
-    };
+    realtime = new FakeRealtime();
+    realtime.displays = list;
     TestBed.configureTestingModule({
       imports: [DisplaysPage],
       providers: [provideHttpClient(), provideHttpClientTesting(), { provide: Realtime, useValue: realtime }],
@@ -50,7 +45,7 @@ describe('DisplaysPage', () => {
   it('follows status pushed over the realtime connection', async () => {
     const root = await render([{ id: '1', name: 'Hallway', dashboardId: null, status: status({}) }]);
 
-    push([{ id: '1', name: 'Hallway', dashboardId: null, status: status({ connected: true }) }]);
+    realtime.push('Displays', [{ id: '1', name: 'Hallway', dashboardId: null, status: status({ connected: true }) }]);
     await TestBed.inject(ApplicationRef).whenStable();
 
     expect(pills(root)[0]).toBe('Connected');

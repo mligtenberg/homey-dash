@@ -15,28 +15,26 @@ public static class DashboardEndpoints
     {
         var dashboards = api.MapGroup("/dashboards");
 
-        dashboards.MapGet("/", async (HomeyDashDbContext db, CancellationToken ct) =>
-            (await db.Dashboards.ToListAsync(ct))
-            .OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Select(d => d.ToSummary()));
+        dashboards.MapGet("/", (HomeyDashDbContext db, CancellationToken ct) => ListAsync(db, ct));
 
         dashboards.MapGet("/{id:guid}", async (Guid id, HomeyDashDbContext db, CancellationToken ct) =>
             await db.Dashboards.FindAsync([id], ct) is { } dashboard
                 ? Results.Ok(dashboard.ToDetail())
                 : NotFound(id));
 
-        dashboards.MapPost("/", async (NewDashboard body, HomeyDashDbContext db, CancellationToken ct) =>
+        dashboards.MapPost("/", async (NewDashboard body, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct) =>
         {
             if (DashboardValidator.ValidateName(body.Name) is { } error) return NameProblem(error);
 
             var dashboard = new Dashboard { Name = body.Name!.Trim() };
             db.Dashboards.Add(dashboard);
             await db.SaveChangesAsync(ct);
+            await notifier.DashboardsChangedAsync(db, ct);
             return Results.Created($"/api/dashboards/{dashboard.Id}", dashboard.ToDetail());
         });
 
-        dashboards.MapPatch("/{id:guid}", (Guid id, Rename body, HomeyDashDbContext db, CancellationToken ct) =>
-            Change(id, db, ct, dashboard =>
+        dashboards.MapPatch("/{id:guid}", (Guid id, Rename body, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct) =>
+            Change(id, db, notifier, ct, dashboard =>
             {
                 if (DashboardValidator.ValidateName(body.Name) is { } error) return NameProblem(error);
                 dashboard.Name = body.Name!.Trim();
@@ -51,11 +49,12 @@ public static class DashboardEndpoints
             db.Dashboards.Remove(dashboard);
             await db.SaveChangesAsync(ct);
             await notifier.ScreensChangedAsync(db, screens, ct);
+            await notifier.DashboardsChangedAsync(db, ct);
             return Results.NoContent();
         });
 
-        dashboards.MapPut("/{id:guid}/draft", (Guid id, DashboardLayout draft, HomeyDashDbContext db, CancellationToken ct) =>
-            Change(id, db, ct, dashboard =>
+        dashboards.MapPut("/{id:guid}/draft", (Guid id, DashboardLayout draft, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct) =>
+            Change(id, db, notifier, ct, dashboard =>
             {
                 var errors = DashboardValidator.Validate(draft);
                 if (errors.Count > 0) return Results.ValidationProblem(errors, "The draft breaks the layout rules.");
@@ -67,7 +66,7 @@ public static class DashboardEndpoints
         dashboards.MapPost("/{id:guid}/publish",
             async (Guid id, HomeyDashDbContext db, RealtimeNotifier notifier, TimeProvider time, CancellationToken ct) =>
             {
-                var result = await Change(id, db, ct, dashboard =>
+                var result = await Change(id, db, notifier, ct, dashboard =>
                 {
                     dashboard.Publish(time.GetUtcNow());
                     return null;
@@ -81,13 +80,21 @@ public static class DashboardEndpoints
     private static async Task<List<Guid?>> ScreensShowingAsync(HomeyDashDbContext db, Guid id, CancellationToken ct) =>
         await db.Displays.Where(d => d.DashboardId == id).Select(d => d.ScreenId).ToListAsync(ct);
 
-    // Loads a dashboard, applies a change (which returns a problem to refuse it) and answers with the result.
+    public static async Task<List<DashboardSummary>> ListAsync(HomeyDashDbContext db, CancellationToken ct) =>
+        (await db.Dashboards.ToListAsync(ct))
+        .OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase)
+        .Select(d => d.ToSummary())
+        .ToList();
+
+    // Loads a dashboard, applies a change (which returns a problem to refuse it), tells Management and answers
+    // with the result.
     private static async Task<IResult> Change(
-        Guid id, HomeyDashDbContext db, CancellationToken ct, Func<Dashboard, IResult?> change)
+        Guid id, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct, Func<Dashboard, IResult?> change)
     {
         if (await db.Dashboards.FindAsync([id], ct) is not { } dashboard) return NotFound(id);
         if (change(dashboard) is { } problem) return problem;
         await db.SaveChangesAsync(ct);
+        await notifier.DashboardsChangedAsync(db, ct);
         return Results.Ok(dashboard.ToDetail());
     }
 
