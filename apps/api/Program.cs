@@ -1,11 +1,17 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using HomeyDash.Api.Data;
+using HomeyDash.Api.Homey;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 builder.Services.AddDbContext<HomeyDashDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("HomeyDash")));
+builder.Services.AddHomey(builder.Configuration);
 
 var app = builder.Build();
 
@@ -22,20 +28,6 @@ if (app.Environment.IsDevelopment())
 var api = app.MapGroup("/api");
 
 api.MapGet("/health", () => Results.Ok(new { status = "ok" }));
-
-api.MapGet("/tiles", async (HomeyDashDbContext db) =>
-    await db.Tiles.OrderBy(t => t.SortOrder).ToListAsync());
-
-api.MapPost("/tiles", async (Tile tile, HomeyDashDbContext db) =>
-{
-    db.Tiles.Add(tile);
-    await db.SaveChangesAsync();
-    return Results.Created($"/api/tiles/{tile.Id}", tile);
-});
-
-api.MapDelete("/tiles/{id:int}", async (int id, HomeyDashDbContext db) =>
-    await db.Tiles.Where(t => t.Id == id).ExecuteDeleteAsync() > 0
-        ? Results.NoContent()
-        : Results.NotFound());
+api.MapHomey();
 
 app.Run();
