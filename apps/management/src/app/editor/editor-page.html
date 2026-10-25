@@ -1,0 +1,131 @@
+@if (dashboard(); as dashboard) {
+  <header class="header">
+    <h1>{{ dashboard.name }}</h1>
+    @if (justPublished()) {
+      <span class="hd-pill hd-pill--ok">Published</span>
+    } @else if (unpublished()) {
+      <span class="hd-pill hd-pill--warn hd-pill--dot">Unpublished changes</span>
+    } @else {
+      <span class="hd-pill">Version {{ dashboard.publishedVersion }}</span>
+    }
+    @if (saveState() === 'error') {
+      <span class="hd-pill hd-pill--danger" role="alert">Couldn't save the draft</span>
+    }
+    @if (refused(); as refused) {
+      <span class="hd-pill" role="status">{{ refused }}</span>
+    }
+    <span class="spacer"></span>
+    <a class="hd-btn" [routerLink]="['/dashboards', dashboard.id, 'preview']">Preview</a>
+    <button class="hd-btn hd-btn--primary" type="button" [disabled]="!unpublished() || saveState() === 'error'" (click)="publish()">
+      Publish
+    </button>
+  </header>
+
+  <div class="body">
+    <div
+      class="hd-stage"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp()"
+      (pointercancel)="onPointerUp()"
+      tabindex="-1"
+      (click)="select(null)"
+      (keydown.escape)="select(null)"
+    >
+      @for (section of layout().sections; track section.id; let first = $first, last = $last) {
+        <div class="hd-section">
+          <div class="section-head">
+            <input
+              class="hd-section__title title"
+              [value]="section.title"
+              aria-label="Section title"
+              placeholder="Untitled section"
+              (change)="renameSection(section.id, $any($event.target).value)"
+            />
+            <button class="icon-btn" type="button" title="Move section left" [disabled]="first" (click)="moveSection(section.id, -1)">
+              <svg [lucideIcon]="icons.LucideChevronLeft" />
+            </button>
+            <button class="icon-btn" type="button" title="Move section right" [disabled]="last" (click)="moveSection(section.id, 1)">
+              <svg [lucideIcon]="icons.LucideChevronRight" />
+            </button>
+            <button class="icon-btn danger" type="button" title="Remove section" (click)="removeSection(section.id, section.title, section.tiles.length)">
+              <svg [lucideIcon]="icons.LucideTrash" />
+            </button>
+          </div>
+          <div #grid class="hd-section__grid" [attr.data-section]="section.id" [style.--rows]="layout().rows">
+            @for (cell of emptyCells(section.id); track cell.column + ',' + cell.row) {
+              <button
+                class="hd-slot"
+                type="button"
+                [class.is-adding]="adding()?.sectionId === section.id && adding()?.position?.column === cell.column && adding()?.position?.row === cell.row"
+                [style.grid-column]="cell.column + 1"
+                [style.grid-row]="cell.row + 1"
+                [attr.aria-label]="'Add a tile at column ' + (cell.column + 1) + ', row ' + (cell.row + 1)"
+                (click)="$event.stopPropagation(); startAdding(section.id, cell)"
+              >
+                <svg class="slot-icon" [lucideIcon]="icons.LucidePlus" />
+              </button>
+            }
+            @for (tile of section.tiles; track tile.id) {
+              <hd-tile-host [tile]="tile" [class.is-selected]="tile.id === selectedTileId()">
+                <button
+                  class="overlay"
+                  type="button"
+                  [attr.aria-label]="(kindOf(tile)?.label ?? 'Unknown tile') + '. Arrow keys move it, Delete removes it.'"
+                  [attr.aria-pressed]="tile.id === selectedTileId()"
+                  (pointerdown)="startDrag($event, tile, 'move')"
+                  (click)="$event.stopPropagation()"
+                  (focus)="select(tile.id)"
+                  (keydown)="onTileKey($event, tile, section.id)"
+                ></button>
+                @if (tile.id === selectedTileId()) {
+                  <span class="hd-handle" title="Drag to resize" (pointerdown)="startDrag($event, tile, 'resize')"></span>
+                }
+              </hd-tile-host>
+            }
+          </div>
+        </div>
+      }
+      <button class="add-section" type="button" [style.--rows]="layout().rows" (click)="$event.stopPropagation(); addSection()">
+        <svg [lucideIcon]="icons.LucidePlus" />
+        Add section
+      </button>
+    </div>
+
+    <aside class="hd-panel panel">
+      @if (adding()) {
+        <h2>Add a tile</h2>
+        <div class="kinds">
+          @for (kind of kinds.all(); track kind.id) {
+            <button class="hd-btn kind" type="button" [disabled]="!canAdd(kind)" (click)="add(kind)">{{ kind.label }}</button>
+          }
+        </div>
+        <button class="hd-btn" type="button" (click)="adding.set(null)">Cancel</button>
+      } @else if (selected(); as selected) {
+        <hd-tile-panel
+          [tile]="selected.tile"
+          [kind]="kindOf(selected.tile)"
+          [fitsSize]="fitsSize()"
+          (settingsChanged)="updateSettings(selected.tile.id, $event)"
+          (resized)="resize(selected.tile.id, $event)"
+          (removed)="removeTile(selected.tile.id)"
+        />
+      } @else {
+        <h2>Dashboard</h2>
+        <div class="hd-field">
+          <label class="hd-field__label" for="dashboard-name">Name</label>
+          <input id="dashboard-name" class="hd-input" [value]="dashboard.name" (change)="rename($any($event.target).value)" />
+        </div>
+        <div class="hd-field">
+          <label class="hd-field__label" for="dashboard-rows">Rows</label>
+          <select id="dashboard-rows" class="hd-select" (change)="setRows(+$any($event.target).value)">
+            @for (rows of rowChoices; track rows) {
+              <option [value]="rows" [selected]="rows === layout().rows" [disabled]="!rowsFit(rows)">{{ rows }}</option>
+            }
+          </select>
+        </div>
+        <p class="hint">Press an empty cell to add a tile. Drag a tile to move it, or its corner to resize it.</p>
+        <button class="hd-btn hd-btn--danger delete" type="button" (click)="deleteDashboard()">Delete dashboard</button>
+      }
+    </aside>
+  </div>
+}

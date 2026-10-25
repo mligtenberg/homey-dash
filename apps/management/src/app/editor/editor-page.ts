@@ -1,0 +1,345 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  ElementRef,
+  inject,
+  input,
+  signal,
+  viewChildren,
+} from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { DashboardDetail, DashboardLayout, DashboardsApi, Tile } from '@homey-dash/api-client';
+import { TilePosition, TileSize } from '@homey-dash/layout';
+import { TileHost, TileKind, TileKindRegistry, TileSettings } from '@homey-dash/tiles';
+import { LucideChevronLeft, LucideChevronRight, LucideDynamicIcon, LucidePlus, LucideTrash } from '@lucide/angular';
+import { firstValueFrom, Subscription } from 'rxjs';
+import { DashboardsStore } from '../dashboards-store';
+import * as edits from './draft-edits';
+import { TilePanel } from './tile-panel';
+
+const SAVE_DELAY_MS = 400;
+const DRAG_THRESHOLD_PX = 4;
+const MAX_ROWS = 12;
+
+interface Drag {
+  tileId: string;
+  mode: 'move' | 'resize';
+  /** The cell within the tile where it was grabbed, so the tile keeps its offset under the pointer. */
+  grab: TilePosition;
+  start: { x: number; y: number };
+  moved: boolean;
+  candidate: DashboardLayout | null;
+}
+
+@Component({
+  selector: 'hd-editor-page',
+  imports: [RouterLink, TileHost, TilePanel, LucideDynamicIcon],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './editor-page.html',
+  styleUrl: './editor-page.scss',
+})
+export class EditorPage {
+  readonly id = input.required<string>();
+
+  private readonly api = inject(DashboardsApi);
+  private readonly store = inject(DashboardsStore);
+  private readonly router = inject(Router);
+  protected readonly kinds = inject(TileKindRegistry);
+
+  protected readonly icons = { LucidePlus, LucideChevronLeft, LucideChevronRight, LucideTrash };
+  protected readonly rowChoices = Array.from({ length: MAX_ROWS }, (_, i) => i + 1);
+
+  protected readonly dashboard = signal<DashboardDetail | null>(null);
+  protected readonly draft = signal<DashboardLayout | null>(null);
+  protected readonly selectedTileId = signal<string | null>(null);
+  protected readonly adding = signal<{ sectionId: string; position: TilePosition } | null>(null);
+  protected readonly saveState = signal<'saved' | 'pending' | 'saving' | 'error'>('saved');
+  protected readonly refused = signal<string | null>(null);
+  protected readonly justPublished = signal(false);
+  private readonly drag = signal<Drag | null>(null);
+
+  private readonly grids = viewChildren<ElementRef<HTMLElement>>('grid');
+  private saveTimer: ReturnType<typeof setTimeout> | undefined;
+  private saving: Promise<void> = Promise.resolve();
+  private inFlight = false;
+
+  /** What the stage shows: the draft, or where a tile would land while it is being dragged. */
+  protected readonly view = computed(() => this.drag()?.candidate ?? this.draft());
+
+  /** The draft; only called once the dashboard has loaded, as the template renders nothing before. */
+  private current(): DashboardLayout {
+    const draft = this.draft();
+    if (!draft) throw new Error('The draft has not loaded yet');
+    return draft;
+  }
+
+  private loadedDashboard(): DashboardDetail {
+    const dashboard = this.dashboard();
+    if (!dashboard) throw new Error('The dashboard has not loaded yet');
+    return dashboard;
+  }
+
+  /** The stage's layout, in the template. */
+  protected readonly layout = computed(() => this.view() ?? { rows: 4, sections: [] });
+
+  protected readonly selected = computed(() => {
+    const id = this.selectedTileId();
+    const draft = this.draft();
+    return id && draft ? edits.findTile(draft, id) : null;
+  });
+
+  protected readonly unpublished = computed(
+    () => this.saveState() !== 'saved' || (this.dashboard()?.hasUnpublishedChanges ?? false),
+  );
+
+  constructor() {
+    effect((onCleanup) => {
+      const loading: Subscription = this.api.get(this.id()).subscribe((dashboard) => {
+        this.dashboard.set(dashboard);
+        this.draft.set(dashboard.draft);
+        this.saveState.set('saved');
+        this.selectedTileId.set(null);
+        this.adding.set(null);
+      });
+      onCleanup(() => {
+        loading.unsubscribe();
+        this.flush();
+      });
+    });
+  }
+
+  // ---------- Editing ----------
+
+  /** Applies an edit to the draft and saves it shortly after; an edit that breaks the layout is refused. */
+  protected apply(next: DashboardLayout | null, refusal = "That doesn't fit there") {
+    if (!next) {
+      this.refused.set(refusal);
+      setTimeout(() => this.refused.set(null), 2000);
+      return;
+    }
+    this.refused.set(null);
+    this.draft.set(next);
+    this.saveState.set('pending');
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.flush(), SAVE_DELAY_MS);
+  }
+
+  private flush(): Promise<void> {
+    // One save at a time, so they arrive in order; the one in flight saves again when it ends.
+    if (this.saveState() !== 'pending' || this.inFlight) return this.saving;
+    clearTimeout(this.saveTimer);
+    this.inFlight = true;
+    const id = this.loadedDashboard().id;
+    const draft = this.current();
+    this.saveState.set('saving');
+    this.saving = firstValueFrom(this.api.saveDraft(id, draft)).then(
+      (saved) => {
+        this.inFlight = false;
+        this.store.upsert(saved);
+        if (this.dashboard()?.id !== id) return Promise.resolve();
+        this.dashboard.set(saved);
+        // Edits made while this save was in flight still need saving.
+        if (this.draft() !== draft) return this.flush();
+        this.saveState.set('saved');
+        return Promise.resolve();
+      },
+      () => {
+        this.inFlight = false;
+        this.saveState.set('error');
+      },
+    );
+    return this.saving;
+  }
+
+  protected kindOf(tile: Tile): TileKind | undefined {
+    return this.kinds.find(tile.kind);
+  }
+
+  protected emptyCells(sectionId: string): TilePosition[] {
+    const layout = this.layout();
+    const section = layout.sections.find((s) => s.id === sectionId);
+    return section ? edits.emptyCells(layout, section) : [];
+  }
+
+  protected startAdding(sectionId: string, position: TilePosition) {
+    this.selectedTileId.set(null);
+    this.adding.set({ sectionId, position });
+  }
+
+  protected canAdd(kind: TileKind): boolean {
+    const at = this.adding();
+    return !!at && kind.sizes.some((size) => edits.fits(this.current(), at.sectionId, at.position, size));
+  }
+
+  protected add(kind: TileKind) {
+    const at = this.adding();
+    if (!at) return;
+    const result = edits.addTile(this.current(), at.sectionId, at.position, kind);
+    this.apply(result?.layout ?? null);
+    if (result) {
+      this.adding.set(null);
+      this.selectedTileId.set(result.tileId);
+    }
+  }
+
+  protected select(tileId: string | null) {
+    this.adding.set(null);
+    this.selectedTileId.set(tileId);
+  }
+
+  protected fitsSize = computed(() => {
+    const selected = this.selected();
+    const draft = this.draft();
+    return (size: TileSize) =>
+      !!selected && !!draft && edits.fits(draft, selected.section.id, selected.tile.position, size, selected.tile.id);
+  });
+
+  protected updateSettings(tileId: string, settings: TileSettings) {
+    this.apply(edits.updateTile(this.current(), tileId, (t) => ({ ...t, settings })));
+  }
+
+  protected resize(tileId: string, size: TileSize) {
+    this.apply(edits.resizeTile(this.current(), tileId, size));
+  }
+
+  protected removeTile(tileId: string) {
+    this.apply(edits.removeTile(this.current(), tileId));
+    this.selectedTileId.set(null);
+  }
+
+  protected addSection() {
+    this.apply(edits.addSection(this.current(), 'New section').layout);
+  }
+
+  protected renameSection(sectionId: string, title: string) {
+    this.apply(edits.renameSection(this.current(), sectionId, title.trim()));
+  }
+
+  protected moveSection(sectionId: string, by: -1 | 1) {
+    this.apply(edits.moveSection(this.current(), sectionId, by));
+  }
+
+  protected removeSection(sectionId: string, title: string, tiles: number) {
+    if (tiles > 0 && !confirm(`Remove the section "${title || 'Untitled'}" and its ${tiles} tile(s)?`)) return;
+    if (this.selected()?.section.id === sectionId) this.selectedTileId.set(null);
+    if (this.adding()?.sectionId === sectionId) this.adding.set(null);
+    this.apply(edits.removeSection(this.current(), sectionId));
+  }
+
+  protected setRows(rows: number) {
+    this.apply(edits.setRows(this.current(), rows), 'Move the tiles in the bottom rows first');
+  }
+
+  protected rowsFit(rows: number): boolean {
+    return edits.setRows(this.current(), rows) !== null;
+  }
+
+  // ---------- Dashboard ----------
+
+  protected rename(name: string) {
+    const dashboard = this.loadedDashboard();
+    if (!name.trim() || name.trim() === dashboard.name) return;
+    this.api.rename(dashboard.id, name).subscribe((renamed) => {
+      this.dashboard.update((d) => (d ? { ...d, name: renamed.name } : d));
+      this.store.upsert(renamed);
+    });
+  }
+
+  protected deleteDashboard() {
+    const dashboard = this.loadedDashboard();
+    if (!confirm(`Delete the dashboard "${dashboard.name}"? This can't be undone.`)) return;
+    clearTimeout(this.saveTimer);
+    this.saveState.set('saved');
+    this.api.delete(dashboard.id).subscribe(() => {
+      this.store.remove(dashboard.id);
+      this.router.navigate(['/']);
+    });
+  }
+
+  protected async publish() {
+    await this.flush();
+    if (this.saveState() === 'error') return;
+    const published = await firstValueFrom(this.api.publish(this.loadedDashboard().id));
+    this.dashboard.set(published);
+    this.store.upsert(published);
+    this.justPublished.set(true);
+    setTimeout(() => this.justPublished.set(false), 2500);
+  }
+
+  // ---------- Dragging and keyboard ----------
+
+  /** The section and cell under a point, measured from the rendered grids. */
+  private cellAt(x: number, y: number): { sectionId: string; cell: TilePosition } | null {
+    const rows = this.current().rows;
+    for (const { nativeElement: grid } of this.grids()) {
+      const rect = grid.getBoundingClientRect();
+      // A grid is 3 cells and 2 gaps wide, and a gap is 0.08 of a cell.
+      const pitch = (rect.width / (3 + 2 * 0.08)) * 1.08;
+      if (x < rect.left - pitch / 2 || x > rect.right + pitch / 2) continue;
+      const clamp = (v: number, max: number) => Math.min(Math.max(v, 0), max);
+      return {
+        sectionId: grid.dataset['section'] ?? '',
+        cell: { column: clamp(Math.floor((x - rect.left) / pitch), 2), row: clamp(Math.floor((y - rect.top) / pitch), rows - 1) },
+      };
+    }
+    return null;
+  }
+
+  protected startDrag(event: PointerEvent, tile: Tile, mode: Drag['mode']) {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    this.select(tile.id);
+    const at = this.cellAt(event.clientX, event.clientY);
+    const grab = at && mode === 'move'
+      ? { column: at.cell.column - tile.position.column, row: at.cell.row - tile.position.row }
+      : { column: 0, row: 0 };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    this.drag.set({ tileId: tile.id, mode, grab, start: { x: event.clientX, y: event.clientY }, moved: false, candidate: null });
+  }
+
+  protected onPointerMove(event: PointerEvent) {
+    const drag = this.drag();
+    if (!drag) return;
+    if (!drag.moved && Math.hypot(event.clientX - drag.start.x, event.clientY - drag.start.y) < DRAG_THRESHOLD_PX) return;
+    const at = this.cellAt(event.clientX, event.clientY);
+    const draft = this.current();
+    const found = edits.findTile(draft, drag.tileId);
+    if (!at || !found) return;
+
+    let candidate: DashboardLayout | null;
+    if (drag.mode === 'move') {
+      const position = { column: at.cell.column - drag.grab.column, row: at.cell.row - drag.grab.row };
+      candidate = edits.moveTile(draft, drag.tileId, at.sectionId, position);
+    } else {
+      const { position } = found.tile;
+      const wanted = { columns: at.cell.column - position.column + 1, rows: at.cell.row - position.row + 1 };
+      const size = edits.closestSize(draft, drag.tileId, this.kindOf(found.tile)?.sizes ?? [], wanted);
+      candidate = size ? edits.resizeTile(draft, drag.tileId, size) : null;
+    }
+    // Keep showing the last valid spot while the pointer is over one that isn't.
+    this.drag.set({ ...drag, moved: true, candidate: candidate ?? drag.candidate });
+  }
+
+  protected onPointerUp() {
+    const drag = this.drag();
+    this.drag.set(null);
+    if (drag?.moved && drag.candidate) this.apply(drag.candidate);
+  }
+
+  protected onTileKey(event: KeyboardEvent, tile: Tile, sectionId: string) {
+    const step: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (event.key in step) {
+      event.preventDefault();
+      const [dc, dr] = step[event.key];
+      const position = { column: tile.position.column + dc, row: tile.position.row + dr };
+      this.apply(edits.moveTile(this.current(), tile.id, sectionId, position));
+    } else if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      this.removeTile(tile.id);
+    } else if (event.key === 'Escape') {
+      this.select(null);
+    }
+  }
+}

@@ -8,7 +8,7 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 | 0. Foundations | Done |
 | 1. Homey connection | Done, verified against the real Homey Pro (2026-10-25) |
 | 2. Dashboards, drafts and publishing | Done (API and api-client; UI comes in slice 3) |
-| 3. Management editor | To do |
+| 3. Management editor | Done (first version) |
 | 4. Displays and setup | To do |
 | 5. Realtime and display status | To do |
 | 6. Tile modules | To do |
@@ -60,7 +60,23 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 - `DashboardsApi` and the dashboard types in `libs/api-client`, reusing `TileSize` and `TilePosition` from `libs/layout`.
 - 42 API tests (19 new).
 
-### Open from slices 0 to 2
+### 3. Management editor
+
+- `libs/tiles`: `TileData` (what tiles read from Homey), `TileHost` (places a tile and renders its kind, or an
+  "Unknown tile" when no module registers the kind), `DashboardView` (sections as a display shows them), and
+  `CORE_TILES` with basic device, flow, mood and statistic kinds. Shared settings are `{ target, label }`.
+- Icons from `@lucide/angular` (the signal-based successor of `lucide-angular`, which does not support Angular 22).
+- Management shell: sidebar with dashboards, "Draft" pill, new dashboard; collapses to a strip below 860px.
+- Editor (`apps/management/src/app/editor`): `hd-stage` with real tiles under an overlay, `hd-slot` for empty
+  cells, kind chooser, drag to move (also between sections), drag the handle to resize to the closest
+  supported size, arrow keys to move and Delete to remove. Invalid moves are refused. Sections can be added,
+  renamed, reordered and removed. Panel: target picker fed by `/api/homey/*` (devices as `Name — Zone`),
+  label, size picker, Remove tile; with nothing selected, name, rows and Delete dashboard.
+- The draft saves itself 400 ms after each edit, one save at a time. Unpublished changes pill, **Publish**
+  (disabled without changes) and **Preview** (`/dashboards/:id/preview`, fitted to the window with `cellSize`).
+- Draft edits are pure functions in `draft-edits.ts` with 12 unit tests; a Shell test covers the sidebar.
+
+### Open from slices 0 to 3
 
 - Verified on the real Homey Pro (firmware 13.5.3): handshake, namespace, subscriptions and live `capability`
   events work; 116 devices, 33 flows, 24 moods and 427 insight logs load. Not yet seen live: flow and mood
@@ -74,16 +90,13 @@ Built in vertical slices; each ends with something that works and has tests. Dom
   (ADR-0003), so Management checks that against the `TileKindRegistry` in slice 3.
 - Deleting a dashboard does not yet consider displays; decide in slice 4 what happens to displays showing it.
 - No concurrency check on saving drafts (last write wins); fine while one person edits at a time.
+- Kind-specific settings (which capabilities a device tile shows, a statistic's time window) need a settings
+  component per kind in `TileKind`; add it with the full tile modules in slice 6.
+- The sidebar's warning dot for dashboards with missing tiles needs the API to know about targets; slice 6.
+- Management reads Homey data by polling REST every 10 s; switch to the realtime connection in slice 5.
+- Not yet checked in the browser with live Homey data: picking targets, moving and resizing, Publish and Preview.
 
 ## To do
-
-### 3. Management editor
-
-- Sidebar and dashboard list.
-- Editor canvas (`hd-stage`, fixed 92px cell) with an overlay on each tile: add, place, resize (size picker),
-  configure and remove tiles; add and reorder sections.
-- Target picker fed by `/api/homey/*`.
-- Unpublished-changes indicator, **Publish**, and **Preview** fitted to the window.
 
 ### 4. Displays and setup
 
