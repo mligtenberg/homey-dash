@@ -1,9 +1,9 @@
 {
-  "name": "dashboard",
+  "name": "display",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "prefix": "hd",
-  "sourceRoot": "apps/dashboard/src",
+  "sourceRoot": "apps/display/src",
   "tags": [],
   "targets": {
     "build": {
@@ -11,17 +11,17 @@
       "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
-        "outputPath": "dist/apps/dashboard",
-        "browser": "apps/dashboard/src/main.ts",
-        "tsConfig": "apps/dashboard/tsconfig.app.json",
+        "outputPath": "dist/apps/display",
+        "browser": "apps/display/src/main.ts",
+        "tsConfig": "apps/display/tsconfig.app.json",
         "inlineStyleLanguage": "scss",
         "assets": [
           {
             "glob": "**/*",
-            "input": "apps/dashboard/public"
+            "input": "apps/display/public"
           }
         ],
-        "styles": ["apps/dashboard/src/styles.scss"]
+        "styles": ["apps/display/src/styles.scss"]
       },
       "configurations": {
         "production": {
@@ -51,14 +51,23 @@
       "readyWhen": {
         "signal": true
       },
+      "dependsOn": [
+        {
+          "projects": ["api"],
+          "target": "serve"
+        }
+      ],
       "executor": "@angular/build:dev-server",
       "defaultConfiguration": "development",
+      "options": {
+        "proxyConfig": "apps/display/proxy.conf.json"
+      },
       "configurations": {
         "production": {
-          "buildTarget": "dashboard:build:production"
+          "buildTarget": "display:build:production"
         },
         "development": {
-          "buildTarget": "dashboard:build:development"
+          "buildTarget": "display:build:development"
         }
       }
     },
@@ -70,10 +79,19 @@
       "dependsOn": ["build"],
       "executor": "@nx/web:file-server",
       "options": {
-        "buildTarget": "dashboard:build",
+        "buildTarget": "display:build",
         "port": 4200,
-        "staticFilePath": "dist/apps/dashboard/browser",
+        "staticFilePath": "dist/apps/display/browser",
         "spa": true
+      }
+    },
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "buildTarget": "display:build:development",
+        "tsConfig": "apps/display/tsconfig.spec.json",
+        "runner": "vitest",
+        "watch": false
       }
     }
   }
