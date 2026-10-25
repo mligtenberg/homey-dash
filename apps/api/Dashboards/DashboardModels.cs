@@ -35,7 +35,8 @@ public sealed record DashboardSummary(
     string Name,
     int PublishedVersion,
     DateTimeOffset? PublishedAt,
-    bool HasUnpublishedChanges);
+    bool HasUnpublishedChanges,
+    int MissingTiles);
 
 public sealed record DashboardDetail(
     Guid Id,
@@ -44,4 +45,5 @@ public sealed record DashboardDetail(
     DashboardLayout? Published,
     int PublishedVersion,
     DateTimeOffset? PublishedAt,
-    bool HasUnpublishedChanges);
+    bool HasUnpublishedChanges,
+    int MissingTiles);

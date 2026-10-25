@@ -12,7 +12,8 @@ import { DashboardView } from '@homey-dash/tiles';
   host: { class: 'hd-display', '[style.--cell.px]': 'cell()', '(window:resize)': 'onResize()' },
   template: `
     @if (dashboard(); as dashboard) {
-      <hd-dashboard-view [layout]="dashboard.draft" />
+      <!-- A preview shows the draft; it does not operate the home. -->
+      <hd-dashboard-view [layout]="dashboard.draft" inert />
     }
     <a class="hd-btn back" [routerLink]="['/dashboards', id()]">Back to editor</a>
   `,

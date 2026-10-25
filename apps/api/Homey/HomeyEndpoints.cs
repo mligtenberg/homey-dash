@@ -37,6 +37,14 @@ public static class HomeyEndpoints
         homey.MapGet("/moods", (HomeyState state) => state.Moods.OrderBy(m => m.Name));
         homey.MapGet("/insights", (IHomey h, CancellationToken ct) => Perform(async () => Results.Ok(await h.GetInsightLogsAsync(ct))));
 
+        homey.MapGet("/insights/entries", (string log, string resolution, IHomey h, CancellationToken ct) =>
+            Perform(async () =>
+            {
+                if (!InsightResolutions.All.Contains(resolution))
+                    throw new ArgumentException($"Unknown resolution {resolution}");
+                return Results.Ok(await h.GetInsightEntriesAsync(log, resolution, ct));
+            }));
+
         homey.MapPut("/devices/{deviceId}/capabilities/{capabilityId}",
             (string deviceId, string capabilityId, CapabilityValue body, IHomey h, CancellationToken ct) =>
                 Perform(async () =>

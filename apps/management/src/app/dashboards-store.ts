@@ -31,8 +31,8 @@ export class DashboardsStore {
     });
   }
 
-  upsert({ id, name, publishedVersion, publishedAt, hasUnpublishedChanges }: DashboardDetail) {
-    const summary = { id, name, publishedVersion, publishedAt, hasUnpublishedChanges };
+  upsert({ id, name, publishedVersion, publishedAt, hasUnpublishedChanges, missingTiles }: DashboardDetail) {
+    const summary = { id, name, publishedVersion, publishedAt, hasUnpublishedChanges, missingTiles };
     this.list.update((list) =>
       [...list.filter((d) => d.id !== id), summary].sort((a, b) => a.name.localeCompare(b.name)),
     );

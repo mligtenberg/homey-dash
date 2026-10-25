@@ -116,23 +116,30 @@
 .hd-segmented { display: flex; gap: calc(var(--cell) * .06); }
 .hd-segmented button {
   flex: 1;
+  box-sizing: content-box;
   height: calc(var(--cell) * var(--segment-height));
   border: 0;
+  border-block: max(0px, (44px - var(--cell) * var(--segment-height)) / 2) solid transparent;
+  background-clip: padding-box;
   border-radius: calc(var(--cell) * var(--tile-radius) * .75);
-  background: var(--ground); color: var(--ink);
+  background-color: var(--ground); color: var(--ink);
   box-shadow: var(--pressed);
   font: 700 calc(var(--cell) * .095)/1 var(--font-sans);
   cursor: pointer;
   transition: transform .1s;
 }
 .hd-segmented button:active { transform: scale(.96); }
-.hd-segmented button[aria-pressed="true"] { background: var(--k-ink); color: var(--on-kind); box-shadow: none; }
+.hd-segmented button[aria-pressed="true"] { background-color: var(--k-ink); color: var(--on-kind); box-shadow: none; }
 
 .hd-slider {
   position: relative;
+  box-sizing: content-box;
   height: calc(var(--cell) * var(--slider-height));
+  /* Touch area of at least 44px; the visible bar stays thin. */
+  border-block: max(0px, (44px - var(--cell) * var(--slider-height)) / 2) solid transparent;
+  background-clip: padding-box;
   border-radius: var(--radius-pill);
-  background: var(--ground);
+  background-color: var(--ground);
   box-shadow: var(--pressed);
   overflow: hidden;
   touch-action: none;
@@ -164,6 +171,7 @@
 .hd-tile.is-missing { background: transparent; box-shadow: inset 0 0 0 2px var(--line); }
 .hd-tile.is-missing .hd-tile__name { color: var(--ink-muted); }
 .hd-tile.is-missing .hd-tile__detail, .hd-tile.is-missing .hd-icon { color: var(--danger); }
+.hd-tile.is-error .hd-tile__detail { color: var(--danger); }
 
 /* Connection lost */
 .hd-display.is-connection-lost .hd-dashboard .hd-tile { pointer-events: none; filter: saturate(.4); }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using HomeyDash.Api.Homey;
 
 namespace HomeyDash.Api.Dashboards;
 
@@ -35,8 +36,19 @@ public sealed class Dashboard
         PublishedAt = now;
     }
 
-    public DashboardSummary ToSummary() => new(Id, Name, PublishedVersion, PublishedAt, HasUnpublishedChanges);
+    // Draft tiles whose target (settings.target) Homey does not know; 0 while Homey is not loaded.
+    public int MissingTiles(HomeyState homey) =>
+        !homey.Loaded
+            ? 0
+            : Draft.Sections.SelectMany(s => s.Tiles).Count(t =>
+                t.Settings.ValueKind == JsonValueKind.Object
+                && t.Settings.TryGetProperty("target", out var target)
+                && target.ValueKind == JsonValueKind.String
+                && !homey.Knows(target.GetString()!));
 
-    public DashboardDetail ToDetail() =>
-        new(Id, Name, Draft, Published, PublishedVersion, PublishedAt, HasUnpublishedChanges);
+    public DashboardSummary ToSummary(HomeyState homey) =>
+        new(Id, Name, PublishedVersion, PublishedAt, HasUnpublishedChanges, MissingTiles(homey));
+
+    public DashboardDetail ToDetail(HomeyState homey) =>
+        new(Id, Name, Draft, Published, PublishedVersion, PublishedAt, HasUnpublishedChanges, MissingTiles(homey));
 }

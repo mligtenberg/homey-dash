@@ -61,6 +61,14 @@ export interface HomeyInsightLog {
   units: string | null;
 }
 
+export type InsightResolution = 'lastHour' | 'last24Hours' | 'last7Days' | 'last31Days';
+
+/** One point of an insight log: `t` is an ISO time, `v` the value (null for a gap). */
+export interface HomeyInsightEntry {
+  t: string;
+  v: number | null;
+}
+
 /** What Management reads from Homey to pick tile targets. */
 @Injectable({ providedIn: 'root' })
 export class HomeyApi {
@@ -84,5 +92,9 @@ export class HomeyApi {
 
   insights() {
     return this.http.get<HomeyInsightLog[]>('/api/homey/insights');
+  }
+
+  insightEntries(log: string, resolution: InsightResolution) {
+    return this.http.get<HomeyInsightEntry[]>('/api/homey/insights/entries', { params: { log, resolution } });
   }
 }

@@ -23,9 +23,19 @@ import { DashboardsStore } from './dashboards-store';
             ariaCurrentWhenActive="page"
           >
             <span>{{ dashboard.name }}</span>
-            @if (dashboard.hasUnpublishedChanges) {
-              <span class="hd-pill hd-pill--warn">Draft</span>
-            }
+            <span class="marks">
+              @if (dashboard.missingTiles > 0) {
+                <span
+                  class="hd-dot-warn"
+                  role="img"
+                  [attr.aria-label]="missingLabel(dashboard.missingTiles)"
+                  [title]="missingLabel(dashboard.missingTiles)"
+                ></span>
+              }
+              @if (dashboard.hasUnpublishedChanges) {
+                <span class="hd-pill hd-pill--warn">Draft</span>
+              }
+            </span>
           </a>
         } @empty {
           @if (store.loaded()) {
@@ -62,6 +72,8 @@ import { DashboardsStore } from './dashboards-store';
     .brand { font-weight: 800; font-size: 20px; color: var(--ink); text-decoration: none; padding: 0 10px; }
     .hd-nav__item { text-decoration: none; }
     .add { color: var(--brand); }
+    .marks { display: flex; align-items: center; gap: 8px; }
+    .marks:empty { display: none; }
     .icon { width: 18px; height: 18px; }
     .muted { color: var(--ink-muted); margin: 0; padding: 4px 10px; }
     .new { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) 4px; }
@@ -90,6 +102,10 @@ export class Shell {
   constructor() {
     this.store.load();
     effect(() => this.nameInput()?.nativeElement.focus());
+  }
+
+  protected missingLabel(count: number) {
+    return count === 1 ? '1 tile not found in Homey' : `${count} tiles not found in Homey`;
   }
 
   protected create(event: Event, name: string) {

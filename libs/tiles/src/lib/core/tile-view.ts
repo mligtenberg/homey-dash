@@ -1,4 +1,4 @@
-import { Directive, inject, input, Signal } from '@angular/core';
+import { DestroyRef, Directive, inject, input, Signal, signal } from '@angular/core';
 import { LucideIconInput } from '@lucide/angular';
 import { TileSize } from '@homey-dash/layout';
 import { TileData, TileSettings } from '../tile-data';
@@ -11,6 +11,8 @@ export interface TileFace {
   icon: LucideIconInput;
   hue: KindHue;
   active?: boolean;
+  /** Whether pressing the tile acts on its target (see `tap`). */
+  tappable?: boolean;
   /** `unset`: no target picked yet; `loading`: Homey's data has not arrived. */
   state: 'ok' | 'unavailable' | 'missing' | 'unset' | 'loading';
 }
@@ -23,7 +25,18 @@ export const TILE_FACE_HOST = {
   '[class.is-active]': "face().active && face().state === 'ok'",
   '[class.is-unavailable]': "face().state === 'unavailable'",
   '[class.is-missing]': "face().state === 'missing'",
+  '[class.is-feedback]': "flash() === 'ok'",
+  '[class.is-error]': "flash() === 'error'",
+  '[attr.data-tap]': "face().tappable ? '' : null",
+  '[attr.role]': "face().tappable ? 'button' : null",
+  '[attr.tabindex]': 'face().tappable ? 0 : null',
+  '(click)': 'onPress($event)',
+  '(keydown.enter)': 'onKey($event)',
+  '(keydown.space)': 'onKey($event)',
 };
+
+/** How long a tile shows the outcome of a press, such as "Started". */
+export const FLASH_MS = 1400;
 
 export const TILE_FACE_TEMPLATE = `
   <svg class="hd-icon" [lucideIcon]="face().icon" />
@@ -44,6 +57,45 @@ export abstract class TileView<TSettings extends TileSettings = TileSettings> {
   protected readonly data = inject(TileData);
 
   abstract readonly face: Signal<TileFace>;
+
+  /** The outcome of the last press while it shows: `.is-feedback` or `.is-error`. */
+  protected readonly flash = signal<'ok' | 'error' | null>(null);
+  private flashTimer?: ReturnType<typeof setTimeout>;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.flashTimer));
+  }
+
+  /** What pressing a tappable tile does. */
+  protected tap(): void {
+    // Not tappable by default.
+  }
+
+  /** Runs a command against Homey, flashing its outcome; `quiet` skips the flash on success. */
+  protected async send(command: () => Promise<unknown>, quiet = false) {
+    let outcome: 'ok' | 'error' = 'ok';
+    try {
+      await command();
+    } catch {
+      outcome = 'error';
+    }
+    if (quiet && outcome === 'ok') return;
+    clearTimeout(this.flashTimer);
+    this.flash.set(outcome);
+    this.flashTimer = setTimeout(() => this.flash.set(null), FLASH_MS);
+  }
+
+  protected onPress(event: Event) {
+    // Inline controls handle their own presses.
+    if (!this.face().tappable || (event.target as Element).closest('button, [role="slider"]')) return;
+    this.tap();
+  }
+
+  protected onKey(event: Event) {
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    this.onPress(event);
+  }
 
   /** The face of a tile whose target is not in Homey's data: not picked yet, not loaded yet, or missing. */
   protected absentFace(base: Pick<TileFace, 'icon' | 'hue'> & { noun: string }): TileFace {

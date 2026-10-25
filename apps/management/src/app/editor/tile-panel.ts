@@ -1,4 +1,17 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  inputBinding,
+  output,
+  outputBinding,
+  untracked,
+  viewChild,
+  ViewContainerRef,
+} from '@angular/core';
 import { Tile } from '@homey-dash/api-client';
 import { TileSize } from '@homey-dash/layout';
 import { TileData, TileKind, TileSettings } from '@homey-dash/tiles';
@@ -9,7 +22,7 @@ interface TargetOption {
   label: string;
 }
 
-/** Settings of the selected tile: its target, label and size. */
+/** Settings of the selected tile: its target, its kind's own settings, label and size. */
 @Component({
   selector: 'hd-tile-panel',
   imports: [SizePicker],
@@ -30,6 +43,8 @@ interface TargetOption {
           }
         </select>
       </div>
+
+      <ng-container #kindSettings />
 
       <div class="hd-field">
         <label class="hd-field__label" for="tile-label">Label</label>
@@ -104,6 +119,33 @@ export class TilePanel {
     const fits = this.fitsSize();
     return (size: TileSize) => size === this.tile().size || (!!kind?.sizes.includes(size) && fits(size));
   });
+
+  private readonly kindSettings = viewChild('kindSettings', { read: ViewContainerRef });
+  private readonly kindSettingsComponent = computed(() => this.kind()?.settings);
+
+  constructor() {
+    // The kind's settings component, created once per kind and fed the tile's current settings.
+    effect(() => {
+      const container = this.kindSettings();
+      const component = this.kindSettingsComponent();
+      untracked(() => {
+        container?.clear();
+        if (!container || !component) return;
+        container.createComponent(component, {
+          bindings: [
+            inputBinding('settings', this.settings),
+            outputBinding<Partial<TileSettings>>('changed', (patch) => this.patch(patch)),
+          ],
+        });
+      });
+    });
+  }
+
+  protected patch(patch: Partial<TileSettings>) {
+    const next = { ...this.settings(), ...patch } as Record<string, unknown>;
+    Object.keys(next).forEach((key) => next[key] === undefined && delete next[key]);
+    this.settingsChanged.emit(next as unknown as TileSettings);
+  }
 
   protected setTarget(target: string) {
     this.settingsChanged.emit({ ...this.settings(), target: target || null });

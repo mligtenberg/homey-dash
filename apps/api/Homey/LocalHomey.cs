@@ -203,6 +203,25 @@ public sealed class LocalHomey(
         return HomeyMapper.Values(logs).Select(HomeyMapper.InsightLog).ToList();
     }
 
+    public async Task<IReadOnlyList<HomeyInsightEntry>> GetInsightEntriesAsync(string logId, string resolution, CancellationToken ct)
+    {
+        // The log's uri is the first three parts of its id, as in the official client.
+        var uri = string.Join(':', logId.Split(':', 4).Take(3));
+        var path = $"api/manager/insights/log/{Uri.EscapeDataString(uri)}/{Uri.EscapeDataString(logId)}/entry?resolution={Uri.EscapeDataString(resolution)}";
+        try
+        {
+            using var response = await Http().GetAsync(path, ct);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                throw new HomeyNotFoundException($"Insight log {logId} not found in Homey");
+            response.EnsureSuccessStatusCode();
+            return HomeyMapper.InsightEntries(await response.Content.ReadFromJsonAsync<JsonElement>(ct));
+        }
+        catch (HttpRequestException e)
+        {
+            throw new HomeyUnavailableException("Homey cannot be reached", e);
+        }
+    }
+
     private HttpClient Http() => httpFactory.CreateClient(HttpClientName);
 
     private async Task<JsonElement> GetJsonAsync(string path, CancellationToken ct)

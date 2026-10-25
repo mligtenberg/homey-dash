@@ -60,6 +60,18 @@ public static class HomeyMapper
         Type: String(json, "type") ?? "number",
         Units: String(json, "units"));
 
+    // Homey answers { values: [{ t, v }], step, start, end, lastValue }.
+    public static List<HomeyInsightEntry> InsightEntries(JsonElement json) =>
+        json.ValueKind == JsonValueKind.Object && json.TryGetProperty("values", out var values) && values.ValueKind == JsonValueKind.Array
+            ? values.EnumerateArray()
+                .Select(v => Date(v, "t") is { } t
+                    ? new HomeyInsightEntry(t, v.TryGetProperty("v", out var n) && n.ValueKind == JsonValueKind.Number ? n.GetDouble() : null)
+                    : null)
+                .OfType<HomeyInsightEntry>()
+                .OrderBy(e => e.T)
+                .ToList()
+            : [];
+
     public static Dictionary<string, string> ZoneNames(JsonElement zones) =>
         Values(zones).ToDictionary(z => String(z, "id") ?? "", z => String(z, "name") ?? "");
 

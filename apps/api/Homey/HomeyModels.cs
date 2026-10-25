@@ -35,6 +35,9 @@ public sealed record HomeyFlow(string Id, string Name, bool Advanced, bool Enabl
 
 public sealed record HomeyMood(string Id, string Name, string? ZoneId);
 
+// One point of an insight log; V is null for a gap.
+public sealed record HomeyInsightEntry(DateTimeOffset T, double? V);
+
 public sealed record HomeyInsightLog(string Id, string OwnerUri, string? OwnerName, string Title, string Type, string? Units);
 
 // Something in Homey changed; raised by HomeyState.

@@ -19,6 +19,9 @@ public sealed class HomeyState(TimeProvider time)
     public HomeyStatus Status { get; private set; } =
         new(HomeyConnection.Connecting, null, time.GetUtcNow(), Fake: false);
 
+    // False until the first snapshot of Homey has arrived.
+    public bool Loaded { get; private set; }
+
     public IEnumerable<HomeyDevice> Devices => _devices.Values;
     public IEnumerable<HomeyFlow> Flows => _flows.Values;
     public IEnumerable<HomeyMood> Moods => _moods.Values;
@@ -26,6 +29,14 @@ public sealed class HomeyState(TimeProvider time)
     public HomeyDevice? FindDevice(string id) => _devices.GetValueOrDefault(id);
     public HomeyFlow? FindFlow(string id) => _flows.GetValueOrDefault(id);
     public HomeyMood? FindMood(string id) => _moods.GetValueOrDefault(id);
+
+    // Whether a tile target (device, flow or mood id, or an insight log of a known device) exists in Homey.
+    public bool Knows(string target) =>
+        _devices.ContainsKey(target) || _flows.ContainsKey(target) || _moods.ContainsKey(target)
+        || (target.StartsWith("homey:device:", StringComparison.Ordinal)
+            ? target.Split(':', 4) is [_, _, var deviceId, _] && _devices.ContainsKey(deviceId)
+            // Logs Homey keeps itself, such as homey:manager:weather:temperature.
+            : target.StartsWith("homey:manager:", StringComparison.Ordinal));
 
     public HomeyCapability RequireSetableCapability(string deviceId, string capabilityId)
     {
@@ -62,6 +73,7 @@ public sealed class HomeyState(TimeProvider time)
             _devices = next;
             _flows = flows.ToImmutableDictionary(f => f.Id);
             _moods = moods.ToImmutableDictionary(m => m.Id);
+            Loaded = true;
         }
         changes.Add(new CatalogChanged());
         foreach (var change in changes) Changed?.Invoke(change);

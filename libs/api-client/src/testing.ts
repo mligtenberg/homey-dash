@@ -1,9 +1,10 @@
 import { signal } from '@angular/core';
-import { DisplayInfo, HomeySnapshot, Realtime, RealtimeMessages, ScreenView } from './index';
+import { CapabilityValue, DisplayInfo, HomeySnapshot, Realtime, RealtimeMessages, ScreenView } from './index';
 
 /**
  * Stands in for the realtime connection in tests: answers joins with `screen` and `displays`, records what a
- * screen reports, and lets a test push messages or simulate a reconnect. Provide it as `Realtime`.
+ * screen reports and the commands tiles send, and lets a test push messages or simulate a reconnect. Provide it
+ * as `Realtime`.
  */
 export class FakeRealtime implements Partial<Realtime> {
   readonly connected = signal(true);
@@ -11,6 +12,10 @@ export class FakeRealtime implements Partial<Realtime> {
   displays: DisplayInfo[] = [];
   readonly joined: string[] = [];
   readonly shown: (number | null)[] = [];
+  /** Commands sent to Homey, such as `['setCapability', 'd1', 'onoff', true]`. */
+  readonly commands: unknown[][] = [];
+  /** Makes commands fail, as when Homey does not respond. */
+  failCommands = false;
   /** Called as a screen reports the version it shows. */
   onShowing: (version: number | null) => void = () => undefined;
 
@@ -54,5 +59,22 @@ export class FakeRealtime implements Partial<Realtime> {
 
   async joinManagement() {
     return this.displays;
+  }
+
+  setCapability(deviceId: string, capabilityId: string, value: CapabilityValue) {
+    return this.command('setCapability', deviceId, capabilityId, value);
+  }
+
+  triggerFlow(flowId: string) {
+    return this.command('triggerFlow', flowId);
+  }
+
+  activateMood(moodId: string) {
+    return this.command('activateMood', moodId);
+  }
+
+  private async command(...command: unknown[]) {
+    this.commands.push(command);
+    if (this.failCommands) throw new Error('Homey did not respond');
   }
 }

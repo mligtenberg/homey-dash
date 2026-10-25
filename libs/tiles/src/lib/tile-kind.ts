@@ -32,6 +32,11 @@ export interface TileKind<TSettings = unknown> {
   sizes: readonly TileSize[];
   defaultSettings: TSettings;
   component: Type<unknown>;
+  /**
+   * The kind's own settings in Management's tile panel, below the target: a component with a `settings`
+   * input (the tile's current settings) and a `changed` output that emits a patch of them.
+   */
+  settings?: Type<unknown>;
 }
 
 /** A self-contained extension of HomeyDash that registers one or more tile kinds. */

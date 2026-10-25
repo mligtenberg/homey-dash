@@ -120,6 +120,29 @@ public class DashboardApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task MissingTiles_CountsDraftTilesWhoseTargetHomeyDoesNotKnow()
+    {
+        var id = await CreateAsync();
+        static object WithTarget(string id, int slot, object? target) => new
+        {
+            id, kind = "device", size = "small", position = new { column = slot % 3, row = slot / 3 },
+            settings = target is null ? new Dictionary<string, object>() : new Dictionary<string, object> { ["target"] = target },
+        };
+
+        await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft", Draft(4,
+            WithTarget("known", 0, "living-lamp"), WithTarget("gone", 1, "removed-device"),
+            WithTarget("unset", 2, null), WithTarget("log", 3, "homey:device:p1-meter:measure_power"),
+            WithTarget("lost-log", 4, "homey:device:removed:measure_power"),
+            WithTarget("weather", 5, "homey:manager:weather:temperature")));
+
+        var list = await _client.GetFromJsonAsync<JsonElement>("/api/dashboards");
+        var summary = list.EnumerateArray().Single(d => d.GetProperty("id").GetString() == id);
+        Assert.Equal(2, summary.GetProperty("missingTiles").GetInt32());
+        var detail = await _client.GetFromJsonAsync<JsonElement>($"/api/dashboards/{id}");
+        Assert.Equal(2, detail.GetProperty("missingTiles").GetInt32());
+    }
+
+    [Fact]
     public async Task AnUnknownDashboard_IsNotFound()
     {
         var response = await _client.PostAsync($"/api/dashboards/{Guid.NewGuid()}/publish", null);

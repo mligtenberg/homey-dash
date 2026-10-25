@@ -80,6 +80,16 @@ public sealed class LocalHomeyTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task InsightEntries_AskHomeyForTheLogOfItsOwner()
+    {
+        var entries = await _homey.GetInsightEntriesAsync("homey:device:abc:measure_power", "last24Hours", CancellationToken.None);
+
+        Assert.Contains(_server.Requests, r => r is ("GET",
+            "/api/manager/insights/log/homey:device:abc/homey:device:abc:measure_power/entry?resolution=last24Hours", _));
+        Assert.Equal([4.5, 5, null], entries.Select(e => e.V));
+    }
+
+    [Fact]
     public async Task AWrongApiKey_KeepsRetryingAndReportsWhy()
     {
         await _homey.StopAsync(CancellationToken.None);

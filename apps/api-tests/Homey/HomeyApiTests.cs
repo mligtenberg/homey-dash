@@ -28,6 +28,30 @@ public class HomeyApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(0.8, lamp.GetProperty("capabilities").GetProperty("dim").GetProperty("value").GetDouble());
     }
 
+    [Theory]
+    [InlineData("lastHour")]
+    [InlineData("last31Days")]
+    public async Task InsightEntries_AreAscendingAndEndNow(string resolution)
+    {
+        var entries = await _client.GetFromJsonAsync<JsonElement>($"/api/homey/insights/entries?log=homey:device:p1-meter:measure_power&resolution={resolution}");
+
+        var times = entries.EnumerateArray().Select(e => e.GetProperty("t").GetDateTimeOffset()).ToList();
+        Assert.NotEmpty(times);
+        Assert.Equal(times.OrderBy(t => t), times);
+        Assert.InRange(DateTimeOffset.UtcNow - times[^1], TimeSpan.Zero, TimeSpan.FromMinutes(1));
+        Assert.True(entries[0].GetProperty("v").GetDouble() > 0);
+    }
+
+    [Fact]
+    public async Task InsightEntries_RefuseAnUnknownResolutionAndLog()
+    {
+        var resolution = await _client.GetAsync("/api/homey/insights/entries?log=homey:device:p1-meter:measure_power&resolution=lastYear");
+        var log = await _client.GetAsync("/api/homey/insights/entries?log=nope&resolution=lastHour");
+
+        Assert.Equal(HttpStatusCode.BadRequest, resolution.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, log.StatusCode);
+    }
+
     [Fact]
     public async Task SettingACapability_UpdatesTheDeviceAndRaisesAChange()
     {

@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace HomeyDash.Api.Homey;
 
 // A Homey with a few sample devices, flows and moods, used when no Homey address is configured.
-public sealed class FakeHomey(HomeyState state) : IHostedService, IHomey
+public sealed class FakeHomey(HomeyState state, TimeProvider time) : IHostedService, IHomey
 {
     private static readonly JsonElement True = JsonSerializer.SerializeToElement(true);
     private static readonly JsonElement False = JsonSerializer.SerializeToElement(false);
@@ -52,9 +52,30 @@ public sealed class FakeHomey(HomeyState state) : IHostedService, IHomey
     public Task<IReadOnlyList<HomeyInsightLog>> GetInsightLogsAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<HomeyInsightLog>>(
         [
-            new("measure_temperature", "homey:device:thermostat", "Thermostat", "Temperature", "number", "°C"),
-            new("measure_power", "homey:device:p1-meter", "Energy meter", "Power", "number", "W"),
+            new("homey:device:thermostat:measure_temperature", "homey:device:thermostat", "Thermostat", "Temperature", "number", "°C"),
+            new("homey:device:p1-meter:measure_power", "homey:device:p1-meter", "Energy meter", "Power", "number", "W"),
         ]);
+
+    // A smooth, repeatable curve per log, ending now.
+    public async Task<IReadOnlyList<HomeyInsightEntry>> GetInsightEntriesAsync(string logId, string resolution, CancellationToken ct)
+    {
+        var logs = await GetInsightLogsAsync(ct);
+        if (logs.All(l => l.Id != logId)) throw new HomeyNotFoundException($"Insight log {logId} not found in Homey");
+
+        const int points = 60;
+        var window = InsightResolutions.Window(resolution);
+        var end = time.GetUtcNow();
+        var power = logId.EndsWith(":measure_power");
+        return Enumerable.Range(0, points)
+            .Select(i =>
+            {
+                var t = end - window * (points - 1 - i) / (points - 1);
+                var phase = (t - DateTimeOffset.UnixEpoch).TotalSeconds / window.TotalSeconds * 2 * Math.PI;
+                var wave = Math.Sin(phase * 3) * 0.6 + Math.Sin(phase * 7) * 0.4;
+                return new HomeyInsightEntry(t, Math.Round(power ? 1100 + wave * 900 : 20.5 + wave * 1.5, 1));
+            })
+            .ToList();
+    }
 
     private static HomeyDevice Device(string id, string name, string zoneId, string zoneName, string @class,
         params HomeyCapability[] capabilities) =>

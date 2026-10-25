@@ -107,11 +107,15 @@ export function deviceLook(device: HomeyDevice | undefined): { hue: KindHue; ico
   return { hue: HUES[device.class] ?? 'neutral', icon: ICONS[device.class] ?? LucideBox };
 }
 
-function formatNumber(capability: HomeyCapability): string {
-  const value = capability.value as number;
+/** A reading split for display: `20.5` and `°C`, rounded to what a tile has room for. */
+export function formatReading(value: number, units: string | null): { value: string; units: string } {
   const rounded = Math.abs(value) >= 100 ? Math.round(value) : Math.round(value * 10) / 10;
-  const units = capability.units ? (capability.units.startsWith('°') ? capability.units : ` ${capability.units}`) : '';
-  return `${rounded}${units}`;
+  return { value: `${rounded}`, units: units ?? '' };
+}
+
+function formatNumber(capability: HomeyCapability): string {
+  const { value, units } = formatReading(capability.value as number, capability.units);
+  return units ? `${value}${units.startsWith('°') ? '' : ' '}${units}` : value;
 }
 
 /** A short state phrase for a device, such as `On · 80%`, `Closed` or `20.5°C`. */

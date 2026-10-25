@@ -31,6 +31,8 @@ export interface DashboardSummary {
   publishedVersion: number;
   publishedAt: string | null;
   hasUnpublishedChanges: boolean;
+  /** Tiles in the draft whose target Homey does not have; 0 while Homey is not loaded. */
+  missingTiles: number;
 }
 
 export interface DashboardDetail extends DashboardSummary {

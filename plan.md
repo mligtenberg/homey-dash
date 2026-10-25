@@ -11,7 +11,7 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 | 3. Management editor | Done (first version) |
 | 4. Displays and setup | Done |
 | 5. Realtime and display status | Done |
-| 6. Tile modules | To do |
+| 6. Tile modules | Done |
 | 7. Packaging | To do |
 
 ## Defaults
@@ -132,32 +132,49 @@ Built in vertical slices; each ends with something that works and has tests. Dom
   status goes Connected → Last seen just now when the display closes, a rename in one Management window shows in
   another.
 
+### 6. Tile modules
+
+- Device tile: tap toggles `onoff`; wide and large tiles get inline controls (dim slider, thermostat +/− in steps
+  of 0.5, cover Up/Stop/Down). The active state follows Homey only, never optimistic. A "Shows" setting picks the
+  capability (Automatic: the first setable of onoff, dim, target_temperature, windowcoverings_state, else the first
+  reading). A failed command shows "Did not respond".
+- Flow and mood tiles: tap runs them; "Started" / "Activated" for 1.4 s after success, "Could not start" /
+  "Could not activate" on failure.
+- Statistic tile (large, full-large): `GET /api/homey/insights/entries?log=&resolution=` (LocalHomey splits the
+  owner URI off the log id; FakeHomey generates 60 points), drawn as an SVG chart with live values appended from the
+  owner device. A "Window" setting picks the resolution (default last 24 hours).
+- Unavailable devices keep their last value, cannot be tapped and hide controls; missing targets show "Not found in
+  Homey". Dashboard summaries carry `missingTiles` (draft tiles whose target Homey lacks, 0 until Homey loads);
+  Management's sidebar shows the warning dot. The list is pushed again when devices, flows or moods change.
+- Kinds can register a settings component (`TileKind.settings`), shown in the editor's tile panel. Preview is inert.
+- FakeHomey's insight log ids now include the owner URI, like the real Homey's.
+- Checked in the browser with FakeHomey: the lamp toggles, the thermostat + raises the target by 0.5, flow and mood
+  show "Started" / "Activated" and clear, the chart draws and updates live, a missing target shows "Not found in
+  Homey" and Management's sidebar flags the dashboard; the statistic settings show the time window.
+- Against the real Homey (read-only, through the running instance): insight entries load for device logs,
+  `energy_power` logs and Homey's own logs (`homey:manager:weather:temperature`), as 5-minute points.
+- Follow-ups: logs Homey keeps itself no longer count as missing; `energy_power` logs follow the device's
+  `measure_power` live; statistic history reloads after a reconnect; the dashboard list push is coalesced (250 ms);
+  the slider and segmented buttons get a 44 px touch area through a transparent border; Management's bundle
+  budget is 600 kB (now 517 kB).
+- 64 API tests (5 new), 16 tiles tests, 18 Management tests, 8 display tests, 11 layout tests.
+
 ### Open
 
 - Verified on the real Homey Pro (firmware 13.5.3): handshake, namespace, subscriptions and live `capability`
   events work; 116 devices, 33 flows, 24 moods and 427 insight logs load. Not yet seen live: flow and mood
-  events, and `device.update` (whether it carries the full device). Realtime (slice 5) has not run against it yet.
-- Insight log ids include the owner URI (`homey:device:<id>:energy_power`); account for this when fetching entries in slice 6.
+  events, and `device.update` (whether it carries the full device).
 - Give the Homey a fixed IP (DHCP reservation): it moved from .242 to .244, which broke the configured address.
 - The local `apps/api/homey-dash.db` still has the empty `Tiles` table and the `InitialCreate` history row from the
   removed scaffold. Harmless; drop them (or delete the file, losing its dashboards) when convenient.
 - The API does not check that a tile's size is supported by its kind: kinds are declared in front-end modules
   (ADR-0003), so Management checks that against the `TileKindRegistry`.
 - No concurrency check on saving drafts (last write wins); fine while one person edits at a time.
-- Kind-specific settings (which capabilities a device tile shows, a statistic's time window) need a settings
-  component per kind in `TileKind`; add it with the full tile modules in slice 6.
-- The sidebar's warning dot for dashboards with missing tiles needs the API to know about targets; slice 6.
-- Not yet checked in the browser with live Homey data: picking targets, moving and resizing, Publish and Preview.
-- Tiles on displays cannot be operated yet; the hub's actions are ready for slice 6.
+- Not yet checked in the browser with live Homey data: picking targets, moving and resizing, Publish and Preview,
+  and operating tiles (needs someone at home: it switches real devices and runs real flows).
+- The segmented control's larger touch area is not seen in the browser yet (FakeHomey has no cover).
 
 ## To do
-
-### 6. Tile modules
-
-- Device tile: lights and dimmers first, then other capabilities through inline controls.
-- Flow and mood tiles: tap action, then "Started" or "Activated".
-- Statistic tile: insights history with live updates.
-- Unavailable and missing states; Management flags every dashboard with a missing tile.
 
 ### 7. Packaging
 

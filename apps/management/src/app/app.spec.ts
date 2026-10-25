@@ -13,6 +13,7 @@ const dashboard = (id: string, name: string, change: Partial<DashboardSummary> =
   publishedVersion: 1,
   publishedAt: null,
   hasUnpublishedChanges: false,
+  missingTiles: 0,
   ...change,
 });
 
@@ -42,6 +43,15 @@ describe('Shell', () => {
 
     expect(items(root).map((i) => i.querySelector('span')?.textContent)).toEqual(['Hallway', 'Kitchen']);
     expect(items(root).map((i) => i.querySelector('.hd-pill')?.textContent ?? null)).toEqual([null, 'Draft']);
+  });
+
+  it('flags a dashboard with tiles Homey does not have', async () => {
+    const root = await render([dashboard('1', 'Hallway'), dashboard('2', 'Kitchen', { missingTiles: 2 })]);
+
+    expect(items(root).map((i) => i.querySelector('.hd-dot-warn')?.getAttribute('aria-label') ?? null)).toEqual([
+      null,
+      '2 tiles not found in Homey',
+    ]);
   });
 
   it('follows dashboards changed elsewhere', async () => {

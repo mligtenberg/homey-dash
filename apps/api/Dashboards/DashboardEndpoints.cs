@@ -1,5 +1,6 @@
 using System.Text.Json;
 using HomeyDash.Api.Data;
+using HomeyDash.Api.Homey;
 using HomeyDash.Api.Realtime;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,14 +16,14 @@ public static class DashboardEndpoints
     {
         var dashboards = api.MapGroup("/dashboards");
 
-        dashboards.MapGet("/", (HomeyDashDbContext db, CancellationToken ct) => ListAsync(db, ct));
+        dashboards.MapGet("/", (HomeyDashDbContext db, HomeyState homey, CancellationToken ct) => ListAsync(db, homey, ct));
 
-        dashboards.MapGet("/{id:guid}", async (Guid id, HomeyDashDbContext db, CancellationToken ct) =>
+        dashboards.MapGet("/{id:guid}", async (Guid id, HomeyDashDbContext db, HomeyState homey, CancellationToken ct) =>
             await db.Dashboards.FindAsync([id], ct) is { } dashboard
-                ? Results.Ok(dashboard.ToDetail())
+                ? Results.Ok(dashboard.ToDetail(homey))
                 : NotFound(id));
 
-        dashboards.MapPost("/", async (NewDashboard body, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct) =>
+        dashboards.MapPost("/", async (NewDashboard body, HomeyDashDbContext db, HomeyState homey, RealtimeNotifier notifier, CancellationToken ct) =>
         {
             if (DashboardValidator.ValidateName(body.Name) is { } error) return NameProblem(error);
 
@@ -30,11 +31,11 @@ public static class DashboardEndpoints
             db.Dashboards.Add(dashboard);
             await db.SaveChangesAsync(ct);
             await notifier.DashboardsChangedAsync(db, ct);
-            return Results.Created($"/api/dashboards/{dashboard.Id}", dashboard.ToDetail());
+            return Results.Created($"/api/dashboards/{dashboard.Id}", dashboard.ToDetail(homey));
         });
 
-        dashboards.MapPatch("/{id:guid}", (Guid id, Rename body, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct) =>
-            Change(id, db, notifier, ct, dashboard =>
+        dashboards.MapPatch("/{id:guid}", (Guid id, Rename body, HomeyDashDbContext db, HomeyState homey, RealtimeNotifier notifier, CancellationToken ct) =>
+            Change(id, db, homey, notifier, ct, dashboard =>
             {
                 if (DashboardValidator.ValidateName(body.Name) is { } error) return NameProblem(error);
                 dashboard.Name = body.Name!.Trim();
@@ -53,8 +54,8 @@ public static class DashboardEndpoints
             return Results.NoContent();
         });
 
-        dashboards.MapPut("/{id:guid}/draft", (Guid id, DashboardLayout draft, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct) =>
-            Change(id, db, notifier, ct, dashboard =>
+        dashboards.MapPut("/{id:guid}/draft", (Guid id, DashboardLayout draft, HomeyDashDbContext db, HomeyState homey, RealtimeNotifier notifier, CancellationToken ct) =>
+            Change(id, db, homey, notifier, ct, dashboard =>
             {
                 var errors = DashboardValidator.Validate(draft);
                 if (errors.Count > 0) return Results.ValidationProblem(errors, "The draft breaks the layout rules.");
@@ -64,9 +65,9 @@ public static class DashboardEndpoints
 
         // Every display showing the dashboard switches to the new version at once.
         dashboards.MapPost("/{id:guid}/publish",
-            async (Guid id, HomeyDashDbContext db, RealtimeNotifier notifier, TimeProvider time, CancellationToken ct) =>
+            async (Guid id, HomeyDashDbContext db, HomeyState homey, RealtimeNotifier notifier, TimeProvider time, CancellationToken ct) =>
             {
-                var result = await Change(id, db, notifier, ct, dashboard =>
+                var result = await Change(id, db, homey, notifier, ct, dashboard =>
                 {
                     dashboard.Publish(time.GetUtcNow());
                     return null;
@@ -80,22 +81,22 @@ public static class DashboardEndpoints
     private static async Task<List<Guid?>> ScreensShowingAsync(HomeyDashDbContext db, Guid id, CancellationToken ct) =>
         await db.Displays.Where(d => d.DashboardId == id).Select(d => d.ScreenId).ToListAsync(ct);
 
-    public static async Task<List<DashboardSummary>> ListAsync(HomeyDashDbContext db, CancellationToken ct) =>
+    public static async Task<List<DashboardSummary>> ListAsync(HomeyDashDbContext db, HomeyState homey, CancellationToken ct) =>
         (await db.Dashboards.ToListAsync(ct))
         .OrderBy(d => d.Name, StringComparer.CurrentCultureIgnoreCase)
-        .Select(d => d.ToSummary())
+        .Select(d => d.ToSummary(homey))
         .ToList();
 
     // Loads a dashboard, applies a change (which returns a problem to refuse it), tells Management and answers
     // with the result.
     private static async Task<IResult> Change(
-        Guid id, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct, Func<Dashboard, IResult?> change)
+        Guid id, HomeyDashDbContext db, HomeyState homey, RealtimeNotifier notifier, CancellationToken ct, Func<Dashboard, IResult?> change)
     {
         if (await db.Dashboards.FindAsync([id], ct) is not { } dashboard) return NotFound(id);
         if (change(dashboard) is { } problem) return problem;
         await db.SaveChangesAsync(ct);
         await notifier.DashboardsChangedAsync(db, ct);
-        return Results.Ok(dashboard.ToDetail());
+        return Results.Ok(dashboard.ToDetail(homey));
     }
 
     // A tile sent without settings gets an empty object, so every stored tile has one.

@@ -1,12 +1,13 @@
 using HomeyDash.Api.Dashboards;
 using HomeyDash.Api.Data;
 using HomeyDash.Api.Displays;
+using HomeyDash.Api.Homey;
 using Microsoft.AspNetCore.SignalR;
 
 namespace HomeyDash.Api.Realtime;
 
 /// <summary>Tells screens and Management that displays or dashboards changed.</summary>
-public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresence presence)
+public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresence presence, HomeyState homey)
 {
     public const string ManagementGroup = "management";
 
@@ -24,7 +25,7 @@ public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresen
     public async Task DisplaysChangedAsync(HomeyDashDbContext db, CancellationToken ct) =>
         await hub.Clients.Group(ManagementGroup).SendAsync("Displays", await DisplayQueries.ListAsync(db, presence, ct), ct);
 
-    // Management's dashboard list: names, publish state and unpublished changes.
+    // Management's dashboard list: names, publish state, unpublished changes and tiles Homey does not know.
     public async Task DashboardsChangedAsync(HomeyDashDbContext db, CancellationToken ct) =>
-        await hub.Clients.Group(ManagementGroup).SendAsync("Dashboards", await DashboardEndpoints.ListAsync(db, ct), ct);
+        await hub.Clients.Group(ManagementGroup).SendAsync("Dashboards", await DashboardEndpoints.ListAsync(db, homey, ct), ct);
 }
