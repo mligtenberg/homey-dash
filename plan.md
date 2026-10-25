@@ -44,6 +44,11 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 - Endpoints under `/api/homey`: `status`, `devices`, `flows`, `moods`, `insights`,
   `PUT devices/{id}/capabilities/{cap}`, `POST flows/{id}/trigger`, `POST moods/{id}/activate`.
 - 23 API tests, including the real client against `ScriptedHomeyServer`.
+- Verified on the real Homey Pro (firmware 13.5.3): handshake, namespace, subscriptions and live `capability`
+  events; 116 devices, 33 flows, 24 moods and 427 insight logs load. Live events checked on 2026-10-25: a flow
+  created, renamed, turned off and deleted reached HomeyDash; `device.update` carries the full device (renaming
+  the Papagaai lamp and back kept its capabilities, values and zone); renaming the Hemels dag mood and back showed
+  in HomeyDash (checked by Martin, as the connector cannot rename moods).
 
 ### 2. Dashboards, drafts and publishing
 
@@ -159,6 +164,8 @@ Built in vertical slices; each ends with something that works and has tests. Dom
   flow and mood tiles now confirm on press and switch to the error text if Homey refuses. Requests to Homey that
   perform an action may take 30 s (reads still give up after 10 s), so a slow mood no longer shows as failed. The heating statistic
   loads its history.
+- Management with live Homey data: picking targets, moving and resizing, Publish and Preview work (checked by
+  Martin, 2026-10-25).
 - The Homey is addressed by its `.local` name instead of its IP, which had moved from .242 to .244 (README updated).
 - Follow-ups: logs Homey keeps itself no longer count as missing; `energy_power` logs follow the device's
   `measure_power` live; statistic history reloads after a reconnect; the dashboard list push is coalesced (250 ms);
@@ -168,16 +175,11 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 
 ### Open
 
-- Verified on the real Homey Pro (firmware 13.5.3): handshake, namespace, subscriptions and live `capability`
-  events work; 116 devices, 33 flows, 24 moods and 427 insight logs load. Flow events work live (2026-10-25): a
-  flow created, renamed, turned off and deleted reached HomeyDash. Not yet seen live: mood events and
-  `device.update` (whether it carries the full device).
 - The local `apps/api/homey-dash.db` still has the empty `Tiles` table and the `InitialCreate` history row from the
   removed scaffold. Harmless; drop them (or delete the file, losing its dashboards) when convenient.
 - The API does not check that a tile's size is supported by its kind: kinds are declared in front-end modules
   (ADR-0003), so Management checks that against the `TileKindRegistry`.
 - No concurrency check on saving drafts (last write wins); fine while one person edits at a time.
-- Not yet checked in the browser with live Homey data: picking targets, moving and resizing, Publish and Preview.
 - The segmented control's larger touch area is not seen in the browser yet (FakeHomey has no cover).
 
 ## To do
