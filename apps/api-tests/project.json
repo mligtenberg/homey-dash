@@ -1,0 +1,16 @@
+{
+  "name": "api-tests",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/api-tests",
+  "implicitDependencies": ["api"],
+  "tags": [],
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "dotnet test apps/api-tests/HomeyDash.Api.Tests.csproj"
+      }
+    }
+  }
+}

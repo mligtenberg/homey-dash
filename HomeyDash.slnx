@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/apps/" />
+  <Folder Name="/apps/api-tests/">
+    <Project Path="apps/api-tests/HomeyDash.Api.Tests.csproj" />
+  </Folder>
+  <Folder Name="/apps/api/">
+    <Project Path="apps/api/HomeyDash.Api.csproj" />
+  </Folder>
+</Solution>
