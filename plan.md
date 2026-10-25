@@ -155,7 +155,7 @@ Built in vertical slices; each ends with something that works and has tests. Dom
   `energy_power` logs and Homey's own logs (`homey:manager:weather:temperature`), as 5-minute points.
 - Tiles live on the real Homey (2026-10-25): the Papagaai lamp turned off on tap, the tile changing only when Homey
   reported it, and on again in about 150 ms (it came back at 27% instead of 39%, its own fade, so a dimmer's level
-  is not kept across off and on). Moods Hemels dag and Hawaii avond activate; Homey takes about 9 s to answer, so
+  is not kept across off and on). Moods Hemels dag and Hawaii avond activate, and flow tiles run their flows; Homey takes about 9 s to answer, so
   flow and mood tiles now confirm on press and switch to the error text if Homey refuses. Requests to Homey that
   perform an action may take 30 s (reads still give up after 10 s), so a slow mood no longer shows as failed. The heating statistic
   loads its history.
@@ -169,15 +169,15 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 ### Open
 
 - Verified on the real Homey Pro (firmware 13.5.3): handshake, namespace, subscriptions and live `capability`
-  events work; 116 devices, 33 flows, 24 moods and 427 insight logs load. Not yet seen live: flow and mood
-  events, and `device.update` (whether it carries the full device).
+  events work; 116 devices, 33 flows, 24 moods and 427 insight logs load. Flow events work live (2026-10-25): a
+  flow created, renamed, turned off and deleted reached HomeyDash. Not yet seen live: mood events and
+  `device.update` (whether it carries the full device).
 - The local `apps/api/homey-dash.db` still has the empty `Tiles` table and the `InitialCreate` history row from the
   removed scaffold. Harmless; drop them (or delete the file, losing its dashboards) when convenient.
 - The API does not check that a tile's size is supported by its kind: kinds are declared in front-end modules
   (ADR-0003), so Management checks that against the `TileKindRegistry`.
 - No concurrency check on saving drafts (last write wins); fine while one person edits at a time.
-- Not yet checked in the browser with live Homey data: picking targets, moving and resizing, Publish and Preview,
-  and a flow tile.
+- Not yet checked in the browser with live Homey data: picking targets, moving and resizing, Publish and Preview.
 - The segmented control's larger touch area is not seen in the browser yet (FakeHomey has no cover).
 
 ## To do
