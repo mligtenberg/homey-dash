@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using HomeyDash.Api.Dashboards;
 using HomeyDash.Api.Data;
+using HomeyDash.Api.Displays;
 using HomeyDash.Api.Homey;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,5 +32,6 @@ var api = app.MapGroup("/api");
 api.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 api.MapHomey();
 api.MapDashboards();
+api.MapDisplays();
 
 app.Run();

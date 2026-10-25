@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { DashboardsApi } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucidePlus } from '@lucide/angular';
+import { LucideDynamicIcon, LucideMonitor, LucidePlus } from '@lucide/angular';
 import { DashboardsStore } from './dashboards-store';
 
 /** Management's frame: the sidebar with dashboards, and the current page. */
@@ -47,6 +47,11 @@ import { DashboardsStore } from './dashboards-store';
             <svg class="icon" [lucideIcon]="plus" />
           </button>
         }
+        <div class="hd-nav__group">Displays</div>
+        <a class="hd-nav__item" routerLink="/displays" routerLinkActive ariaCurrentWhenActive="page">
+          <span>All displays</span>
+          <svg class="icon" [lucideIcon]="monitor" />
+        </a>
       </nav>
     </aside>
     <main class="page"><router-outlet /></main>
@@ -78,6 +83,7 @@ export class Shell {
   private readonly router = inject(Router);
 
   protected readonly plus = LucidePlus;
+  protected readonly monitor = LucideMonitor;
   protected readonly naming = signal(false);
   private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('name');
 

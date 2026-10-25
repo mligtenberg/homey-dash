@@ -9,7 +9,7 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 | 1. Homey connection | Done, verified against the real Homey Pro (2026-10-25) |
 | 2. Dashboards, drafts and publishing | Done (API and api-client; UI comes in slice 3) |
 | 3. Management editor | Done (first version) |
-| 4. Displays and setup | To do |
+| 4. Displays and setup | Done |
 | 5. Realtime and display status | To do |
 | 6. Tile modules | To do |
 | 7. Packaging | To do |
@@ -76,7 +76,30 @@ Built in vertical slices; each ends with something that works and has tests. Dom
   (disabled without changes) and **Preview** (`/dashboards/:id/preview`, fitted to the window with `cellSize`).
 - Draft edits are pure functions in `draft-edits.ts` with 12 unit tests; a Shell test covers the sidebar.
 
-### Open from slices 0 to 3
+### 4. Displays and setup
+
+- `Display` (`apps/api/Displays`): permanent id, name, assigned dashboard, and the `screenId` of the screen that
+  holds it. The screen keeps only its own screen id in localStorage (`homeydash.screen`, made with
+  `getRandomValues` because `randomUUID` needs a secure context and displays run over plain http).
+  `GET /api/screens/{screenId}` tells a screen which display it is and the published version it shows; a 404
+  sends it to setup. So takeover just moves the display to the new screen id, and the previous screen finds out
+  on its next request.
+- Endpoints under `/api/displays`: list, setup (`POST`, name and screen id), `POST {id}/takeover`, `PATCH` rename,
+  `PUT {id}/dashboard` (only a published dashboard, or null to wait), delete. A screen holds at most one display.
+- Deleting a dashboard sets its displays back to waiting (foreign key with `SET NULL`). Migration `AddDisplays`.
+- Display app: setup (new display with a name, or take over one from a list with a confirm step), waiting state
+  with the display's name, and the published dashboard fitted with `cellSize`. It polls every 10 s until realtime
+  in slice 5; when the API cannot be reached it keeps what it shows, adds `is-connection-lost` and "Reconnecting…".
+- Management: Displays in the sidebar; per display a name field, a dashboard picker (unpublished dashboards
+  disabled) and Remove display (its screen returns to setup).
+- `RestTileData` moved to `libs/tiles` so both apps use it. `.hd-dashboard` hides its scrollbar, which otherwise
+  took height from the cells.
+- `.claude/launch.json` runs separate instances for Claude (API on 5212 with `api-fake` for FakeHomey, display on
+  4300, Management on 4301; database and build output in `tmp/claude/`), so they don't collide with yours.
+- 51 API tests (9 new), 4 display app tests. Checked in the browser: setup, waiting, assignment, takeover both
+  ways, connection lost.
+
+### Open from slices 0 to 4
 
 - Verified on the real Homey Pro (firmware 13.5.3): handshake, namespace, subscriptions and live `capability`
   events work; 116 devices, 33 flows, 24 moods and 427 insight logs load. Not yet seen live: flow and mood
@@ -88,21 +111,19 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 - Delete the old local `apps/api/homey-dash.db`; it still has the removed `Tiles` table.
 - The API does not check that a tile's size is supported by its kind: kinds are declared in front-end modules
   (ADR-0003), so Management checks that against the `TileKindRegistry` in slice 3.
-- Deleting a dashboard does not yet consider displays; decide in slice 4 what happens to displays showing it.
 - No concurrency check on saving drafts (last write wins); fine while one person edits at a time.
 - Kind-specific settings (which capabilities a device tile shows, a statistic's time window) need a settings
   component per kind in `TileKind`; add it with the full tile modules in slice 6.
 - The sidebar's warning dot for dashboards with missing tiles needs the API to know about targets; slice 6.
 - Management reads Homey data by polling REST every 10 s; switch to the realtime connection in slice 5.
 - Not yet checked in the browser with live Homey data: picking targets, moving and resizing, Publish and Preview.
+- Displays poll REST for their dashboard and tile data; slice 5 replaces both with SignalR. Tiles on displays
+  cannot be operated yet (slice 6).
+- A display no screen holds any more (after its screen was given to another display) still shows in Management;
+  display status in slice 5 will show it as never connected.
+- The editor's Delete dashboard does not say which displays will go back to waiting.
 
 ## To do
-
-### 4. Displays and setup
-
-- `Display`: permanent GUID identity kept in the screen's localStorage, name, assigned dashboard.
-- Setup: become a new display (give it a name) or take over an existing one; takeover sends the previous screen back to setup.
-- Waiting state when no dashboard is assigned; only published dashboards can be assigned.
 
 ### 5. Realtime and display status
 

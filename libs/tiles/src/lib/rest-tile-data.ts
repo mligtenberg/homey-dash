@@ -1,7 +1,7 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HomeyApi, HomeyDevice, HomeyFlow, HomeyInsightLog, HomeyMood } from '@homey-dash/api-client';
-import { TileData } from '@homey-dash/tiles';
+import { TileData } from './tile-data';
 import { forkJoin, switchMap, timer } from 'rxjs';
 
 const REFRESH_MS = 10_000;
@@ -10,7 +10,7 @@ function byId<T extends { id: string }>(items: T[]): ReadonlyMap<string, T> {
   return new Map(items.map((item) => [item.id, item]));
 }
 
-/** Tile data for the editor and Preview, read from the API and refreshed every few seconds. */
+/** Tile data read from the API and refreshed every few seconds. */
 @Injectable({ providedIn: 'root' })
 export class RestTileData extends TileData {
   private readonly homey = inject(HomeyApi);

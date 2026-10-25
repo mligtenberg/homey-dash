@@ -45,6 +45,41 @@ namespace HomeyDash.Api.Migrations
 
                     b.ToTable("Dashboards");
                 });
+
+            modelBuilder.Entity("HomeyDash.Api.Displays.Display", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("DashboardId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ScreenId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DashboardId");
+
+                    b.HasIndex("ScreenId")
+                        .IsUnique();
+
+                    b.ToTable("Displays");
+                });
+
+            modelBuilder.Entity("HomeyDash.Api.Displays.Display", b =>
+                {
+                    b.HasOne("HomeyDash.Api.Dashboards.Dashboard", null)
+                        .WithMany()
+                        .HasForeignKey("DashboardId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
 #pragma warning restore 612, 618
         }
     }

@@ -19,7 +19,7 @@ describe('Shell', () => {
       ]);
     await fixture.whenStable();
 
-    const items = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a.hd-nav__item')];
+    const items = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a.hd-nav__item[href^="/dashboards"]')];
     expect(items.map((i) => i.querySelector('span')?.textContent)).toEqual(['Hallway', 'Kitchen']);
     expect(items.map((i) => i.querySelector('.hd-pill')?.textContent ?? null)).toEqual([null, 'Draft']);
   });

@@ -1,0 +1,74 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "apps/api",
+        "--no-launch-profile",
+        "--artifacts-path",
+        "tmp/claude/api",
+        "--",
+        "--environment",
+        "Development",
+        "--urls",
+        "http://localhost:5212",
+        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash.db"
+      ],
+      "port": 5212
+    },
+    {
+      "name": "api-fake",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "apps/api",
+        "--no-launch-profile",
+        "--artifacts-path",
+        "tmp/claude/api",
+        "--",
+        "--environment",
+        "Development",
+        "--urls",
+        "http://localhost:5212",
+        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash.db",
+        "--Homey:Address="
+      ],
+      "port": 5212
+    },
+    {
+      "name": "display",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "nx",
+        "serve",
+        "display",
+        "--excludeTaskDependencies",
+        "--port",
+        "4300",
+        "--proxy-config",
+        ".claude/proxy.json"
+      ],
+      "port": 4300
+    },
+    {
+      "name": "management",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "nx",
+        "serve",
+        "management",
+        "--excludeTaskDependencies",
+        "--port",
+        "4301",
+        "--proxy-config",
+        ".claude/proxy.json"
+      ],
+      "port": 4301
+    }
+  ]
+}

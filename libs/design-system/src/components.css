@@ -13,6 +13,8 @@
   padding: calc(var(--cell) * var(--cell-gap));
   overflow-x: auto;
   overflow-y: hidden;
+  /* A scrollbar would take height from the cells, which must fill the screen exactly. */
+  scrollbar-width: none;
 }
 .hd-section { display: flex; flex-direction: column; gap: calc(var(--cell) * var(--cell-gap) * .6); flex: none; }
 .hd-section__title { font-size: calc(var(--cell) * .1); line-height: 1.2; font-weight: 700; color: var(--ink-muted); padding-inline: 4px; }
