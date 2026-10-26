@@ -49,7 +49,7 @@ The state of a display that cannot reach HomeyDash, or whose HomeyDash cannot re
 _Avoid_: Offline, stale, disconnected
 
 **Management**:
-A separate application, apart from the one displays run, where dashboards are built and displays are assigned a dashboard. The only place configuration changes. Opening it never triggers setup.
+A separate application, apart from the one displays run, where dashboards are built and displays are assigned a dashboard. AI assistants can make the same changes through the MCP server (ADR-0006), but Management is the only place where a dashboard is arranged visually and where dashboards and displays are deleted. Opening it never triggers setup.
 _Avoid_: Management environment, admin, settings, backend
 
 **Homey**:

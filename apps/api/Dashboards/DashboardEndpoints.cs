@@ -78,7 +78,7 @@ public static class DashboardEndpoints
     }
 
     // The screens of the displays assigned this dashboard.
-    private static async Task<List<Guid?>> ScreensShowingAsync(HomeyDashDbContext db, Guid id, CancellationToken ct) =>
+    public static async Task<List<Guid?>> ScreensShowingAsync(HomeyDashDbContext db, Guid id, CancellationToken ct) =>
         await db.Displays.Where(d => d.DashboardId == id).Select(d => d.ScreenId).ToListAsync(ct);
 
     public static async Task<List<DashboardSummary>> ListAsync(HomeyDashDbContext db, HomeyState homey, CancellationToken ct) =>
@@ -100,7 +100,7 @@ public static class DashboardEndpoints
     }
 
     // A tile sent without settings gets an empty object, so every stored tile has one.
-    private static DashboardLayout WithSettings(DashboardLayout layout)
+    public static DashboardLayout WithSettings(DashboardLayout layout)
     {
         var empty = JsonSerializer.SerializeToElement(new { });
         return layout with

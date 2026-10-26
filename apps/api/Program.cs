@@ -4,6 +4,7 @@ using HomeyDash.Api.Dashboards;
 using HomeyDash.Api.Data;
 using HomeyDash.Api.Displays;
 using HomeyDash.Api.Homey;
+using HomeyDash.Api.Mcp;
 using HomeyDash.Api.Realtime;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,6 +17,9 @@ builder.Services.AddDbContext<HomeyDashDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("HomeyDash")));
 builder.Services.AddHomey(builder.Configuration);
 builder.Services.AddRealtime();
+builder.Services.AddMcpServer()
+    .WithHttpTransport(options => options.Stateless = true)
+    .WithTools<ManagementTools>(ManagementTools.Json);
 
 var app = builder.Build();
 
@@ -36,5 +40,6 @@ api.MapHomey();
 api.MapDashboards();
 api.MapDisplays();
 app.MapHub<RealtimeHub>(RealtimeHub.Path);
+app.MapMcp(ManagementTools.Path);
 
 app.Run();
