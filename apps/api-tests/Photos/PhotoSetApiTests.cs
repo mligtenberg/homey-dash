@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using HomeyDash.Api.Data;
 using HomeyDash.Api.Photos;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HomeyDash.Api.Tests.Photos;
 
@@ -23,9 +25,31 @@ public class PhotoSetApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task Albums_ListWhatTheAccountCanSee()
     {
-        var albums = await _client.GetFromJsonAsync<JsonElement>("/api/accounts/immich/albums");
+        var albums = await _client.GetFromJsonAsync<JsonElement>("/api/accounts/immich/1/albums");
 
         Assert.Equal(["Garden", "Summer"], albums.EnumerateArray().Select(a => a.GetProperty("name").GetString()).Order());
+    }
+
+    [Fact]
+    public async Task TheFakeAccount_IsTheOnlyOneAndCannotBeChanged()
+    {
+        var info = await _client.GetFromJsonAsync<JsonElement>("/api/accounts/immich");
+
+        Assert.True(info.GetProperty("fake").GetBoolean());
+        Assert.Equal(["Fake Immich"], info.GetProperty("accounts").EnumerateArray().Select(a => a.GetProperty("name").GetString()));
+        var adding = await _client.PostAsJsonAsync("/api/accounts/immich", new { name = "Mine", address = "immich.local", apiKey = "key" });
+        Assert.Equal(HttpStatusCode.Conflict, adding.StatusCode);
+    }
+
+    [Fact]
+    public async Task APhotoSet_DrawsFromTheOldestAccountUnlessItNamesAnother()
+    {
+        var set = await CreateAsync();
+
+        Assert.Equal(1, set.GetProperty("accountId").GetInt32());
+        Assert.Equal("Fake Immich", set.GetProperty("accountName").GetString());
+        var unknown = await _client.PostAsJsonAsync("/api/photo-sets", new { albumId = FakeImmich.SummerId, accountId = 7 });
+        Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
     }
 
     [Fact]
@@ -122,7 +146,7 @@ public class PhotoSetApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task People_AreThoseWithANameInImmich()
     {
-        var people = await _client.GetFromJsonAsync<JsonElement>("/api/accounts/immich/people");
+        var people = await _client.GetFromJsonAsync<JsonElement>("/api/accounts/immich/1/people");
 
         Assert.Equal(["Anna", "Bram", "Cas"], people.EnumerateArray().Select(p => p.GetProperty("name").GetString()));
     }
@@ -231,9 +255,82 @@ public class ImmichAccountApiTests(RealImmichApiFactory factory) : IClassFixture
 {
     private readonly HttpClient _client = factory.CreateClient();
 
+    // Accounts as if set up earlier, since checking a new one needs an Immich that answers.
+    private async Task<int[]> SeedAsync(params string[] names)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HomeyDashDbContext>();
+        var accounts = names.Select(name => new ImmichAccount("http://127.0.0.1:1", "key") { Name = name }).ToList();
+        db.ImmichAccounts.AddRange(accounts);
+        await db.SaveChangesAsync();
+        scope.ServiceProvider.GetRequiredService<ImmichAccounts>().Set(db.ImmichAccounts.ToList());
+        return [.. accounts.Select(a => a.Id)];
+    }
+
+    private async Task RemoveAllAsync()
+    {
+        foreach (var account in (await _client.GetFromJsonAsync<JsonElement>("/api/accounts/immich")).GetProperty("accounts").EnumerateArray())
+            await _client.DeleteAsync($"/api/accounts/immich/{account.GetProperty("id").GetInt32()}");
+    }
+
+    [Fact]
+    public async Task AccountsOfAHome_ListOldestFirstWithoutTheirKeys()
+    {
+        await RemoveAllAsync();
+        await SeedAsync("Martin", "Anna");
+
+        var accounts = (await _client.GetFromJsonAsync<JsonElement>("/api/accounts/immich")).GetProperty("accounts").EnumerateArray().ToList();
+
+        Assert.Equal(["Martin", "Anna"], accounts.Select(a => a.GetProperty("name").GetString()));
+        Assert.All(accounts, a => Assert.False(a.TryGetProperty("apiKey", out _)));
+    }
+
+    [Fact]
+    public async Task TwoAccounts_CannotShareAName()
+    {
+        await RemoveAllAsync();
+        var ids = await SeedAsync("Home", "Studio");
+
+        // The address and key stay the same, so Immich isn't asked.
+        var response = await _client.PutAsJsonAsync($"/api/accounts/immich/{ids[1]}", new { name = " home ", address = "127.0.0.1:1" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(problem.GetProperty("errors").TryGetProperty("name", out _));
+        var renamed = await _client.PutAsJsonAsync($"/api/accounts/immich/{ids[1]}", new { name = "Attic", address = "127.0.0.1:1" });
+        Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
+    }
+
+    [Fact]
+    public async Task RemovingAnAccount_LeavesItsPhotoSetsWithoutOne()
+    {
+        await RemoveAllAsync();
+        var ids = await SeedAsync("Home", "Studio");
+        var setId = Guid.NewGuid();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<HomeyDashDbContext>();
+            db.PhotoSets.Add(new PhotoSet { Id = setId, Name = "Studio shots", AccountId = ids[1], AlbumId = FakeImmich.SummerId });
+            await db.SaveChangesAsync();
+        }
+
+        Assert.Equal(HttpStatusCode.OK, (await _client.DeleteAsync($"/api/accounts/immich/{ids[1]}")).StatusCode);
+
+        JsonElement set = default;
+        for (var i = 0; i < 100; i++)
+        {
+            set = (await _client.GetFromJsonAsync<JsonElement>("/api/photo-sets")).EnumerateArray().Single(s => s.GetProperty("id").GetGuid() == setId);
+            if (set.GetProperty("syncError").ValueKind == JsonValueKind.String) break;
+            await Task.Delay(50);
+        }
+        Assert.Equal(JsonValueKind.Null, set.GetProperty("accountId").ValueKind);
+        Assert.Contains("account was removed", set.GetProperty("syncError").GetString());
+    }
+
     [Fact]
     public async Task WithoutAnAccount_PhotoSetsAreRefused()
     {
+        await RemoveAllAsync();
         var response = await _client.PostAsJsonAsync("/api/photo-sets", new { name = "Summer", albumId = FakeImmich.SummerId });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -242,11 +339,13 @@ public class ImmichAccountApiTests(RealImmichApiFactory factory) : IClassFixture
     [Fact]
     public async Task AnAddressWhereNoImmichAnswers_IsRefused()
     {
-        var response = await _client.PutAsJsonAsync("/api/accounts/immich", new { address = "127.0.0.1:1", apiKey = "key" });
+        await RemoveAllAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/accounts/immich", new { name = "Home", address = "127.0.0.1:1", apiKey = "key" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(problem.GetProperty("errors").TryGetProperty("address", out _));
-        Assert.Equal(JsonValueKind.Null, (await _client.GetFromJsonAsync<JsonElement>("/api/accounts/immich")).GetProperty("address").ValueKind);
+        Assert.Equal(0, (await _client.GetFromJsonAsync<JsonElement>("/api/accounts/immich")).GetProperty("accounts").GetArrayLength());
     }
 }

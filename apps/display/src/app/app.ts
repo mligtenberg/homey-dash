@@ -11,7 +11,7 @@ import {
 import { LucideChevronLeft, LucideDynamicIcon, LucideLayers } from '@lucide/angular';
 import { Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
 import { cellSize } from '@homey-dash/layout';
-import { DashboardView, RealtimeTileData } from '@homey-dash/tiles';
+import { DashboardView, homeyLost, TileData, TileKindRegistry } from '@homey-dash/tiles';
 import { screenId, safeStorage } from './screen-id';
 import { Setup } from './setup';
 
@@ -34,7 +34,7 @@ const TAPE_KEY = 'homeydash.tape';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'hd-display',
-    '[class.is-connection-lost]': 'lost()',
+    '[class.is-connection-lost]': '!realtime.connected()',
     '[style.--cell.px]': 'cell()',
     '(window:resize)': 'onResize()',
     '(pointerdown)': 'touched()',
@@ -105,8 +105,9 @@ const TAPE_KEY = 'homeydash.tape';
   `,
 })
 export class App {
-  private readonly realtime = inject(Realtime);
-  private readonly homey = inject(RealtimeTileData);
+  protected readonly realtime = inject(Realtime);
+  private readonly data = inject(TileData);
+  private readonly kinds = inject(TileKindRegistry);
   private readonly injector = inject(Injector);
 
   protected readonly screenId = screenId();
@@ -114,12 +115,13 @@ export class App {
   protected readonly state = signal<ScreenState>({ kind: 'loading' }, {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
-  // Connection lost: HomeyDash cannot be reached, or HomeyDash cannot reach Homey (or has no Homey account yet).
-  // What is shown stays.
-  protected readonly lost = computed(() => {
-    const connection = this.homey.status()?.connection;
-    return !this.realtime.connected() || connection === 'disconnected' || connection === 'notSetUp';
-  });
+  // Connection lost: HomeyDash cannot be reached, which locks every tile, or HomeyDash cannot reach a Homey the shown
+  // dashboard has tiles of (or has no Homey account yet), which locks just those. What is shown stays.
+  protected readonly lost = computed(
+    () =>
+      !this.realtime.connected() ||
+      !!this.current()?.layout.sections.some((s) => s.tiles.some((t) => homeyLost(t, this.kinds.find(t.kind), this.data))),
+  );
   protected readonly view = computed(() => {
     const state = this.state();
     return state.kind === 'display' ? state.view : null;

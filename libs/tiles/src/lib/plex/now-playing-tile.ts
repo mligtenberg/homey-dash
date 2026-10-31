@@ -25,7 +25,7 @@ export function plexIdle(status: string | undefined, error: string | null | unde
 }
 
 /**
- * What plays on a Plex player, or on any (`plex-player:any`), over its artwork: title, who watches where, progress, and
+ * What plays on a player of the tile's Plex account, or on any of them (`plex-player:any`), over its artwork: title, who watches where, progress, and
  * buttons to skip back, play or pause, and skip on. With several sessions, a tile following any player moves through
  * them. A press opens the detail view with every session it follows. Buttons only work for players that take remote
  * control; the tile flashes when one refuses.
@@ -90,7 +90,7 @@ export function plexIdle(status: string | undefined, error: string | null | unde
       @for (item of sessions(); track item.id) {
         <div class="hd-plex-details__row">
           @if (item.image) {
-            <img class="hd-plex-details__poster" [src]="posterUrl(item.image)" alt="" draggable="false" />
+            <img class="hd-plex-details__poster" [src]="posterUrl(item, item.image)" alt="" draggable="false" />
           }
           <div class="hd-plex-details__info">
             <div class="hd-details__label">{{ item.title }}</div>
@@ -139,10 +139,13 @@ export class NowPlayingTile extends TileView {
   protected readonly backIcon = LucideSkipBack;
   protected readonly forwardIcon = LucideSkipForward;
 
-  /** The sessions this tile follows: one player's, or every one. */
+  private readonly overview = computed(() => this.plex.overview(this.settings().account));
+
+  /** The sessions this tile follows on its account: one player's, or every one. */
   protected readonly sessions = computed(() => {
     const target = this.settings().target;
-    const sessions = this.plex.sessions();
+    const accountId = this.overview()?.accountId;
+    const sessions = this.plex.sessions().filter((s) => s.accountId === accountId);
     if (!target || target === ANY_PLEX_PLAYER) return sessions;
     return sessions.filter((s) => `plex-player:${s.playerId}` === target);
   });
@@ -160,15 +163,16 @@ export class NowPlayingTile extends TileView {
     const look = { icon: LucideTv, hue: 'neutral' as const };
     const label = this.settings().label;
     const session = this.session();
-    const overview = this.plex.overview();
+    const overview = this.overview();
+    const status = this.plex.status(this.settings().account);
     if (!this.settings().target) return { ...look, name: label || 'Now playing', detail: 'Pick a player', state: 'unset' };
     if (session) return { ...look, name: label || session.title, detail: session.subtitle ?? '', details: true, state: 'ok' };
     const player = overview?.players.find((p) => `plex-player:${p.id}` === this.settings().target);
     return {
       ...look,
       name: label || player?.name || 'Plex',
-      detail: plexIdle(overview?.status, overview?.error),
-      state: overview?.status === 'connected' || !overview ? 'ok' : 'unavailable',
+      detail: plexIdle(status, overview?.error),
+      state: status === 'connected' || !status ? 'ok' : 'unavailable',
     };
   });
 
@@ -214,14 +218,14 @@ export class NowPlayingTile extends TileView {
   protected artUrl(session: LivePlexSession) {
     const wide = this.size() === 'wide' || this.size() === 'full' || this.size() === 'full-large';
     const path = (wide ? session.art : null) ?? session.image ?? session.art;
-    return path ? plexImageUrl(path, wide ? 1280 : 720, 720) : null;
+    return path ? plexImageUrl(session.accountId, path, wide ? 1280 : 720, 720) : null;
   }
 
-  protected posterUrl(path: string) {
-    return plexImageUrl(path, 200, 300);
+  protected posterUrl(session: LivePlexSession, path: string) {
+    return plexImageUrl(session.accountId, path, 200, 300);
   }
 
   protected control(session: LivePlexSession, command: PlexCommand) {
-    this.send(() => this.realtime.controlPlex(session.playerId, command), 'quiet');
+    this.send(() => this.realtime.controlPlex(session.accountId, session.playerId, command), 'quiet');
   }
 }

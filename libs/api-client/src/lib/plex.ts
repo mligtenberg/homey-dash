@@ -22,6 +22,8 @@ export interface PlexSession {
   user: string | null;
   playerId: string;
   playerName: string;
+  /** The account whose server plays it. */
+  accountId: number;
 }
 
 /** Something newly added to a library. */
@@ -48,8 +50,12 @@ export interface PlexPlayer {
   name: string;
 }
 
-/** Plex as tiles see it. `loaded` is false until the libraries first arrived; nothing is missing then. */
+/**
+ * One Plex account as tiles see it. `loaded` is false until the libraries first arrived; nothing is missing then.
+ */
 export interface PlexOverview {
+  accountId: number;
+  accountName: string;
   status: 'notSetUp' | 'choosingServer' | 'connected' | 'disconnected';
   error: string | null;
   loaded: boolean;
@@ -57,8 +63,9 @@ export interface PlexOverview {
   players: PlexPlayer[];
 }
 
+/** Every Plex account, oldest first, and what plays on any of them. */
 export interface PlexSnapshot {
-  overview: PlexOverview;
+  accounts: PlexOverview[];
   sessions: PlexSession[];
 }
 
@@ -77,27 +84,39 @@ export function plexLibraryTarget(library: Pick<PlexLibrary, 'id'>) {
   return `plex-library:${library.id}`;
 }
 
-/** A picture from the Plex server, scaled by it to fit `width` × `height`. */
-export function plexImageUrl(path: string, width: number, height: number) {
-  return `/api/plex/image?path=${encodeURIComponent(path)}&w=${Math.round(width)}&h=${Math.round(height)}`;
+/** A picture from a Plex account's server, scaled by it to fit `width` × `height`. */
+export function plexImageUrl(accountId: number, path: string, width: number, height: number) {
+  return `/api/plex/image?account=${accountId}&path=${encodeURIComponent(path)}&w=${Math.round(width)}&h=${Math.round(height)}`;
 }
 
-/** A sign-in waiting for someone to approve it at `authUrl`, or one that failed. */
+/**
+ * A sign-in waiting for someone to approve it at `authUrl`, or one that failed. `accountId` is the account signed in
+ * again, null for a new one that will be called `name`.
+ */
 export interface PlexSignInStatus {
   state: 'waiting' | 'failed';
   authUrl: string | null;
   error: string | null;
+  accountId: number | null;
+  name: string;
 }
 
-/** The Plex account. Its tokens never leave HomeyDash. */
-export interface PlexAccountInfo {
-  /** HomeyDash runs against a fake Plex, set in its configuration. */
-  fake: boolean;
-  signedIn: boolean;
+/** A Plex account. Its tokens never leave HomeyDash. */
+export interface PlexAccount {
+  id: number;
+  /** Tells a home's Plex accounts apart, such as which server it shows. */
+  name: string;
   username: string | null;
   /** Null while someone has to choose one of the account's servers. */
   serverId: string | null;
   serverName: string | null;
+}
+
+export interface PlexAccounts {
+  /** HomeyDash runs against a fake Plex, set in its configuration, whose one account can't be changed. */
+  fake: boolean;
+  /** Oldest first; a Plex tile shows the first unless its settings name another. */
+  accounts: PlexAccount[];
   signIn: PlexSignInStatus | null;
 }
 
@@ -108,33 +127,41 @@ export interface PlexServer {
   owned: boolean;
 }
 
-/** Signing in with Plex, and choosing its server. */
+/** Signing in with Plex, and choosing each account's server. Changes answer with every account. */
 @Injectable({ providedIn: 'root' })
 export class PlexAccountApi {
   private readonly http = inject(HttpClient);
 
-  get() {
-    return this.http.get<PlexAccountInfo>('/api/accounts/plex');
+  list() {
+    return this.http.get<PlexAccounts>('/api/accounts/plex');
   }
 
-  /** Starts signing in: open `url`, Plex's own page, for someone to approve HomeyDash. */
-  signIn() {
-    return this.http.post<{ url: string }>('/api/accounts/plex/sign-in', null);
+  /**
+   * Starts signing in a new account called `name`, or again the account `accountId`, which keeps its tiles: open
+   * `url`, Plex's own page, for someone to approve HomeyDash.
+   */
+  signIn(change: { name: string } | { accountId: number }) {
+    return this.http.post<{ url: string }>('/api/accounts/plex/sign-in', change);
   }
 
   cancelSignIn() {
     return this.http.delete<void>('/api/accounts/plex/sign-in');
   }
 
-  servers() {
-    return this.http.get<PlexServer[]>('/api/accounts/plex/servers');
+  rename(id: number, name: string) {
+    return this.http.put<PlexAccounts>(`/api/accounts/plex/${id}`, { name });
   }
 
-  chooseServer(id: string) {
-    return this.http.put<PlexAccountInfo>('/api/accounts/plex/server', { id });
+  servers(id: number) {
+    return this.http.get<PlexServer[]>(`/api/accounts/plex/${id}/servers`);
   }
 
-  signOut() {
-    return this.http.delete<void>('/api/accounts/plex');
+  chooseServer(id: number, serverId: string) {
+    return this.http.put<PlexAccounts>(`/api/accounts/plex/${id}/server`, { id: serverId });
+  }
+
+  /** Its Plex tiles show Plex as not set up until they are given another account. */
+  remove(id: number) {
+    return this.http.delete<PlexAccounts>(`/api/accounts/plex/${id}`);
   }
 }

@@ -15,6 +15,9 @@ public sealed class PhotoSet
     public Guid Id { get; init; } = Guid.NewGuid();
     public required string Name { get; set; }
 
+    // The Immich account it draws from. Null once that account is removed, until it is given another.
+    public int? AccountId { get; set; }
+
     // The Immich album it follows, and that album's name when it last synced. Null for a selection.
     public string? AlbumId { get; set; }
     public string AlbumName { get; set; } = "";

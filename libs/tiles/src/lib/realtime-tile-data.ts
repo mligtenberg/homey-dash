@@ -1,68 +1,56 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
-import {
-  HomeyApi,
-  HomeyCatalog,
-  HomeyDevice,
-  HomeyFlow,
-  HomeyFlowFolder,
-  HomeyInsightLog,
-  HomeyMood,
-  HomeyStatus,
-  HomeyZone,
-  PhotoSet,
-  Realtime,
-} from '@homey-dash/api-client';
-import { TileData } from './tile-data';
+import { HomeyApi, HomeyCatalog, HomeySnapshot, PhotoSet, Realtime } from '@homey-dash/api-client';
+import { HomeyData, TileData } from './tile-data';
 
 function byId<T extends { id: string }>(items: T[]): ReadonlyMap<string, T> {
   return new Map(items.map((item) => [item.id, item]));
+}
+
+function catalog({ flows, moods, zones, flowFolders }: Omit<HomeyCatalog, 'accountId'>) {
+  return { flows: byId(flows), moods: byId(moods), zones: byId(zones), flowFolders: byId(flowFolders) };
 }
 
 /** Tile data from HomeyDash's realtime connection: a snapshot on every (re)connect, then each change as it happens. */
 @Injectable({ providedIn: 'root' })
 export class RealtimeTileData extends TileData {
   private readonly realtime = inject(Realtime);
-  private readonly homey = inject(HomeyApi);
+  private readonly homeyApi = inject(HomeyApi);
 
-  readonly loaded = signal(false);
-  readonly devices = signal<ReadonlyMap<string, HomeyDevice>>(new Map());
-  readonly flows = signal<ReadonlyMap<string, HomeyFlow>>(new Map());
-  readonly moods = signal<ReadonlyMap<string, HomeyMood>>(new Map());
-  readonly insights = signal<ReadonlyMap<string, HomeyInsightLog>>(new Map());
-  readonly zones = signal<ReadonlyMap<string, HomeyZone>>(new Map());
-  readonly flowFolders = signal<ReadonlyMap<string, HomeyFlowFolder>>(new Map());
+  readonly homeys = signal<readonly HomeyData[] | null>(null);
   readonly photoSets = signal<ReadonlyMap<string, PhotoSet>>(new Map());
   readonly photoSetsLoaded = signal(false);
-  /** HomeyDash's connection to Homey; null until the first snapshot. */
-  readonly status = signal<HomeyStatus | null>(null);
 
   // Changes that arrive while a snapshot loads wait for it, so the snapshot cannot undo them.
   private queued: (() => void)[] | null = null;
-  private insightsLoaded = false;
+  // Accounts whose insight logs loaded, or are loading.
+  private readonly insightsLoaded = new Set<number>();
 
   constructor() {
     super();
     const stops = [
-      this.realtime.on('DeviceChanged', (device) =>
-        this.apply(() => this.devices.update((devices) => new Map(devices).set(device.id, device))),
+      this.realtime.on('Homeys', (snapshots) => this.apply(() => this.setHomeys(snapshots))),
+      this.realtime.on('DeviceChanged', ({ accountId, device }) =>
+        this.apply(() => this.change(accountId, (h) => ({ ...h, devices: new Map(h.devices).set(device.id, device) }))),
       ),
-      this.realtime.on('DeviceRemoved', (id) =>
+      this.realtime.on('DeviceRemoved', ({ accountId, deviceId }) =>
         this.apply(() =>
-          this.devices.update((devices) => {
-            const next = new Map(devices);
-            next.delete(id);
-            return next;
+          this.change(accountId, (h) => {
+            const devices = new Map(h.devices);
+            devices.delete(deviceId);
+            return { ...h, devices };
           }),
         ),
       ),
-      // Homey sends its catalog once its data first arrives.
-      this.realtime.on('Catalog', (catalog) =>
+      // A Homey sends its catalog once its data first arrives.
+      this.realtime.on('Catalog', (message) =>
+        this.apply(() => this.change(message.accountId, (h) => ({ ...h, ...catalog(message), loaded: true }))),
+      ),
+      this.realtime.on('HomeyStatus', (status) =>
         this.apply(() => {
-          this.setCatalog(catalog);
-          this.loaded.set(true);
+          this.change(status.accountId, (h) => ({ ...h, status }));
+          if (status.connection === 'connected') this.loadInsights(status.accountId);
         }),
       ),
-      this.realtime.on('HomeyStatus', (status) => this.apply(() => this.status.set(status))),
       this.realtime.on('PhotoSets', (sets) => this.setPhotoSets(sets)),
       this.realtime.whenConnected(() => this.load()),
       this.realtime.whenConnected(() => this.loadPhotoSets()),
@@ -75,11 +63,26 @@ export class RealtimeTileData extends TileData {
     else change();
   }
 
-  private setCatalog({ flows, moods, zones, flowFolders }: HomeyCatalog) {
-    this.flows.set(byId(flows));
-    this.moods.set(byId(moods));
-    this.zones.set(byId(zones));
-    this.flowFolders.set(byId(flowFolders));
+  private change(accountId: number, change: (homey: HomeyData) => HomeyData) {
+    this.homeys.update((homeys) => homeys?.map((h) => (h.accountId === accountId ? change(h) : h)) ?? null);
+  }
+
+  // Insight logs already loaded stay, for they don't come with the snapshot.
+  private setHomeys(snapshots: HomeySnapshot[]) {
+    const before = new Map((this.homeys() ?? []).map((h) => [h.accountId, h]));
+    this.homeys.set(
+      snapshots.map((s) => ({
+        accountId: s.accountId,
+        accountName: s.accountName,
+        status: s.status,
+        loaded: s.loaded,
+        devices: byId(s.devices),
+        ...catalog(s),
+        insights: before.get(s.accountId)?.insights ?? new Map(),
+      })),
+    );
+    for (const id of this.insightsLoaded) if (!snapshots.some((s) => s.accountId === id)) this.insightsLoaded.delete(id);
+    snapshots.forEach((s) => this.loadInsights(s.accountId));
   }
 
   private setPhotoSets(sets: PhotoSet[]) {
@@ -98,11 +101,7 @@ export class RealtimeTileData extends TileData {
   private async load() {
     this.queued = [];
     try {
-      const snapshot = await this.realtime.homey();
-      this.status.set(snapshot.status);
-      this.devices.set(byId(snapshot.devices));
-      this.setCatalog(snapshot);
-      this.loaded.set(snapshot.loaded);
+      this.setHomeys(await this.realtime.homey());
     } catch {
       // The connection dropped again; the next reconnect loads it.
     } finally {
@@ -110,18 +109,16 @@ export class RealtimeTileData extends TileData {
       this.queued = null;
       queued.forEach((change) => change());
     }
-    this.loadInsights();
   }
 
-  // Insight logs are many and rarely change, so they load over REST until they once succeed.
-  private loadInsights() {
-    if (this.insightsLoaded) return;
-    this.homey.insights().subscribe({
-      next: (logs) => {
-        this.insights.set(byId(logs));
-        this.insightsLoaded = true;
-      },
-      error: () => undefined, // Homey unreachable: statistic tiles show as missing until the next connect.
+  // Insight logs are many and rarely change, so they load over REST, per Homey, until they once succeed.
+  private loadInsights(accountId: number) {
+    if (this.insightsLoaded.has(accountId)) return;
+    this.insightsLoaded.add(accountId);
+    this.homeyApi.insights(accountId).subscribe({
+      next: (logs) => this.change(accountId, (h) => ({ ...h, insights: byId(logs) })),
+      // Homey unreachable: statistic tiles show as missing until it connects again.
+      error: () => this.insightsLoaded.delete(accountId),
     });
   }
 }

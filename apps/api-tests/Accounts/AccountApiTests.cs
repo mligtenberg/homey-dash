@@ -12,64 +12,99 @@ public class AccountApiTests(RealHomeyApiFactory factory) : IClassFixture<RealHo
 
     private readonly HttpClient _client = factory.CreateClient();
 
-    private async Task<JsonElement> HomeyAccountAsync() =>
-        await _client.GetFromJsonAsync<JsonElement>("/api/accounts/homey");
+    private async Task<JsonElement> HomeyAccountsAsync() =>
+        (await _client.GetFromJsonAsync<JsonElement>("/api/accounts/homey")).GetProperty("accounts");
+
+    private async Task RemoveAllAsync()
+    {
+        foreach (var account in (await HomeyAccountsAsync()).EnumerateArray())
+            await _client.DeleteAsync($"/api/accounts/homey/{account.GetProperty("id").GetInt32()}");
+    }
+
+    private async Task<JsonElement> AddAsync(string name, string address = NoHomey, string apiKey = "secret-key")
+    {
+        var response = await _client.PostAsJsonAsync("/api/accounts/homey", new { name, address, apiKey });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("accounts").EnumerateArray()
+            .Single(a => a.GetProperty("name").GetString() == name);
+    }
 
     [Fact]
     public async Task WithoutAnAccount_HomeyIsNotSetUp()
     {
-        await _client.DeleteAsync("/api/accounts/homey");
+        await RemoveAllAsync();
 
-        var account = await HomeyAccountAsync();
-        Assert.False(account.GetProperty("fake").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, account.GetProperty("address").ValueKind);
+        var info = await _client.GetFromJsonAsync<JsonElement>("/api/accounts/homey");
+        Assert.False(info.GetProperty("fake").GetBoolean());
+        Assert.Equal(0, info.GetProperty("accounts").GetArrayLength());
         await Eventually(async () =>
             (await _client.GetFromJsonAsync<JsonElement>("/api/homey/status")).GetProperty("connection").GetString() == "notSetUp");
     }
 
     [Fact]
-    public async Task SettingUpHomey_KeepsTheKeyInTheBackend()
+    public async Task AddingAHomey_KeepsTheKeyInTheBackend()
     {
-        var response = await _client.PutAsJsonAsync("/api/accounts/homey", new { address = NoHomey, apiKey = "secret-key" });
+        await RemoveAllAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/accounts/homey", new { name = "Home", address = NoHomey, apiKey = "secret-key" });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.DoesNotContain("secret-key", await response.Content.ReadAsStringAsync());
-        Assert.Equal("http://127.0.0.1:9", (await HomeyAccountAsync()).GetProperty("address").GetString());
+        Assert.Equal("http://127.0.0.1:9", (await HomeyAccountsAsync())[0].GetProperty("address").GetString());
         Assert.DoesNotContain("secret-key", await _client.GetStringAsync("/api/accounts/homey"));
     }
 
     [Fact]
     public async Task ChangingTheAddress_KeepsTheKey()
     {
-        await _client.PutAsJsonAsync("/api/accounts/homey", new { address = NoHomey, apiKey = "secret-key" });
+        await RemoveAllAsync();
+        var id = (await AddAsync("Home")).GetProperty("id").GetInt32();
 
-        var response = await _client.PutAsJsonAsync("/api/accounts/homey", new { address = "127.0.0.2:9" });
+        var response = await _client.PutAsJsonAsync($"/api/accounts/homey/{id}", new { name = "Home", address = "127.0.0.2:9" });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("http://127.0.0.2:9", (await HomeyAccountAsync()).GetProperty("address").GetString());
+        Assert.Equal("http://127.0.0.2:9", (await HomeyAccountsAsync())[0].GetProperty("address").GetString());
     }
 
     [Fact]
-    public async Task ANewAccount_NeedsAnAddressAndAKey()
+    public async Task ANewAccount_NeedsANameAnAddressAndAKey()
     {
-        await _client.DeleteAsync("/api/accounts/homey");
-
-        var response = await _client.PutAsJsonAsync("/api/accounts/homey", new { address = "not a url" });
+        var response = await _client.PostAsJsonAsync("/api/accounts/homey", new { address = "not a url" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var errors = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
+        Assert.True(errors.TryGetProperty("name", out _));
         Assert.True(errors.TryGetProperty("address", out _));
         Assert.True(errors.TryGetProperty("apiKey", out _));
     }
 
     [Fact]
-    public async Task RemovingTheAccount_ForgetsIt()
+    public async Task SeveralHomeys_EachConnectAndNeedTheirOwnName()
     {
-        await _client.PutAsJsonAsync("/api/accounts/homey", new { address = NoHomey, apiKey = "secret-key" });
+        await RemoveAllAsync();
+        var first = (await AddAsync("Home")).GetProperty("id").GetInt32();
+        var second = (await AddAsync("Holiday home")).GetProperty("id").GetInt32();
 
-        Assert.Equal(HttpStatusCode.NoContent, (await _client.DeleteAsync("/api/accounts/homey")).StatusCode);
+        var duplicate = await _client.PostAsJsonAsync("/api/accounts/homey", new { name = "home", address = NoHomey, apiKey = "key" });
 
-        Assert.Equal(JsonValueKind.Null, (await HomeyAccountAsync()).GetProperty("address").ValueKind);
+        Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
+        await Eventually(async () =>
+            (await _client.GetFromJsonAsync<JsonElement>($"/api/homey/status?account={second}")).GetProperty("connection").GetString() == "disconnected");
+        var oldest = await _client.GetFromJsonAsync<JsonElement>("/api/homey/status");
+        Assert.Equal(first, oldest.GetProperty("accountId").GetInt32());
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync("/api/homey/status?account=999")).StatusCode);
+    }
+
+    [Fact]
+    public async Task RemovingAnAccount_ForgetsIt()
+    {
+        await RemoveAllAsync();
+        var id = (await AddAsync("Home")).GetProperty("id").GetInt32();
+
+        Assert.Equal(HttpStatusCode.OK, (await _client.DeleteAsync($"/api/accounts/homey/{id}")).StatusCode);
+
+        Assert.Equal(0, (await HomeyAccountsAsync()).GetArrayLength());
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.DeleteAsync($"/api/accounts/homey/{id}")).StatusCode);
     }
 
     [Theory]
@@ -99,12 +134,16 @@ public class FakeHomeyAccountApiTests(ApiFactory factory) : IClassFixture<ApiFac
     private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
-    public async Task AFakeHomey_CannotBeReplacedByAnAccount()
+    public async Task AFakeHomey_HasOneAccountThatCannotChange()
     {
-        Assert.True((await _client.GetFromJsonAsync<JsonElement>("/api/accounts/homey")).GetProperty("fake").GetBoolean());
+        var info = await _client.GetFromJsonAsync<JsonElement>("/api/accounts/homey");
+        Assert.True(info.GetProperty("fake").GetBoolean());
+        Assert.Equal("Fake Homey", Assert.Single(info.GetProperty("accounts").EnumerateArray()).GetProperty("name").GetString());
 
-        var response = await _client.PutAsJsonAsync("/api/accounts/homey", new { address = "192.168.1.10", apiKey = "key" });
+        var added = await _client.PostAsJsonAsync("/api/accounts/homey", new { name = "Home", address = "192.168.1.10", apiKey = "key" });
+        var removed = await _client.DeleteAsync("/api/accounts/homey/1");
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, added.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, removed.StatusCode);
     }
 }

@@ -1,11 +1,30 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Tile } from '@homey-dash/api-client';
+import { Realtime, Tile } from '@homey-dash/api-client';
+import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { CORE_TILES } from './core/core-tiles';
+import { RealtimeTileData } from './realtime-tile-data';
+import { TileData } from './tile-data';
 import { provideTileModules } from './tile-kind';
 import { TileHost } from './tile-host';
 
 describe('TileHost', () => {
-  beforeEach(() => TestBed.configureTestingModule({ providers: [provideTileModules(CORE_TILES)] }));
+  let realtime: FakeRealtime;
+
+  beforeEach(() => {
+    realtime = new FakeRealtime();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideTileModules(CORE_TILES),
+        { provide: Realtime, useValue: realtime },
+        { provide: TileData, useExisting: RealtimeTileData },
+      ],
+    });
+  });
 
   function render(tile: Partial<Tile>) {
     const fixture = TestBed.createComponent(TileHost);
@@ -13,6 +32,17 @@ describe('TileHost', () => {
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
+
+  it("is lost while HomeyDash can't reach the Homey of a Homey tile", async () => {
+    TestBed.inject(TileData);
+    await TestBed.inject(ApplicationRef).whenStable();
+    const host = render({ kind: 'device', settings: { target: 'd1' } });
+
+    realtime.push('HomeyStatus', { accountId: 1, connection: 'disconnected', lastError: null, since: '', fake: false });
+    await TestBed.inject(ApplicationRef).whenStable();
+
+    expect(host.classList).toContain('is-homey-lost');
+  });
 
   it('places the tile on its grid cell', () => {
     const host = render({});

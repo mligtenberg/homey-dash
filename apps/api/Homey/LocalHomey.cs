@@ -6,15 +6,15 @@ using HomeyDash.Api.Accounts;
 namespace HomeyDash.Api.Homey;
 
 /// <summary>
-/// The one connection to Homey (ADR-0002): loads a snapshot over the local REST API, then keeps
-/// <see cref="HomeyState"/> current from the realtime socket, and reconnects whenever either fails. It connects to
-/// the Homey account set up in Management (ADR-0007), waits while there is none, and starts over when it changes.
+/// The connection to the Homey of one account (ADR-0002): loads a snapshot over the local REST API, then keeps
+/// <see cref="HomeyState"/> current from the realtime socket, and reconnects whenever either fails. Runs for as long as
+/// <see cref="LocalHomeys"/> keeps the account (ADR-0007) as it is.
 /// </summary>
 public sealed class LocalHomey(
     IHttpClientFactory httpFactory,
-    CurrentHomeyAccount accounts,
+    HomeyAccount account,
     HomeyState state,
-    ILogger<LocalHomey> logger) : BackgroundService, IHomey
+    ILogger<LocalHomey> logger) : IHomey
 {
     public const string HttpClientName = "Homey";
 
@@ -24,6 +24,10 @@ public sealed class LocalHomey(
     private string _namespace = "/";
 
     public static TimeSpan FirstRetryDelay { get; set; } = TimeSpan.FromSeconds(1);
+
+    public HomeyAccount Account => account;
+
+    public HomeyState State => state;
 
     private static void ConfigureHttpClient(HttpClient http, HomeyAccount account)
     {
@@ -43,31 +47,19 @@ public sealed class LocalHomey(
         return cts;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken ct)
+    // Keeps connected until cancelled.
+    public async Task RunAsync(CancellationToken ct)
     {
-        while (!ct.IsCancellationRequested)
+        try
         {
-            var (account, replaced) = accounts.Get();
-            using var session = CancellationTokenSource.CreateLinkedTokenSource(ct, replaced);
-            try
-            {
-                if (account is null)
-                {
-                    state.SetStatus(HomeyConnection.NotSetUp);
-                    await Task.Delay(Timeout.Infinite, session.Token);
-                }
-                else
-                {
-                    await KeepConnectedAsync(account, session.Token);
-                }
-            }
-            catch (OperationCanceledException) when (session.IsCancellationRequested)
-            {
-            }
+            await KeepConnectedAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
         }
     }
 
-    private async Task KeepConnectedAsync(HomeyAccount account, CancellationToken ct)
+    private async Task KeepConnectedAsync(CancellationToken ct)
     {
         var delay = FirstRetryDelay;
         while (!ct.IsCancellationRequested)
@@ -75,7 +67,7 @@ public sealed class LocalHomey(
             try
             {
                 state.SetStatus(HomeyConnection.Connecting, state.Status.LastError);
-                await RunSessionAsync(account, onConnected: () => delay = FirstRetryDelay, ct);
+                await RunSessionAsync(onConnected: () => delay = FirstRetryDelay, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -83,7 +75,7 @@ public sealed class LocalHomey(
             }
             catch (Exception e)
             {
-                logger.LogWarning("Connection to Homey lost: {Error}. Retrying in {Delay}", e.Message, delay);
+                logger.LogWarning("Connection to Homey {Account} lost: {Error}. Retrying in {Delay}", account.Name, e.Message, delay);
                 state.SetStatus(HomeyConnection.Disconnected, e.Message);
             }
 
@@ -92,10 +84,10 @@ public sealed class LocalHomey(
         }
     }
 
-    private async Task RunSessionAsync(HomeyAccount account, Action onConnected, CancellationToken ct)
+    private async Task RunSessionAsync(Action onConnected, CancellationToken ct)
     {
         var address = new Uri(account.Address);
-        var homeyId = await PingAsync(account, ct);
+        var homeyId = await PingAsync(ct);
 
         await using var socket = await SocketIoClient.ConnectAsync(address, ct);
         var handshake = await socket.EmitWithAckAsync("/", "handshakeClient",
@@ -117,8 +109,8 @@ public sealed class LocalHomey(
 
             state.SetStatus(HomeyConnection.Connected);
             onConnected();
-            logger.LogInformation("Connected to Homey {HomeyId}: {Devices} devices, {Flows} flows, {Moods} moods",
-                homeyId, state.Devices.Count(), state.Flows.Count(), state.Moods.Count());
+            logger.LogInformation("Connected to Homey {Account} ({HomeyId}): {Devices} devices, {Flows} flows, {Moods} moods",
+                account.Name, homeyId, state.Devices.Count(), state.Flows.Count(), state.Moods.Count());
 
             await socket.Completion.WaitAsync(ct);
             throw new InvalidOperationException("Homey's realtime connection ended");
@@ -130,9 +122,9 @@ public sealed class LocalHomey(
         }
     }
 
-    private async Task<string> PingAsync(HomeyAccount account, CancellationToken ct)
+    private async Task<string> PingAsync(CancellationToken ct)
     {
-        using var response = await Http(account).GetAsync("api/manager/system/ping", ct);
+        using var response = await Http().GetAsync("api/manager/system/ping", ct);
         response.EnsureSuccessStatusCode();
         return response.Headers.TryGetValues("X-Homey-ID", out var ids)
             ? ids.First()
@@ -274,9 +266,8 @@ public sealed class LocalHomey(
         }
     }
 
-    private HttpClient Http(HomeyAccount? account = null)
+    private HttpClient Http()
     {
-        account ??= accounts.Account ?? throw new HomeyUnavailableException("Homey is not set up yet");
         var http = httpFactory.CreateClient(HttpClientName);
         ConfigureHttpClient(http, account);
         return http;

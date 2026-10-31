@@ -130,5 +130,6 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
         var flows = Json(await CallAsync(mcp, "list_targets", new { type = "flow" }));
 
         Assert.NotEqual(0, flows.GetArrayLength());
+        Assert.All(flows.EnumerateArray(), f => Assert.Equal(1, f.GetProperty("account").GetInt32()));
     }
 }

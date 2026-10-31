@@ -2,9 +2,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Realtime, ScreenView } from '@homey-dash/api-client';
+import { HomeySnapshot, Realtime, ScreenView, Tile } from '@homey-dash/api-client';
 import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { cellSize } from '@homey-dash/layout';
+import { CORE_TILES, provideTileModules, RealtimeTileData, TileData } from '@homey-dash/tiles';
 import { App, IDLE_MS } from './app';
 
 const hallway = { id: 'd1', name: 'Hallway', dashboardId: null, otherDashboardIds: [] };
@@ -26,7 +27,13 @@ describe('App', () => {
     realtime = new FakeRealtime();
     TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: Realtime, useValue: realtime }],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideTileModules(CORE_TILES),
+        { provide: Realtime, useValue: realtime },
+        { provide: TileData, useExisting: RealtimeTileData },
+      ],
     });
   });
 
@@ -201,12 +208,50 @@ describe('App', () => {
     expect(root.querySelector('.hd-reconnecting')).not.toBeNull();
   });
 
-  it('shows connection lost when HomeyDash cannot reach Homey', async () => {
-    const root = await start(published(1));
+  describe('with two Homeys', () => {
+    const homey = (accountId: number): HomeySnapshot => ({
+      ...realtime.homeySnapshot[0],
+      accountId,
+      accountName: `Homey ${accountId}`,
+      status: { ...realtime.homeySnapshot[0].status, accountId },
+    });
+    const lamp = (id: string, column: number, account?: number): Tile => ({
+      id,
+      kind: 'device',
+      size: 'small',
+      position: { column, row: 0 },
+      settings: account ? { target: 'lamp', account } : { target: 'lamp' },
+    });
+    const withTiles = (...tiles: Tile[]): ScreenView => ({
+      display: { ...hallway, dashboardId: 'k1' },
+      dashboards: [{ ...dashboard('k1', 'Kitchen'), layout: { rows: 4, sections: [{ id: 's1', title: '', tiles }] } }],
+    });
+    const lost = (accountId: number) =>
+      realtime.push('HomeyStatus', { accountId, connection: 'disconnected', lastError: 'timeout', since: '', fake: false });
 
-    realtime.push('HomeyStatus', { connection: 'disconnected', lastError: 'timeout', since: '', fake: false });
-    await stable();
+    beforeEach(() => (realtime.homeySnapshot = [homey(1), homey(2)]));
 
-    expect(root.classList).toContain('is-connection-lost');
+    it("locks just the tiles of a Homey HomeyDash can't reach, and shows reconnecting", async () => {
+      const root = await start(withTiles(lamp('t1', 0), lamp('t2', 1, 2)));
+
+      lost(2);
+      await stable();
+
+      const hosts = root.querySelectorAll('hd-tile-host');
+      expect(root.classList).not.toContain('is-connection-lost');
+      expect(hosts[0].classList).not.toContain('is-homey-lost');
+      expect(hosts[1].classList).toContain('is-homey-lost');
+      expect(root.querySelector('.hd-reconnecting')).not.toBeNull();
+    });
+
+    it('shows no reconnecting for a lost Homey the dashboard has no tiles of', async () => {
+      const root = await start(withTiles(lamp('t1', 0)));
+
+      lost(2);
+      await stable();
+
+      expect(root.querySelector('hd-tile-host')?.classList).not.toContain('is-homey-lost');
+      expect(root.querySelector('.hd-reconnecting')).toBeNull();
+    });
   });
 });

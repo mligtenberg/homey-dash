@@ -1,16 +1,17 @@
 import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ImmichAlbum, PhotoSelection, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
+import { ImmichAccount, ImmichAccountApi, ImmichAlbum, PhotoSelection, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
 import { RealtimeTileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
 import { timeAgo } from './displays-page';
-import { albumLabel, loadAlbums, problem } from './immich-albums';
+import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue, problem } from './immich-albums';
 import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-selection-form';
 
 /**
  * Every photo set (ADR-0008), kept current over the realtime connection: the Immich album it follows or the rules it
  * draws photos by, its photos, when it last synced and the dashboards that show it. HomeyDash syncs albums every 15
- * minutes and draws again as each set's rules say; Sync now or Draw again does it at once.
+ * minutes and draws again as each set's rules say; Sync now or Draw again does it at once. With several Immich
+ * accounts, each set says which one it draws from, and albums are grouped by account.
  */
 @Component({
   selector: 'hd-photo-sets-page',
@@ -39,9 +40,19 @@ import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-
               <div class="hd-field">
                 <label class="hd-field__label" for="new-album">Immich album</label>
                 <select #album id="new-album" class="hd-select" (change)="chosenAlbum.set(album.value)" (keydown.escape)="adding.set(false)">
-                  <option value="" selected>{{ albums() ? 'Choose an album' : 'Loading albums…' }}</option>
-                  @for (option of albums(); track option.id) {
-                    <option [value]="option.id">{{ label(option) }}</option>
+                  <option value="" selected>{{ groups() ? 'Choose an album' : 'Loading albums…' }}</option>
+                  @for (group of groups(); track group.account.id) {
+                    @if (groups()!.length > 1) {
+                      <optgroup [label]="group.account.name">
+                        @for (option of group.albums; track option.id) {
+                          <option [value]="value(group.account.id, option.id)">{{ label(option) }}</option>
+                        }
+                      </optgroup>
+                    } @else {
+                      @for (option of group.albums; track option.id) {
+                        <option [value]="value(group.account.id, option.id)">{{ label(option) }}</option>
+                      }
+                    }
                   }
                 </select>
               </div>
@@ -60,7 +71,17 @@ import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-
                 <label class="hd-field__label" for="new-rules-set">Name</label>
                 <input #ruleName id="new-rules-set" class="hd-input" placeholder="Such as Family or Landscapes" (keydown.escape)="adding.set(false)" />
               </div>
-              <hd-photo-selection-form [(selection)]="newSelection" />
+              @if (accounts().length > 1) {
+                <div class="hd-field">
+                  <label class="hd-field__label" for="new-rules-account">Immich account</label>
+                  <select id="new-rules-account" class="hd-select" (change)="ruleAccount.set(+$any($event.target).value)">
+                    @for (account of accounts(); track account.id) {
+                      <option [value]="account.id" [selected]="account.id === ruleAccount()">{{ account.name }}</option>
+                    }
+                  </select>
+                </div>
+              }
+              <hd-photo-selection-form [(selection)]="newSelection" [accountId]="ruleAccount()" />
               <div class="actions start">
                 <button class="hd-btn hd-btn--primary" type="submit" [disabled]="busy()">{{ busy() ? 'Drawing photos…' : 'Add photo set' }}</button>
                 <button class="hd-btn" type="button" (click)="adding.set(false)">Cancel</button>
@@ -102,17 +123,42 @@ import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-
                 (change)="changeAlbum(set, other.value)"
                 (keydown.escape)="changingAlbum.set(null)"
               >
-                @if (!albums()) {
+                @if (!groups()) {
                   <option value="" selected>Loading albums…</option>
+                } @else if (set.accountId === null) {
+                  <option value="" selected>Choose an album</option>
                 }
-                @for (option of albums(); track option.id) {
-                  <option [value]="option.id" [selected]="option.id === set.albumId">{{ label(option) }}</option>
+                @for (group of groups(); track group.account.id) {
+                  @if (groups()!.length > 1) {
+                    <optgroup [label]="group.account.name">
+                      @for (option of group.albums; track option.id) {
+                        <option [value]="value(group.account.id, option.id)" [selected]="isAlbumOf(set, group.account.id, option.id)">{{ label(option) }}</option>
+                      }
+                    </optgroup>
+                  } @else {
+                    @for (option of group.albums; track option.id) {
+                      <option [value]="value(group.account.id, option.id)" [selected]="isAlbumOf(set, group.account.id, option.id)">{{ label(option) }}</option>
+                    }
+                  }
                 }
               </select>
             }
             @if (editing() === set.id) {
               <form class="rules" (submit)="saveSelection($event, set)">
-                <hd-photo-selection-form [(selection)]="editedSelection" />
+                @if (accounts().length > 1 || set.accountId === null) {
+                  <div class="hd-field">
+                    <label class="hd-field__label" [for]="'rules-account-' + set.id">Immich account</label>
+                    <select [id]="'rules-account-' + set.id" class="hd-select" (change)="editedAccount.set(+$any($event.target).value || null)">
+                      @if (editedAccount() === null) {
+                        <option value="" selected>Choose an account</option>
+                      }
+                      @for (account of accounts(); track account.id) {
+                        <option [value]="account.id" [selected]="account.id === editedAccount()">{{ account.name }}</option>
+                      }
+                    </select>
+                  </div>
+                }
+                <hd-photo-selection-form [(selection)]="editedSelection" [accountId]="editedAccount()" />
                 <div class="actions start">
                   <button class="hd-btn hd-btn--primary" type="submit">Save and draw</button>
                   <button class="hd-btn" type="button" (click)="editing.set(null)">Cancel</button>
@@ -126,6 +172,9 @@ import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-
               {{ set.photos.length }} {{ set.photos.length === 1 ? 'photo' : 'photos' }}
               @if (set.albumName) {
                 from {{ set.albumName }}
+              }
+              @if (accounts().length > 1 && set.accountName) {
+                in {{ set.accountName }}
               }
               @if (set.syncedAt) {
                 · {{ set.selection ? 'drawn' : 'synced' }} {{ ago(set.syncedAt) }}
@@ -216,16 +265,24 @@ export class PhotoSetsPage {
   private readonly api = inject(PhotoSetsApi);
 
   protected readonly sets = computed(() => [...this.data.photoSets().values()].sort((a, b) => a.name.localeCompare(b.name)));
-  protected readonly albums = signal<ImmichAlbum[] | null>(null);
+  private readonly accountsApi = inject(ImmichAccountApi);
+
+  protected readonly accounts = signal<ImmichAccount[]>([]);
+  /** Every Immich account's albums, once asked for. */
+  protected readonly groups = signal<AlbumGroup[] | null>(null);
   protected readonly adding = signal(false);
+  protected readonly ruleAccount = signal<number | null>(null);
+  protected readonly editedAccount = signal<number | null>(null);
   protected readonly source = signal<'album' | 'rules'>('album');
   protected readonly newSelection = signal<PhotoSelection>(defaultSelection());
   protected readonly editing = signal<string | null>(null);
   protected readonly editedSelection = signal<PhotoSelection>(defaultSelection());
   protected readonly chosenAlbum = signal('');
-  protected readonly namePlaceholder = computed(
-    () => this.albums()?.find((a) => a.id === this.chosenAlbum())?.name ?? 'The album’s name, unless you give another',
-  );
+  protected readonly namePlaceholder = computed(() => {
+    const chosen = parseAlbumValue(this.chosenAlbum());
+    const group = this.groups()?.find((g) => g.account.id === chosen?.accountId);
+    return group?.albums.find((a) => a.id === chosen?.albumId)?.name ?? 'The album’s name, unless you give another';
+  });
   protected readonly changingAlbum = signal<string | null>(null);
   protected readonly syncing = signal<string | null>(null);
   protected readonly removing = signal<string | null>(null);
@@ -237,6 +294,7 @@ export class PhotoSetsPage {
   private readonly now = signal(Date.now());
 
   constructor() {
+    this.loadAccounts();
     const ticker = setInterval(() => this.now.set(Date.now()), 30_000);
     effect((onCleanup) => onCleanup(() => clearInterval(ticker)));
     effect(() => {
@@ -252,6 +310,14 @@ export class PhotoSetsPage {
     return albumLabel(album);
   }
 
+  protected value(accountId: number, albumId: string) {
+    return albumValue(accountId, albumId);
+  }
+
+  protected isAlbumOf(set: PhotoSet, accountId: number, albumId: string) {
+    return set.accountId === accountId && set.albumId === albumId;
+  }
+
   protected summary(selection: PhotoSelection) {
     return selectionSummary(selection);
   }
@@ -264,17 +330,20 @@ export class PhotoSetsPage {
     this.chosenAlbum.set('');
     this.source.set('album');
     this.adding.set(true);
+    this.loadAccounts();
     this.loadAlbums();
   }
 
   protected startRules() {
     this.newSelection.set(defaultSelection());
+    this.ruleAccount.set(this.accounts()[0]?.id ?? null);
     this.source.set('rules');
   }
 
   protected startEditing(set: PhotoSet) {
     if (!set.selection) return;
     this.editedSelection.set(set.selection);
+    this.editedAccount.set(set.accountId);
     this.editing.set(set.id);
   }
 
@@ -284,9 +353,14 @@ export class PhotoSetsPage {
       this.error.set('Give the photo set a name.');
       return;
     }
+    const accountId = this.ruleAccount();
+    if (accountId === null) {
+      this.error.set('Set up Immich under Accounts first.');
+      return;
+    }
     this.busy.set(true);
     try {
-      await firstValueFrom(this.api.createSelection(name.trim(), this.newSelection()));
+      await firstValueFrom(this.api.createSelection(accountId, name.trim(), this.newSelection()));
       this.adding.set(false);
       this.error.set(null);
     } catch (e) {
@@ -298,7 +372,12 @@ export class PhotoSetsPage {
 
   protected saveSelection(event: Event, set: PhotoSet) {
     event.preventDefault();
-    this.api.update(set.id, { selection: this.editedSelection() }).subscribe({
+    const accountId = this.editedAccount();
+    if (accountId === null) {
+      this.error.set('Choose an Immich account for the photo set.');
+      return;
+    }
+    this.api.update(set.id, { selection: this.editedSelection(), accountId }).subscribe({
       next: () => {
         this.editing.set(null);
         this.error.set(null);
@@ -312,12 +391,13 @@ export class PhotoSetsPage {
     this.loadAlbums();
   }
 
-  protected async create(event: Event, albumId: string, name: string) {
+  protected async create(event: Event, value: string, name: string) {
     event.preventDefault();
-    if (!albumId) return;
+    const album = parseAlbumValue(value);
+    if (!album) return;
     this.busy.set(true);
     try {
-      await firstValueFrom(this.api.create(albumId, name.trim()));
+      await firstValueFrom(this.api.create(album.accountId, album.albumId, name.trim()));
       this.adding.set(false);
       this.error.set(null);
     } catch (e) {
@@ -340,10 +420,12 @@ export class PhotoSetsPage {
     }
   }
 
-  protected changeAlbum(set: PhotoSet, albumId: string) {
-    if (!albumId || albumId === set.albumId) return;
+  // An album of another account moves the set to that account.
+  protected changeAlbum(set: PhotoSet, value: string) {
+    const album = parseAlbumValue(value);
+    if (!album || this.isAlbumOf(set, album.accountId, album.albumId)) return;
     this.changingAlbum.set(null);
-    this.api.update(set.id, { albumId }).subscribe({ error: (e) => this.error.set(problem(e, 'Could not change the album. Try again.')) });
+    this.api.update(set.id, album).subscribe({ error: (e) => this.error.set(problem(e, 'Could not change the album. Try again.')) });
   }
 
   protected rename(set: PhotoSet, name: string) {
@@ -359,8 +441,18 @@ export class PhotoSetsPage {
   }
 
   private async loadAlbums() {
-    const albums = await loadAlbums(this.api);
-    if (typeof albums === 'string') this.error.set(albums);
-    else this.albums.set(albums);
+    const { groups, error } = await loadAlbums(this.accountsApi, this.api);
+    this.error.set(error);
+    this.groups.set(groups);
+  }
+
+  private loadAccounts() {
+    this.accountsApi.list().subscribe({
+      next: ({ accounts }) => {
+        this.accounts.set(accounts);
+        if (this.ruleAccount() === null) this.ruleAccount.set(accounts[0]?.id ?? null);
+      },
+      error: (e) => this.error.set(problem(e, 'Could not load the Immich accounts. Try again.')),
+    });
   }
 }

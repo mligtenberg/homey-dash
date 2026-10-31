@@ -127,7 +127,7 @@ export class Shell {
   protected readonly key = LucideKeyRound;
   protected readonly images = LucideImages;
   private readonly homey = inject(RealtimeTileData);
-  protected readonly homeyNotSetUp = computed(() => this.homey.status()?.connection === 'notSetUp');
+  protected readonly homeyNotSetUp = computed(() => this.homey.homeys()?.length === 0);
   protected readonly onAccounts = toSignal(
     this.router.events.pipe(
       filter((e) => e instanceof NavigationEnd),

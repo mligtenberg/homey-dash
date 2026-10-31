@@ -1,44 +1,33 @@
 namespace HomeyDash.Api.Accounts;
 
 /// <summary>
-/// The Homey account (ADR-0007): where the Homey Pro is on the local network and its local API key. Set up in
-/// Management and kept in the database; a home has at most one.
+/// A Homey account (ADR-0007): where a Homey Pro is on the local network and its local API key, under a name that
+/// tells a home's Homeys apart. Set up in Management and kept in the database.
 /// </summary>
 public sealed record HomeyAccount(string Address, string ApiKey)
 {
-    public const int SingleId = 1;
+    public int Id { get; init; }
 
-    public int Id { get; init; } = SingleId;
+    public string Name { get; init; } = "Homey";
 }
 
 /// <summary>
-/// The Homey account in use, or null while none is set up. Whoever connects to Homey reads it, and watches
-/// <c>Replaced</c> to start over with the next one.
+/// The Homey accounts set up, oldest first. Whoever connects to Homey reads them, and watches <c>Changed</c> to connect
+/// to new ones and let go of removed ones.
 /// </summary>
-public sealed class CurrentHomeyAccount
+public sealed class HomeyAccounts
 {
-    private readonly Lock _lock = new();
-    private HomeyAccount? _account;
-    private CancellationTokenSource _replaced = new();
+    private volatile IReadOnlyList<HomeyAccount> _all = [];
 
-    public HomeyAccount? Account => _account;
+    public event Action? Changed;
 
-    // The account, and a token that is cancelled once it is replaced or removed.
-    public (HomeyAccount? Account, CancellationToken Replaced) Get()
+    public IReadOnlyList<HomeyAccount> All => _all;
+
+    public HomeyAccount? Find(int? id) => id is null ? null : _all.FirstOrDefault(a => a.Id == id);
+
+    public void Set(IEnumerable<HomeyAccount> accounts)
     {
-        lock (_lock) return (_account, _replaced.Token);
-    }
-
-    public void Set(HomeyAccount? account)
-    {
-        CancellationTokenSource replaced;
-        lock (_lock)
-        {
-            replaced = _replaced;
-            _account = account;
-            _replaced = new CancellationTokenSource();
-        }
-        // Not disposed: a connection may still link to its token, and accounts change rarely.
-        replaced.Cancel();
+        _all = accounts.OrderBy(a => a.Id).ToList();
+        Changed?.Invoke();
     }
 }

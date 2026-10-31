@@ -54,7 +54,7 @@ export class FlowTile extends ActionTile {
   protected readonly verb = 'Start';
 
   readonly face = computed<TileFace>(() => {
-    const flow = this.data.flows().get(this.settings().target ?? '');
+    const flow = this.homey()?.flows.get(this.settings().target ?? '');
     const base = { icon: LucideWorkflow, hue: 'flow' as const };
     if (!flow) return this.absentFace({ ...base, noun: 'Flow' });
     const face: TileFace = { ...base, name: this.settings().label || flow.name, detail: flow.enabled ? 'Flow' : 'Flow · turned off', state: 'ok' };
@@ -62,7 +62,7 @@ export class FlowTile extends ActionTile {
   });
 
   protected run(target: string) {
-    return this.realtime.triggerFlow(target);
+    return this.realtime.triggerFlow(this.settings().account, target);
   }
 }
 
@@ -82,12 +82,12 @@ export class MoodTile extends ActionTile {
   protected readonly verb = 'Activate';
 
   protected readonly tint = computed(() => {
-    const mood = this.data.moods().get(this.settings().target ?? '');
+    const mood = this.homey()?.moods.get(this.settings().target ?? '');
     return mood ? moodTint(mood.colors) : null;
   });
 
   readonly face = computed<TileFace>(() => {
-    const mood = this.data.moods().get(this.settings().target ?? '');
+    const mood = this.homey()?.moods.get(this.settings().target ?? '');
     const base = { icon: LucideSparkles, hue: 'mood' as const };
     if (!mood) return this.absentFace({ ...base, noun: 'Mood' });
     const face: TileFace = { ...base, name: this.settings().label || mood.name, detail: 'Mood', state: 'ok' };
@@ -95,6 +95,6 @@ export class MoodTile extends ActionTile {
   });
 
   protected run(target: string) {
-    return this.realtime.activateMood(target);
+    return this.realtime.activateMood(this.settings().account, target);
   }
 }

@@ -15,7 +15,7 @@ import {
 import { Tile } from '@homey-dash/api-client';
 import { TileSize } from '@homey-dash/layout';
 import { LucideChartLine, LucideSparkles, LucideWorkflow } from '@lucide/angular';
-import { deviceLook, deviceType, TileData, TileKind, TileSettings } from '@homey-dash/tiles';
+import { deviceLook, deviceType, isHomeyTarget, TileData, TileKind, TileSettings } from '@homey-dash/tiles';
 import { PhotoSetField } from './photo-set-field';
 import { PlexTargetField } from './plex-target-field';
 import { SizePicker } from './size-picker';
@@ -31,10 +31,29 @@ import { allOptions, buildTree, TargetNode } from './target-tree';
     <h2>{{ kind()?.label ?? 'Unknown tile' }}</h2>
 
     @if (kind(); as kind) {
+      @if (homeyAccounts(); as accounts) {
+        <div class="hd-field">
+          <label class="hd-field__label" for="tile-account">Homey</label>
+          <select id="tile-account" class="hd-select" (change)="setAccount(+$any($event.target).value)">
+            @if (!homey()) {
+              <option value="" selected>Account removed</option>
+            }
+            @for (account of accounts; track account.accountId) {
+              <option [value]="account.accountId" [selected]="account.accountId === homey()?.accountId">{{ account.accountName }}</option>
+            }
+          </select>
+        </div>
+      }
       @if (kind.target === 'photoSet') {
         <hd-photo-set-field [value]="settings().target" (picked)="setTarget($event)" />
       } @else if (kind.target === 'plexPlayer' || kind.target === 'plexLibrary') {
-        <hd-plex-target-field [type]="kind.target" [value]="settings().target" (picked)="setTarget($event)" />
+        <hd-plex-target-field
+          [type]="kind.target"
+          [value]="settings().target"
+          [account]="settings().account"
+          (picked)="setTarget($event)"
+          (accountPicked)="setAccount($event)"
+        />
       } @else if (kind.multiple) {
         <div class="hd-field">
           <label class="hd-field__label" for="tile-target">{{ targetsLabel() }}</label>
@@ -117,6 +136,15 @@ export class TilePanel {
 
   protected readonly settings = computed(() => this.tile().settings as TileSettings);
 
+  /** The Homey of the tile's account, whose devices, flows, moods and recorded values it can point at. */
+  protected readonly homey = computed(() => this.data.homey(this.settings().account));
+  /** Every Homey, for a Homey kind to pick from once there is more than one. */
+  protected readonly homeyAccounts = computed(() => {
+    const kind = this.kind();
+    const homeys = this.data.homeys() ?? [];
+    return kind && isHomeyTarget(kind.target) && homeys.length > 1 ? homeys : null;
+  });
+
   protected readonly targetNoun = computed(
     () =>
       ({ device: 'device', flow: 'flow', mood: 'mood', insight: 'recorded value', photoSet: 'photo set', plexPlayer: 'player', plexLibrary: 'library' })[this.kind()?.target ?? 'device'],
@@ -128,12 +156,14 @@ export class TilePanel {
 
   // Devices, moods and recorded values sit in Homey's zones; flows in its flow folders.
   protected readonly targets = computed<TargetNode>(() => {
-    const zones = this.data.zones().values();
+    const homey = this.homey();
+    if (!homey) return buildTree([], []);
+    const zones = homey.zones.values();
     switch (this.kind()?.target) {
       case 'device':
         return buildTree(
           zones,
-          [...this.data.devices().values()].map((d) => ({
+          [...homey.devices.values()].map((d) => ({
             id: d.id,
             label: d.name,
             summary: d.zoneName ? `${d.name} — ${d.zoneName}` : d.name,
@@ -144,8 +174,8 @@ export class TilePanel {
         );
       case 'flow':
         return buildTree(
-          this.data.flowFolders().values(),
-          [...this.data.flows().values()].map((f) => ({
+          homey.flowFolders.values(),
+          [...homey.flows.values()].map((f) => ({
             id: f.id,
             label: f.name,
             type: [f.advanced ? 'Advanced flow' : 'Flow', f.enabled ? '' : 'disabled'].filter(Boolean).join(' · '),
@@ -157,7 +187,7 @@ export class TilePanel {
       case 'mood':
         return buildTree(
           zones,
-          [...this.data.moods().values()].map((m) => ({
+          [...homey.moods.values()].map((m) => ({
             id: m.id,
             label: m.name,
             type: 'Mood',
@@ -167,10 +197,10 @@ export class TilePanel {
           })),
         );
       case 'insight': {
-        const devices = this.data.devices();
+        const devices = homey.devices;
         return buildTree(
           zones,
-          [...this.data.insights().values()].map((l) => {
+          [...homey.insights.values()].map((l) => {
             const owner = devices.get(l.ownerUri.replace(/^homey:device:/, ''));
             return {
               id: l.id,
@@ -228,6 +258,13 @@ export class TilePanel {
     const next = { ...this.settings(), ...patch } as Record<string, unknown>;
     Object.keys(next).forEach((key) => next[key] === undefined && delete next[key]);
     this.settingsChanged.emit(next as unknown as TileSettings);
+  }
+
+  // Another account's targets are others, so the tile starts over at its kind's default.
+  protected setAccount(account: number) {
+    const kind = this.kind();
+    const target = (kind?.defaultSettings as TileSettings | undefined)?.target ?? null;
+    this.settingsChanged.emit({ ...this.settings(), account, target, ...(kind?.multiple ? { targets: [] } : {}) });
   }
 
   protected setTarget(target: string) {

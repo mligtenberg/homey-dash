@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, model, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, signal } from '@angular/core';
 import { PersonRef, PhotoSelection, PhotoSetsApi, SELECTION_MAX_COUNT, SELECTION_REFRESH } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
 import { problem } from './immich-albums';
@@ -20,7 +20,8 @@ export function selectionSummary(selection: PhotoSelection) {
 
 /**
  * The rules a photo set draws its photos from Immich by: people who should be in them (at least one), people who
- * should not, what should be in them, how many and how often to draw again. Edits `selection` in place.
+ * should not, what should be in them, how many and how often to draw again, from the people of the Immich account
+ * `accountId`. Edits `selection` in place.
  */
 @Component({
   selector: 'hd-photo-selection-form',
@@ -58,7 +59,7 @@ export function selectionSummary(selection: PhotoSelection) {
         id="person-search"
         class="hd-input"
         autocomplete="off"
-        [placeholder]="people() ? 'Name, as in Immich' : 'Loading people…'"
+        [placeholder]="accountId() === null ? 'Choose an Immich account first' : people() ? 'Name, as in Immich' : 'Loading people…'"
         [value]="search()"
         (input)="search.set($any($event.target).value)"
         (focus)="loadPeople()"
@@ -132,6 +133,7 @@ export function selectionSummary(selection: PhotoSelection) {
 })
 export class PhotoSelectionForm {
   readonly selection = model.required<PhotoSelection>();
+  readonly accountId = input.required<number | null>();
 
   private readonly api = inject(PhotoSetsApi);
 
@@ -151,11 +153,21 @@ export class PhotoSelectionForm {
 
   private loading = false;
 
+  constructor() {
+    // Another account knows other people.
+    effect(() => {
+      this.accountId();
+      this.people.set(null);
+    });
+  }
+
   protected async loadPeople() {
-    if (this.people() || this.loading) return;
+    const accountId = this.accountId();
+    if (this.people() || this.loading || accountId === null) return;
     this.loading = true;
     try {
-      this.people.set(await firstValueFrom(this.api.people()));
+      const people = await firstValueFrom(this.api.people(accountId));
+      if (accountId === this.accountId()) this.people.set(people);
       this.error.set(null);
     } catch (e) {
       this.error.set(problem(e, 'Could not load the people from Immich. Try again.'));

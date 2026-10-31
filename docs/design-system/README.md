@@ -118,7 +118,7 @@ Tile states:
 - **Active.** The tile background becomes `kind-*-fill`.
 - **Unavailable.** The tile drops to 60% opacity, shows its last known value, and carries an "Unavailable" badge in `warn`.
 - **Missing.** The tile becomes a transparent outline in `line`. The icon and the detail "Not found in Homey" are in `danger`. Missing tiles are never removed automatically.
-- **Connection lost.** The whole dashboard desaturates and stops responding to taps, though it can still be swiped between pages. A "Reconnecting…" pill sits at the bottom center.
+- **Connection lost.** When the display can't reach HomeyDash, the whole dashboard desaturates and stops responding to taps, though it can still be swiped between pages. When HomeyDash can't reach one of the home's Homeys, only that Homey's tiles do. A "Reconnecting…" pill sits at the bottom center.
 
 ## Iconography
 

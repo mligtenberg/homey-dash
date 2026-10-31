@@ -12,7 +12,7 @@ namespace HomeyDash.Api.Photos;
 /// why, until the next sync of that set works.
 /// </summary>
 public sealed class PhotoSync(
-    IImmich immich, CurrentImmichAccount current, IServiceScopeFactory scopes, TimeProvider time, ILogger<PhotoSync> logger)
+    IImmich immich, ImmichAccounts accounts, IServiceScopeFactory scopes, TimeProvider time, ILogger<PhotoSync> logger)
     : BackgroundService
 {
     private static readonly TimeSpan Every = TimeSpan.FromMinutes(15);
@@ -84,7 +84,8 @@ public sealed class PhotoSync(
 
     private async Task<string?> TrySyncAsync(PhotoSet set, bool force, CancellationToken ct)
     {
-        if (current.Account is not { } account) return "Set up Immich under Accounts first.";
+        if (accounts.Find(set.AccountId) is not { } account)
+            return accounts.All.Count == 0 ? "Set up Immich under Accounts first." : "Its Immich account was removed. Choose another account for it.";
         try
         {
             if (set.Selection is { } selection)
@@ -116,7 +117,8 @@ public sealed class PhotoSync(
         }
     }
 
-    private async Task PushAsync()
+    // Tells every connection the photo sets changed, such as when their account is renamed.
+    public async Task PushAsync()
     {
         try
         {

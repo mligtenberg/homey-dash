@@ -49,6 +49,8 @@ export abstract class TileView<TSettings extends TileSettings = TileSettings> {
   readonly detailView = input(true);
 
   protected readonly data = inject(TileData);
+  /** The Homey of the tile's account, for kinds that point at something in Homey. */
+  protected readonly homey = computed(() => this.data.homey(this.settings().account));
 
   abstract readonly face: Signal<TileFace>;
 
@@ -105,14 +107,23 @@ export abstract class TileView<TSettings extends TileSettings = TileSettings> {
     this.details()?.open();
   }
 
-  /** The face of a tile whose target is not in Homey's data: not picked yet, not loaded yet, or missing. */
+  /**
+   * The face of a tile whose target is not in its Homey's data: not picked yet, not loaded yet, or missing (also when
+   * its account was removed).
+   */
   protected absentFace(base: Pick<TileFace, 'icon' | 'hue'> & { noun: string }): TileFace {
     const { target, label } = this.settings();
     const { noun, ...look } = base;
     const name = label || noun;
     if (!target) return { ...look, name, detail: `Pick a ${noun.toLowerCase()}`, state: 'unset' };
-    if (!this.data.loaded()) return { ...look, name, detail: '…', state: 'loading' };
+    if (!this.homeyLoaded()) return { ...look, name, detail: '…', state: 'loading' };
     return { ...look, name, detail: 'Not found in Homey', state: 'missing' };
+  }
+
+  /** Whether what the tile's Homey holds can be told yet; a tile naming a removed account can. */
+  protected homeyLoaded() {
+    const homey = this.homey();
+    return homey ? homey.loaded : this.data.homeys() !== null && this.settings().account !== undefined;
   }
 }
 

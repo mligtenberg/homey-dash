@@ -8,18 +8,23 @@ import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, Ho
 
 // Mirrors apps/api/Realtime/RealtimeHub.cs.
 
+/** The Homey of one account as it is now. */
 export interface HomeySnapshot {
+  accountId: number;
+  /** The account's name, telling a home's Homeys apart. */
+  accountName: string;
   status: HomeyStatus;
   devices: HomeyDevice[];
   flows: HomeyFlow[];
   moods: HomeyMood[];
   zones: HomeyZone[];
   flowFolders: HomeyFlowFolder[];
-  /** False until Homey's data first arrived, such as while no Homey account is set up; nothing is missing then. */
+  /** False until the Homey's data first arrived; nothing is missing then. */
   loaded: boolean;
 }
 
 export interface HomeyCatalog {
+  accountId: number;
   flows: HomeyFlow[];
   moods: HomeyMood[];
   zones: HomeyZone[];
@@ -28,8 +33,10 @@ export interface HomeyCatalog {
 
 /** The messages HomeyDash pushes, by name. */
 export interface RealtimeMessages {
-  DeviceChanged: HomeyDevice;
-  DeviceRemoved: string;
+  /** Every Homey again, oldest account first, when a Homey account is added, removed or renamed. */
+  Homeys: HomeySnapshot[];
+  DeviceChanged: { accountId: number; device: HomeyDevice };
+  DeviceRemoved: { accountId: number; deviceId: string };
   Catalog: HomeyCatalog;
   HomeyStatus: HomeyStatus;
   /** What a joined screen now is and shows; null sends it to setup. */
@@ -40,8 +47,8 @@ export interface RealtimeMessages {
   Dashboards: DashboardSummary[];
   /** Every photo set, whenever one changes. */
   PhotoSets: PhotoSet[];
-  /** Plex's status, libraries and players, whenever they change. */
-  Plex: PlexOverview;
+  /** Every Plex account's status, libraries and players, whenever one changes. */
+  Plex: PlexOverview[];
   /** What plays on Plex, whenever more than its progress changed. */
   PlexSessions: PlexSession[];
 }
@@ -92,8 +99,9 @@ export class Realtime {
     return () => this.hub.off(name, handler);
   }
 
+  /** Every Homey, oldest account first; changes that follow arrive as messages naming the account. */
   homey() {
-    return this.hub.invoke<HomeySnapshot>('Homey');
+    return this.hub.invoke<HomeySnapshot[]>('Homey');
   }
 
   /** Every photo set with its photos; changes that follow arrive as `PhotoSets`. */
@@ -106,9 +114,9 @@ export class Realtime {
     return this.hub.invoke<PlexSnapshot>('Plex');
   }
 
-  /** Plays, pauses or skips on a Plex player; fails when the player takes no remote control. */
-  controlPlex(playerId: string, command: PlexCommand) {
-    return this.hub.invoke<void>('ControlPlex', playerId, command);
+  /** Plays, pauses or skips on a player of a Plex account; fails when the player takes no remote control. */
+  controlPlex(accountId: number, playerId: string, command: PlexCommand) {
+    return this.hub.invoke<void>('ControlPlex', accountId, playerId, command);
   }
 
   /** Joins as the screen with this id: which display it is, or null when it belongs in setup. */
@@ -126,16 +134,18 @@ export class Realtime {
     return this.hub.invoke<DisplayInfo[]>('JoinManagement');
   }
 
-  setCapability(deviceId: string, capabilityId: string, value: CapabilityValue) {
-    return this.hub.invoke<void>('SetCapability', deviceId, capabilityId, value);
+  // Each acts on the Homey of a tile's account (`settings.account`); without one, on the oldest.
+
+  setCapability(account: number | undefined, deviceId: string, capabilityId: string, value: CapabilityValue) {
+    return this.hub.invoke<void>('SetCapability', account ?? null, deviceId, capabilityId, value);
   }
 
-  triggerFlow(flowId: string) {
-    return this.hub.invoke<void>('TriggerFlow', flowId);
+  triggerFlow(account: number | undefined, flowId: string) {
+    return this.hub.invoke<void>('TriggerFlow', account ?? null, flowId);
   }
 
-  activateMood(moodId: string) {
-    return this.hub.invoke<void>('ActivateMood', moodId);
+  activateMood(account: number | undefined, moodId: string) {
+    return this.hub.invoke<void>('ActivateMood', account ?? null, moodId);
   }
 
   private start(attempt: number) {

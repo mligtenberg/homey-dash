@@ -4,10 +4,10 @@ using System.Text.Json;
 namespace HomeyDash.Api.Homey;
 
 /// <summary>
-/// The last known state of everything in Homey, kept current by the Homey connection.
+/// The last known state of everything in the Homey of one account, kept current by its connection.
 /// Reads never wait for Homey; when the connection is lost, the last known values stay.
 /// </summary>
-public sealed class HomeyState(TimeProvider time)
+public sealed class HomeyState(TimeProvider time, int accountId)
 {
     private readonly Lock _lock = new();
     private ImmutableDictionary<string, HomeyDevice> _devices = ImmutableDictionary<string, HomeyDevice>.Empty;
@@ -18,8 +18,10 @@ public sealed class HomeyState(TimeProvider time)
 
     public event Action<HomeyChange>? Changed;
 
+    public int AccountId => accountId;
+
     public HomeyStatus Status { get; private set; } =
-        new(HomeyConnection.Connecting, null, time.GetUtcNow(), Fake: false);
+        new(accountId, HomeyConnection.Connecting, null, time.GetUtcNow(), Fake: false);
 
     // False until the first snapshot of Homey has arrived.
     public bool Loaded { get; private set; }
@@ -58,7 +60,7 @@ public sealed class HomeyState(TimeProvider time)
         lock (_lock)
         {
             if (Status.Connection == connection && Status.LastError == lastError) return;
-            status = Status = new HomeyStatus(connection, lastError, time.GetUtcNow(), fake);
+            status = Status = new HomeyStatus(accountId, connection, lastError, time.GetUtcNow(), fake);
         }
         Changed?.Invoke(new ConnectionChanged(status));
     }

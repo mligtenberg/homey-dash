@@ -10,8 +10,9 @@ using Microsoft.EntityFrameworkCore;
 namespace HomeyDash.Api.Realtime;
 
 /// <summary>
-/// The realtime connection both apps keep open. Every connection receives Homey's changes (<c>DeviceChanged</c>,
-/// <c>DeviceRemoved</c>, <c>Catalog</c>, <c>HomeyStatus</c>). A screen joins with its screen id and is told which
+/// The realtime connection both apps keep open. Every connection receives each Homey's changes, which name its account
+/// (<c>DeviceChanged</c>, <c>DeviceRemoved</c>, <c>Catalog</c>, <c>HomeyStatus</c>), and <c>Homeys</c> with every Homey
+/// again when a Homey account is added, removed or renamed. A screen joins with its screen id and is told which
 /// display it is with <c>Screen</c>; Management joins to receive <c>Displays</c> with every display's status and
 /// <c>Dashboards</c> with the dashboard list. Every connection also receives <c>PhotoSets</c> whenever a photo set changes,
 /// and <c>Plex</c> and <c>PlexSessions</c> as Plex's libraries and what plays change.
@@ -19,35 +20,33 @@ namespace HomeyDash.Api.Realtime;
 /// </summary>
 public sealed class RealtimeHub(
     HomeyDashDbContext db,
-    HomeyState homey,
-    IHomey actions,
+    Homeys homeys,
     DisplayPresence presence,
     RealtimeNotifier notifier,
     PhotoSync sync,
+    ImmichAccounts immich,
     PlexWatcher plexWatcher,
     IPlex plex,
-    CurrentPlexAccount plexAccount,
+    PlexAccounts plexAccounts,
     TimeProvider time) : Hub
 {
     public const string Path = "/api/realtime";
     private const string ScreenKey = "screen";
 
-    // Homey as it is now. Changes that follow arrive as messages.
-    public HomeySnapshot Homey() =>
-        new(homey.Status, homey.Devices.OrderBy(d => d.Name), homey.Flows.OrderBy(f => f.Name), homey.Moods.OrderBy(m => m.Name),
-            homey.Zones.OrderBy(z => z.Name), homey.FlowFolders.OrderBy(f => f.Name), homey.Loaded);
+    // Every Homey as it is now, oldest account first. Changes that follow arrive as messages.
+    public IEnumerable<HomeySnapshot> Homey() => HomeySnapshot.All(homeys);
 
     // Every photo set with its photos. Changes that follow arrive as PhotoSets.
-    public Task<List<PhotoSetView>> PhotoSets() => PhotoEndpoints.ListAsync(db, sync, Context.ConnectionAborted);
+    public Task<List<PhotoSetView>> PhotoSets() => PhotoEndpoints.ListAsync(db, sync, immich, Context.ConnectionAborted);
 
-    // Plex's libraries and what plays now. Changes that follow arrive as Plex and PlexSessions.
+    // Every Plex account's libraries, and what plays now. Changes that follow arrive as Plex and PlexSessions.
     public PlexSnapshot Plex() => plexWatcher.Snapshot;
 
-    // Plays or pauses what plays on a player, or skips; the player must allow remote control.
-    public async Task ControlPlex(string playerId, PlexCommand command)
+    // Plays or pauses what plays on one of the account's players, or skips; the player must allow remote control.
+    public async Task ControlPlex(int accountId, string playerId, PlexCommand command)
     {
-        if (plexAccount.Account?.Connection is not { } server) throw new HubException("Sign in with Plex under Accounts first.");
-        var session = plexWatcher.Sessions.FirstOrDefault(s => s.PlayerId == playerId)
+        if (plexAccounts.Find(accountId)?.Connection is not { } server) throw new HubException("Sign in with Plex under Accounts first.");
+        var session = plexWatcher.Sessions.FirstOrDefault(s => s.AccountId == accountId && s.PlayerId == playerId)
             ?? throw new HubException("That player isn't playing anything.");
         try
         {
@@ -57,7 +56,7 @@ public sealed class RealtimeHub(
         {
             throw new HubException(e.Message);
         }
-        plexWatcher.Wake();
+        plexWatcher.Wake(accountId);
     }
 
     // A screen joins with the id it keeps in localStorage. Null sends it to setup; later changes arrive as Screen.
@@ -87,12 +86,13 @@ public sealed class RealtimeHub(
         return await DisplayQueries.ListAsync(db, presence, Context.ConnectionAborted);
     }
 
-    public Task SetCapability(string deviceId, string capabilityId, JsonElement value) =>
-        Perform(ct => actions.SetCapabilityValueAsync(deviceId, capabilityId, value, ct));
+    // Each acts on the Homey of the tile's account; null for the oldest.
+    public Task SetCapability(int? accountId, string deviceId, string capabilityId, JsonElement value) =>
+        Perform(ct => homeys.Require(accountId).SetCapabilityValueAsync(deviceId, capabilityId, value, ct));
 
-    public Task TriggerFlow(string flowId) => Perform(ct => actions.TriggerFlowAsync(flowId, ct));
+    public Task TriggerFlow(int? accountId, string flowId) => Perform(ct => homeys.Require(accountId).TriggerFlowAsync(flowId, ct));
 
-    public Task ActivateMood(string moodId) => Perform(ct => actions.ActivateMoodAsync(moodId, ct));
+    public Task ActivateMood(int? accountId, string moodId) => Perform(ct => homeys.Require(accountId).ActivateMoodAsync(moodId, ct));
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
@@ -130,10 +130,23 @@ public sealed class RealtimeHub(
 }
 
 public sealed record HomeySnapshot(
+    int AccountId, string AccountName,
     HomeyStatus Status, IEnumerable<HomeyDevice> Devices, IEnumerable<HomeyFlow> Flows, IEnumerable<HomeyMood> Moods,
     IEnumerable<HomeyZone> Zones, IEnumerable<HomeyFlowFolder> FlowFolders,
-    // False until Homey's data first arrived, such as while no Homey account is set up; nothing is missing then.
-    bool Loaded);
+    // False until the Homey's data first arrived; nothing is missing then.
+    bool Loaded)
+{
+    public static List<HomeySnapshot> All(Homeys homeys) =>
+        homeys.All.Select(e => new HomeySnapshot(e.AccountId, e.Name, e.State.Status, e.State.Devices.OrderBy(d => d.Name),
+            e.State.Flows.OrderBy(f => f.Name), e.State.Moods.OrderBy(m => m.Name), e.State.Zones.OrderBy(z => z.Name),
+            e.State.FlowFolders.OrderBy(f => f.Name), e.State.Loaded)).ToList();
+}
 
 public sealed record HomeyCatalog(
-    IEnumerable<HomeyFlow> Flows, IEnumerable<HomeyMood> Moods, IEnumerable<HomeyZone> Zones, IEnumerable<HomeyFlowFolder> FlowFolders);
+    int AccountId, IEnumerable<HomeyFlow> Flows, IEnumerable<HomeyMood> Moods, IEnumerable<HomeyZone> Zones,
+    IEnumerable<HomeyFlowFolder> FlowFolders);
+
+// A device of the account's Homey changed or was added.
+public sealed record HomeyDeviceChange(int AccountId, HomeyDevice Device);
+
+public sealed record HomeyDeviceRemoval(int AccountId, string DeviceId);

@@ -3,56 +3,81 @@ import { inject, Injectable } from '@angular/core';
 
 // Mirrors apps/api/Accounts/AccountEndpoints.cs.
 
-/** The Homey account. Its key never leaves HomeyDash, so only the address is shown. */
-export interface HomeyAccountInfo {
-  /** HomeyDash runs against a fake Homey, set in its configuration, so no account can be set up. */
-  fake: boolean;
-  /** Null while no Homey account is set up. */
-  address: string | null;
+/** A Homey account: a Homey Pro on the local network. Its key never leaves HomeyDash, so only the address is shown. */
+export interface HomeyAccount {
+  id: number;
+  /** Tells a home's Homeys apart, such as which house or floor. */
+  name: string;
+  address: string;
 }
 
-/** The accounts HomeyDash holds for the home, set up in Management. */
+export interface HomeyAccounts {
+  /** HomeyDash runs against a fake Homey, set in its configuration, whose one account can't be changed. */
+  fake: boolean;
+  /** Oldest first; a Homey tile uses the first unless it names another. */
+  accounts: HomeyAccount[];
+}
+
+/** Setting up the Homey accounts HomeyDash connects to. Every change answers with all of them. */
 @Injectable({ providedIn: 'root' })
-export class AccountsApi {
+export class HomeyAccountApi {
   private readonly http = inject(HttpClient);
 
-  homey() {
-    return this.http.get<HomeyAccountInfo>('/api/accounts/homey');
+  list() {
+    return this.http.get<HomeyAccounts>('/api/accounts/homey');
   }
 
-  /** Leave `apiKey` empty to keep the current key. */
-  setHomey(address: string, apiKey: string) {
-    return this.http.put<HomeyAccountInfo>('/api/accounts/homey', { address, apiKey: apiKey || null });
+  add(name: string, address: string, apiKey: string) {
+    return this.http.post<HomeyAccounts>('/api/accounts/homey', { name, address, apiKey });
   }
 
-  removeHomey() {
-    return this.http.delete<void>('/api/accounts/homey');
+  /** Another address or key connects again. Leave `apiKey` empty to keep the current key. */
+  update(id: number, name: string, address: string, apiKey: string) {
+    return this.http.put<HomeyAccounts>(`/api/accounts/homey/${id}`, { name, address, apiKey: apiKey || null });
+  }
+
+  /** Tiles that name it show as missing until they are given another account. */
+  remove(id: number) {
+    return this.http.delete<HomeyAccounts>(`/api/accounts/homey/${id}`);
   }
 }
 
-/** The Immich account, for photo sets. Its key never leaves HomeyDash, so only the address is shown. */
-export interface ImmichAccountInfo {
-  /** HomeyDash runs against a fake Immich, set in its configuration, so no account can be set up. */
+/** An Immich account, for photo sets. Its key never leaves HomeyDash, so only the address is shown. */
+export interface ImmichAccount {
+  id: number;
+  /** Tells a home's Immich accounts apart, such as whose it is. */
+  name: string;
+  address: string;
+}
+
+export interface ImmichAccounts {
+  /** HomeyDash runs against a fake Immich, set in its configuration, whose one account can't be changed. */
   fake: boolean;
-  /** Null while no Immich account is set up. */
-  address: string | null;
+  /** Oldest first; a new photo set uses the first unless it names another. */
+  accounts: ImmichAccount[];
 }
 
-/** Setting up Immich, whose albums photo sets follow. */
+/** Setting up the Immich accounts, whose albums photo sets follow. Every change answers with all of them. */
 @Injectable({ providedIn: 'root' })
 export class ImmichAccountApi {
   private readonly http = inject(HttpClient);
 
-  get() {
-    return this.http.get<ImmichAccountInfo>('/api/accounts/immich');
+  list() {
+    return this.http.get<ImmichAccounts>('/api/accounts/immich');
   }
 
-  /** Checked with Immich before it is kept. Leave `apiKey` empty to keep the current key. */
-  set(address: string, apiKey: string) {
-    return this.http.put<ImmichAccountInfo>('/api/accounts/immich', { address, apiKey: apiKey || null });
+  /** Checked with Immich before it is kept. */
+  add(name: string, address: string, apiKey: string) {
+    return this.http.post<ImmichAccounts>('/api/accounts/immich', { name, address, apiKey });
   }
 
-  remove() {
-    return this.http.delete<void>('/api/accounts/immich');
+  /** A new address or key is checked with Immich first. Leave `apiKey` empty to keep the current key. */
+  update(id: number, name: string, address: string, apiKey: string) {
+    return this.http.put<ImmichAccounts>(`/api/accounts/immich/${id}`, { name, address, apiKey: apiKey || null });
+  }
+
+  /** Its photo sets keep their photos, but displays can't show them until each set is given another account. */
+  remove(id: number) {
+    return this.http.delete<ImmichAccounts>(`/api/accounts/immich/${id}`);
   }
 }

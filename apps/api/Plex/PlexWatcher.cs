@@ -6,21 +6,24 @@ using Microsoft.AspNetCore.SignalR;
 namespace HomeyDash.Api.Plex;
 
 /// <summary>
-/// Plex as tiles see it: whether HomeyDash reaches the server, its libraries with their newest items, and the players
-/// that played something since HomeyDash started. Pushed as <c>Plex</c>; what plays now is pushed as <c>PlexSessions</c>.
+/// One Plex account as tiles see it: whether HomeyDash reaches its server, its libraries with their newest items, and
+/// the players that played something since HomeyDash started. Every account's is pushed as <c>Plex</c>; what plays
+/// now, on any of them, is pushed as <c>PlexSessions</c>.
 /// </summary>
-public sealed record PlexOverview(string Status, string? Error, bool Loaded, IReadOnlyList<PlexLibrary> Libraries, IReadOnlyList<PlexPlayer> Players);
+public sealed record PlexOverview(
+    int AccountId, string AccountName, string Status, string? Error, bool Loaded, IReadOnlyList<PlexLibrary> Libraries,
+    IReadOnlyList<PlexPlayer> Players);
 
-// What a connection gets when it (re)connects.
-public sealed record PlexSnapshot(PlexOverview Overview, IReadOnlyList<PlexSession> Sessions);
+// What a connection gets when it (re)connects: every account, oldest first, and what plays on any of them.
+public sealed record PlexSnapshot(IReadOnlyList<PlexOverview> Accounts, IReadOnlyList<PlexSession> Sessions);
 
 /// <summary>
-/// Watches the Plex server (ADR-0009): what plays every few seconds, and the libraries' newest items every 10 minutes.
-/// Plex has no push that works across versions and players, so this polls. Sessions are pushed only when something
-/// other than the steady progress of playing changed; tiles move progress on themselves.
+/// Watches the server of every Plex account (ADR-0009): what plays every few seconds, and the libraries' newest items
+/// every 10 minutes. Plex has no push that works across versions and players, so this polls. Sessions are pushed only
+/// when something other than the steady progress of playing changed; tiles move progress on themselves.
 /// </summary>
 public sealed class PlexWatcher(
-    IPlex plex, CurrentPlexAccount current, IHubContext<RealtimeHub> hub, IServiceScopeFactory scopes, TimeProvider time,
+    IPlex plex, PlexAccounts accounts, IHubContext<RealtimeHub> hub, IServiceScopeFactory scopes, TimeProvider time,
     ILogger<PlexWatcher> logger) : BackgroundService
 {
     public const int RecentCount = 24;
@@ -32,74 +35,154 @@ public sealed class PlexWatcher(
     // Progress that drifts less than this from where tiles think it is goes unpushed.
     private const long DriftMs = 5_000;
 
-    private readonly SemaphoreSlim _wake = new(0);
-    private readonly ConcurrentDictionary<string, PlexPlayer> _players = new();
-    private volatile PlexOverview _overview = new("notSetUp", null, false, [], []);
-    private volatile IReadOnlyList<PlexSession> _sessions = [];
+    // Watching one account, for as long as it exists and keeps its sign-in and server.
+    private sealed class Watch(PlexAccount account)
+    {
+        public volatile PlexAccount Account = account;
+        public readonly CancellationTokenSource Stop = new();
+        public readonly SemaphoreSlim Wake = new(0);
+        public readonly ConcurrentDictionary<string, PlexPlayer> Players = new();
+        public volatile PlexOverview Overview = Initial(account);
+        public volatile IReadOnlyList<PlexSession> Sessions = [];
+    }
 
-    public PlexOverview Overview => _overview;
-    public IReadOnlyList<PlexSession> Sessions => _sessions;
-    public PlexSnapshot Snapshot => new(_overview, _sessions);
+    private readonly ConcurrentDictionary<int, Watch> _watches = new();
+    private readonly SemaphoreSlim _accountsChanged = new(0);
 
-    // Looks again now, such as after a command to a player or a new account.
-    public void Wake() => _wake.Release();
+    public IReadOnlyList<PlexOverview> Overviews =>
+        accounts.All.Select(a => _watches.TryGetValue(a.Id, out var w) ? w.Overview : Initial(a)).ToList();
+
+    // A tile's account (settings.account), or the oldest when it names none; null while there is no Plex account.
+    public PlexOverview? Overview(int? accountId) =>
+        accounts.For(accountId) is { } account ? _watches.TryGetValue(account.Id, out var w) ? w.Overview : Initial(account) : null;
+
+    public IReadOnlyList<PlexSession> Sessions =>
+        accounts.All.SelectMany(a => _watches.TryGetValue(a.Id, out var w) ? w.Sessions : []).ToList();
+
+    public PlexSnapshot Snapshot => new(Overviews, Sessions);
+
+    // Looks again now, such as after a command to one of the account's players.
+    public void Wake(int accountId)
+    {
+        if (_watches.TryGetValue(accountId, out var watch)) watch.Wake.Release();
+    }
+
+    // Before the first look: loading, or waiting for someone to choose a server.
+    private static PlexOverview Initial(PlexAccount account) =>
+        new(account.Id, account.Name, account.Connection is null ? "choosingServer" : "connected", null, false, [], []);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        PlexAccount? watching = null;
-        var librariesAt = DateTimeOffset.MinValue;
-        while (!stoppingToken.IsCancellationRequested)
+        accounts.Changed += OnAccountsChanged;
+        try
         {
-            var account = current.Account;
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await ReconcileAsync(stoppingToken);
+                await _accountsChanged.WaitAsync(stoppingToken);
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            accounts.Changed -= OnAccountsChanged;
+            foreach (var watch in _watches.Values) watch.Stop.Cancel();
+        }
+    }
+
+    private void OnAccountsChanged() => _accountsChanged.Release();
+
+    // Watches new accounts and stops watching removed ones. An account signed in again or given another server starts
+    // over; a new name only changes its overview.
+    private async Task ReconcileAsync(CancellationToken stoppingToken)
+    {
+        var all = accounts.All;
+        var changed = false;
+        foreach (var (id, watch) in _watches)
+        {
+            if (all.Any(a => a.Id == id)) continue;
+            watch.Stop.Cancel();
+            _watches.TryRemove(id, out _);
+            changed = true;
+        }
+        foreach (var account in all)
+        {
+            if (_watches.TryGetValue(account.Id, out var watch))
+            {
+                if (watch.Account == account) continue;
+                if (watch.Account with { Name = account.Name } == account)
+                {
+                    watch.Account = account;
+                    watch.Overview = watch.Overview with { AccountName = account.Name };
+                    changed = true;
+                    continue;
+                }
+                watch.Stop.Cancel();
+            }
+            var started = new Watch(account);
+            _watches[account.Id] = started;
+            _ = WatchAsync(started, stoppingToken);
+            changed = true;
+        }
+        if (!changed) return;
+        await SendAsync("Plex", Overviews);
+        await SendAsync("PlexSessions", Sessions);
+        await PushDashboardsAsync();
+    }
+
+    private async Task WatchAsync(Watch watch, CancellationToken stoppingToken)
+    {
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, watch.Stop.Token);
+        var ct = stop.Token;
+        var librariesAt = DateTimeOffset.MinValue;
+        while (!ct.IsCancellationRequested)
+        {
+            var account = watch.Account;
             var wait = SessionsEvery;
             try
             {
-                if (!ReferenceEquals(account, watching))
+                if (account.Connection is not { } server)
                 {
-                    watching = account;
-                    librariesAt = DateTimeOffset.MinValue;
-                    _players.Clear();
-                    await SetSessionsAsync([], force: true);
-                }
-                if (account?.Connection is not { } server)
-                {
-                    await SetOverviewAsync(new(account is null ? "notSetUp" : "choosingServer", null, false, [], []));
+                    await SetOverviewAsync(watch, Initial(account));
                     wait = Timeout.InfiniteTimeSpan;
                 }
                 else
                 {
-                    var sessions = await plex.SessionsAsync(server, stoppingToken);
-                    foreach (var session in sessions) _players[session.PlayerId] = new PlexPlayer(session.PlayerId, session.PlayerName);
-                    var libraries = _overview.Libraries;
-                    if (time.GetUtcNow() - librariesAt >= LibrariesEvery || _overview.Status != "connected")
+                    var sessions = (await plex.SessionsAsync(server, ct)).Select(s => s with { AccountId = account.Id }).ToList();
+                    foreach (var session in sessions) watch.Players[session.PlayerId] = new PlexPlayer(session.PlayerId, session.PlayerName);
+                    var libraries = watch.Overview.Libraries;
+                    if (time.GetUtcNow() - librariesAt >= LibrariesEvery || watch.Overview.Status != "connected" || !watch.Overview.Loaded)
                     {
-                        libraries = await plex.LibrariesAsync(server, RecentCount, stoppingToken);
+                        libraries = await plex.LibrariesAsync(server, RecentCount, ct);
                         librariesAt = time.GetUtcNow();
                     }
-                    await SetOverviewAsync(new("connected", null, true, libraries, Players()));
-                    await SetSessionsAsync(sessions);
+                    await SetOverviewAsync(watch, new(account.Id, account.Name, "connected", null, true, libraries, Players(watch)));
+                    await SetSessionsAsync(watch, sessions);
                 }
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
                 return;
             }
             catch (Exception e)
             {
-                if (e is not PlexException) logger.LogWarning(e, "Watching Plex failed");
+                if (e is not PlexException) logger.LogWarning(e, "Watching Plex account {Account} failed", account.Name);
                 // Libraries stay, so recently-added tiles keep their posters while the server is away.
-                await SetOverviewAsync(_overview with
+                await SetOverviewAsync(watch, watch.Overview with
                 {
+                    AccountName = account.Name,
                     Status = "disconnected",
                     Error = e is PlexException ? e.Message : "Could not reach Plex.",
                 });
-                await SetSessionsAsync([]);
+                await SetSessionsAsync(watch, []);
                 wait = RetryEvery;
             }
 
             try
             {
-                await _wake.WaitAsync(wait, stoppingToken);
+                await watch.Wake.WaitAsync(wait, ct);
             }
             catch (OperationCanceledException)
             {
@@ -108,26 +191,28 @@ public sealed class PlexWatcher(
         }
     }
 
-    private List<PlexPlayer> Players() => _players.Values.OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+    private static List<PlexPlayer> Players(Watch watch) =>
+        watch.Players.Values.OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
 
-    private async Task SetOverviewAsync(PlexOverview overview)
+    private async Task SetOverviewAsync(Watch watch, PlexOverview overview)
     {
-        var before = _overview;
-        if (before.Status == overview.Status && before.Error == overview.Error && before.Loaded == overview.Loaded
-            && before.Libraries.SequenceEqual(overview.Libraries, LibraryComparer.Instance) && before.Players.SequenceEqual(overview.Players))
+        var before = watch.Overview;
+        if (before.AccountName == overview.AccountName && before.Status == overview.Status && before.Error == overview.Error
+            && before.Loaded == overview.Loaded && before.Libraries.SequenceEqual(overview.Libraries, LibraryComparer.Instance)
+            && before.Players.SequenceEqual(overview.Players))
             return;
-        _overview = overview;
-        await SendAsync("Plex", overview);
+        watch.Overview = overview;
+        await SendAsync("Plex", Overviews);
         // Libraries coming or going change which tiles are missing.
         if (!before.Libraries.Select(l => l.Id).SequenceEqual(overview.Libraries.Select(l => l.Id)) || before.Loaded != overview.Loaded)
             await PushDashboardsAsync();
     }
 
-    private async Task SetSessionsAsync(IReadOnlyList<PlexSession> sessions, bool force = false)
+    private async Task SetSessionsAsync(Watch watch, IReadOnlyList<PlexSession> sessions)
     {
-        var before = _sessions;
-        _sessions = sessions;
-        if (force || Differs(before, sessions)) await SendAsync("PlexSessions", sessions);
+        var before = watch.Sessions;
+        watch.Sessions = sessions;
+        if (Differs(before, sessions)) await SendAsync("PlexSessions", Sessions);
     }
 
     // Anything but progress that moves on as tiles expect.

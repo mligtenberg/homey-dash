@@ -23,7 +23,7 @@ export class FakeRealtime implements Partial<Realtime> {
   readonly joined: string[] = [];
   /** What a screen reported it shows, each time: published version by dashboard id. */
   readonly shown: Record<string, number>[] = [];
-  /** Commands sent to Homey, such as `['setCapability', 'd1', 'onoff', true]`. */
+  /** Commands sent, such as `['setCapability', undefined, 'd1', 'onoff', true]` (the second item is the account). */
   readonly commands: unknown[][] = [];
   /** Makes commands fail, as when Homey does not respond. */
   failCommands = false;
@@ -54,8 +54,22 @@ export class FakeRealtime implements Partial<Realtime> {
     this.joins.forEach((join) => join());
   }
 
-  async homey(): Promise<HomeySnapshot> {
-    return { status: { connection: 'connected', lastError: null, since: '', fake: true }, devices: [], flows: [], moods: [], zones: [], flowFolders: [], loaded: true };
+  homeySnapshot: HomeySnapshot[] = [
+    {
+      accountId: 1,
+      accountName: 'Homey',
+      status: { accountId: 1, connection: 'connected', lastError: null, since: '', fake: true },
+      devices: [],
+      flows: [],
+      moods: [],
+      zones: [],
+      flowFolders: [],
+      loaded: true,
+    },
+  ];
+
+  async homey() {
+    return this.homeySnapshot;
   }
 
   photoSetList: PhotoSet[] = [];
@@ -65,7 +79,7 @@ export class FakeRealtime implements Partial<Realtime> {
   }
 
   plexSnapshot: PlexSnapshot = {
-    overview: { status: 'connected', error: null, loaded: true, libraries: [], players: [] },
+    accounts: [{ accountId: 1, accountName: 'Plex', status: 'connected', error: null, loaded: true, libraries: [], players: [] }],
     sessions: [],
   };
 
@@ -73,8 +87,8 @@ export class FakeRealtime implements Partial<Realtime> {
     return this.plexSnapshot;
   }
 
-  controlPlex(playerId: string, command: PlexCommand) {
-    return this.command('controlPlex', playerId, command);
+  controlPlex(accountId: number, playerId: string, command: PlexCommand) {
+    return this.command('controlPlex', accountId, playerId, command);
   }
 
   async joinScreen(screenId: string) {
@@ -91,16 +105,16 @@ export class FakeRealtime implements Partial<Realtime> {
     return this.displays;
   }
 
-  setCapability(deviceId: string, capabilityId: string, value: CapabilityValue) {
-    return this.command('setCapability', deviceId, capabilityId, value);
+  setCapability(account: number | undefined, deviceId: string, capabilityId: string, value: CapabilityValue) {
+    return this.command('setCapability', account, deviceId, capabilityId, value);
   }
 
-  triggerFlow(flowId: string) {
-    return this.command('triggerFlow', flowId);
+  triggerFlow(account: number | undefined, flowId: string) {
+    return this.command('triggerFlow', account, flowId);
   }
 
-  activateMood(moodId: string) {
-    return this.command('activateMood', moodId);
+  activateMood(account: number | undefined, moodId: string) {
+    return this.command('activateMood', account, moodId);
   }
 
   private async command(...command: unknown[]) {

@@ -20,6 +20,7 @@ namespace HomeyDash.Api.Migrations
             modelBuilder.Entity("HomeyDash.Api.Accounts.HomeyAccount", b =>
                 {
                     b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Address")
@@ -28,6 +29,11 @@ namespace HomeyDash.Api.Migrations
 
                     b.Property<string>("ApiKey")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -121,6 +127,7 @@ namespace HomeyDash.Api.Migrations
             modelBuilder.Entity("HomeyDash.Api.Photos.ImmichAccount", b =>
                 {
                     b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Address")
@@ -129,6 +136,11 @@ namespace HomeyDash.Api.Migrations
 
                     b.Property<string>("ApiKey")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -141,6 +153,9 @@ namespace HomeyDash.Api.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("AccountId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AlbumId")
                         .HasColumnType("TEXT");
@@ -175,10 +190,16 @@ namespace HomeyDash.Api.Migrations
             modelBuilder.Entity("HomeyDash.Api.Plex.PlexAccount", b =>
                 {
                     b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ClientId")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ServerId")

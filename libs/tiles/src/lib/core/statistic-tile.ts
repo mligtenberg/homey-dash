@@ -270,22 +270,22 @@ export class StatisticChart {
   `,
 })
 export class StatisticTile extends TileView<StatisticTileSettings> {
-  private readonly homey = inject(HomeyApi);
+  private readonly homeyApi = inject(HomeyApi);
   private readonly realtime = inject(Realtime);
 
-  private readonly log = computed(() => this.data.insights().get(this.settings().target ?? ''));
+  private readonly log = computed(() => this.homey()?.insights.get(this.settings().target ?? ''));
   private readonly owner = computed(() => {
     const owner = logOwner(this.settings().target ?? '');
-    return owner ? { device: this.data.devices().get(owner.deviceId), capability: owner.capability } : null;
+    return owner ? { device: this.homey()?.devices.get(owner.deviceId), capability: owner.capability } : null;
   });
   protected readonly window = computed(() => STATISTIC_WINDOWS[this.settings().window ?? 'last24Hours']);
 
   private readonly history = rxResource({
     params: () => {
       const log = this.log();
-      return log ? { log: log.id, window: this.settings().window ?? 'last24Hours' } : undefined;
+      return log ? { log: log.id, window: this.settings().window ?? 'last24Hours', account: this.settings().account } : undefined;
     },
-    stream: ({ params }) => this.homey.insightEntries(params.log, params.window),
+    stream: ({ params }) => this.homeyApi.insightEntries(params.log, params.window, params.account),
   });
   /** The history with the owner device's live values appended. */
   private readonly entries = linkedSignal<HomeyInsightEntry[]>(() => (this.history.hasValue() ? this.history.value() : []));

@@ -6,31 +6,36 @@ using Microsoft.EntityFrameworkCore;
 namespace HomeyDash.Api.Photos;
 
 // A photo set as the apps see it: Target is what a photo tile stores, Dashboards names those whose draft shows it.
-// It has an AlbumId or a Selection. SyncError says why the last sync with Immich failed; the photos are then those of
-// the sync before.
+// It has an AlbumId or a Selection. AccountId and AccountName are null once its Immich account is removed. SyncError
+// says why the last sync with Immich failed; the photos are then those of the sync before.
 public sealed record PhotoSetView(
-    Guid Id, string Name, string Target, string? AlbumId, string AlbumName, PhotoSelection? Selection, IReadOnlyList<Photo> Photos,
-    DateTimeOffset? SyncedAt, int SkippedVideos, string? SyncError, IReadOnlyList<string> Dashboards);
+    Guid Id, string Name, string Target, int? AccountId, string? AccountName, string? AlbumId, string AlbumName,
+    PhotoSelection? Selection, IReadOnlyList<Photo> Photos, DateTimeOffset? SyncedAt, int SkippedVideos, string? SyncError,
+    IReadOnlyList<string> Dashboards);
 
-// The Immich account as Management sees it. Its key never leaves the backend.
-public sealed record ImmichAccountInfo(bool Fake, string? Address);
+// An Immich account as Management sees it. Its key never leaves the backend.
+public sealed record ImmichAccountInfo(int Id, string Name, string Address);
+
+// Fake: the configuration runs HomeyDash against FakeImmich, whose one account can't be changed. Oldest first.
+public sealed record ImmichAccountsInfo(bool Fake, IReadOnlyList<ImmichAccountInfo> Accounts);
 
 public static class PhotoEndpoints
 {
-    // An album or a selection. Name may be left out to take the album's.
-    public sealed record NewPhotoSet(string? Name, string? AlbumId, PhotoSelection? Selection);
+    // An album or a selection. Name may be left out to take the album's, AccountId to use the oldest Immich account.
+    public sealed record NewPhotoSet(string? Name, string? AlbumId, PhotoSelection? Selection, int? AccountId = null);
 
-    // Leaves out what stays the same. An album replaces a selection, and the other way round.
-    public sealed record PhotoSetChange(string? Name, string? AlbumId, PhotoSelection? Selection);
+    // Leaves out what stays the same. An album replaces a selection, and the other way round. Another account syncs
+    // the album or selection with that account.
+    public sealed record PhotoSetChange(string? Name, string? AlbumId, PhotoSelection? Selection, int? AccountId = null);
 
-    // ApiKey may be left out to keep the current key, such as when only the address changes.
-    public sealed record ImmichAccountChange(string? Address, string? ApiKey);
+    // ApiKey may be left out of a change to keep the current key, such as when only the address changes.
+    public sealed record ImmichAccountChange(string? Name, string? Address, string? ApiKey);
 
     public static IServiceCollection AddPhotos(this IServiceCollection services, IConfiguration configuration)
     {
         var options = configuration.GetSection("Immich").Get<ImmichOptions>() ?? new ImmichOptions();
         services.AddSingleton(options);
-        services.AddSingleton<CurrentImmichAccount>();
+        services.AddSingleton<ImmichAccounts>();
         if (options.Fake)
         {
             services.AddSingleton<IImmich, FakeImmich>();
@@ -46,111 +51,97 @@ public static class PhotoEndpoints
         return services;
     }
 
-    // Reads which photo sets exist, before anything counts missing tiles, and the Immich account.
+    // Reads which photo sets exist, before anything counts missing tiles, and the Immich accounts.
     public static void LoadPhotoSets(this IServiceProvider services)
     {
         var db = services.GetRequiredService<HomeyDashDbContext>();
         var index = services.GetRequiredService<PhotoSetIndex>();
         foreach (var id in db.PhotoSets.Select(s => s.Id)) index.Add(id);
-        services.GetRequiredService<CurrentImmichAccount>().Account = services.GetRequiredService<ImmichOptions>().Fake
-            ? FakeImmich.Account
-            : db.ImmichAccounts.AsNoTracking().SingleOrDefault();
+        services.GetRequiredService<ImmichAccounts>().Set(services.GetRequiredService<ImmichOptions>().Fake
+            ? [FakeImmich.Account]
+            : db.ImmichAccounts.AsNoTracking().ToList());
     }
 
     public static void MapPhotos(this RouteGroupBuilder api)
     {
         var immich = api.MapGroup("/accounts/immich");
 
-        immich.MapGet("/", (ImmichOptions options, CurrentImmichAccount current) => Info(options, current));
+        immich.MapGet("/", (ImmichOptions options, ImmichAccounts accounts) => Info(options, accounts));
 
-        // Checks the address and key with Immich before keeping them, then syncs every photo set with the new account.
-        immich.MapPut("/", async (ImmichAccountChange body, ImmichOptions options, CurrentImmichAccount current, IImmich photos,
-            PhotoSync sync, HomeyDashDbContext db, CancellationToken ct) =>
+        // Checks the address and key with Immich before keeping them.
+        immich.MapPost("/", async (ImmichAccountChange body, ImmichOptions options, ImmichAccounts accounts, IImmich photos,
+            HomeyDashDbContext db, CancellationToken ct) =>
         {
             if (options.Fake) return FakeProblem();
-
-            Dictionary<string, string[]> errors = [];
-            var address = AccountEndpoints.NormalizeAddress(body.Address);
-            if (address is null) errors["address"] = ["Enter Immich's address, such as 192.168.1.20:2283 or https://photos.example.com."];
-            var apiKey = string.IsNullOrWhiteSpace(body.ApiKey) ? current.Account?.ApiKey : body.ApiKey.Trim();
-            if (apiKey is null) errors["apiKey"] = ["Enter an API key, made in Immich under Account Settings → API Keys."];
-            if (errors.Count > 0) return Results.ValidationProblem(errors);
-
-            var account = new ImmichAccount(address!, apiKey!);
-            try
-            {
-                await photos.CheckAsync(account, ct);
-            }
-            catch (ImmichException e)
-            {
-                return Results.ValidationProblem(new Dictionary<string, string[]> { [e.KeyRefused ? "apiKey" : "address"] = [e.Message] });
-            }
-
-            await db.ImmichAccounts.ExecuteDeleteAsync(ct);
+            var (account, problem) = await CheckAsync(body, null, accounts, photos, ct);
+            if (account is null) return problem!;
             db.ImmichAccounts.Add(account);
             await db.SaveChangesAsync(ct);
-            current.Account = account;
-            _ = sync.SyncAllAsync(CancellationToken.None);
-            return Info(options, current);
+            accounts.Set(await db.ImmichAccounts.AsNoTracking().ToListAsync(ct));
+            return Info(options, accounts);
         });
 
-        // Photo sets keep their list, but displays can't fetch their photos until Immich is set up again.
-        immich.MapDelete("/", async (ImmichOptions options, CurrentImmichAccount current, HomeyDashDbContext db, CancellationToken ct) =>
+        // A new address or key is checked with Immich first; the account's photo sets then sync with it.
+        immich.MapPut("/{id:int}", async (int id, ImmichAccountChange body, ImmichOptions options, ImmichAccounts accounts,
+            IImmich photos, PhotoSync sync, HomeyDashDbContext db, CancellationToken ct) =>
         {
             if (options.Fake) return FakeProblem();
-            await db.ImmichAccounts.ExecuteDeleteAsync(ct);
-            current.Account = null;
-            return Results.NoContent();
+            if (await db.ImmichAccounts.FindAsync([id], ct) is not { } stored) return Results.NotFound();
+            var (account, problem) = await CheckAsync(body, stored, accounts, photos, ct);
+            if (account is null) return problem!;
+            db.Entry(stored).State = EntityState.Detached;
+            db.ImmichAccounts.Update(account);
+            await db.SaveChangesAsync(ct);
+            accounts.Set(await db.ImmichAccounts.AsNoTracking().ToListAsync(ct));
+            if (account.Address != stored.Address || account.ApiKey != stored.ApiKey) _ = sync.SyncAllAsync(CancellationToken.None, force: false);
+            else await sync.PushAsync();
+            return Info(options, accounts);
+        });
+
+        // Its photo sets keep their photos, but displays can't fetch them until each set is given another account.
+        immich.MapDelete("/{id:int}", async (int id, ImmichOptions options, ImmichAccounts accounts, PhotoSync sync,
+            HomeyDashDbContext db, CancellationToken ct) =>
+        {
+            if (options.Fake) return FakeProblem();
+            if (await db.ImmichAccounts.FindAsync([id], ct) is not { } account) return Results.NotFound();
+            db.ImmichAccounts.Remove(account);
+            await db.SaveChangesAsync(ct);
+            await db.PhotoSets.Where(s => s.AccountId == id).ExecuteUpdateAsync(u => u.SetProperty(s => s.AccountId, (int?)null), ct);
+            accounts.Set(await db.ImmichAccounts.AsNoTracking().ToListAsync(ct));
+            _ = sync.SyncAllAsync(CancellationToken.None, force: false);
+            return Info(options, accounts);
         });
 
         // The albums photo sets can follow.
-        immich.MapGet("/albums", async (CurrentImmichAccount current, IImmich photos, CancellationToken ct) =>
-        {
-            if (current.Account is not { } account) return NotSetUp();
-            try
-            {
-                return Results.Ok(await photos.AlbumsAsync(account, ct));
-            }
-            catch (ImmichException e)
-            {
-                return Results.Problem(e.Message, statusCode: StatusCodes.Status502BadGateway);
-            }
-        });
+        immich.MapGet("/{id:int}/albums", (int id, ImmichAccounts accounts, IImmich photos, CancellationToken ct) =>
+            AskAsync(accounts.Find(id), account => photos.AlbumsAsync(account, ct)));
 
         // The people with a name, for a selection's rules.
-        immich.MapGet("/people", async (CurrentImmichAccount current, IImmich photos, CancellationToken ct) =>
-        {
-            if (current.Account is not { } account) return NotSetUp();
-            try
-            {
-                return Results.Ok(await photos.PeopleAsync(account, ct));
-            }
-            catch (ImmichException e)
-            {
-                return Results.Problem(e.Message, statusCode: StatusCodes.Status502BadGateway);
-            }
-        });
+        immich.MapGet("/{id:int}/people", (int id, ImmichAccounts accounts, IImmich photos, CancellationToken ct) =>
+            AskAsync(accounts.Find(id), account => photos.PeopleAsync(account, ct)));
 
         var sets = api.MapGroup("/photo-sets");
 
-        sets.MapGet("/", (HomeyDashDbContext db, PhotoSync sync, CancellationToken ct) => ListAsync(db, sync, ct));
+        sets.MapGet("/", (HomeyDashDbContext db, PhotoSync sync, ImmichAccounts accounts, CancellationToken ct) => ListAsync(db, sync, accounts, ct));
 
         // Syncs at once, so the set arrives with its photos.
-        sets.MapPost("/", async (NewPhotoSet body, CurrentImmichAccount current, IImmich photos, [AsParameters] Services s, CancellationToken ct) =>
+        sets.MapPost("/", async (NewPhotoSet body, ImmichAccounts accounts, IImmich photos, [AsParameters] Services s, CancellationToken ct) =>
         {
-            if (current.Account is not { } account) return NotSetUp();
+            if (accounts.Default is null) return NotSetUp();
+            if ((body.AccountId is null ? accounts.Default : accounts.Find(body.AccountId)) is not { } account)
+                return AccountProblem("Choose one of the Immich accounts.");
             if (body.Selection is { } selection)
             {
                 if (PhotoSet.ValidateName(body.Name) is { } nameError) return NameProblem(nameError);
                 if (PhotoSelection.Validate(selection) is { } selectionError) return SelectionProblem(selectionError);
-                var drawn = new PhotoSet { Name = body.Name!.Trim(), Selection = selection.Normalized() };
+                var drawn = new PhotoSet { Name = body.Name!.Trim(), AccountId = account.Id, Selection = selection.Normalized() };
                 s.Db.PhotoSets.Add(drawn);
                 await s.Db.SaveChangesAsync(ct);
                 s.Index.Add(drawn.Id);
                 await s.Sync.SyncAsync(drawn.Id, ct);
                 await s.Db.Entry(drawn).ReloadAsync(ct);
                 await s.ChangedAsync(ct, dashboards: true);
-                return Results.Created($"/api/photo-sets/{drawn.Id}", await ViewAsync(s.Db, s.Sync, drawn, ct));
+                return Results.Created($"/api/photo-sets/{drawn.Id}", await ViewAsync(s, drawn, ct));
             }
             if (string.IsNullOrWhiteSpace(body.AlbumId)) return AlbumProblem("Choose an Immich album.");
             ImmichAlbumContents? album;
@@ -168,20 +159,21 @@ public static class PhotoEndpoints
 
             var set = new PhotoSet
             {
-                Name = name.Trim(), AlbumId = body.AlbumId, AlbumName = album.Name, Photos = album.Photos,
+                Name = name.Trim(), AccountId = account.Id, AlbumId = body.AlbumId, AlbumName = album.Name, Photos = album.Photos,
                 SkippedVideos = album.SkippedVideos, SyncedAt = s.Time.GetUtcNow(),
             };
             s.Db.PhotoSets.Add(set);
             await s.Db.SaveChangesAsync(ct);
             s.Index.Add(set.Id);
             await s.ChangedAsync(ct, dashboards: true);
-            return Results.Created($"/api/photo-sets/{set.Id}", await ViewAsync(s.Db, s.Sync, set, ct));
+            return Results.Created($"/api/photo-sets/{set.Id}", await ViewAsync(s, set, ct));
         });
 
         // A different album or selection syncs at once; a failed sync keeps the change and says why.
-        sets.MapPatch("/{id:guid}", async (Guid id, PhotoSetChange body, [AsParameters] Services s, CancellationToken ct) =>
+        sets.MapPatch("/{id:guid}", async (Guid id, PhotoSetChange body, ImmichAccounts accounts, [AsParameters] Services s, CancellationToken ct) =>
         {
             if (await s.Db.PhotoSets.FindAsync([id], ct) is not { } set) return Results.NotFound();
+            if (body.AccountId is not null && accounts.Find(body.AccountId) is null) return AccountProblem("Choose one of the Immich accounts.");
             if (body.Name is not null && PhotoSet.ValidateName(body.Name) is { } error) return NameProblem(error);
             if (body.AlbumId is not null && string.IsNullOrWhiteSpace(body.AlbumId)) return AlbumProblem("Choose an Immich album.");
             if (body.AlbumId is not null && body.Selection is not null) return AlbumProblem("Choose an album or rules, not both.");
@@ -191,6 +183,8 @@ public static class PhotoEndpoints
             var albumChanged = body.AlbumId is not null && body.AlbumId != set.AlbumId;
             var selection = body.Selection?.Normalized();
             var selectionChanged = selection is not null && !SameSelection(selection, set.Selection);
+            var accountChanged = body.AccountId is not null && body.AccountId != set.AccountId;
+            if (accountChanged) set.AccountId = body.AccountId;
             if (albumChanged || selectionChanged)
             {
                 set.AlbumId = selection is null ? body.AlbumId : null;
@@ -201,10 +195,10 @@ public static class PhotoEndpoints
                 set.SkippedVideos = 0;
             }
             await s.Db.SaveChangesAsync(ct);
-            if (albumChanged || selectionChanged) await s.Sync.SyncAsync(id, ct);
+            if (albumChanged || selectionChanged || accountChanged) await s.Sync.SyncAsync(id, ct);
             else await s.ChangedAsync(ct);
             await s.Db.Entry(set).ReloadAsync(ct);
-            return Results.Ok(await ViewAsync(s.Db, s.Sync, set, ct));
+            return Results.Ok(await ViewAsync(s, set, ct));
         });
 
         // Tiles showing it become missing; Management flags their dashboards.
@@ -225,16 +219,16 @@ public static class PhotoEndpoints
             if (await s.Db.PhotoSets.AsNoTracking().FirstOrDefaultAsync(set => set.Id == id, ct) is null) return Results.NotFound();
             await s.Sync.SyncAsync(id, ct);
             var set = await s.Db.PhotoSets.AsNoTracking().FirstAsync(set => set.Id == id, ct);
-            return Results.Ok(await ViewAsync(s.Db, s.Sync, set, ct));
+            return Results.Ok(await ViewAsync(s, set, ct));
         });
 
         // Fetched from Immich as a display asks for it; only photos of the set, so this can't reach the rest of Immich.
         api.MapGet("/photos/{setId:guid}/{photoId}", async (Guid setId, string photoId, HomeyDashDbContext db,
-            CurrentImmichAccount current, IImmich photos, HttpContext http, CancellationToken ct) =>
+            ImmichAccounts accounts, IImmich photos, HttpContext http, CancellationToken ct) =>
         {
             var set = await db.PhotoSets.AsNoTracking().FirstOrDefaultAsync(s => s.Id == setId, ct);
             if (set?.Photos.Any(p => p.Id == photoId) != true) return Results.NotFound();
-            if (current.Account is not { } account) return NotSetUp();
+            if (accounts.Find(set.AccountId) is not { } account) return NotSetUp();
             ImmichPhoto? photo;
             try
             {
@@ -251,7 +245,8 @@ public static class PhotoEndpoints
         });
     }
 
-    public sealed record Services(HomeyDashDbContext Db, PhotoSetIndex Index, PhotoSync Sync, RealtimeNotifier Notifier, TimeProvider Time)
+    public sealed record Services(
+        HomeyDashDbContext Db, PhotoSetIndex Index, PhotoSync Sync, ImmichAccounts Accounts, RealtimeNotifier Notifier, TimeProvider Time)
     {
         public async Task ChangedAsync(CancellationToken ct, bool dashboards = false)
         {
@@ -260,20 +255,23 @@ public static class PhotoEndpoints
         }
     }
 
-    public static async Task<List<PhotoSetView>> ListAsync(HomeyDashDbContext db, PhotoSync sync, CancellationToken ct)
+    public static async Task<List<PhotoSetView>> ListAsync(HomeyDashDbContext db, PhotoSync sync, ImmichAccounts accounts, CancellationToken ct)
     {
         var sets = await db.PhotoSets.AsNoTracking().ToListAsync(ct);
         var usage = await UsageAsync(db, ct);
         return sets.OrderBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Select(s => View(s, sync, usage)).ToList();
+            .Select(s => View(s, sync, accounts, usage)).ToList();
     }
 
-    private static async Task<PhotoSetView> ViewAsync(HomeyDashDbContext db, PhotoSync sync, PhotoSet set, CancellationToken ct) =>
-        View(set, sync, await UsageAsync(db, ct));
+    private static async Task<PhotoSetView> ViewAsync(Services s, PhotoSet set, CancellationToken ct) =>
+        View(set, s.Sync, s.Accounts, await UsageAsync(s.Db, ct));
 
-    private static PhotoSetView View(PhotoSet set, PhotoSync sync, ILookup<string, string> usage) =>
-        new(set.Id, set.Name, set.Target, set.AlbumId, set.AlbumName, set.Selection, set.Photos, set.SyncedAt, set.SkippedVideos,
-            sync.Error(set.Id), usage[set.Target].Distinct().Order().ToList());
+    private static PhotoSetView View(PhotoSet set, PhotoSync sync, ImmichAccounts accounts, ILookup<string, string> usage)
+    {
+        var account = accounts.Find(set.AccountId);
+        return new(set.Id, set.Name, set.Target, account?.Id, account?.Name, set.AlbumId, set.AlbumName, set.Selection, set.Photos,
+            set.SyncedAt, set.SkippedVideos, sync.Error(set.Id), usage[set.Target].Distinct().Order().ToList());
+    }
 
     // Which dashboards' drafts point at each target.
     private static async Task<ILookup<string, string>> UsageAsync(HomeyDashDbContext db, CancellationToken ct) =>
@@ -281,8 +279,52 @@ public static class PhotoEndpoints
         .SelectMany(d => d.Targets().Select(target => (target, d.Name)))
         .ToLookup(x => x.target, x => x.Name);
 
-    private static IResult Info(ImmichOptions options, CurrentImmichAccount current) =>
-        Results.Ok(new ImmichAccountInfo(options.Fake, options.Fake ? null : current.Account?.Address));
+    private static IResult Info(ImmichOptions options, ImmichAccounts accounts) =>
+        Results.Ok(new ImmichAccountsInfo(options.Fake, accounts.All.Select(a => new ImmichAccountInfo(a.Id, a.Name, a.Address)).ToList()));
+
+    // The account as changed, or why not: a field left empty, or what Immich said. Stored is the account being changed,
+    // null for a new one; Immich is only asked when its address or key changes.
+    private static async Task<(ImmichAccount? Account, IResult? Problem)> CheckAsync(ImmichAccountChange body, ImmichAccount? stored, ImmichAccounts accounts,
+        IImmich photos, CancellationToken ct)
+    {
+        Dictionary<string, string[]> errors = [];
+        if (AccountEndpoints.ValidateName(body.Name, accounts.All.Where(a => a.Id != stored?.Id).Select(a => a.Name)) is { } nameError)
+            errors["name"] = [nameError];
+        var address = AccountEndpoints.NormalizeAddress(body.Address);
+        if (address is null) errors["address"] = ["Enter Immich's address, such as 192.168.1.20:2283 or https://photos.example.com."];
+        var apiKey = string.IsNullOrWhiteSpace(body.ApiKey) ? stored?.ApiKey : body.ApiKey.Trim();
+        if (apiKey is null) errors["apiKey"] = ["Enter an API key, made in Immich under Account Settings → API Keys."];
+        if (errors.Count > 0) return (null, Results.ValidationProblem(errors));
+
+        var account = new ImmichAccount(address!, apiKey!) { Id = stored?.Id ?? 0, Name = body.Name!.Trim() };
+        if (account.Address == stored?.Address && account.ApiKey == stored.ApiKey) return (account, null);
+        try
+        {
+            await photos.CheckAsync(account, ct);
+            return (account, null);
+        }
+        catch (ImmichException e)
+        {
+            return (null, Results.ValidationProblem(new Dictionary<string, string[]> { [e.KeyRefused ? "apiKey" : "address"] = [e.Message] }));
+        }
+    }
+
+    // Asks the account's Immich, or says why it can't.
+    private static async Task<IResult> AskAsync<T>(ImmichAccount? account, Func<ImmichAccount, Task<T>> ask)
+    {
+        if (account is null) return Results.NotFound();
+        try
+        {
+            return Results.Ok(await ask(account));
+        }
+        catch (ImmichException e)
+        {
+            return Results.Problem(e.Message, statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
+    private static IResult AccountProblem(string error) =>
+        Results.ValidationProblem(new Dictionary<string, string[]> { ["accountId"] = [error] });
 
     private static IResult NotSetUp() =>
         Results.Problem("Set up Immich under Accounts first.", statusCode: StatusCodes.Status409Conflict);

@@ -1,13 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ImmichAlbum, PhotoSetsApi } from '@homey-dash/api-client';
+import { ImmichAccountApi, ImmichAlbum, PhotoSetsApi } from '@homey-dash/api-client';
 import { TileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
-import { albumLabel, loadAlbums, problem } from '../immich-albums';
+import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue, problem } from '../immich-albums';
 
 /**
  * A photo tile's target: one of the photo sets, or a new one made here from an Immich album, so building a dashboard
- * never needs a trip to the Photo sets page.
+ * never needs a trip to the Photo sets page. With several Immich accounts, the albums are grouped by account.
  */
 @Component({
   selector: 'hd-photo-set-field',
@@ -16,11 +16,21 @@ import { albumLabel, loadAlbums, problem } from '../immich-albums';
   template: `
     <div class="hd-field">
       <label class="hd-field__label" for="tile-target">Photo set</label>
-      @if (albums(); as albums) {
+      @if (groups(); as groups) {
         <select id="tile-target" class="hd-select" (change)="create($any($event.target).value)" (keydown.escape)="cancel()">
           <option value="" selected>Choose an Immich album</option>
-          @for (album of albums; track album.id) {
-            <option [value]="album.id">{{ label(album) }}</option>
+          @for (group of groups; track group.account.id) {
+            @if (groups.length > 1) {
+              <optgroup [label]="group.account.name">
+                @for (album of group.albums; track album.id) {
+                  <option [value]="optionValue(group, album)">{{ label(album) }}</option>
+                }
+              </optgroup>
+            } @else {
+              @for (album of group.albums; track album.id) {
+                <option [value]="optionValue(group, album)">{{ label(album) }}</option>
+              }
+            }
           }
         </select>
         <button class="hd-btn" type="button" (click)="cancel()">Cancel</button>
@@ -59,9 +69,10 @@ export class PhotoSetField {
 
   private readonly data = inject(TileData);
   private readonly api = inject(PhotoSetsApi);
+  private readonly accounts = inject(ImmichAccountApi);
 
-  /** Immich's albums while a new photo set is being made, else null. */
-  protected readonly albums = signal<ImmichAlbum[] | null>(null);
+  /** Every Immich account's albums while a new photo set is being made, else null. */
+  protected readonly groups = signal<AlbumGroup[] | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly sets = computed(() =>
     [...this.data.photoSets().values()].sort((a, b) => a.name.localeCompare(b.name)),
@@ -75,27 +86,32 @@ export class PhotoSetField {
     return albumLabel(album);
   }
 
+  protected optionValue(group: AlbumGroup, album: ImmichAlbum) {
+    return albumValue(group.account.id, album.id);
+  }
+
   protected async choose(value: string) {
     this.error.set(null);
     if (value !== 'new') {
       if (value) this.picked.emit(value);
       return;
     }
-    const albums = await loadAlbums(this.api);
-    if (typeof albums === 'string') this.error.set(albums);
-    else this.albums.set(albums);
+    const { groups, error } = await loadAlbums(this.accounts, this.api);
+    this.error.set(error);
+    if (groups.length) this.groups.set(groups);
   }
 
   protected cancel() {
-    this.albums.set(null);
+    this.groups.set(null);
   }
 
   // Makes a set named after the album and points the tile at it.
-  protected async create(albumId: string) {
-    if (!albumId) return;
+  protected async create(value: string) {
+    const album = parseAlbumValue(value);
+    if (!album) return;
     try {
-      const set = await firstValueFrom(this.api.create(albumId));
-      this.albums.set(null);
+      const set = await firstValueFrom(this.api.create(album.accountId, album.albumId));
+      this.groups.set(null);
       this.picked.emit(set.target);
     } catch (e) {
       this.error.set(problem(e, 'Could not make the photo set. Try again.'));

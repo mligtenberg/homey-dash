@@ -1,11 +1,14 @@
+using HomeyDash.Api.Accounts;
 using HomeyDash.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace HomeyDash.Api.Plex;
 
-// The Plex account as Management sees it. Its tokens never leave the backend.
-public sealed record PlexAccountInfo(
-    bool Fake, bool SignedIn, string? Username, string? ServerId, string? ServerName, PlexSignInStatus? SignIn);
+// A Plex account as Management sees it. Its tokens never leave the backend.
+public sealed record PlexAccountInfo(int Id, string Name, string? Username, string? ServerId, string? ServerName);
+
+// Fake: the configuration runs HomeyDash against FakePlex, whose one account can't be changed. Oldest first.
+public sealed record PlexAccountsInfo(bool Fake, IReadOnlyList<PlexAccountInfo> Accounts, PlexSignInStatus? SignIn);
 
 public sealed record PlexServerInfo(string Id, string Name, bool Owned);
 
@@ -13,11 +16,16 @@ public static class PlexEndpoints
 {
     public sealed record ServerChoice(string? Id);
 
+    // A new account needs a name; AccountId signs in an existing one again.
+    public sealed record SignInRequest(string? Name, int? AccountId);
+
+    public sealed record AccountChange(string? Name);
+
     public static IServiceCollection AddPlex(this IServiceCollection services, IConfiguration configuration)
     {
         var options = configuration.GetSection("Plex").Get<PlexOptions>() ?? new PlexOptions();
         services.AddSingleton(options);
-        services.AddSingleton<CurrentPlexAccount>();
+        services.AddSingleton<PlexAccounts>();
         if (options.Fake)
         {
             services.AddSingleton<IPlex, FakePlex>();
@@ -33,27 +41,32 @@ public static class PlexEndpoints
         return services;
     }
 
-    // Reads the account kept in the database, before the watcher starts.
+    // Reads the accounts kept in the database, before the watcher starts.
     public static void LoadPlex(this IServiceProvider services)
     {
-        services.GetRequiredService<CurrentPlexAccount>().Account = services.GetRequiredService<PlexOptions>().Fake
-            ? FakePlex.Account
-            : services.GetRequiredService<HomeyDashDbContext>().PlexAccounts.AsNoTracking().SingleOrDefault();
+        services.GetRequiredService<PlexAccounts>().Set(services.GetRequiredService<PlexOptions>().Fake
+            ? [FakePlex.Account]
+            : services.GetRequiredService<HomeyDashDbContext>().PlexAccounts.AsNoTracking().ToList());
     }
 
     public static void MapPlex(this RouteGroupBuilder api)
     {
-        var account = api.MapGroup("/accounts/plex");
+        var plexAccounts = api.MapGroup("/accounts/plex");
 
-        account.MapGet("/", (PlexOptions options, CurrentPlexAccount current, PlexSignIn signIn) => Info(options, current, signIn));
+        plexAccounts.MapGet("/", (PlexOptions options, PlexAccounts accounts, PlexSignIn signIn) => Info(options, accounts, signIn));
 
         // Starts signing in: Management opens the url, Plex's own page, for someone to approve HomeyDash.
-        account.MapPost("/sign-in", async (PlexOptions options, PlexSignIn signIn, CancellationToken ct) =>
+        plexAccounts.MapPost("/sign-in", async (SignInRequest body, PlexOptions options, PlexAccounts accounts, PlexSignIn signIn,
+            CancellationToken ct) =>
         {
             if (options.Fake) return FakeProblem();
+            if (body.AccountId is not null && accounts.Find(body.AccountId) is null) return Results.NotFound();
+            if (body.AccountId is null
+                && AccountEndpoints.ValidateName(body.Name, accounts.All.Select(a => a.Name)) is { } nameError)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["name"] = [nameError] });
             try
             {
-                return Results.Ok(new { url = await signIn.StartAsync(ct) });
+                return Results.Ok(new { url = await signIn.StartAsync(body.Name?.Trim() ?? "", body.AccountId, ct) });
             }
             catch (PlexException e)
             {
@@ -61,19 +74,30 @@ public static class PlexEndpoints
             }
         });
 
-        account.MapDelete("/sign-in", (PlexSignIn signIn) =>
+        plexAccounts.MapDelete("/sign-in", (PlexSignIn signIn) =>
         {
             signIn.Cancel();
             return Results.NoContent();
         });
 
-        // The servers the account can use, to choose from.
-        account.MapGet("/servers", async (CurrentPlexAccount current, IPlex plex, CancellationToken ct) =>
+        plexAccounts.MapPut("/{id:int}", async (int id, AccountChange body, PlexOptions options, PlexAccounts accounts,
+            PlexSignIn signIn, CancellationToken ct) =>
         {
-            if (current.Account is not { } signedIn) return NotSignedIn();
+            if (options.Fake) return FakeProblem();
+            if (accounts.Find(id) is not { } account) return Results.NotFound();
+            if (AccountEndpoints.ValidateName(body.Name, accounts.All.Where(a => a.Id != id).Select(a => a.Name)) is { } nameError)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["name"] = [nameError] });
+            await signIn.SaveAsync(account with { Name = body.Name!.Trim() }, ct);
+            return Info(options, accounts, signIn);
+        });
+
+        // The servers the account can use, to choose from.
+        plexAccounts.MapGet("/{id:int}/servers", async (int id, PlexAccounts accounts, IPlex plex, CancellationToken ct) =>
+        {
+            if (accounts.Find(id) is not { } account) return Results.NotFound();
             try
             {
-                var servers = await plex.ServersAsync(signedIn.ClientId, signedIn.Token, ct);
+                var servers = await plex.ServersAsync(account.ClientId, account.Token, ct);
                 return Results.Ok(servers.Select(s => new PlexServerInfo(s.Id, s.Name, s.Owned)).OrderByDescending(s => s.Owned).ThenBy(s => s.Name));
             }
             catch (PlexException e)
@@ -82,18 +106,18 @@ public static class PlexEndpoints
             }
         });
 
-        account.MapPut("/server", async (ServerChoice body, PlexOptions options, CurrentPlexAccount current, IPlex plex,
+        plexAccounts.MapPut("/{id:int}/server", async (int id, ServerChoice body, PlexOptions options, PlexAccounts accounts, IPlex plex,
             PlexSignIn signIn, CancellationToken ct) =>
         {
             if (options.Fake) return FakeProblem();
-            if (current.Account is not { } signedIn) return NotSignedIn();
+            if (accounts.Find(id) is not { } account) return Results.NotFound();
             try
             {
-                var server = (await plex.ServersAsync(signedIn.ClientId, signedIn.Token, ct)).FirstOrDefault(s => s.Id == body.Id);
+                var server = (await plex.ServersAsync(account.ClientId, account.Token, ct)).FirstOrDefault(s => s.Id == body.Id);
                 if (server is null)
                     return Results.ValidationProblem(new Dictionary<string, string[]> { ["id"] = ["Choose one of the account's servers."] });
-                await signIn.UseServerAsync(signedIn, server, ct);
-                return Info(options, current, signIn);
+                await signIn.UseServerAsync(account, server, ct);
+                return Info(options, accounts, signIn);
             }
             catch (PlexException e)
             {
@@ -101,22 +125,24 @@ public static class PlexEndpoints
             }
         });
 
-        // Plex tiles show Plex as not set up until someone signs in again.
-        account.MapDelete("/", async (PlexOptions options, PlexSignIn signIn, CancellationToken ct) =>
+        // Its Plex tiles show Plex as not set up until they are given another account.
+        plexAccounts.MapDelete("/{id:int}", async (int id, PlexOptions options, PlexAccounts accounts, PlexSignIn signIn, CancellationToken ct) =>
         {
             if (options.Fake) return FakeProblem();
-            signIn.Cancel();
-            await signIn.SaveAsync(null, ct);
-            return Results.NoContent();
+            if (accounts.Find(id) is null) return Results.NotFound();
+            if (signIn.Status?.AccountId == id) signIn.Cancel();
+            await signIn.RemoveAsync(id, ct);
+            return Info(options, accounts, signIn);
         });
 
-        // Posters and artwork, scaled by the server. Only the library's own pictures, so this can't reach the rest of it.
-        api.MapGet("/plex/image", async (string? path, int? w, int? h, CurrentPlexAccount current, IPlex plex,
+        // Posters and artwork, scaled by the account's server (the oldest account's when none is given). Only the
+        // library's own pictures, so this can't reach the rest of it.
+        api.MapGet("/plex/image", async (string? path, int? w, int? h, int? account, PlexAccounts accounts, IPlex plex,
             HttpContext http, CancellationToken ct) =>
         {
             if (path is null || !path.StartsWith("/library/metadata/", StringComparison.Ordinal) || path.Contains("..") || path.Contains('?'))
                 return Results.NotFound();
-            if (current.Account?.Connection is not { } server) return NotSignedIn();
+            if (accounts.For(account)?.Connection is not { } server) return NotSignedIn();
             try
             {
                 var image = await plex.ImageAsync(server, path, Math.Clamp(w ?? 400, 32, 1920), Math.Clamp(h ?? 600, 32, 1920), ct);
@@ -131,12 +157,11 @@ public static class PlexEndpoints
         });
     }
 
-    private static IResult Info(PlexOptions options, CurrentPlexAccount current, PlexSignIn signIn)
-    {
-        var account = current.Account;
-        return Results.Ok(new PlexAccountInfo(options.Fake, account is not null, account?.Username, account?.ServerId,
-            account?.ServerName, signIn.Status));
-    }
+    private static IResult Info(PlexOptions options, PlexAccounts accounts, PlexSignIn signIn) =>
+        Results.Ok(new PlexAccountsInfo(
+            options.Fake,
+            accounts.All.Select(a => new PlexAccountInfo(a.Id, a.Name, a.Username, a.ServerId, a.ServerName)).ToList(),
+            signIn.Status));
 
     private static IResult NotSignedIn() =>
         Results.Problem("Sign in with Plex under Accounts first.", statusCode: StatusCodes.Status409Conflict);

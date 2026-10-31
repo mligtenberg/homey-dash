@@ -9,7 +9,7 @@ namespace HomeyDash.Api.Photos;
 /// </summary>
 public sealed class FakeImmich(TimeProvider time) : IImmich
 {
-    public static readonly ImmichAccount Account = new("http://fake-immich", "fake");
+    public static readonly ImmichAccount Account = new("http://fake-immich", "fake") { Id = 1, Name = "Fake Immich" };
 
     public const string SummerId = "00000000-0000-4000-8000-000000000001";
     public const string GardenId = "00000000-0000-4000-8000-000000000002";

@@ -47,6 +47,9 @@ export interface PhotoSet {
   name: string;
   /** What a photo tile stores as its target. */
   target: string;
+  /** The Immich account it draws from; both null once that account is removed. */
+  accountId: number | null;
+  accountName: string | null;
   /** Null for a selection. */
   albumId: string | null;
   /** The album's name in Immich when it last synced. */
@@ -83,28 +86,28 @@ export class PhotoSetsApi {
     return this.http.get<PhotoSet[]>('/api/photo-sets');
   }
 
-  /** The albums in Immich, by name. */
-  albums() {
-    return this.http.get<ImmichAlbum[]>('/api/accounts/immich/albums');
+  /** The albums in an Immich account, by name. */
+  albums(accountId: number) {
+    return this.http.get<ImmichAlbum[]>(`/api/accounts/immich/${accountId}/albums`);
   }
 
-  /** The people with a name in Immich, by name. */
-  people() {
-    return this.http.get<PersonRef[]>('/api/accounts/immich/people');
+  /** The people with a name in an Immich account, by name. */
+  people(accountId: number) {
+    return this.http.get<PersonRef[]>(`/api/accounts/immich/${accountId}/people`);
   }
 
   /** Leave `name` empty to take the album's. The set arrives with the album's photos. */
-  create(albumId: string, name?: string) {
-    return this.http.post<PhotoSet>('/api/photo-sets', { albumId, name: name || null });
+  create(accountId: number, albumId: string, name?: string) {
+    return this.http.post<PhotoSet>('/api/photo-sets', { accountId, albumId, name: name || null });
   }
 
   /** A set drawn by `selection`; it arrives with its first draw. */
-  createSelection(name: string, selection: PhotoSelection) {
-    return this.http.post<PhotoSet>('/api/photo-sets', { name, selection });
+  createSelection(accountId: number, name: string, selection: PhotoSelection) {
+    return this.http.post<PhotoSet>('/api/photo-sets', { accountId, name, selection });
   }
 
-  /** Leave out what stays the same. Another album or selection syncs at once. */
-  update(id: string, change: { name?: string; albumId?: string; selection?: PhotoSelection }) {
+  /** Leave out what stays the same. Another album, selection or account syncs at once. */
+  update(id: string, change: { name?: string; albumId?: string; selection?: PhotoSelection; accountId?: number }) {
     return this.http.patch<PhotoSet>(`/api/photo-sets/${id}`, change);
   }
 

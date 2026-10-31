@@ -97,7 +97,7 @@ export class MoodListTile extends TileView {
   protected readonly columns = computed(() => Math.max(1, Math.min(this.page().columns, this.moods().length)));
 
   protected readonly moods = computed<MoodButton[]>(() => {
-    const known = this.data.moods();
+    const known = this.homey()?.moods ?? new Map();
     return (this.settings().targets ?? []).map((id) => {
       const mood = known.get(id);
       return { id, name: mood?.name ?? 'Not found', found: !!mood, tint: mood ? moodTint(mood.colors) : null };
@@ -117,7 +117,7 @@ export class MoodListTile extends TileView {
     const name = this.settings().label || 'Moods';
     const moods = this.moods();
     if (!moods.length) return { ...look, name, detail: 'Pick moods', state: 'unset' };
-    if (!this.data.loaded()) return { ...look, name, detail: '…', state: 'loading' };
+    if (!this.homeyLoaded()) return { ...look, name, detail: '…', state: 'loading' };
     if (!moods.some((m) => m.found)) return { ...look, name, detail: 'Not found in Homey', state: 'missing' };
     const pressed = moods.find((m) => m.id === this.pressed())?.name;
     const flash = this.flash();
@@ -127,7 +127,7 @@ export class MoodListTile extends TileView {
 
   protected activate(mood: MoodButton) {
     this.pressed.set(mood.id);
-    this.send(() => this.realtime.activateMood(mood.id), 'early');
+    this.send(() => this.realtime.activateMood(this.settings().account, mood.id), 'early');
   }
 
   protected onScroll() {

@@ -35,9 +35,15 @@ public sealed class Dashboard
         PublishedAt = now;
     }
 
-    // Draft tiles with a target (settings.target, or one of settings.targets) that no longer exists.
+    // Draft tiles with a target (settings.target, or one of settings.targets) that no longer exists in their account.
     public int MissingTiles(TargetCatalog targets) =>
-        Draft.Sections.SelectMany(s => s.Tiles).Count(t => Targets(t.Settings).Any(target => targets.Knows(target) == false));
+        Draft.Sections.SelectMany(s => s.Tiles)
+            .Count(t => Targets(t.Settings).Any(target => targets.Knows(target, Account(t.Settings)) == false));
+
+    // The account a tile's settings name (settings.account); null for the oldest account of its kind.
+    public static int? Account(JsonElement settings) =>
+        settings.ValueKind == JsonValueKind.Object && settings.TryGetProperty("account", out var account)
+        && account.ValueKind == JsonValueKind.Number && account.TryGetInt32(out var id) ? id : null;
 
     // Every target the draft's tiles point at.
     public IEnumerable<string> Targets() => Draft.Sections.SelectMany(s => s.Tiles).SelectMany(t => Targets(t.Settings));

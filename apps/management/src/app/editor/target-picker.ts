@@ -145,7 +145,7 @@ export class TargetPicker {
 
   protected readonly query = signal('');
   private readonly homey = inject(RealtimeTileData);
-  protected readonly notSetUp = computed(() => this.homey.status()?.connection === 'notSetUp');
+  protected readonly notSetUp = computed(() => this.homey.homeys()?.length === 0);
   /** The zone or folder picked on the left; null for all of them. */
   protected readonly selected = signal<string | null>(null);
 

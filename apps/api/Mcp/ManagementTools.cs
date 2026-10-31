@@ -20,7 +20,7 @@ namespace HomeyDash.Api.Mcp;
 /// </summary>
 [McpServerToolType]
 public sealed class ManagementTools(
-    HomeyDashDbContext db, HomeyState homey, PlexWatcher plex, TargetCatalog targets, RealtimeNotifier notifier, DisplayPresence presence, TimeProvider time)
+    HomeyDashDbContext db, Homeys homeys, PlexWatcher plex, TargetCatalog targets, RealtimeNotifier notifier, DisplayPresence presence, TimeProvider time)
 {
     public const string Path = "/mcp";
 
@@ -42,7 +42,9 @@ public sealed class ManagementTools(
           settings.target is "plex-player:any" for whatever plays, or a player's target.
         - "plex-recent" (small, wide, full, large, full-large): the posters of what was newly added to Plex; settings.target is
           "plex-library:all" or a library's target.
-        Every tile's settings may have a "label" that overrides its target's name.
+        Every tile's settings may have a "label" that overrides its target's name. A home can have several Homey and Plex
+        accounts: a Homey or Plex tile's settings.account is the account of its target (list_targets gives it); left out, the
+        oldest account. A mood-list tile's moods are all in its one account.
         """;
 
     [McpServerTool(Name = "list_dashboards", ReadOnly = true)]
@@ -134,7 +136,8 @@ public sealed class ManagementTools(
         return await DisplayQueries.InfoAsync(db, presence, display, ct);
     }
 
-    public sealed record Target(string Id, string Name, string? Detail);
+    // Account: the account a tile on it names in settings.account, for kinds that can have several.
+    public sealed record Target(string Id, string Name, string? Detail, int? Account = null);
 
     [McpServerTool(Name = "list_targets", ReadOnly = true)]
     [Description("""
@@ -143,35 +146,43 @@ public sealed class ManagementTools(
         album and are made in Management, so assistants can only use the ones that exist.
         """)]
     public async Task<IEnumerable<Target>> ListTargets(
-        [Description("device, flow, mood, insight, photoSet, plexPlayer or plexLibrary")] string type, IHomey homeyActions, CancellationToken ct) =>
+        [Description("device, flow, mood, insight, photoSet, plexPlayer or plexLibrary")] string type, CancellationToken ct) =>
         type switch
         {
-            "device" => homey.Devices.OrderBy(d => d.Name).Select(d =>
-                new Target(d.Id, d.Name, $"{d.Class} in {d.ZoneName ?? "no zone"}; capabilities: {string.Join(", ", d.Capabilities.Keys)}")),
-            "flow" => homey.Flows.OrderBy(f => f.Name).Select(f => new Target(f.Id, f.Name, f.Enabled ? null : "turned off")),
-            "mood" => homey.Moods.OrderBy(m => m.Name).Select(m => new Target(m.Id, m.Name, null)),
-            "insight" => (await InsightLogsAsync(homeyActions, ct)).Select(l =>
-                new Target(l.Id, string.Join(" · ", new[] { l.OwnerName, l.Title }.OfType<string>()), l.Units)),
+            "device" => homeys.All.SelectMany(h => h.State.Devices.OrderBy(d => d.Name).Select(d =>
+                new Target(d.Id, d.Name, $"{d.Class} in {d.ZoneName ?? "no zone"} on {h.Name}; capabilities: {string.Join(", ", d.Capabilities.Keys)}", h.AccountId))),
+            "flow" => homeys.All.SelectMany(h => h.State.Flows.OrderBy(f => f.Name).Select(f =>
+                new Target(f.Id, f.Name, f.Enabled ? $"on {h.Name}" : $"on {h.Name}, turned off", h.AccountId))),
+            "mood" => homeys.All.SelectMany(h => h.State.Moods.OrderBy(m => m.Name).Select(m => new Target(m.Id, m.Name, $"on {h.Name}", h.AccountId))),
+            "insight" => await InsightLogsAsync(ct),
             "photoSet" => (await db.PhotoSets.AsNoTracking().ToListAsync(ct)).OrderBy(p => p.Name).Select(p =>
                 new Target(p.Target, p.Name, (p.Photos.Count == 1 ? "1 photo" : $"{p.Photos.Count} photos") + (p.Selection is null ? $" from the Immich album {p.AlbumName}" : " drawn at random from Immich"))),
-            "plexPlayer" => [new Target(TargetCatalog.AnyPlexPlayer, "Any player", "whatever plays"),
-                .. plex.Overview.Players.Select(p => new Target(TargetCatalog.PlexPlayerPrefix + p.Id, p.Name, "played since HomeyDash started"))],
-            "plexLibrary" => [new Target(TargetCatalog.AllPlexLibraries, "All libraries", null),
-                .. plex.Overview.Libraries.Select(l => new Target(TargetCatalog.PlexLibraryPrefix + l.Id, l.Title, l.Type))],
+            "plexPlayer" => plex.Overviews.SelectMany(o => (IEnumerable<Target>)[
+                new Target(TargetCatalog.AnyPlexPlayer, "Any player", $"whatever plays on {o.AccountName}", o.AccountId),
+                .. o.Players.Select(p => new Target(TargetCatalog.PlexPlayerPrefix + p.Id, p.Name, $"on {o.AccountName}, played since HomeyDash started", o.AccountId))]),
+            "plexLibrary" => plex.Overviews.SelectMany(o => (IEnumerable<Target>)[
+                new Target(TargetCatalog.AllPlexLibraries, "All libraries", $"on {o.AccountName}", o.AccountId),
+                .. o.Libraries.Select(l => new Target(TargetCatalog.PlexLibraryPrefix + l.Id, l.Title, $"{l.Type} on {o.AccountName}", o.AccountId))]),
             _ => throw new McpException($"Unknown target type {type}; use device, flow, mood, insight, photoSet, plexPlayer or plexLibrary."),
         };
 
-    // Insight logs are fetched from Homey, which may be out of reach.
-    private static async Task<IReadOnlyList<HomeyInsightLog>> InsightLogsAsync(IHomey homeyActions, CancellationToken ct)
+    // Insight logs are fetched from each Homey, which may be out of reach.
+    private async Task<List<Target>> InsightLogsAsync(CancellationToken ct)
     {
-        try
+        List<Target> logs = [];
+        foreach (var h in homeys.All)
         {
-            return await homeyActions.GetInsightLogsAsync(ct);
+            try
+            {
+                logs.AddRange((await h.Homey.GetInsightLogsAsync(ct)).Select(l => new Target(l.Id,
+                    string.Join(" · ", new[] { l.OwnerName, l.Title }.OfType<string>()), $"{l.Units ?? "no units"} on {h.Name}", h.AccountId)));
+            }
+            catch (Exception e) when (e is HomeyUnavailableException or HttpRequestException)
+            {
+                throw new McpException($"Homey {h.Name} cannot be reached: {e.Message}");
+            }
         }
-        catch (Exception e) when (e is HomeyUnavailableException or HttpRequestException)
-        {
-            throw new McpException($"Homey cannot be reached: {e.Message}");
-        }
+        return logs;
     }
 
     private async Task<Dashboard> FindDashboardAsync(Guid id, CancellationToken ct) =>

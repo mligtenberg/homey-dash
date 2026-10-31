@@ -15,6 +15,7 @@ A photo tile shows a photo set, made in Management: a named link to an album in 
 
 - A smart search ranks every photo by how well it matches, so a rule's query only draws from the best matches, twice as many as the photos it draws.
 - Setting up Immich takes its address and an API key with at least the `album.read`, `asset.read`, `asset.view` and `person.read` permissions, entered under Accounts ([ADR-0007](0007-accounts-set-up-in-management.md)). HomeyDash checks both with Immich before keeping them.
+- A home can have several Immich accounts, each with a name, such as a server per household or a key per person. A photo set draws from one of them: the oldest unless another is chosen. Choosing an album of another account moves the set to that account. Removing an account leaves its sets without one, keeping their photos list, until they are given another.
 - When Immich can't be reached, photo tiles keep the photo they show and photos browsers have kept (for a day) still show, but new ones don't load. Photo tiles still work without the internet, in line with [ADR-0002](0002-homeydash-is-the-only-homey-client.md), as long as Immich runs on the home network.
 - The photo endpoint only serves photos in a photo set's list, so a display can't use HomeyDash to reach the rest of Immich.
 - An album's photos are read with Immich's `/search/metadata`, since Immich 3 no longer lists them with the album. The client pages by number and, from Immich 3.2, by cursor, so it works with Immich 1.1xx to 3.x.

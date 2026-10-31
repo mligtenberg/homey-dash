@@ -7,7 +7,8 @@ namespace HomeyDash.Api.Homey;
 // NotSetUp while no Homey account is set up in Management (ADR-0007).
 public enum HomeyConnection { Connecting, Connected, Disconnected, NotSetUp }
 
-public sealed record HomeyStatus(HomeyConnection Connection, string? LastError, DateTimeOffset Since, bool Fake);
+// How HomeyDash's connection to the Homey of one account (AccountId) is doing.
+public sealed record HomeyStatus(int AccountId, HomeyConnection Connection, string? LastError, DateTimeOffset Since, bool Fake);
 
 public sealed record HomeyCapability(
     string Id,

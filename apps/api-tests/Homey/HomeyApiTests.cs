@@ -16,6 +16,15 @@ public class HomeyApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal("connected", status.GetProperty("connection").GetString());
         Assert.True(status.GetProperty("fake").GetBoolean());
+        Assert.Equal(1, status.GetProperty("accountId").GetInt32());
+    }
+
+    [Fact]
+    public async Task AnAccountThatIsNotThere_IsNotFound()
+    {
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync("/api/homey/devices?account=2")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.PostAsync("/api/homey/flows/flow-goodnight/trigger?account=2", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await _client.PostAsync("/api/homey/flows/flow-goodnight/trigger?account=1", null)).StatusCode);
     }
 
     [Fact]
@@ -68,7 +77,7 @@ public class HomeyApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     [Fact]
     public async Task SettingACapability_UpdatesTheDeviceAndRaisesAChange()
     {
-        var state = (HomeyState)factory.Services.GetService(typeof(HomeyState))!;
+        var state = ((Homeys)factory.Services.GetService(typeof(Homeys))!).Require(null).State;
         HomeyChange? change = null;
         state.Changed += c => change = c;
 

@@ -1,12 +1,20 @@
 using System.Text.Json;
+using HomeyDash.Api.Accounts;
 
 namespace HomeyDash.Api.Homey;
 
 // A Homey with a realistic family home (two floors, an attic, a garden and a garage, with the devices, flows and
 // moods such a home has), used when the configuration sets Homey:Fake. Tests rely on living-lamp, thermostat,
 // front-door, washer, p1-meter, flow-goodnight, mood-movie and mood-dinner; keep those.
-public sealed class FakeHomey(HomeyState state, TimeProvider time) : IHostedService, IHomey
+public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService, IHomey
 {
+    // Its one account, which can't be changed.
+    public static readonly HomeyAccount Account = new("http://fake-homey", "fake") { Id = 1, Name = "Fake Homey" };
+
+    private readonly HomeyState _state = new(time, Account.Id);
+
+    public HomeyState State => _state;
+
     private static readonly JsonElement True = JsonSerializer.SerializeToElement(true);
     private static readonly JsonElement False = JsonSerializer.SerializeToElement(false);
 
@@ -197,8 +205,9 @@ public sealed class FakeHomey(HomeyState state, TimeProvider time) : IHostedServ
 
     public Task StartAsync(CancellationToken ct)
     {
-        state.Replace(Devices, Flows, Moods, Zones, FlowFolders);
-        state.SetStatus(HomeyConnection.Connected, fake: true);
+        _state.Replace(Devices, Flows, Moods, Zones, FlowFolders);
+        _state.SetStatus(HomeyConnection.Connected, fake: true);
+        homeys.Set([new Homeys.Entry(Account.Id, Account.Name, this)]);
         return Task.CompletedTask;
     }
 
@@ -206,18 +215,18 @@ public sealed class FakeHomey(HomeyState state, TimeProvider time) : IHostedServ
 
     public Task SetCapabilityValueAsync(string deviceId, string capabilityId, JsonElement value, CancellationToken ct)
     {
-        state.RequireSetableCapability(deviceId, capabilityId);
-        state.UpdateCapability(deviceId, capabilityId, value, null);
+        _state.RequireSetableCapability(deviceId, capabilityId);
+        _state.UpdateCapability(deviceId, capabilityId, value, null);
         return Task.CompletedTask;
     }
 
     public Task TriggerFlowAsync(string flowId, CancellationToken ct) =>
-        state.FindFlow(flowId) is null
+        _state.FindFlow(flowId) is null
             ? throw new HomeyNotFoundException($"Flow {flowId} not found in Homey")
             : Task.CompletedTask;
 
     public Task ActivateMoodAsync(string moodId, CancellationToken ct) =>
-        state.FindMood(moodId) is null
+        _state.FindMood(moodId) is null
             ? throw new HomeyNotFoundException($"Mood {moodId} not found in Homey")
             : Task.CompletedTask;
 

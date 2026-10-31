@@ -181,7 +181,7 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
   /** Where the slider is while a finger is on it, and until Homey has the new brightness. */
   protected readonly dragging = signal<number | null>(null);
 
-  private readonly device = computed(() => this.data.devices().get(this.settings().target ?? ''));
+  private readonly device = computed(() => this.homey()?.devices.get(this.settings().target ?? ''));
 
   readonly face = computed<DeviceFace>(() => {
     const device = this.device();
@@ -277,7 +277,7 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
   protected set(capability: string, value: CapabilityValue) {
     const id = this.settings().target;
     // The tile changes when Homey reports the new value, not before.
-    if (id) return this.send(() => this.realtime.setCapability(id, capability, value), 'quiet');
+    if (id) return this.send(() => this.realtime.setCapability(this.settings().account, id, capability, value), 'quiet');
     return Promise.resolve();
   }
 
@@ -342,7 +342,7 @@ export class DeviceTileSettingsEditor {
   private readonly data = inject(TileData);
 
   protected readonly capabilities = computed(() =>
-    Object.values(this.data.devices().get(this.settings().target ?? '')?.capabilities ?? {}),
+    Object.values(this.data.homey(this.settings().account)?.devices.get(this.settings().target ?? '')?.capabilities ?? {}),
   );
 
   protected pick(capability: string) {

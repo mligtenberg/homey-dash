@@ -7,7 +7,8 @@ using Microsoft.AspNetCore.SignalR;
 namespace HomeyDash.Api.Realtime;
 
 /// <summary>Tells screens and Management that displays, dashboards or photo sets changed.</summary>
-public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresence presence, TargetCatalog targets, PhotoSync sync)
+public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresence presence, TargetCatalog targets, PhotoSync sync,
+    ImmichAccounts immich)
 {
     public const string ManagementGroup = "management";
 
@@ -31,5 +32,5 @@ public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresen
 
     // Every photo set, to every connection: displays show their photos, Management also how syncing with Immich went.
     public async Task PhotoSetsChangedAsync(HomeyDashDbContext db, CancellationToken ct) =>
-        await hub.Clients.All.SendAsync("PhotoSets", await PhotoEndpoints.ListAsync(db, sync, ct), ct);
+        await hub.Clients.All.SendAsync("PhotoSets", await PhotoEndpoints.ListAsync(db, sync, immich, ct), ct);
 }

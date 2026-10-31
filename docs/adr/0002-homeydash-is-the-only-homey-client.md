@@ -10,4 +10,4 @@ Displays never talk to Homey. The HomeyDash backend holds the single Homey crede
 
 ## Consequences
 
-The backend is not a thin CRUD layer. It owns the Homey connection, reconnects after failures, and fans out updates. "Connection lost" on a display covers both "HomeyDash unreachable" and "Homey unreachable from HomeyDash".
+The backend is not a thin CRUD layer. It owns the Homey connection (one per Homey account, [ADR-0007](0007-accounts-set-up-in-management.md)), reconnects after failures, and fans out updates. "Connection lost" on a display covers both "HomeyDash unreachable" and "a Homey unreachable from HomeyDash". The second locks only that Homey's tiles.

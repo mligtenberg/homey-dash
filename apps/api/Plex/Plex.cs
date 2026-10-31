@@ -8,15 +8,14 @@ public sealed class PlexOptions
 }
 
 /// <summary>
-/// The Plex account (ADR-0009): the token HomeyDash got when someone signed in with Plex, the client identifier it
+/// A Plex account (ADR-0009): the token HomeyDash got when someone signed in with Plex, the client identifier it
 /// signed in as, and the server it shows. ServerId is null until someone chooses one of several servers. Set up in
-/// Management and kept in the database; a home has at most one.
+/// Management and kept in the database; a home can have several, told apart by their names, such as one per server.
 /// </summary>
 public sealed record PlexAccount(string ClientId, string Token, string? Username)
 {
-    public const int SingleId = 1;
-
-    public int Id { get; init; } = SingleId;
+    public int Id { get; init; }
+    public string Name { get; init; } = "Plex";
     public string? ServerId { get; init; }
     public string? ServerName { get; init; }
     public string? ServerUri { get; init; }
@@ -27,15 +26,28 @@ public sealed record PlexAccount(string ClientId, string Token, string? Username
         ServerUri is null || ServerToken is null ? null : new PlexConnection(ServerUri, ServerToken, ClientId);
 }
 
-// The Plex account in use, or null while nobody signed in. Always the fake's when the configuration sets Plex:Fake.
-public sealed class CurrentPlexAccount
+// The Plex accounts in use, oldest first. Only the fake's when the configuration sets Plex:Fake.
+public sealed class PlexAccounts
 {
-    private volatile PlexAccount? _account;
+    private volatile IReadOnlyList<PlexAccount> _all = [];
 
-    public PlexAccount? Account
+    // Raised after the accounts changed, for the watcher to start or stop watching them.
+    public event Action? Changed;
+
+    public IReadOnlyList<PlexAccount> All => _all;
+
+    // The oldest, which a Plex tile shows unless its settings name another.
+    public PlexAccount? Default => _all.FirstOrDefault();
+
+    public PlexAccount? Find(int? id) => id is null ? null : _all.FirstOrDefault(a => a.Id == id);
+
+    // The tile's account (settings.account), or the oldest when it names none.
+    public PlexAccount? For(int? id) => id is null ? Default : Find(id);
+
+    public void Set(IEnumerable<PlexAccount> accounts)
     {
-        get => _account;
-        set => _account = value;
+        _all = accounts.OrderBy(a => a.Id).ToList();
+        Changed?.Invoke();
     }
 }
 
@@ -56,7 +68,11 @@ public sealed record PlexServerAddress(string Uri, bool Local, bool Relay);
 /// </summary>
 public sealed record PlexSession(
     string Id, string Kind, string Title, string? Subtitle, string? Image, string? Art, long DurationMs, long OffsetMs,
-    DateTimeOffset At, string State, string? User, string PlayerId, string PlayerName);
+    DateTimeOffset At, string State, string? User, string PlayerId, string PlayerName)
+{
+    // The account whose server plays it.
+    public int AccountId { get; init; }
+}
 
 // A player that played something since HomeyDash started, for a now-playing tile to follow.
 public sealed record PlexPlayer(string Id, string Name);

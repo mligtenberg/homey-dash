@@ -10,6 +10,7 @@ Plex tiles come in their own tile module with two kinds: **Now playing** shows w
 
 ## Consequences
 
+- A home can have several Plex accounts, each with a name, such as one per server. HomeyDash watches each one's server. A Plex tile names its account in `settings.account`, or shows the oldest when it names none, so tiles made before there were several keep working. Signing an account in again keeps its id, and so its tiles; removing it makes them show Plex as not set up, and counts them as missing.
 - Signing in opens Plex's own page in a new tab; HomeyDash checks every 2 seconds for up to 15 minutes whether someone approved it. An account with one server connects to it at once; with several, someone chooses in Accounts. HomeyDash tries the server's local addresses first, then remote ones, then Plex's relay.
 - The buttons go through the server's `/player` API to the player. Only players that take remote control obey: Plex's own apps with **Advertise as player** turned on. Others refuse, and the tile flashes an error and says so in its detail view.
 - A now-playing tile's target is `plex-player:any` or `plex-player:<machine id>`. Players only become known once they played something since HomeyDash started, so such a target is never missing. A recently-added tile's target is `plex-library:all` or `plex-library:<key>`, missing once the server no longer has that library.

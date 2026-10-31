@@ -23,7 +23,8 @@ export function addedOn(iso: string, now = Date.now()): string {
 }
 
 /**
- * The posters of what was newly added to one Plex library, or every library (`plex-library:all`), newest first: as
+ * The posters of what was newly added to one library of the tile's Plex account, or every library of it
+ * (`plex-library:all`), newest first: as
  * many as fit the tile, with their titles. A press opens the detail view with the newest 24 and when each was added.
  */
 @Component({
@@ -84,15 +85,17 @@ export class RecentlyAddedTile extends TileView {
   protected readonly icon = LucideClapperboard;
   protected readonly detailCount = DETAIL_COUNT;
 
+  private readonly overview = computed(() => this.plex.overview(this.settings().account));
+
   private readonly library = computed(() => {
     const target = this.settings().target;
-    return this.plex.overview()?.libraries.find((l) => `plex-library:${l.id}` === target);
+    return this.overview()?.libraries.find((l) => `plex-library:${l.id}` === target);
   });
 
   /** The target's newest items, merged across libraries for `plex-library:all`. */
   protected readonly items = computed<PlexItem[]>(() => {
     const target = this.settings().target;
-    const libraries = this.plex.overview()?.libraries ?? [];
+    const libraries = this.overview()?.libraries ?? [];
     if (target === ALL_PLEX_LIBRARIES)
       return libraries.flatMap((l) => l.recent).sort((a, b) => b.addedAt.localeCompare(a.addedAt));
     return this.library()?.recent ?? [];
@@ -103,12 +106,13 @@ export class RecentlyAddedTile extends TileView {
   readonly face = computed<TileFace>(() => {
     const look = { icon: LucideClapperboard, hue: 'neutral' as const };
     const { target, label } = this.settings();
-    const overview = this.plex.overview();
+    const overview = this.overview();
+    const status = this.plex.status(this.settings().account);
     const name = label || (target === ALL_PLEX_LIBRARIES ? 'Recently added' : (this.library()?.title ?? 'Plex library'));
     if (!target) return { ...look, name, detail: 'Pick a library', state: 'unset' };
     if (!overview?.loaded) {
-      return overview && overview.status !== 'connected'
-        ? { ...look, name, detail: plexIdle(overview.status, overview.error), state: 'unavailable' }
+      return status && status !== 'connected'
+        ? { ...look, name, detail: plexIdle(status, overview?.error), state: 'unavailable' }
         : { ...look, name, detail: '…', state: 'loading' };
     }
     if (target !== ALL_PLEX_LIBRARIES && !this.library()) return { ...look, name, detail: 'Library not found in Plex', state: 'missing' };
@@ -117,7 +121,7 @@ export class RecentlyAddedTile extends TileView {
   });
 
   protected posterUrl(path: string) {
-    return plexImageUrl(path, 400, 600);
+    return plexImageUrl(this.overview()?.accountId ?? 0, path, 400, 600);
   }
 
   protected added(item: PlexItem) {

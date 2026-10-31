@@ -21,24 +21,35 @@ export function plexTime(ms: number): string {
 }
 
 /**
- * Plex as Plex tiles see it, from HomeyDash's realtime connection (ADR-0009): its status, libraries and players
- * (`Plex`) and what plays now (`PlexSessions`). A snapshot loads on every (re)connect.
+ * Plex as Plex tiles see it, from HomeyDash's realtime connection (ADR-0009): each account's status, libraries and
+ * players (`Plex`) and what plays now on any of them (`PlexSessions`). A snapshot loads on every (re)connect.
  */
 @Injectable({ providedIn: 'root' })
 export class PlexData {
   private readonly realtime = inject(Realtime);
 
-  /** Null until the first snapshot. */
-  readonly overview = signal<PlexOverview | null>(null);
+  /** Every account, oldest first; null until the first snapshot. */
+  readonly overviews = signal<PlexOverview[] | null>(null);
   readonly sessions = signal<LivePlexSession[]>([]);
 
   constructor() {
     const stops = [
-      this.realtime.on('Plex', (overview) => this.overview.set(overview)),
+      this.realtime.on('Plex', (overviews) => this.overviews.set(overviews)),
       this.realtime.on('PlexSessions', (sessions) => this.setSessions(sessions)),
       this.realtime.whenConnected(() => this.load()),
     ];
     inject(DestroyRef).onDestroy(() => stops.forEach((stop) => stop()));
+  }
+
+  /** A tile's account (`settings.account`), or the oldest when it names none; undefined when there is no such account. */
+  overview(account: number | null | undefined): PlexOverview | undefined {
+    const all = this.overviews();
+    return account == null ? all?.[0] : all?.find((o) => o.accountId === account);
+  }
+
+  /** The account's status for `plexIdle`: not set up when it doesn't exist, unknown before the first snapshot. */
+  status(account: number | null | undefined) {
+    return this.overview(account)?.status ?? (this.overviews() ? 'notSetUp' : undefined);
   }
 
   private setSessions(sessions: PlexSession[]) {
@@ -49,7 +60,7 @@ export class PlexData {
   private async load() {
     try {
       const snapshot = await this.realtime.plex();
-      this.overview.set(snapshot.overview);
+      this.overviews.set(snapshot.accounts);
       this.setSessions(snapshot.sessions);
     } catch {
       // The connection dropped again; the next reconnect loads it.

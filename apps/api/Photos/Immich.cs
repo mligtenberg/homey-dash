@@ -8,26 +8,29 @@ public sealed class ImmichOptions
 }
 
 /// <summary>
-/// The Immich account (ADR-0007): where the home's Immich server is and an API key made in it, with at least the
-/// album.read, asset.read, asset.view and person.read permissions. Set up in Management and kept in the database; a home has at most one.
+/// An Immich account (ADR-0007): where an Immich server is and an API key made in it, with at least the album.read,
+/// asset.read, asset.view and person.read permissions. Set up in Management and kept in the database; a home can have
+/// several, told apart by their names, such as one per person's Immich.
 /// </summary>
 public sealed record ImmichAccount(string Address, string ApiKey)
 {
-    public const int SingleId = 1;
-
-    public int Id { get; init; } = SingleId;
+    public int Id { get; init; }
+    public string Name { get; init; } = "Immich";
 }
 
-// The Immich account in use, or null while none is set up. Always the fake's when the configuration sets Immich:Fake.
-public sealed class CurrentImmichAccount
+// The Immich accounts in use, oldest first. Only the fake's when the configuration sets Immich:Fake.
+public sealed class ImmichAccounts
 {
-    private volatile ImmichAccount? _account;
+    private volatile IReadOnlyList<ImmichAccount> _all = [];
 
-    public ImmichAccount? Account
-    {
-        get => _account;
-        set => _account = value;
-    }
+    public IReadOnlyList<ImmichAccount> All => _all;
+
+    // The oldest, which a new photo set uses unless it names another.
+    public ImmichAccount? Default => _all.FirstOrDefault();
+
+    public ImmichAccount? Find(int? id) => id is null ? null : _all.FirstOrDefault(a => a.Id == id);
+
+    public void Set(IEnumerable<ImmichAccount> accounts) => _all = accounts.OrderBy(a => a.Id).ToList();
 }
 
 public sealed record ImmichAlbum(string Id, string Name, int AssetCount);

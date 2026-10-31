@@ -17,6 +17,11 @@ export type KindHue =
 /** What a tile kind points at: something in Homey, a photo set, or a Plex player or library. */
 export type TargetType = 'device' | 'flow' | 'mood' | 'insight' | 'photoSet' | 'plexPlayer' | 'plexLibrary';
 
+/** Whether a kind's target is something in Homey, read from the Homey of the tile's account. */
+export function isHomeyTarget(target: TargetType) {
+  return target === 'device' || target === 'flow' || target === 'mood' || target === 'insight';
+}
+
 /**
  * A category of tile, registered by exactly one module.
  *

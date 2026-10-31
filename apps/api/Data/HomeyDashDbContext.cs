@@ -49,11 +49,11 @@ public class HomeyDashDbContext(DbContextOptions<HomeyDashDbContext> options) : 
             other.HasOne<Dashboard>().WithMany().HasForeignKey(o => o.DashboardId).OnDelete(DeleteBehavior.Cascade);
         });
 
-        model.Entity<HomeyAccount>(account => account.Property(a => a.Id).ValueGeneratedNever());
-        model.Entity<ImmichAccount>(account => account.Property(a => a.Id).ValueGeneratedNever());
+        model.Entity<HomeyAccount>(account => account.Property(a => a.Name).HasMaxLength(AccountEndpoints.MaxNameLength));
+        model.Entity<ImmichAccount>(account => account.Property(a => a.Name).HasMaxLength(AccountEndpoints.MaxNameLength));
         model.Entity<PlexAccount>(account =>
         {
-            account.Property(a => a.Id).ValueGeneratedNever();
+            account.Property(a => a.Name).HasMaxLength(AccountEndpoints.MaxNameLength);
             account.Ignore(a => a.Connection);
         });
 

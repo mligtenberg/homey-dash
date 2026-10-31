@@ -9,17 +9,21 @@ namespace HomeyDash.Api.Tests.Homey;
 public sealed class LocalHomeyTests : IAsyncLifetime
 {
     private readonly ScriptedHomeyServer _server = new();
-    private readonly HomeyState _state = new(TimeProvider.System);
-    private readonly CurrentHomeyAccount _account = new();
-    private LocalHomey _homey = null!;
+    private readonly HomeyAccounts _accounts = new();
+    private readonly Homeys _homeys = new();
+    private LocalHomeys _connections = null!;
+
+    private HomeyState _state => _homeys.Find(1)!.State;
+    private IHomey _homey => _homeys.Find(1)!.Homey;
 
     public async Task InitializeAsync()
     {
         await _server.StartAsync();
         LocalHomey.FirstRetryDelay = TimeSpan.FromMilliseconds(50);
-        _account.Set(new HomeyAccount(_server.Address.ToString(), ScriptedHomeyServer.ApiKey));
-        _homey = Create(_account);
-        await _homey.StartAsync(CancellationToken.None);
+        _accounts.Set([Account(1, ScriptedHomeyServer.ApiKey)]);
+        _connections = Create(_accounts, _homeys);
+        await _connections.StartAsync(CancellationToken.None);
+        await Eventually(() => _homeys.Find(1) is not null);
     }
 
     [Fact]
@@ -107,72 +111,88 @@ public sealed class LocalHomeyTests : IAsyncLifetime
     [Fact]
     public async Task AWrongApiKey_KeepsRetryingAndReportsWhy()
     {
-        await _homey.StopAsync(CancellationToken.None);
-        var state = new HomeyState(TimeProvider.System);
-        var homey = Create("wrong-key", state);
-        await homey.StartAsync(CancellationToken.None);
+        _accounts.Set([Account(1, "wrong-key")]);
 
-        await Eventually(() => state.Status is { Connection: HomeyConnection.Disconnected, LastError: not null });
-        await homey.StopAsync(CancellationToken.None);
+        await Eventually(() => _homeys.Find(1)?.State.Status is { Connection: HomeyConnection.Disconnected, LastError: not null });
     }
 
     [Fact]
-    public async Task WithoutAnAccount_WaitsUntilOneIsSetUp()
+    public async Task WithoutAnAccount_ThereIsNoHomey()
     {
-        await _homey.StopAsync(CancellationToken.None);
-        var state = new HomeyState(TimeProvider.System);
-        var account = new CurrentHomeyAccount();
-        var homey = Create(account, state);
-        await homey.StartAsync(CancellationToken.None);
+        _accounts.Set([]);
 
-        await Eventually(() => state.Status.Connection == HomeyConnection.NotSetUp);
-        account.Set(new HomeyAccount(_server.Address.ToString(), ScriptedHomeyServer.ApiKey));
-
-        await Eventually(() => state.Status.Connection == HomeyConnection.Connected);
-        await homey.StopAsync(CancellationToken.None);
+        await Eventually(() => _homeys.All.Count == 0);
+        Assert.Throws<HomeyUnavailableException>(() => _homeys.Require(null));
     }
 
     [Fact]
-    public async Task AReplacedAccount_ConnectsAgainWithIt()
+    public async Task ANewAccount_Connects()
     {
-        await _homey.StopAsync(CancellationToken.None);
-        var state = new HomeyState(TimeProvider.System);
-        var account = new CurrentHomeyAccount();
-        account.Set(new HomeyAccount(_server.Address.ToString(), "wrong-key"));
-        var homey = Create(account, state);
-        await homey.StartAsync(CancellationToken.None);
-        await Eventually(() => state.Status.Connection == HomeyConnection.Disconnected);
+        _accounts.Set([]);
+        await Eventually(() => _homeys.All.Count == 0);
 
-        account.Set(new HomeyAccount(_server.Address.ToString(), ScriptedHomeyServer.ApiKey));
+        _accounts.Set([Account(1, ScriptedHomeyServer.ApiKey)]);
 
-        await Eventually(() => state.Status.Connection == HomeyConnection.Connected);
-        await homey.StopAsync(CancellationToken.None);
+        await Eventually(() => _homeys.Find(1)?.State.Status.Connection == HomeyConnection.Connected);
     }
 
     [Fact]
-    public async Task ARemovedAccount_IsNotSetUp()
+    public async Task AReplacedKey_ConnectsAgainWithIt()
+    {
+        _accounts.Set([Account(1, "wrong-key")]);
+        await Eventually(() => _homeys.Find(1)?.State.Status.Connection == HomeyConnection.Disconnected);
+
+        _accounts.Set([Account(1, ScriptedHomeyServer.ApiKey)]);
+
+        await Eventually(() => _homeys.Find(1)?.State.Status.Connection == HomeyConnection.Connected);
+    }
+
+    [Fact]
+    public async Task ARename_KeepsTheConnection()
     {
         await Eventually(() => _state.Status.Connection == HomeyConnection.Connected);
+        var homey = _homey;
 
-        _account.Set(null);
+        _accounts.Set([Account(1, ScriptedHomeyServer.ApiKey) with { Name = "Upstairs" }]);
 
-        await Eventually(() => _state.Status.Connection == HomeyConnection.NotSetUp);
-        await Assert.ThrowsAsync<HomeyUnavailableException>(() => _homey.TriggerFlowAsync("f1", CancellationToken.None));
+        await Eventually(() => _homeys.Find(1)!.Name == "Upstairs");
+        Assert.Same(homey, _homey);
+        Assert.Equal(HomeyConnection.Connected, _state.Status.Connection);
     }
 
-    private LocalHomey Create(string apiKey, HomeyState? state = null)
+    [Fact]
+    public async Task EveryAccount_HasItsOwnHomey()
     {
-        var account = new CurrentHomeyAccount();
-        account.Set(new HomeyAccount(_server.Address.ToString(), apiKey));
-        return Create(account, state);
+        _accounts.Set([Account(1, ScriptedHomeyServer.ApiKey), Account(2, "wrong-key")]);
+
+        await Eventually(() => _homeys.Find(1)?.State.Status.Connection == HomeyConnection.Connected
+            && _homeys.Find(2)?.State.Status.Connection == HomeyConnection.Disconnected);
+        Assert.Equal(1, _homeys.For(null)!.AccountId);
+        Assert.Equal(2, _homeys.Find(2)!.State.Status.AccountId);
     }
 
-    private LocalHomey Create(CurrentHomeyAccount account, HomeyState? state = null)
+    [Fact]
+    public async Task ARemovedAccount_LetsGoOfItsHomey()
+    {
+        _accounts.Set([Account(1, ScriptedHomeyServer.ApiKey), Account(2, ScriptedHomeyServer.ApiKey)]);
+        await Eventually(() => _homeys.All.Count == 2);
+
+        _accounts.Set([Account(2, ScriptedHomeyServer.ApiKey)]);
+
+        await Eventually(() => _homeys.All is [{ AccountId: 2 }]);
+        Assert.Throws<HomeyNotFoundException>(() => _homeys.Require(1));
+        Assert.Equal(2, _homeys.For(null)!.AccountId);
+    }
+
+    private HomeyAccount Account(int id, string apiKey) =>
+        new(_server.Address.ToString(), apiKey) { Id = id, Name = $"Homey {id}" };
+
+    private static LocalHomeys Create(HomeyAccounts accounts, Homeys homeys)
     {
         var services = new ServiceCollection();
         services.AddHttpClient(LocalHomey.HttpClientName);
         var factory = services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>();
-        return new LocalHomey(factory, account, state ?? _state, NullLogger<LocalHomey>.Instance);
+        return new LocalHomeys(factory, accounts, homeys, TimeProvider.System, NullLoggerFactory.Instance);
     }
 
     private static async Task Eventually(Func<bool> condition)
@@ -187,8 +207,8 @@ public sealed class LocalHomeyTests : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        await _homey.StopAsync(CancellationToken.None);
-        _homey.Dispose();
+        await _connections.StopAsync(CancellationToken.None);
+        _connections.Dispose();
         await _server.DisposeAsync();
     }
 }

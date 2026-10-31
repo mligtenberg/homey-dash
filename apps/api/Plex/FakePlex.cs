@@ -16,7 +16,7 @@ public sealed class FakePlex(TimeProvider time) : IPlex
 
     public static readonly PlexAccount Account = new("fake-client", "fake-token", Username)
     {
-        ServerId = ServerId, ServerName = "Fake Plex", ServerUri = "http://fake-plex:32400", ServerToken = "fake-token",
+        Id = 1, Name = "Fake Plex", ServerId = ServerId, ServerName = "Fake Plex", ServerUri = "http://fake-plex:32400", ServerToken = "fake-token",
     };
 
     private readonly Lock _lock = new();

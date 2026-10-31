@@ -355,11 +355,14 @@
 .hd-tile.is-missing .hd-tile__detail, .hd-tile.is-missing .hd-icon { color: var(--danger); }
 .hd-tile.is-error .hd-tile__detail { color: var(--danger); }
 
-/* Connection lost */
-.hd-display.is-connection-lost .hd-dashboard .hd-tile { pointer-events: none; filter: saturate(.4); }
+/* Connection lost: to HomeyDash locks every tile, to a Homey only the tiles of that Homey. */
+.hd-display.is-connection-lost .hd-dashboard .hd-tile,
+.hd-display .hd-dashboard .is-homey-lost > .hd-tile { pointer-events: none; filter: saturate(.4); }
 /* An open detail view can still be closed; its controls stop like the tiles'. */
-.hd-display.is-connection-lost .hd-details { pointer-events: auto; }
-.hd-display.is-connection-lost .hd-details__panel > :not(.hd-details__head) { pointer-events: none; filter: saturate(.4); }
+.hd-display.is-connection-lost .hd-details,
+.hd-display .is-homey-lost .hd-details { pointer-events: auto; }
+.hd-display.is-connection-lost .hd-details__panel > :not(.hd-details__head),
+.hd-display .is-homey-lost .hd-details__panel > :not(.hd-details__head) { pointer-events: none; filter: saturate(.4); }
 .hd-reconnecting {
   display: inline-flex; align-items: center; gap: 10px;
   padding: 10px 16px; border-radius: var(--radius-pill);

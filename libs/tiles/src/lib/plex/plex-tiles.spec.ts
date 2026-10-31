@@ -26,6 +26,7 @@ const session = (change: Partial<PlexSession> = {}): PlexSession => ({
   user: 'Martin',
   playerId: 'tv',
   playerName: 'Living room TV',
+  accountId: 1,
   ...change,
 });
 
@@ -39,6 +40,8 @@ const item = (n: number, addedAt: string): PlexItem => ({
 });
 
 const overview = (change: Partial<PlexOverview> = {}): PlexOverview => ({
+  accountId: 1,
+  accountName: 'Home',
   status: 'connected',
   error: null,
   loaded: true,
@@ -70,11 +73,11 @@ describe('Plex tiles', () => {
 
   const settle = () => TestBed.inject(ApplicationRef).whenStable();
 
-  async function render(component: Type<unknown>, target: string | null, size: TileSize = 'wide') {
+  async function render(component: Type<unknown>, target: string | null, size: TileSize = 'wide', account?: number) {
     TestBed.inject(PlexData); // Connects, so pushes reach it.
     await settle();
     const fixture = TestBed.createComponent(component);
-    fixture.componentRef.setInput('settings', { target });
+    fixture.componentRef.setInput('settings', { target, account });
     fixture.componentRef.setInput('size', size);
     await settle();
     return fixture.nativeElement as HTMLElement;
@@ -82,7 +85,7 @@ describe('Plex tiles', () => {
 
   describe('now playing tile', () => {
     it('shows what plays over its artwork, and pauses it from its button', async () => {
-      realtime.plexSnapshot = { overview: overview(), sessions: [session()] };
+      realtime.plexSnapshot = { accounts: [overview()], sessions: [session()] };
       const tile = await render(NowPlayingTile, 'plex-player:any');
 
       expect(tile.classList).toContain('has-art');
@@ -91,11 +94,11 @@ describe('Plex tiles', () => {
       button(tile, 'Pause').click();
       await settle();
 
-      expect(realtime.commands).toContainEqual(['controlPlex', 'tv', 'pause']);
+      expect(realtime.commands).toContainEqual(['controlPlex', 1, 'tv', 'pause']);
     });
 
     it('follows only its own player', async () => {
-      realtime.plexSnapshot = { overview: overview(), sessions: [session({ playerId: 'ipad', playerName: 'iPad' })] };
+      realtime.plexSnapshot = { accounts: [overview()], sessions: [session({ playerId: 'ipad', playerName: 'iPad' })] };
 
       const tile = await render(NowPlayingTile, 'plex-player:tv');
 
@@ -105,7 +108,7 @@ describe('Plex tiles', () => {
     });
 
     it('says when Plex is not set up', async () => {
-      realtime.plexSnapshot = { overview: overview({ status: 'notSetUp', loaded: false, libraries: [], players: [] }), sessions: [] };
+      realtime.plexSnapshot = { accounts: [], sessions: [] };
 
       const tile = await render(NowPlayingTile, 'plex-player:any');
 
@@ -114,7 +117,7 @@ describe('Plex tiles', () => {
     });
 
     it('starts showing a session as soon as it is pushed', async () => {
-      realtime.plexSnapshot = { overview: overview(), sessions: [] };
+      realtime.plexSnapshot = { accounts: [overview()], sessions: [] };
       const tile = await render(NowPlayingTile, 'plex-player:any');
 
       realtime.push('PlexSessions', [session({ state: 'paused' })]);
@@ -123,8 +126,24 @@ describe('Plex tiles', () => {
       expect(button(tile, 'Play')).toBeTruthy();
     });
 
+    it('follows the players of its own account, with pictures from its server', async () => {
+      const attic = overview({ accountId: 2, accountName: 'Attic', players: [{ id: 'tv', name: 'Attic TV' }] });
+      realtime.plexSnapshot = {
+        accounts: [overview(), attic],
+        sessions: [session(), session({ id: '2', title: 'Arrival', accountId: 2, playerName: 'Attic TV' })],
+      };
+
+      const tile = await render(NowPlayingTile, 'plex-player:tv', 'wide', 2);
+      button(tile, 'Pause').click();
+      await settle();
+
+      expect(tile.querySelector('.hd-plex__title')?.textContent?.trim()).toBe('Arrival');
+      expect(tile.querySelector('img')?.getAttribute('src')).toContain('account=2');
+      expect(realtime.commands).toContainEqual(['controlPlex', 2, 'tv', 'pause']);
+    });
+
     it('flashes when the player refuses', async () => {
-      realtime.plexSnapshot = { overview: overview(), sessions: [session()] };
+      realtime.plexSnapshot = { accounts: [overview()], sessions: [session()] };
       realtime.failCommands = true;
       const tile = await render(NowPlayingTile, 'plex-player:any');
 
@@ -137,7 +156,7 @@ describe('Plex tiles', () => {
 
   describe('recently added tile', () => {
     it('shows the newest posters of every library, as many as fit', async () => {
-      realtime.plexSnapshot = { overview: overview(), sessions: [] };
+      realtime.plexSnapshot = { accounts: [overview()], sessions: [] };
 
       const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
 
@@ -145,7 +164,7 @@ describe('Plex tiles', () => {
     });
 
     it('shows one library, and is missing when Plex no longer has it', async () => {
-      realtime.plexSnapshot = { overview: overview(), sessions: [] };
+      realtime.plexSnapshot = { accounts: [overview()], sessions: [] };
 
       const movies = await render(RecentlyAddedTile, 'plex-library:1', 'full');
       const gone = await render(RecentlyAddedTile, 'plex-library:9');

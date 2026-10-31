@@ -170,14 +170,16 @@ public sealed class RealtimeHubTests(ApiFactory factory) : IClassFixture<ApiFact
     {
         var hub = await ConnectAsync();
         var changes = Listen(hub, "DeviceChanged");
-        var snapshot = await hub.InvokeAsync<JsonElement>("Homey");
+        var snapshot = Assert.Single((await hub.InvokeAsync<JsonElement>("Homey")).EnumerateArray());
+        Assert.Equal("Fake Homey", snapshot.GetProperty("accountName").GetString());
         var device = snapshot.GetProperty("devices").EnumerateArray()
             .First(d => d.GetProperty("capabilities").TryGetProperty("onoff", out var onoff) && onoff.GetProperty("setable").GetBoolean());
         var on = device.GetProperty("capabilities").GetProperty("onoff").GetProperty("value").GetBoolean();
 
-        await hub.InvokeAsync("SetCapability", device.GetProperty("id").GetString(), "onoff", !on);
+        await hub.InvokeAsync("SetCapability", null, device.GetProperty("id").GetString(), "onoff", !on);
 
-        await NextAsync(changes, d => d.GetProperty("id").GetString() == device.GetProperty("id").GetString()
+        await NextAsync(changes, c => c.GetProperty("accountId").GetInt32() == 1 && c.GetProperty("device") is var d
+            && d.GetProperty("id").GetString() == device.GetProperty("id").GetString()
             && d.GetProperty("capabilities").GetProperty("onoff").GetProperty("value").GetBoolean() == !on);
     }
 
@@ -186,8 +188,10 @@ public sealed class RealtimeHubTests(ApiFactory factory) : IClassFixture<ApiFact
     {
         var hub = await ConnectAsync();
 
-        var error = await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("TriggerFlow", "no-such-flow"));
+        var error = await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("TriggerFlow", 1, "no-such-flow"));
+        var account = await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("ActivateMood", 2, "mood-movie"));
         Assert.Contains("not found", error.Message);
+        Assert.Contains("no Homey account 2", account.Message);
     }
 
     public Task InitializeAsync() => Task.CompletedTask;

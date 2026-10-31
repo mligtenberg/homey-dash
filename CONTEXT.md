@@ -53,7 +53,7 @@ The version of a dashboard that displays show.
 _Avoid_: Live version, current version
 
 **Connection lost**:
-The state of a display that cannot reach HomeyDash, or whose HomeyDash cannot reach Homey, including when no Homey account is set up yet. The dashboard stays visible with its last known values, cannot be interacted with (horizontal scrolling still works), and shows a reconnecting indicator until it recovers on its own.
+The state of a display that cannot reach HomeyDash, or whose HomeyDash cannot reach a Homey the dashboard has tiles of, including when no Homey account is set up yet. The dashboard stays visible with its last known values and shows a reconnecting indicator until it recovers on its own. Without HomeyDash, no tile can be interacted with (horizontal scrolling still works); without a Homey, only that Homey's tiles can't.
 _Avoid_: Offline, stale, disconnected
 
 **Management**:
@@ -61,7 +61,7 @@ A separate application, apart from the one displays run, where dashboards are bu
 _Avoid_: Management environment, admin, settings, backend
 
 **Homey**:
-The smart-home hub (a Homey Pro) that owns all devices and their state. The source of truth for anything in the home.
+The smart-home hub (a Homey Pro) that owns all devices and their state. The source of truth for anything in the home. A home can have more than one, each set up as its own **Account**.
 _Avoid_: Hub, controller, gateway
 
 **Device**:
@@ -69,7 +69,7 @@ Something Homey controls or reads, such as a light, sensor, or thermostat. Never
 _Avoid_: Accessory, thing, appliance
 
 **Account**:
-A sign-in HomeyDash holds for the home, so it can reach a service on everyone's behalf: Homey, Immich or Plex. Set up in Management; displays never hold one.
+A sign-in HomeyDash holds for the home, so it can reach a service on everyone's behalf: Homey, Immich or Plex. Set up in Management; displays never hold one. A home can have several accounts of each, such as one Homey per house, one per person's Immich or one per Plex server, each with a name that tells them apart. A Homey or Plex tile points into one account: the one it names, or the oldest.
 _Avoid_: Connection, integration, credential
 
 ### Layout
@@ -153,9 +153,31 @@ _Avoid_: Media tile, player tile
 A Plex tile that shows the newest posters of one Plex library, or every library.
 _Avoid_: New media tile
 
+**Logic tile**:
+A tile that holds an ordered list of other tiles, each with a rule, and shows the first whose rule holds, or its fallback tile when none does; with no fallback it shows nothing, like empty cells. It holds tiles of any kind except another logic tile, and a tile it holds that points at a missing target is shown as **Missing** when chosen, not skipped. The tiles it holds take its size, so it only holds kinds that support that size. It fades from one tile to the next, and once switched it can stay on a tile for a chosen **Minimum show time**, after which it shows whatever its rules then choose.
+_Avoid_: Logic card, conditional tile, switch tile
+
+**Minimum show time**:
+How long a **Logic tile** keeps showing a tile it switched to before it may switch again, however its rules change; none by default.
+_Avoid_: Debounce, hold time, delay
+
 **Statistic tile**:
 A tile showing the history of one recorded value over a chosen time window, with its current value, updating live as new values arrive.
 _Avoid_: Graph tile, chart tile, insight tile
+
+### Logic
+
+**Signal**:
+A named, live value HomeyDash knows, of one of four types: text, yes/no, number, or date and time. Signals come from sources such as a device's capabilities, Homey variables, the clock, the display a dashboard is shown on, or Plex; a module can add its own. A text signal may have a fixed set of values to choose from, such as a thermostat's modes; a condition comparing with a value no longer in that set stays, never holds, and is flagged in **Management**.
+_Avoid_: Variable, token, input, fact
+
+**Condition**:
+One signal compared with a fixed value, by an operator that suits the signal's type, optionally negated.
+_Avoid_: Check, test, filter
+
+**Rule**:
+One or more conditions, of which all, or any, must hold.
+_Avoid_: Expression, logic, formula
 
 ## Relationships
 
@@ -170,5 +192,12 @@ _Avoid_: Graph tile, chart tile, insight tile
 - **Tiles** in a **Section** never overlap and never extend beyond its grid.
 - A **Display** places all **Sections** side by side in one horizontal row. A **Dashboard** never scrolls vertically; when its **Sections** are wider than the screen, it scrolls horizontally.
 - A **Display** never talks to **Homey** directly; HomeyDash is the only party that speaks to **Homey** on its behalf.
-- A **Photo set** follows one album in the Immich **Account** and can be the **Target** of several tiles; a change to the album, or pointing the set at another, changes every tile showing it. Removing that **Account** leaves the **Photo set**, but its photos can't be shown until Immich is set up again.
+- A tile on **Homey** points into one Homey **Account**; removing that **Account** leaves the tile **Missing** until it is given another.
+- A **Photo set** draws from one Immich **Account**, follows one album in it (or draws by a **Selection**), and can be the **Target** of several tiles; a change to the album, or pointing the set at another, changes every tile showing it. Removing that **Account** leaves the **Photo set**, but its photos can't be shown until it is given another **Account**.
 - A **Display** never talks to Immich; it gets a **Photo set**'s photos through HomeyDash.
+- HomeyDash evaluates every **Rule**, for as long as a shown **Dashboard** asks it to and separately for each **Display** showing it, and tells it at once whenever its answer changes; the **Logic tile** itself picks the first tile whose **Rule** holds. A **Preview** asks HomeyDash too, as if shown on a **Display** chosen in **Management**, or on none.
+- A **Signal** from **Homey** belongs to one Homey **Account**; a **Rule** may mix **Signals** from several. Removing that **Account** makes the **Signal** **Missing**; an unreachable **Homey** makes it **Unavailable**.
+- A **Condition** on a **Display**'s name refers to its permanent identity, so renaming the **Display** keeps the **Condition**, and a **Takeover** carries it over.
+- The **Editor** shows the tile a **Logic tile**'s rules choose now, as the **Preview** would, except while one of the tiles it holds is being configured, which it then shows instead.
+- A **Display** in **Connection lost** keeps showing the tile a **Logic tile** last chose.
+- A **Condition** on an **Unavailable** **Signal** uses its last known value. A **Condition** on a **Missing** **Signal**, or on one that has never had a value, fails even when negated, so its **Logic tile** moves on to the next tile in its list; only a **Missing** one makes **Management** flag the dashboard.

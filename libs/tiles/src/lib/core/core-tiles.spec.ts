@@ -87,11 +87,28 @@ describe('core tiles', () => {
   }
 
   async function push(d: HomeyDevice) {
-    realtime.push('DeviceChanged', d);
+    realtime.push('DeviceChanged', { accountId: 1, device: d });
     await settle();
   }
 
   describe('device tile', () => {
+    it("reads and acts on its account's Homey", async () => {
+      realtime.homeySnapshot = [
+        realtime.homeySnapshot[0],
+        { ...realtime.homeySnapshot[0], accountId: 2, accountName: 'Holiday home', status: { ...realtime.homeySnapshot[0].status, accountId: 2 } },
+      ];
+      const tile = await render(DeviceTile, 'd1', 'small', { account: 2 });
+      realtime.push('DeviceChanged', { accountId: 1, device: device([capability('onoff', true)], { name: 'Home lamp' }) });
+      realtime.push('DeviceChanged', { accountId: 2, device: device([capability('onoff', false)], { name: 'Holiday lamp' }) });
+      await settle();
+
+      expect(tile.textContent).toContain('Holiday lamp');
+      button(tile, 'Turn on').click();
+      await settle();
+
+      expect(realtime.commands).toEqual([['setCapability', 2, 'd1', 'onoff', true]]);
+    });
+
     it('toggles from its corner button, and turns active only when Homey reports it', async () => {
       const tile = await render(DeviceTile, 'd1');
       await push(device([capability('onoff', false)]));
@@ -99,7 +116,7 @@ describe('core tiles', () => {
       button(tile, 'Turn on').click();
       await settle();
 
-      expect(realtime.commands).toEqual([['setCapability', 'd1', 'onoff', true]]);
+      expect(realtime.commands).toEqual([['setCapability', undefined, 'd1', 'onoff', true]]);
       expect(tile.classList).not.toContain('is-active');
       expect(details(tile).open).toBe(false);
 
@@ -165,7 +182,7 @@ describe('core tiles', () => {
       expect(wide.querySelector('[role="slider"]')?.getAttribute('aria-valuenow')).toBe('65');
       wide.querySelector('[role="slider"]')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
       await settle();
-      expect(realtime.commands).toEqual([['setCapability', 'd1', 'dim', 0.75]]);
+      expect(realtime.commands).toEqual([['setCapability', undefined, 'd1', 'dim', 0.75]]);
 
       const small = await render(DeviceTile, 'd1', 'small');
       expect(small.querySelector('[role="slider"]')).toBeNull();
@@ -184,7 +201,7 @@ describe('core tiles', () => {
       (tile.querySelector('[aria-label="Raise target"]') as HTMLElement).click();
       await settle();
 
-      expect(realtime.commands).toEqual([['setCapability', 'd1', 'target_temperature', 21.5]]);
+      expect(realtime.commands).toEqual([['setCapability', undefined, 'd1', 'target_temperature', 21.5]]);
     });
 
     it('sets a cover from its segmented control', async () => {
@@ -196,7 +213,7 @@ describe('core tiles', () => {
       buttons[2].click();
       await settle();
 
-      expect(realtime.commands).toEqual([['setCapability', 'd1', 'windowcoverings_state', 'down']]);
+      expect(realtime.commands).toEqual([['setCapability', undefined, 'd1', 'windowcoverings_state', 'down']]);
     });
 
     it('shows a sensor value with its unit, and opens its readings on tap', async () => {
@@ -255,8 +272,8 @@ describe('core tiles', () => {
         await settle();
 
         expect(realtime.commands).toEqual([
-          ['setCapability', 'd1', 'target_temperature', 21.5],
-          ['setCapability', 'd1', 'target_temperature', 20.5],
+          ['setCapability', undefined, 'd1', 'target_temperature', 21.5],
+          ['setCapability', undefined, 'd1', 'target_temperature', 20.5],
         ]);
         expect(dialog.open).toBe(true);
       });
@@ -297,8 +314,8 @@ describe('core tiles', () => {
         dialog.querySelector('[role="slider"]')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
         await settle();
         expect(realtime.commands).toEqual([
-          ['setCapability', 'd1', 'onoff', false],
-          ['setCapability', 'd1', 'dim', 0.5],
+          ['setCapability', undefined, 'd1', 'onoff', false],
+          ['setCapability', undefined, 'd1', 'dim', 0.5],
         ]);
       });
 
@@ -359,6 +376,7 @@ describe('core tiles', () => {
     async function flowTile() {
       const tile = await render(FlowTile, 'f1');
       realtime.push('Catalog', {
+        accountId: 1,
         flows: [{ id: 'f1', name: 'Good night', advanced: false, enabled: true, folderId: null }],
         moods: [],
         zones: [],
@@ -373,7 +391,7 @@ describe('core tiles', () => {
 
       button(tile, 'Start').click();
       await settle();
-      expect(realtime.commands).toEqual([['triggerFlow', 'f1']]);
+      expect(realtime.commands).toEqual([['triggerFlow', undefined, 'f1']]);
       expect(tile.classList).toContain('is-feedback');
       expect(tile.textContent).toContain('Started');
 
@@ -408,6 +426,7 @@ describe('core tiles', () => {
     it('activates a mood from its corner button, in a wash of its colours that glows while it confirms', async () => {
       const tile = await render(MoodTile, 'm1');
       realtime.push('Catalog', {
+        accountId: 1,
         flows: [],
         moods: [{ id: 'm1', name: 'Movie night', zoneId: null, colors: [{ hue: 0.5, saturation: 1, temperature: null }] }],
         zones: [],
@@ -420,7 +439,7 @@ describe('core tiles', () => {
       button(tile, 'Activate').click();
       await settle();
 
-      expect(realtime.commands).toEqual([['activateMood', 'm1']]);
+      expect(realtime.commands).toEqual([['activateMood', undefined, 'm1']]);
       expect(tile.classList).toContain('is-feedback');
     });
 
@@ -448,6 +467,7 @@ describe('core tiles', () => {
     async function moodList(targets: string[]) {
       const tile = await render(MoodListTile, null, 'wide', { targets, label: 'Living room' });
       realtime.push('Catalog', {
+        accountId: 1,
         flows: [],
         moods: [
           { id: 'm1', name: 'Movie night', zoneId: null, colors: [{ hue: 0.5, saturation: 1, temperature: null }] },
@@ -472,7 +492,7 @@ describe('core tiles', () => {
       button(tile, 'Activate Movie night').click();
       await settle();
 
-      expect(realtime.commands).toEqual([['activateMood', 'm1']]);
+      expect(realtime.commands).toEqual([['activateMood', undefined, 'm1']]);
       expect(tile.classList).toContain('is-feedback');
       expect(moodButtons(tile)[1].classList).toContain('is-pressed');
       expect(tile.querySelector('.hd-tile__detail')?.textContent).toBe('Movie night activated');
@@ -570,7 +590,7 @@ describe('core tiles', () => {
     it('charts the log history and appends live values from the owner device', async () => {
       const tile = await render(StatisticTile, logId, 'large');
       const http = TestBed.inject(HttpTestingController);
-      http.expectOne('/api/homey/insights').flush([
+      http.expectOne('/api/homey/insights?account=1').flush([
         { id: logId, ownerUri: 'homey:device:d1', ownerName: 'Washer', title: 'Power', type: 'number', units: 'W' },
       ]);
       TestBed.tick(); // Not whenStable: the history load is a pending task until it is answered.
@@ -603,7 +623,7 @@ describe('core tiles', () => {
     it('loads the history again after a reconnect', async () => {
       await render(StatisticTile, logId, 'large');
       const http = TestBed.inject(HttpTestingController);
-      http.expectOne('/api/homey/insights').flush([
+      http.expectOne('/api/homey/insights?account=1').flush([
         { id: logId, ownerUri: 'homey:device:d1', ownerName: 'Washer', title: 'Power', type: 'number', units: 'W' },
       ]);
       TestBed.tick();
@@ -625,6 +645,8 @@ describe('core tiles', () => {
       id: 's1',
       name: 'Summer',
       target: 'photo-set:s1',
+      accountId: 1,
+      accountName: 'Immich',
       albumId: 'a1',
       albumName: 'Summer',
       selection: null,

@@ -2,9 +2,11 @@ using System.Text.Json;
 
 namespace HomeyDash.Api.Homey;
 
-// Actions performed on Homey. What Homey currently looks like is read from HomeyState.
+// The Homey of one account: actions performed on it, and what it currently looks like in State.
 public interface IHomey
 {
+    HomeyState State { get; }
+
     Task SetCapabilityValueAsync(string deviceId, string capabilityId, JsonElement value, CancellationToken ct);
     Task TriggerFlowAsync(string flowId, CancellationToken ct);
     Task ActivateMoodAsync(string moodId, CancellationToken ct);

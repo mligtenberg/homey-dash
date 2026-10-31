@@ -6,7 +6,9 @@ import { inject, Injectable } from '@angular/core';
 /** `notSetUp` while no Homey account is set up in Management. */
 export type HomeyConnection = 'connecting' | 'connected' | 'disconnected' | 'notSetUp';
 
+/** How HomeyDash's connection to the Homey of one account is doing. */
 export interface HomeyStatus {
+  accountId: number;
   connection: HomeyConnection;
   lastError: string | null;
   since: string;
@@ -94,32 +96,20 @@ export interface HomeyInsightEntry {
   v: number | null;
 }
 
-/** What Management reads from Homey to pick tile targets. */
+/** Reads from the Homey of an account; without one, of the oldest. */
 @Injectable({ providedIn: 'root' })
 export class HomeyApi {
   private readonly http = inject(HttpClient);
 
-  status() {
-    return this.http.get<HomeyStatus>('/api/homey/status');
+  insights(account?: number) {
+    return this.http.get<HomeyInsightLog[]>('/api/homey/insights', { params: accountParam(account) });
   }
 
-  devices() {
-    return this.http.get<HomeyDevice[]>('/api/homey/devices');
+  insightEntries(log: string, resolution: InsightResolution, account?: number) {
+    return this.http.get<HomeyInsightEntry[]>('/api/homey/insights/entries', { params: { log, resolution, ...accountParam(account) } });
   }
+}
 
-  flows() {
-    return this.http.get<HomeyFlow[]>('/api/homey/flows');
-  }
-
-  moods() {
-    return this.http.get<HomeyMood[]>('/api/homey/moods');
-  }
-
-  insights() {
-    return this.http.get<HomeyInsightLog[]>('/api/homey/insights');
-  }
-
-  insightEntries(log: string, resolution: InsightResolution) {
-    return this.http.get<HomeyInsightEntry[]>('/api/homey/insights/entries', { params: { log, resolution } });
-  }
+function accountParam(account: number | undefined): Record<string, number> {
+  return account === undefined ? {} : { account };
 }
