@@ -1,4 +1,7 @@
 export * from './lib/homey';
+export * from './lib/accounts';
+export * from './lib/photos';
+export * from './lib/plex';
 export * from './lib/dashboards';
 export * from './lib/displays';
 export * from './lib/realtime';

@@ -14,35 +14,60 @@ import {
 } from '@angular/core';
 import { Tile } from '@homey-dash/api-client';
 import { TileSize } from '@homey-dash/layout';
-import { TileData, TileKind, TileSettings } from '@homey-dash/tiles';
+import { LucideChartLine, LucideSparkles, LucideWorkflow } from '@lucide/angular';
+import { deviceLook, deviceType, TileData, TileKind, TileSettings } from '@homey-dash/tiles';
+import { PhotoSetField } from './photo-set-field';
+import { PlexTargetField } from './plex-target-field';
 import { SizePicker } from './size-picker';
-
-interface TargetOption {
-  id: string;
-  label: string;
-}
+import { TargetPicker } from './target-picker';
+import { allOptions, buildTree, TargetNode } from './target-tree';
 
 /** Settings of the selected tile: its target, its kind's own settings, label and size. */
 @Component({
   selector: 'hd-tile-panel',
-  imports: [SizePicker],
+  imports: [PhotoSetField, PlexTargetField, SizePicker, TargetPicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h2>{{ kind()?.label ?? 'Unknown tile' }}</h2>
 
     @if (kind(); as kind) {
-      <div class="hd-field">
-        <label class="hd-field__label" for="tile-target">Target</label>
-        <select id="tile-target" class="hd-select" (change)="setTarget($any($event.target).value)">
-          <option value="" disabled [selected]="!settings().target">Pick a {{ targetNoun() }}</option>
-          @if (settings().target && !targetKnown()) {
-            <option [value]="settings().target" selected>Not found in Homey</option>
+      @if (kind.target === 'photoSet') {
+        <hd-photo-set-field [value]="settings().target" (picked)="setTarget($event)" />
+      } @else if (kind.target === 'plexPlayer' || kind.target === 'plexLibrary') {
+        <hd-plex-target-field [type]="kind.target" [value]="settings().target" (picked)="setTarget($event)" />
+      } @else if (kind.multiple) {
+        <div class="hd-field">
+          <label class="hd-field__label" for="tile-target">{{ targetsLabel() }}</label>
+          @for (picked of pickedTargets(); track picked.id; let i = $index, last = $last) {
+            <div class="picked">
+              <span class="picked__name" [class.missing]="!picked.found">{{ picked.label }}</span>
+              <button type="button" class="hd-btn" [attr.aria-label]="'Move ' + picked.label + ' up'" [disabled]="i === 0" (click)="moveTarget(i, -1)">↑</button>
+              <button type="button" class="hd-btn" [attr.aria-label]="'Move ' + picked.label + ' down'" [disabled]="last" (click)="moveTarget(i, 1)">↓</button>
+              <button type="button" class="hd-btn" [attr.aria-label]="'Remove ' + picked.label" (click)="removeTarget(i)">✕</button>
+            </div>
           }
-          @for (option of options(); track option.id) {
-            <option [value]="option.id" [selected]="option.id === settings().target">{{ option.label }}</option>
-          }
-        </select>
-      </div>
+          <hd-target-picker
+            pickerId="tile-target"
+            [tree]="targets()"
+            [value]="null"
+            [noun]="targetNoun()"
+            [groupNoun]="kind.target === 'flow' ? 'Folder' : 'Zone'"
+            (picked)="addTarget($event)"
+          />
+        </div>
+      } @else {
+        <div class="hd-field">
+          <label class="hd-field__label" for="tile-target">Target</label>
+          <hd-target-picker
+            pickerId="tile-target"
+            [tree]="targets()"
+            [value]="settings().target"
+            [noun]="targetNoun()"
+            [groupNoun]="kind.target === 'flow' ? 'Folder' : 'Zone'"
+            (picked)="setTarget($event)"
+          />
+        </div>
+      }
 
       <ng-container #kindSettings />
 
@@ -52,7 +77,7 @@ interface TargetOption {
           id="tile-label"
           class="hd-input"
           [value]="settings().label ?? ''"
-          placeholder="The target's name"
+          [placeholder]="labelPlaceholder()"
           (change)="setLabel($any($event.target).value)"
         />
       </div>
@@ -72,6 +97,10 @@ interface TargetOption {
     h2 { font-size: 16px; font-weight: 800; margin: 0; }
     .muted { color: var(--ink-muted); margin: 0; }
     .remove { align-self: flex-start; margin-top: var(--space-2); }
+    .picked { display: flex; align-items: center; gap: var(--space-1); }
+    .picked__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .picked__name.missing { color: var(--danger); }
+    .picked .hd-btn { padding-inline: 10px; }
   `,
 })
 export class TilePanel {
@@ -89,30 +118,84 @@ export class TilePanel {
   protected readonly settings = computed(() => this.tile().settings as TileSettings);
 
   protected readonly targetNoun = computed(
-    () => ({ device: 'device', flow: 'flow', mood: 'mood', insight: 'recorded value' })[this.kind()?.target ?? 'device'],
+    () =>
+      ({ device: 'device', flow: 'flow', mood: 'mood', insight: 'recorded value', photoSet: 'photo set', plexPlayer: 'player', plexLibrary: 'library' })[this.kind()?.target ?? 'device'],
   );
 
-  protected readonly options = computed<TargetOption[]>(() => {
-    const byLabel = (a: TargetOption, b: TargetOption) => a.label.localeCompare(b.label);
+  /** What a kind that takes several targets calls them: `Moods`. */
+  protected readonly targetsLabel = computed(() => `${this.targetNoun().replace(/^./, (c) => c.toUpperCase())}s`);
+  protected readonly labelPlaceholder = computed(() => (this.kind()?.multiple ? this.targetsLabel() : "The target's name"));
+
+  // Devices, moods and recorded values sit in Homey's zones; flows in its flow folders.
+  protected readonly targets = computed<TargetNode>(() => {
+    const zones = this.data.zones().values();
     switch (this.kind()?.target) {
       case 'device':
-        return [...this.data.devices().values()]
-          .map((d) => ({ id: d.id, label: d.zoneName ? `${d.name} — ${d.zoneName}` : d.name }))
-          .sort(byLabel);
+        return buildTree(
+          zones,
+          [...this.data.devices().values()].map((d) => ({
+            id: d.id,
+            label: d.name,
+            summary: d.zoneName ? `${d.name} — ${d.zoneName}` : d.name,
+            type: deviceType(d),
+            ...deviceLook(d),
+            groupId: d.zoneId,
+          })),
+        );
       case 'flow':
-        return [...this.data.flows().values()].map((f) => ({ id: f.id, label: f.name })).sort(byLabel);
+        return buildTree(
+          this.data.flowFolders().values(),
+          [...this.data.flows().values()].map((f) => ({
+            id: f.id,
+            label: f.name,
+            type: [f.advanced ? 'Advanced flow' : 'Flow', f.enabled ? '' : 'disabled'].filter(Boolean).join(' · '),
+            icon: LucideWorkflow,
+            hue: 'flow' as const,
+            groupId: f.folderId,
+          })),
+        );
       case 'mood':
-        return [...this.data.moods().values()].map((m) => ({ id: m.id, label: m.name })).sort(byLabel);
-      case 'insight':
-        return [...this.data.insights().values()]
-          .map((l) => ({ id: l.id, label: [l.ownerName, l.title].filter(Boolean).join(' — ') }))
-          .sort(byLabel);
+        return buildTree(
+          zones,
+          [...this.data.moods().values()].map((m) => ({
+            id: m.id,
+            label: m.name,
+            type: 'Mood',
+            icon: LucideSparkles,
+            hue: 'mood' as const,
+            groupId: m.zoneId,
+          })),
+        );
+      case 'insight': {
+        const devices = this.data.devices();
+        return buildTree(
+          zones,
+          [...this.data.insights().values()].map((l) => {
+            const owner = devices.get(l.ownerUri.replace(/^homey:device:/, ''));
+            return {
+              id: l.id,
+              label: [l.ownerName, l.title].filter(Boolean).join(' — '),
+              type: l.units ? `Recorded value · ${l.units}` : 'Recorded value',
+              icon: LucideChartLine,
+              hue: deviceLook(owner).hue,
+              groupId: owner?.zoneId ?? null,
+            };
+          }),
+        );
+      }
       default:
-        return [];
+        return buildTree([], []);
     }
   });
 
-  protected readonly targetKnown = computed(() => this.options().some((o) => o.id === this.settings().target));
+  /** The targets of a kind that takes several, in the tile's order. */
+  protected readonly pickedTargets = computed(() => {
+    const options = new Map(allOptions(this.targets()).map((o) => [o.id, o]));
+    return (this.settings().targets ?? []).map((id) => {
+      const option = options.get(id);
+      return { id, label: option ? (option.summary ?? option.label) : 'Not found in Homey', found: !!option };
+    });
+  });
 
   protected readonly sizeEnabled = computed(() => {
     const kind = this.kind();
@@ -149,6 +232,25 @@ export class TilePanel {
 
   protected setTarget(target: string) {
     this.settingsChanged.emit({ ...this.settings(), target: target || null });
+  }
+
+  protected addTarget(id: string) {
+    const targets = this.settings().targets ?? [];
+    if (id && !targets.includes(id)) this.setTargets([...targets, id]);
+  }
+
+  protected removeTarget(index: number) {
+    this.setTargets((this.settings().targets ?? []).filter((_, i) => i !== index));
+  }
+
+  protected moveTarget(index: number, by: -1 | 1) {
+    const targets = [...(this.settings().targets ?? [])];
+    [targets[index], targets[index + by]] = [targets[index + by], targets[index]];
+    this.setTargets(targets);
+  }
+
+  private setTargets(targets: string[]) {
+    this.settingsChanged.emit({ ...this.settings(), target: null, targets });
   }
 
   protected setLabel(label: string) {

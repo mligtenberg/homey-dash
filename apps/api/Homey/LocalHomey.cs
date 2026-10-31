@@ -1,17 +1,18 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using Microsoft.Extensions.Options;
+using HomeyDash.Api.Accounts;
 
 namespace HomeyDash.Api.Homey;
 
 /// <summary>
 /// The one connection to Homey (ADR-0002): loads a snapshot over the local REST API, then keeps
-/// <see cref="HomeyState"/> current from the realtime socket, and reconnects whenever either fails.
+/// <see cref="HomeyState"/> current from the realtime socket, and reconnects whenever either fails. It connects to
+/// the Homey account set up in Management (ADR-0007), waits while there is none, and starts over when it changes.
 /// </summary>
 public sealed class LocalHomey(
     IHttpClientFactory httpFactory,
-    IOptions<HomeyOptions> options,
+    CurrentHomeyAccount accounts,
     HomeyState state,
     ILogger<LocalHomey> logger) : BackgroundService, IHomey
 {
@@ -19,16 +20,15 @@ public sealed class LocalHomey(
 
     private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(30);
 
-    private Dictionary<string, string> _zoneNames = [];
     private SocketIoClient? _socket;
     private string _namespace = "/";
 
     public static TimeSpan FirstRetryDelay { get; set; } = TimeSpan.FromSeconds(1);
 
-    public static void ConfigureHttpClient(HttpClient http, HomeyOptions options)
+    private static void ConfigureHttpClient(HttpClient http, HomeyAccount account)
     {
-        http.BaseAddress = new Uri(options.Address!);
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
+        http.BaseAddress = new Uri(account.Address);
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", account.ApiKey);
         // Actions answer only once Homey has carried them out; a mood that sets many lights takes about 9 s.
         http.Timeout = TimeSpan.FromSeconds(30);
     }
@@ -45,13 +45,37 @@ public sealed class LocalHomey(
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        while (!ct.IsCancellationRequested)
+        {
+            var (account, replaced) = accounts.Get();
+            using var session = CancellationTokenSource.CreateLinkedTokenSource(ct, replaced);
+            try
+            {
+                if (account is null)
+                {
+                    state.SetStatus(HomeyConnection.NotSetUp);
+                    await Task.Delay(Timeout.Infinite, session.Token);
+                }
+                else
+                {
+                    await KeepConnectedAsync(account, session.Token);
+                }
+            }
+            catch (OperationCanceledException) when (session.IsCancellationRequested)
+            {
+            }
+        }
+    }
+
+    private async Task KeepConnectedAsync(HomeyAccount account, CancellationToken ct)
+    {
         var delay = FirstRetryDelay;
         while (!ct.IsCancellationRequested)
         {
             try
             {
                 state.SetStatus(HomeyConnection.Connecting, state.Status.LastError);
-                await RunSessionAsync(onConnected: () => delay = FirstRetryDelay, ct);
+                await RunSessionAsync(account, onConnected: () => delay = FirstRetryDelay, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -68,14 +92,14 @@ public sealed class LocalHomey(
         }
     }
 
-    private async Task RunSessionAsync(Action onConnected, CancellationToken ct)
+    private async Task RunSessionAsync(HomeyAccount account, Action onConnected, CancellationToken ct)
     {
-        var address = new Uri(options.Value.Address!);
-        var homeyId = await PingAsync(ct);
+        var address = new Uri(account.Address);
+        var homeyId = await PingAsync(account, ct);
 
         await using var socket = await SocketIoClient.ConnectAsync(address, ct);
         var handshake = await socket.EmitWithAckAsync("/", "handshakeClient",
-            [new { token = options.Value.ApiKey, homeyId }], ct);
+            [new { token = account.ApiKey, homeyId }], ct);
         ThrowIfError(handshake, "Homey refused the API key");
         _namespace = HomeyMapper.String(handshake[1], "namespace")
             ?? throw new InvalidOperationException("Homey's handshake returned no namespace");
@@ -86,7 +110,7 @@ public sealed class LocalHomey(
         try
         {
             // Subscribe before loading, so nothing that changes in between is missed.
-            await Task.WhenAll(new[] { "homey:manager:devices", "homey:manager:flow", "homey:manager:moods" }
+            await Task.WhenAll(new[] { "homey:manager:devices", "homey:manager:flow", "homey:manager:moods", "homey:manager:zones" }
                 .Select(uri => SubscribeAsync(socket, uri, ct)));
             await LoadSnapshotAsync(ct);
             await Task.WhenAll(state.Devices.Select(d => SubscribeAsync(socket, DeviceUri(d.Id), ct)));
@@ -106,13 +130,13 @@ public sealed class LocalHomey(
         }
     }
 
-    private async Task<string> PingAsync(CancellationToken ct)
+    private async Task<string> PingAsync(HomeyAccount account, CancellationToken ct)
     {
-        using var response = await Http().GetAsync("api/manager/system/ping", ct);
+        using var response = await Http(account).GetAsync("api/manager/system/ping", ct);
         response.EnsureSuccessStatusCode();
         return response.Headers.TryGetValues("X-Homey-ID", out var ids)
             ? ids.First()
-            : throw new InvalidOperationException($"No Homey found at {options.Value.Address}");
+            : throw new InvalidOperationException($"No Homey found at {account.Address}");
     }
 
     private async Task LoadSnapshotAsync(CancellationToken ct)
@@ -121,15 +145,19 @@ public sealed class LocalHomey(
         var devices = GetJsonAsync("api/manager/devices/device", ct);
         var flows = GetJsonAsync("api/manager/flow/flow", ct);
         var advancedFlows = GetJsonAsync("api/manager/flow/advancedflow", ct);
+        var flowFolders = GetJsonAsync("api/manager/flow/flowfolder", ct);
         var moods = GetJsonAsync("api/manager/moods/mood", ct);
-        await Task.WhenAll(zones, devices, flows, advancedFlows, moods);
+        await Task.WhenAll(zones, devices, flows, advancedFlows, flowFolders, moods);
 
-        _zoneNames = HomeyMapper.ZoneNames(zones.Result);
+        var zoneList = HomeyMapper.Values(zones.Result).Select(HomeyMapper.Zone).ToList();
+        var zoneNames = zoneList.ToDictionary(z => z.Id, z => z.Name);
         state.Replace(
-            HomeyMapper.Values(devices.Result).Select(d => HomeyMapper.Device(d, _zoneNames)),
+            HomeyMapper.Values(devices.Result).Select(d => HomeyMapper.Device(d, zoneNames)),
             HomeyMapper.Values(flows.Result).Select(f => HomeyMapper.Flow(f, advanced: false))
                 .Concat(HomeyMapper.Values(advancedFlows.Result).Select(f => HomeyMapper.Flow(f, advanced: true))),
-            HomeyMapper.Values(moods.Result).Select(HomeyMapper.Mood));
+            HomeyMapper.Values(moods.Result).Select(HomeyMapper.Mood),
+            zoneList,
+            HomeyMapper.Values(flowFolders.Result).Select(HomeyMapper.FlowFolder));
     }
 
     private async Task SubscribeAsync(SocketIoClient socket, string uri, CancellationToken ct) =>
@@ -159,12 +187,12 @@ public sealed class LocalHomey(
                     state.UpdateCapability(uri["homey:device:".Length..], capabilityId, value, HomeyMapper.Date(data, "transactionTime"));
                 break;
             case ("homey:manager:devices", "device.create"):
-                state.UpsertDevice(HomeyMapper.Device(data, _zoneNames));
+                state.UpsertDevice(HomeyMapper.Device(data, ZoneNames()));
                 if (_socket is { } socket)
                     _ = SubscribeAsync(socket, DeviceUri(HomeyMapper.String(data, "id")!), CancellationToken.None);
                 break;
             case ("homey:manager:devices", "device.update"):
-                state.UpsertDevice(HomeyMapper.Device(data, _zoneNames));
+                state.UpsertDevice(HomeyMapper.Device(data, ZoneNames()));
                 break;
             case ("homey:manager:devices", "device.delete"):
                 state.RemoveDevice(HomeyMapper.String(data, "id")!);
@@ -178,11 +206,23 @@ public sealed class LocalHomey(
             case ("homey:manager:flow", "flow.delete" or "advancedflow.delete"):
                 state.RemoveFlow(HomeyMapper.String(data, "id")!);
                 break;
+            case ("homey:manager:flow", "flowfolder.create" or "flowfolder.update"):
+                state.UpsertFlowFolder(HomeyMapper.FlowFolder(data));
+                break;
+            case ("homey:manager:flow", "flowfolder.delete"):
+                state.RemoveFlowFolder(HomeyMapper.String(data, "id")!);
+                break;
             case ("homey:manager:moods", "mood.create" or "mood.update"):
                 state.UpsertMood(HomeyMapper.Mood(data));
                 break;
             case ("homey:manager:moods", "mood.delete"):
                 state.RemoveMood(HomeyMapper.String(data, "id")!);
+                break;
+            case ("homey:manager:zones", "zone.create" or "zone.update"):
+                state.UpsertZone(HomeyMapper.Zone(data));
+                break;
+            case ("homey:manager:zones", "zone.delete"):
+                state.RemoveZone(HomeyMapper.String(data, "id")!);
                 break;
         }
     }
@@ -234,7 +274,13 @@ public sealed class LocalHomey(
         }
     }
 
-    private HttpClient Http() => httpFactory.CreateClient(HttpClientName);
+    private HttpClient Http(HomeyAccount? account = null)
+    {
+        account ??= accounts.Account ?? throw new HomeyUnavailableException("Homey is not set up yet");
+        var http = httpFactory.CreateClient(HttpClientName);
+        ConfigureHttpClient(http, account);
+        return http;
+    }
 
     private async Task<JsonElement> GetJsonAsync(string path, CancellationToken ct)
     {
@@ -266,6 +312,8 @@ public sealed class LocalHomey(
                 throw new HomeyUnavailableException($"Homey answered {(int)response.StatusCode} to {method} {path}");
         }
     }
+
+    private Dictionary<string, string> ZoneNames() => state.Zones.ToDictionary(z => z.Id, z => z.Name);
 
     private static string DeviceUri(string deviceId) => $"homey:device:{deviceId}";
 

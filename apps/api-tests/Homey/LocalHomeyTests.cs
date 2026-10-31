@@ -1,8 +1,8 @@
 using System.Text.Json;
+using HomeyDash.Api.Accounts;
 using HomeyDash.Api.Homey;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace HomeyDash.Api.Tests.Homey;
 
@@ -10,13 +10,15 @@ public sealed class LocalHomeyTests : IAsyncLifetime
 {
     private readonly ScriptedHomeyServer _server = new();
     private readonly HomeyState _state = new(TimeProvider.System);
+    private readonly CurrentHomeyAccount _account = new();
     private LocalHomey _homey = null!;
 
     public async Task InitializeAsync()
     {
         await _server.StartAsync();
         LocalHomey.FirstRetryDelay = TimeSpan.FromMilliseconds(50);
-        _homey = Create(ScriptedHomeyServer.ApiKey);
+        _account.Set(new HomeyAccount(_server.Address.ToString(), ScriptedHomeyServer.ApiKey));
+        _homey = Create(_account);
         await _homey.StartAsync(CancellationToken.None);
     }
 
@@ -29,7 +31,10 @@ public sealed class LocalHomeyTests : IAsyncLifetime
         Assert.Equal("Living room", lamp.ZoneName);
         Assert.True(_state.FindFlow("a1")!.Advanced);
         Assert.Equal("Movie night", _state.FindMood("m1")!.Name);
+        Assert.Contains(_state.Zones, z => z is { Id: "zone-living", ParentId: "zone-home" });
+        Assert.Contains(_state.FlowFolders, f => f.Id == "ff1");
         Assert.Contains("homey:manager:devices", _server.Subscriptions);
+        Assert.Contains("homey:manager:zones", _server.Subscriptions);
         Assert.Contains("homey:device:lamp", _server.Subscriptions);
     }
 
@@ -52,6 +57,16 @@ public sealed class LocalHomeyTests : IAsyncLifetime
         await _server.PushAsync("homey:manager:devices", "device.delete", new { id = "lamp" });
 
         await Eventually(() => _state.FindDevice("lamp") is null);
+    }
+
+    [Fact]
+    public async Task AZoneEvent_UpdatesTheZones()
+    {
+        await Eventually(() => _state.Status.Connection == HomeyConnection.Connected);
+
+        await _server.PushAsync("homey:manager:zones", "zone.create", new { id = "zone-kitchen", name = "Kitchen", parent = "zone-home" });
+
+        await Eventually(() => _state.Zones.Any(z => z.Id == "zone-kitchen"));
     }
 
     [Fact]
@@ -101,13 +116,63 @@ public sealed class LocalHomeyTests : IAsyncLifetime
         await homey.StopAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task WithoutAnAccount_WaitsUntilOneIsSetUp()
+    {
+        await _homey.StopAsync(CancellationToken.None);
+        var state = new HomeyState(TimeProvider.System);
+        var account = new CurrentHomeyAccount();
+        var homey = Create(account, state);
+        await homey.StartAsync(CancellationToken.None);
+
+        await Eventually(() => state.Status.Connection == HomeyConnection.NotSetUp);
+        account.Set(new HomeyAccount(_server.Address.ToString(), ScriptedHomeyServer.ApiKey));
+
+        await Eventually(() => state.Status.Connection == HomeyConnection.Connected);
+        await homey.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task AReplacedAccount_ConnectsAgainWithIt()
+    {
+        await _homey.StopAsync(CancellationToken.None);
+        var state = new HomeyState(TimeProvider.System);
+        var account = new CurrentHomeyAccount();
+        account.Set(new HomeyAccount(_server.Address.ToString(), "wrong-key"));
+        var homey = Create(account, state);
+        await homey.StartAsync(CancellationToken.None);
+        await Eventually(() => state.Status.Connection == HomeyConnection.Disconnected);
+
+        account.Set(new HomeyAccount(_server.Address.ToString(), ScriptedHomeyServer.ApiKey));
+
+        await Eventually(() => state.Status.Connection == HomeyConnection.Connected);
+        await homey.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ARemovedAccount_IsNotSetUp()
+    {
+        await Eventually(() => _state.Status.Connection == HomeyConnection.Connected);
+
+        _account.Set(null);
+
+        await Eventually(() => _state.Status.Connection == HomeyConnection.NotSetUp);
+        await Assert.ThrowsAsync<HomeyUnavailableException>(() => _homey.TriggerFlowAsync("f1", CancellationToken.None));
+    }
+
     private LocalHomey Create(string apiKey, HomeyState? state = null)
     {
-        var options = new HomeyOptions { Address = _server.Address.ToString(), ApiKey = apiKey };
+        var account = new CurrentHomeyAccount();
+        account.Set(new HomeyAccount(_server.Address.ToString(), apiKey));
+        return Create(account, state);
+    }
+
+    private LocalHomey Create(CurrentHomeyAccount account, HomeyState? state = null)
+    {
         var services = new ServiceCollection();
-        services.AddHttpClient(LocalHomey.HttpClientName, http => LocalHomey.ConfigureHttpClient(http, options));
+        services.AddHttpClient(LocalHomey.HttpClientName);
         var factory = services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>();
-        return new LocalHomey(factory, Options.Create(options), state ?? _state, NullLogger<LocalHomey>.Instance);
+        return new LocalHomey(factory, account, state ?? _state, NullLogger<LocalHomey>.Instance);
     }
 
     private static async Task Eventually(Func<bool> condition)

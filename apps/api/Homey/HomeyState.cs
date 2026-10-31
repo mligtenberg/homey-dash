@@ -13,6 +13,8 @@ public sealed class HomeyState(TimeProvider time)
     private ImmutableDictionary<string, HomeyDevice> _devices = ImmutableDictionary<string, HomeyDevice>.Empty;
     private ImmutableDictionary<string, HomeyFlow> _flows = ImmutableDictionary<string, HomeyFlow>.Empty;
     private ImmutableDictionary<string, HomeyMood> _moods = ImmutableDictionary<string, HomeyMood>.Empty;
+    private ImmutableDictionary<string, HomeyZone> _zones = ImmutableDictionary<string, HomeyZone>.Empty;
+    private ImmutableDictionary<string, HomeyFlowFolder> _flowFolders = ImmutableDictionary<string, HomeyFlowFolder>.Empty;
 
     public event Action<HomeyChange>? Changed;
 
@@ -25,6 +27,8 @@ public sealed class HomeyState(TimeProvider time)
     public IEnumerable<HomeyDevice> Devices => _devices.Values;
     public IEnumerable<HomeyFlow> Flows => _flows.Values;
     public IEnumerable<HomeyMood> Moods => _moods.Values;
+    public IEnumerable<HomeyZone> Zones => _zones.Values;
+    public IEnumerable<HomeyFlowFolder> FlowFolders => _flowFolders.Values;
 
     public HomeyDevice? FindDevice(string id) => _devices.GetValueOrDefault(id);
     public HomeyFlow? FindFlow(string id) => _flows.GetValueOrDefault(id);
@@ -60,7 +64,8 @@ public sealed class HomeyState(TimeProvider time)
     }
 
     // Replaces everything with a fresh snapshot, raising a change for each device that differs.
-    public void Replace(IEnumerable<HomeyDevice> devices, IEnumerable<HomeyFlow> flows, IEnumerable<HomeyMood> moods)
+    public void Replace(IEnumerable<HomeyDevice> devices, IEnumerable<HomeyFlow> flows, IEnumerable<HomeyMood> moods,
+        IEnumerable<HomeyZone> zones, IEnumerable<HomeyFlowFolder> flowFolders)
     {
         List<HomeyChange> changes = [];
         lock (_lock)
@@ -73,6 +78,8 @@ public sealed class HomeyState(TimeProvider time)
             _devices = next;
             _flows = flows.ToImmutableDictionary(f => f.Id);
             _moods = moods.ToImmutableDictionary(m => m.Id);
+            _zones = zones.ToImmutableDictionary(z => z.Id);
+            _flowFolders = flowFolders.ToImmutableDictionary(f => f.Id);
             Loaded = true;
         }
         changes.Add(new CatalogChanged());
@@ -114,6 +121,10 @@ public sealed class HomeyState(TimeProvider time)
     public void RemoveFlow(string id) => UpdateCatalog(() => _flows = _flows.Remove(id));
     public void UpsertMood(HomeyMood mood) => UpdateCatalog(() => _moods = _moods.SetItem(mood.Id, mood));
     public void RemoveMood(string id) => UpdateCatalog(() => _moods = _moods.Remove(id));
+    public void UpsertZone(HomeyZone zone) => UpdateCatalog(() => _zones = _zones.SetItem(zone.Id, zone));
+    public void RemoveZone(string id) => UpdateCatalog(() => _zones = _zones.Remove(id));
+    public void UpsertFlowFolder(HomeyFlowFolder folder) => UpdateCatalog(() => _flowFolders = _flowFolders.SetItem(folder.Id, folder));
+    public void RemoveFlowFolder(string id) => UpdateCatalog(() => _flowFolders = _flowFolders.Remove(id));
 
     private void UpdateCatalog(Action update)
     {

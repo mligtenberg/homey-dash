@@ -15,6 +15,13 @@ export const appRoutes: Route[] = [
       { path: '', component: HomePage, title: 'HomeyDash' },
       { path: 'dashboards/:id', component: EditorPage, title: 'Dashboard · HomeyDash' },
       { path: 'displays', component: DisplaysPage, title: 'Displays · HomeyDash' },
+      // Visited rarely, so they load on first visit and keep the editor's bundle small.
+      {
+        path: 'photo-sets',
+        loadComponent: () => import('./photo-sets-page').then((m) => m.PhotoSetsPage),
+        title: 'Photo sets · HomeyDash',
+      },
+      { path: 'accounts', loadComponent: () => import('./accounts-page').then((m) => m.AccountsPage), title: 'Accounts · HomeyDash' },
     ],
   },
   { path: '**', redirectTo: '' },

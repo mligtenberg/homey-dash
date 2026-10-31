@@ -4,23 +4,33 @@ import { DashboardLayout } from './dashboards';
 
 // Mirrors apps/api/Displays/Display.cs.
 
+/** A display, its main dashboard and the others it can switch to, in the order it offers them. */
 export interface DisplaySummary {
   id: string;
   name: string;
+  /** The main dashboard, which it returns to when left alone; null while it waits for one. */
   dashboardId: string | null;
+  otherDashboardIds: string[];
 }
 
 /**
- * What Management knows about a display beyond its configuration. It is on the latest version when
- * `shownVersion` equals `latestVersion`, its dashboard's published version.
+ * Which published version of one of its dashboards a display shows. It is on the latest version when
+ * `shownVersion` equals `latestVersion`.
  */
+export interface DashboardVersion {
+  dashboardId: string;
+  shownVersion: number | null;
+  latestVersion: number;
+}
+
+/** What Management knows about a display beyond its configuration. */
 export interface DisplayStatus {
   connected: boolean;
   /** False once its screen was given to another display; a screen in setup can take it over. */
   held: boolean;
   lastSeenAt: string | null;
-  shownVersion: number | null;
-  latestVersion: number | null;
+  /** One per assigned dashboard, main first. */
+  versions: DashboardVersion[];
 }
 
 /** A display as Management lists it. */
@@ -36,10 +46,10 @@ export interface ShownDashboard {
   layout: DashboardLayout;
 }
 
-/** Which display a screen is, and what it shows (null while waiting for a dashboard). */
+/** Which display a screen is, and the dashboards it offers, main first (none while waiting for one). */
 export interface ScreenView {
   display: DisplaySummary;
-  dashboard: ShownDashboard | null;
+  dashboards: ShownDashboard[];
 }
 
 /**
@@ -66,8 +76,9 @@ export class DisplaysApi {
     return this.http.patch<DisplayInfo>(`/api/displays/${id}`, { name });
   }
 
-  assign(id: string, dashboardId: string | null) {
-    return this.http.put<DisplayInfo>(`/api/displays/${id}/dashboard`, { dashboardId });
+  /** Assigns the main dashboard and the others the display can switch to; others need a main one. */
+  assign(id: string, dashboardId: string | null, otherDashboardIds: string[] = []) {
+    return this.http.put<DisplayInfo>(`/api/displays/${id}/dashboard`, { dashboardId, otherDashboardIds });
   }
 
   delete(id: string) {

@@ -36,7 +36,9 @@
         "--urls",
         "http://localhost:5212",
         "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash.db",
-        "--Homey:Address="
+        "--Homey:Fake=true",
+        "--Immich:Fake=true",
+        "--Plex:Fake=true"
       ],
       "port": 5212
     },
@@ -73,6 +75,81 @@
         ".claude/proxy.json"
       ],
       "port": 4301
+    },
+    {
+      "name": "api-fake-b",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "apps/api",
+        "--no-launch-profile",
+        "--artifacts-path",
+        "tmp/claude/api-b",
+        "--",
+        "--environment",
+        "Development",
+        "--urls",
+        "http://localhost:5213",
+        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash-b.db",
+        "--Homey:Fake=true",
+        "--Immich:Fake=true",
+        "--Plex:Fake=true"
+      ],
+      "port": 5213
+    },
+    {
+      "name": "api-b",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "apps/api",
+        "--no-launch-profile",
+        "--artifacts-path",
+        "tmp/claude/api-b",
+        "--",
+        "--environment",
+        "Development",
+        "--urls",
+        "http://localhost:5213",
+        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash-b.db"
+      ],
+      "port": 5213
+    },
+    {
+      "name": "display-b",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NX_WORKSPACE_DATA_DIRECTORY=tmp/claude/nx-b",
+        "NX_DAEMON=false",
+        "npx",
+        "nx",
+        "serve",
+        "display",
+        "--port",
+        "4302",
+        "--proxy-config",
+        ".claude/proxy-b.json"
+      ],
+      "port": 4302
+    },
+    {
+      "name": "management-b",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NX_WORKSPACE_DATA_DIRECTORY=tmp/claude/nx-b",
+        "NX_DAEMON=false",
+        "npx",
+        "nx",
+        "serve",
+        "management",
+        "--port",
+        "4303",
+        "--proxy-config",
+        ".claude/proxy-b.json"
+      ],
+      "port": 4303
     }
   ]
 }

@@ -25,7 +25,7 @@ import { TileKindRegistry } from './tile-kind-registry';
   },
   template: `
     @if (kind(); as kind) {
-      <ng-container *ngComponentOutlet="kind.component; inputs: { settings: tile().settings, size: tile().size }" />
+      <ng-container *ngComponentOutlet="kind.component; inputs: inputs()" />
     } @else {
       <div class="hd-tile is-missing" [attr.data-size]="tile().size">
         <span></span>
@@ -45,4 +45,10 @@ export class TileHost {
 
   protected readonly kind = computed(() => this.registry.find(this.tile().kind));
   protected readonly area = computed(() => gridArea(this.tile()));
+
+  // `detailView` only where the kind turns it off, so a kind's component need not declare it.
+  protected readonly inputs = computed(() => {
+    const { settings, size } = this.tile();
+    return this.kind()?.details === false ? { settings, size, detailView: false } : { settings, size };
+  });
 }

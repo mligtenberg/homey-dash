@@ -1,13 +1,13 @@
 using HomeyDash.Api.Dashboards;
 using HomeyDash.Api.Data;
 using HomeyDash.Api.Displays;
-using HomeyDash.Api.Homey;
+using HomeyDash.Api.Photos;
 using Microsoft.AspNetCore.SignalR;
 
 namespace HomeyDash.Api.Realtime;
 
-/// <summary>Tells screens and Management that displays or dashboards changed.</summary>
-public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresence presence, HomeyState homey)
+/// <summary>Tells screens and Management that displays, dashboards or photo sets changed.</summary>
+public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresence presence, TargetCatalog targets, PhotoSync sync)
 {
     public const string ManagementGroup = "management";
 
@@ -25,7 +25,11 @@ public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresen
     public async Task DisplaysChangedAsync(HomeyDashDbContext db, CancellationToken ct) =>
         await hub.Clients.Group(ManagementGroup).SendAsync("Displays", await DisplayQueries.ListAsync(db, presence, ct), ct);
 
-    // Management's dashboard list: names, publish state, unpublished changes and tiles Homey does not know.
+    // Management's dashboard list: names, publish state, unpublished changes and tiles whose target is missing.
     public async Task DashboardsChangedAsync(HomeyDashDbContext db, CancellationToken ct) =>
-        await hub.Clients.Group(ManagementGroup).SendAsync("Dashboards", await DashboardEndpoints.ListAsync(db, homey, ct), ct);
+        await hub.Clients.Group(ManagementGroup).SendAsync("Dashboards", await DashboardEndpoints.ListAsync(db, targets, ct), ct);
+
+    // Every photo set, to every connection: displays show their photos, Management also how syncing with Immich went.
+    public async Task PhotoSetsChangedAsync(HomeyDashDbContext db, CancellationToken ct) =>
+        await hub.Clients.All.SendAsync("PhotoSets", await PhotoEndpoints.ListAsync(db, sync, ct), ct);
 }

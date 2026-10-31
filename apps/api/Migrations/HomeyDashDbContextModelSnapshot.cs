@@ -17,6 +17,24 @@ namespace HomeyDash.Api.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
 
+            modelBuilder.Entity("HomeyDash.Api.Accounts.HomeyAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ApiKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("HomeyAccounts");
+                });
+
             modelBuilder.Entity("HomeyDash.Api.Dashboards.Dashboard", b =>
                 {
                     b.Property<Guid>("Id")
@@ -79,12 +97,140 @@ namespace HomeyDash.Api.Migrations
                     b.ToTable("Displays");
                 });
 
+            modelBuilder.Entity("HomeyDash.Api.Displays.DisplayDashboard", b =>
+                {
+                    b.Property<Guid>("DisplayId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("DashboardId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ShownVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("DisplayId", "DashboardId");
+
+                    b.HasIndex("DashboardId");
+
+                    b.ToTable("DisplayDashboards", (string)null);
+                });
+
+            modelBuilder.Entity("HomeyDash.Api.Photos.ImmichAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ApiKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ImmichAccounts");
+                });
+
+            modelBuilder.Entity("HomeyDash.Api.Photos.PhotoSet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AlbumId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AlbumName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Photos")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Selection")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SkippedVideos")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset?>("SyncedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PhotoSets");
+                });
+
+            modelBuilder.Entity("HomeyDash.Api.Plex.PlexAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ServerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ServerName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ServerToken")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ServerUri")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Username")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PlexAccounts");
+                });
+
             modelBuilder.Entity("HomeyDash.Api.Displays.Display", b =>
                 {
                     b.HasOne("HomeyDash.Api.Dashboards.Dashboard", null)
                         .WithMany()
                         .HasForeignKey("DashboardId")
                         .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("HomeyDash.Api.Displays.DisplayDashboard", b =>
+                {
+                    b.HasOne("HomeyDash.Api.Dashboards.Dashboard", null)
+                        .WithMany()
+                        .HasForeignKey("DashboardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HomeyDash.Api.Displays.Display", null)
+                        .WithMany("Others")
+                        .HasForeignKey("DisplayId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("HomeyDash.Api.Displays.Display", b =>
+                {
+                    b.Navigation("Others");
                 });
 #pragma warning restore 612, 618
         }

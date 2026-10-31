@@ -4,7 +4,10 @@ namespace HomeyDash.Api.Tests.Homey;
 public static class HomeyFixtures
 {
     public const string Zones = """
-        { "zone-living": { "id": "zone-living", "name": "Living room", "parent": null } }
+        {
+          "zone-home": { "id": "zone-home", "name": "Home", "parent": null },
+          "zone-living": { "id": "zone-living", "name": "Living room", "parent": "zone-home" }
+        }
         """;
 
     public const string Devices = """
@@ -27,14 +30,28 @@ public static class HomeyFixtures
         """;
 
     public const string Flows = """
-        { "f1": { "id": "f1", "name": "Good night", "enabled": true } }
+        { "f1": { "id": "f1", "name": "Good night", "enabled": true, "folder": "ff1" } }
         """;
 
     public const string AdvancedFlows = """
         { "a1": { "id": "a1", "name": "Leaving home", "enabled": true } }
         """;
 
+    public const string FlowFolders = """
+        { "ff1": { "id": "ff1", "name": "Evening", "parent": null } }
+        """;
+
     public const string Moods = """
-        { "m1": { "id": "m1", "name": "Movie night", "zone": "zone-living" } }
+        {
+          "m1": {
+            "id": "m1", "name": "Movie night", "zone": "zone-living",
+            "devices": {
+              "lamp-1": { "state": { "onoff": true, "dim": 0.3, "light_mode": "color", "light_hue": 0.6, "light_saturation": 0.8, "light_temperature": 1 } },
+              "lamp-2": { "state": { "onoff": true, "dim": 0.2, "light_mode": "temperature", "light_hue": 0.9, "light_temperature": 1 } },
+              "lamp-3": { "state": { "onoff": false, "light_hue": 0.1 } },
+              "plug-1": { "state": { "onoff": true } }
+            }
+          }
+        }
         """;
 }

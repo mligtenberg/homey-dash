@@ -1,7 +1,10 @@
-import { ChangeDetectionStrategy, Component, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { DashboardsApi } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucideMonitor, LucidePlus } from '@lucide/angular';
+import { RealtimeTileData } from '@homey-dash/tiles';
+import { filter, map } from 'rxjs';
+import { LucideDynamicIcon, LucideImages, LucideKeyRound, LucideMonitor, LucidePlus } from '@lucide/angular';
 import { DashboardsStore } from './dashboards-store';
 
 /** Management's frame: the sidebar with dashboards, and the current page. */
@@ -62,9 +65,32 @@ import { DashboardsStore } from './dashboards-store';
           <span>All displays</span>
           <svg class="icon" [lucideIcon]="monitor" />
         </a>
+        <div class="hd-nav__group">Photos</div>
+        <a class="hd-nav__item" routerLink="/photo-sets" routerLinkActive ariaCurrentWhenActive="page">
+          <span>Photo sets</span>
+          <svg class="icon" [lucideIcon]="images" />
+        </a>
+        <div class="hd-nav__group">Accounts</div>
+        <a class="hd-nav__item" routerLink="/accounts" routerLinkActive ariaCurrentWhenActive="page">
+          <span>Accounts</span>
+          <span class="marks">
+            @if (homeyNotSetUp()) {
+              <span class="hd-dot-warn" role="img" aria-label="Homey is not set up" title="Homey is not set up"></span>
+            }
+            <svg class="icon" [lucideIcon]="key" />
+          </span>
+        </a>
       </nav>
     </aside>
-    <main class="page"><router-outlet /></main>
+    <main class="page">
+      @if (homeyNotSetUp() && !onAccounts()) {
+        <div class="setup" role="status">
+          <span>Homey isn't set up yet, so tiles show no devices, flows or moods.</span>
+          <a class="hd-btn hd-btn--primary" routerLink="/accounts">Set up Homey</a>
+        </div>
+      }
+      <router-outlet />
+    </main>
   `,
   styles: `
     :host { display: grid; grid-template-columns: 240px 1fr; min-height: 100dvh; }
@@ -79,6 +105,8 @@ import { DashboardsStore } from './dashboards-store';
     .new { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) 4px; }
     .row { display: flex; gap: var(--space-2); }
     .page { min-width: 0; }
+    .setup { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-6); border-bottom: 1px solid var(--line); color: var(--warn); font-weight: 700; }
+    .setup .hd-btn { text-decoration: none; white-space: nowrap; }
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     @media (max-width: 860px) {
       :host { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
@@ -96,6 +124,17 @@ export class Shell {
 
   protected readonly plus = LucidePlus;
   protected readonly monitor = LucideMonitor;
+  protected readonly key = LucideKeyRound;
+  protected readonly images = LucideImages;
+  private readonly homey = inject(RealtimeTileData);
+  protected readonly homeyNotSetUp = computed(() => this.homey.status()?.connection === 'notSetUp');
+  protected readonly onAccounts = toSignal(
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => this.router.url.startsWith('/accounts')),
+    ),
+    { initialValue: this.router.url.startsWith('/accounts') },
+  );
   protected readonly naming = signal(false);
   private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('name');
 

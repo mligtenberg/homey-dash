@@ -49,7 +49,7 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
 
         Assert.Equal(
             ["assign_dashboard", "create_dashboard", "get_dashboard", "list_dashboards", "list_displays",
-                "list_homey_targets", "publish_dashboard", "rename_dashboard", "save_draft"],
+                "list_targets", "publish_dashboard", "rename_dashboard", "save_draft"],
             tools);
     }
 
@@ -69,7 +69,7 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
         var info = Json(await CallAsync(mcp, "assign_dashboard", new { displayId = display, dashboardId = id }));
 
         Assert.Equal(id, info.GetProperty("dashboardId").GetString());
-        var shown = (await _client.GetFromJsonAsync<JsonElement>($"/api/screens/{screen}")).GetProperty("dashboard");
+        var shown = (await _client.GetFromJsonAsync<JsonElement>($"/api/screens/{screen}")).GetProperty("dashboards")[0];
         Assert.Equal(1, shown.GetProperty("version").GetInt32());
         var tile = shown.GetProperty("layout").GetProperty("sections")[0].GetProperty("tiles")[0];
         Assert.Equal("wide", tile.GetProperty("size").GetString());
@@ -85,6 +85,28 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
         var result = await CallAsync(mcp, "save_draft", new { dashboardId = id, draft = Draft(Tile("t1", "wide", 0, 0), Tile("t2", "small", 1, 0)) });
 
         Assert.Contains("overlaps tile t1", Error(result));
+    }
+
+    [Fact]
+    public async Task OtherDashboards_CanBeAssignedOverMcp()
+    {
+        await using var mcp = await ConnectAsync();
+        var screen = Guid.NewGuid();
+        var setup = await _client.PostAsJsonAsync("/api/displays", new { name = "Hallway", screenId = screen });
+        var display = (await setup.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString();
+        var ids = new List<string?>();
+        foreach (var name in new[] { "Main", "Garden" })
+        {
+            var id = Json(await CallAsync(mcp, "create_dashboard", new { name })).GetProperty("id").GetString();
+            Json(await CallAsync(mcp, "publish_dashboard", new { dashboardId = id }));
+            ids.Add(id);
+        }
+
+        var info = Json(await CallAsync(mcp, "assign_dashboard", new { displayId = display, dashboardId = ids[0], otherDashboardIds = new[] { ids[1] } }));
+
+        Assert.Equal(ids[1], info.GetProperty("otherDashboardIds")[0].GetString());
+        var shown = (await _client.GetFromJsonAsync<JsonElement>($"/api/screens/{screen}")).GetProperty("dashboards");
+        Assert.Equal(ids, shown.EnumerateArray().Select(d => d.GetProperty("id").GetString()).ToList());
     }
 
     [Fact]
@@ -105,7 +127,7 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
     {
         await using var mcp = await ConnectAsync();
 
-        var flows = Json(await CallAsync(mcp, "list_homey_targets", new { type = "flow" }));
+        var flows = Json(await CallAsync(mcp, "list_targets", new { type = "flow" }));
 
         Assert.NotEqual(0, flows.GetArrayLength());
     }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using HomeyDash.Api.Accounts;
 
 namespace HomeyDash.Api.Homey;
 
@@ -6,12 +7,13 @@ public static class HomeyEndpoints
 {
     public static IServiceCollection AddHomey(this IServiceCollection services, IConfiguration configuration)
     {
-        var section = configuration.GetSection("Homey");
-        services.Configure<HomeyOptions>(section);
+        var options = configuration.GetSection("Homey").Get<HomeyOptions>() ?? new HomeyOptions();
+        services.AddSingleton(options);
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<HomeyState>();
+        services.AddSingleton<CurrentHomeyAccount>();
 
-        if (string.IsNullOrWhiteSpace(section[nameof(HomeyOptions.Address)]))
+        if (options.Fake)
         {
             services.AddSingleton<FakeHomey>();
             services.AddSingleton<IHomey>(sp => sp.GetRequiredService<FakeHomey>());
@@ -19,7 +21,7 @@ public static class HomeyEndpoints
         }
         else
         {
-            services.AddHttpClient(LocalHomey.HttpClientName, http => LocalHomey.ConfigureHttpClient(http, section.Get<HomeyOptions>()!));
+            services.AddHttpClient(LocalHomey.HttpClientName);
             services.AddSingleton<LocalHomey>();
             services.AddSingleton<IHomey>(sp => sp.GetRequiredService<LocalHomey>());
             services.AddHostedService(sp => sp.GetRequiredService<LocalHomey>());

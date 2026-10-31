@@ -8,17 +8,28 @@ import {
   Injector,
   signal,
 } from '@angular/core';
-import { Realtime, ScreenView } from '@homey-dash/api-client';
+import { LucideChevronLeft, LucideDynamicIcon, LucideLayers } from '@lucide/angular';
+import { Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
 import { cellSize } from '@homey-dash/layout';
 import { DashboardView, RealtimeTileData } from '@homey-dash/tiles';
-import { screenId } from './screen-id';
+import { screenId, safeStorage } from './screen-id';
 import { Setup } from './setup';
 
 type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; view: ScreenView };
 
-/** A screen: setup until it is a display, then its dashboard's published version, or waiting for one. */
+/** How long a display stays on another dashboard without a touch before it returns to its main one. */
+export const IDLE_MS = 60_000;
+
+/** Where a screen remembers that its tape is open. */
+const TAPE_KEY = 'homeydash.tape';
+
+/**
+ * A screen: setup until it is a display, then its dashboards' published versions, or waiting for one. A display
+ * that offers more than one dashboard floats a tape of pills over its left edge to switch between them, which
+ * starts collapsed to a single button and collapses again once one is picked.
+ */
 @Component({
-  imports: [DashboardView, Setup],
+  imports: [DashboardView, LucideDynamicIcon, Setup],
   selector: 'hd-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -26,6 +37,9 @@ type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; 
     '[class.is-connection-lost]': 'lost()',
     '[style.--cell.px]': 'cell()',
     '(window:resize)': 'onResize()',
+    '(pointerdown)': 'touched()',
+    '(keydown)': 'touched()',
+    '(wheel)': 'touched()',
   },
   template: `
     @switch (state().kind) {
@@ -34,8 +48,39 @@ type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; 
       }
       @case ('display') {
         @if (view(); as view) {
-          @if (view.dashboard; as dashboard) {
-            <hd-dashboard-view [layout]="dashboard.layout" />
+          @if (current(); as current) {
+            @if (view.dashboards.length > 1) {
+              <nav class="hd-tape" [class.is-collapsed]="collapsed()" aria-label="Dashboards">
+                <button
+                  class="hd-tape__toggle"
+                  type="button"
+                  [attr.aria-label]="collapsed() ? 'Show dashboards' : 'Hide dashboards'"
+                  [attr.aria-expanded]="!collapsed()"
+                  (click)="toggleTape()"
+                >
+                  <svg [lucideIcon]="collapsed() ? showIcon : hideIcon" />
+                </button>
+                @if (!collapsed()) {
+                  <div class="hd-tape__pills" [style.--n]="view.dashboards.length" animate.leave="is-leaving">
+                    @for (dashboard of view.dashboards; track dashboard.id) {
+                      <button
+                        class="hd-tape__item"
+                        type="button"
+                        [style.--i]="$index"
+                        [attr.aria-current]="dashboard.id === current.id ? 'page' : null"
+                        (click)="select(dashboard)"
+                      >
+                        {{ dashboard.name }}
+                      </button>
+                    }
+                  </div>
+                }
+              </nav>
+            }
+            <!-- One at a time, so switching starts the next dashboard at its first page. -->
+            @for (dashboard of [current]; track dashboard.id) {
+              <hd-dashboard-view [layout]="dashboard.layout" />
+            }
           } @else {
             <div class="waiting">
               <h1>{{ view.display.name }}</h1>
@@ -69,22 +114,63 @@ export class App {
   protected readonly state = signal<ScreenState>({ kind: 'loading' }, {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
-  // Connection lost: HomeyDash cannot be reached, or HomeyDash cannot reach Homey. What is shown stays.
-  protected readonly lost = computed(
-    () => !this.realtime.connected() || this.homey.status()?.connection === 'disconnected',
-  );
+  // Connection lost: HomeyDash cannot be reached, or HomeyDash cannot reach Homey (or has no Homey account yet).
+  // What is shown stays.
+  protected readonly lost = computed(() => {
+    const connection = this.homey.status()?.connection;
+    return !this.realtime.connected() || connection === 'disconnected' || connection === 'notSetUp';
+  });
   protected readonly view = computed(() => {
     const state = this.state();
     return state.kind === 'display' ? state.view : null;
   });
 
+  // The dashboard picked on the tape; null is the main one, which also stands in for one no longer offered.
+  private readonly picked = signal<string | null>(null);
+  protected readonly current = computed(() => {
+    const dashboards = this.view()?.dashboards ?? [];
+    return dashboards.find((d) => d.id === this.picked()) ?? dashboards[0] ?? null;
+  });
+  private idle?: ReturnType<typeof setTimeout>;
+
+  private readonly storage = safeStorage();
+  protected readonly collapsed = signal(this.storage?.getItem(TAPE_KEY) !== 'open');
+  protected readonly showIcon = LucideLayers;
+  protected readonly hideIcon = LucideChevronLeft;
+
   private readonly height = signal(window.innerHeight);
-  protected readonly cell = computed(() => cellSize(this.height(), this.view()?.dashboard?.layout.rows));
+  protected readonly cell = computed(() => cellSize(this.height(), this.current()?.layout.rows));
 
   constructor() {
     // Joining again on every reconnect picks up a version published while the connection was lost.
     const stops = [this.realtime.on('Screen', (view) => this.show(view)), this.realtime.whenConnected(() => this.join())];
-    inject(DestroyRef).onDestroy(() => stops.forEach((stop) => stop()));
+    inject(DestroyRef).onDestroy(() => {
+      clearTimeout(this.idle);
+      stops.forEach((stop) => stop());
+    });
+  }
+
+  protected select(dashboard: ShownDashboard) {
+    this.picked.set(dashboard.id === this.view()?.dashboards[0]?.id ? null : dashboard.id);
+    this.collapse(true);
+    this.touched();
+  }
+
+  protected toggleTape() {
+    this.collapse(!this.collapsed());
+  }
+
+  // Kept on this screen, so an opened tape stays open after a reload.
+  private collapse(collapsed: boolean) {
+    this.collapsed.set(collapsed);
+    if (collapsed) this.storage?.removeItem(TAPE_KEY);
+    else this.storage?.setItem(TAPE_KEY, 'open');
+  }
+
+  // Any touch keeps the display where it is; left alone on another dashboard, it returns to the main one.
+  protected touched() {
+    clearTimeout(this.idle);
+    if (this.picked() !== null) this.idle = setTimeout(() => this.picked.set(null), IDLE_MS);
   }
 
   protected async join() {
@@ -95,12 +181,13 @@ export class App {
     }
   }
 
-  // null: this screen is not (or no longer) a display. The version is reported once it is on screen.
+  // null: this screen is not (or no longer) a display. The versions are reported once they are in place.
   private show(view: ScreenView | null) {
     this.state.set(view ? { kind: 'display', view } : { kind: 'setup' });
     if (!view) return;
+    const versions = Object.fromEntries(view.dashboards.map((d) => [d.id, d.version]));
     afterNextRender(
-      { read: () => void this.realtime.showing(view.dashboard?.version ?? null).catch(() => undefined) },
+      { read: () => void this.realtime.showing(versions).catch(() => undefined) },
       { injector: this.injector },
     );
   }

@@ -4,7 +4,8 @@ namespace HomeyDash.Api.Homey;
 
 // The API's view of Homey. Mirrored in libs/api-client/src/lib/homey.ts.
 
-public enum HomeyConnection { Connecting, Connected, Disconnected }
+// NotSetUp while no Homey account is set up in Management (ADR-0007).
+public enum HomeyConnection { Connecting, Connected, Disconnected, NotSetUp }
 
 public sealed record HomeyStatus(HomeyConnection Connection, string? LastError, DateTimeOffset Since, bool Fake);
 
@@ -31,9 +32,20 @@ public sealed record HomeyDevice(
     string? UnavailableMessage,
     IReadOnlyDictionary<string, HomeyCapability> Capabilities);
 
-public sealed record HomeyFlow(string Id, string Name, bool Advanced, bool Enabled);
+// A room or area in Homey; zones nest, and only the top one (Home) has no parent.
+public sealed record HomeyZone(string Id, string Name, string? ParentId);
 
-public sealed record HomeyMood(string Id, string Name, string? ZoneId);
+public sealed record HomeyFlow(string Id, string Name, bool Advanced, bool Enabled, string? FolderId);
+
+// A folder of flows in Homey; folders nest, and a flow outside any folder has no FolderId.
+public sealed record HomeyFlowFolder(string Id, string Name, string? ParentId);
+
+// Colors holds the light colours the mood sets, one per light it turns on in colour or white mode, in Homey's order.
+public sealed record HomeyMood(string Id, string Name, string? ZoneId, IReadOnlyList<HomeyLightColor> Colors);
+
+// A light's colour as Homey sets it, each part 0–1: a hue and saturation in colour mode, or a white's temperature
+// (0 cool, 1 warm) in temperature mode.
+public sealed record HomeyLightColor(double? Hue, double? Saturation, double? Temperature);
 
 // One point of an insight log; V is null for a gap.
 public sealed record HomeyInsightEntry(DateTimeOffset T, double? V);
@@ -47,7 +59,7 @@ public sealed record DeviceChanged(HomeyDevice Device) : HomeyChange;
 
 public sealed record DeviceRemoved(string DeviceId) : HomeyChange;
 
-// Flows or moods were added, renamed or removed.
+// Flows, flow folders, moods or zones were added, renamed, moved or removed.
 public sealed record CatalogChanged : HomeyChange;
 
 public sealed record ConnectionChanged(HomeyStatus Status) : HomeyChange;

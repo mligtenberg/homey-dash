@@ -18,7 +18,8 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 
 - SignalR for pushes from the API to displays.
 - Dashboard versions (draft and published) stored as JSON documents in SQLite, so new tile kinds need no migration.
-- Homey address and API key come from configuration (user-secrets or environment variables), never from Management.
+- The Homey address and API key are an account set up in Management → Accounts and kept in the database (ADR-0007);
+  configuration only switches on the fake Homey (`Homey:Fake=true`).
 - `lucide-angular` for icons.
 
 ## Done
@@ -40,7 +41,7 @@ Built in vertical slices; each ends with something that works and has tests. Dom
   subscribes to `homey:manager:devices|flow|moods` and every `homey:device:<id>`, loads a REST snapshot, applies
   live events to `HomeyState`, and reconnects with backoff (1 s to 30 s). Performs actions: set capability, trigger
   flow or advanced flow, activate mood, list insight logs.
-- `FakeHomey`: sample devices, flows and moods, used when `Homey:Address` is empty.
+- `FakeHomey`: sample devices, flows and moods, used when `Homey:Fake` is true. Never a fallback.
 - Endpoints under `/api/homey`: `status`, `devices`, `flows`, `moods`, `insights`,
   `PUT devices/{id}/capabilities/{cap}`, `POST flows/{id}/trigger`, `POST moods/{id}/activate`.
 - 23 API tests, including the real client against `ScriptedHomeyServer`.
@@ -173,6 +174,33 @@ Built in vertical slices; each ends with something that works and has tests. Dom
   budget is 600 kB (now 517 kB).
 - 64 API tests (5 new), 16 tiles tests, 18 Management tests, 8 display tests, 11 layout tests.
 
+### 6a. Accounts (ADR-0007)
+
+- Management → Accounts sets up the Homey account (address and local API key), kept in the `HomeyAccounts` table.
+  The key is write-only: no endpoint returns it. Addresses are accepted as typed (`192.168.1.10` → `http://…`).
+- `LocalHomey` follows `CurrentHomeyAccount`: it waits while there is none (status `notSetUp`, which displays treat
+  as connection lost) and starts over when the account changes or is removed.
+- `Homey:Fake=true` runs FakeHomey; Accounts then shows it read-only. Launch configs and `serve -c simulator` set it.
+- Management shows a "Homey isn't set up yet" banner and a warning dot on Accounts; the target picker says so too.
+  Tiles show loading, not missing, until Homey's data first arrives (the snapshot carries `loaded`).
+- After this change an install that had Homey in user-secrets sets it up once in Accounts; the secrets are unused.
+- 87 API tests (8 new).
+
+### 6c. Several dashboards per display
+
+- A display has a main dashboard (`Display.DashboardId`) and other dashboards in `DisplayDashboards` (position and
+  shown version per row; cascades from both sides; migration `AddOtherDisplayDashboards`). Others need a main one.
+  Deleting a main dashboard makes the next one main, or the display waits.
+- `PUT /api/displays/{id}/dashboard` and MCP `assign_dashboard` take `otherDashboardIds` (published only; the main one
+  and repeats are dropped). `ScreenView.dashboards` lists them main first; `Showing` now takes a version per
+  dashboard id, and `DisplayStatus.versions` reports shown and latest version per dashboard.
+- Display app: the dashboard tape (`.hd-tape`), frosted pills floating over the left edge when it offers more than
+  one, collapsible to one button (remembered per screen in `homeydash.tape`); a minute without a touch
+  (`IDLE_MS`) returns it to the main one. Management: "Main dashboard" plus "Also on its tape" checkboxes, kept in
+  dashboard list order.
+- 136 API tests (4 new), 14 display app tests (5 new), 2 new Management displays page tests. Checked in the
+  browser on the fake Homey.
+
 ### Open
 
 - The local `apps/api/homey-dash.db` still has the empty `Tiles` table and the `InitialCreate` history row from the
@@ -183,6 +211,25 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 - The segmented control's larger touch area is not seen in the browser yet (FakeHomey has no cover).
 
 ## To do
+
+### 6b. Photo tile (ADR-0008)
+
+- Google account in Accounts, signed in with the OAuth device flow (a code entered at Google's address); the refresh
+  token stays in the `GoogleAccounts` table. The Google client (ID and secret) that registers HomeyDash with Google is
+  entered in Accounts too and kept in the `GoogleClients` table; a different client signs the account out.
+  `GooglePhotos:Fake=true` runs `FakeGooglePhotos` (12 SVG photos and a skipped video).
+- Photo sets (`PhotoSets` table, photos as a JSON list) are made and filled in Management → Photo sets, or from a photo
+  tile's panel. Picking opens the Google Photos Picker in a new tab; `PhotoPicking` polls the session, downloads the
+  photos at most 2560 px into a staging folder and swaps them in, so a failed pick changes nothing. Files live under
+  `Photos:Path` (default `apps/api/photos`), served at `/api/photos/{set}/{photo}` as immutable.
+- A photo tile's target is `photo-set:<id>`; `TargetCatalog` tells Homey targets and photo sets apart for missing
+  counts. Every change pushes `PhotoSets` to every connection; `RealtimeTileData` keeps them by target.
+- Photo tile: every size, shuffled per tile, fades every 30 s (setting), pauses while the connection is lost, detail
+  view with the photo whole, its date, arrows and swipe. The design system notes it as the one tile that moves.
+- MCP: `list_homey_targets` is now `list_targets` with a `photoSet` type; `save_draft` describes the photo tile.
+- 95 API tests (8 new), 43 tiles tests (7 new).
+- Not tried against the real Google yet: needs a Google Cloud client. Google's device-flow scope list does not name
+  the Picker scope (ADR-0008).
 
 ### 7. Packaging
 

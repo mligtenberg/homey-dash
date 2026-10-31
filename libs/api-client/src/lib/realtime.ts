@@ -2,7 +2,9 @@ import { Injectable, signal } from '@angular/core';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { DashboardSummary } from './dashboards';
 import { DisplayInfo, ScreenView } from './displays';
-import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyMood, HomeyStatus } from './homey';
+import { PhotoSet } from './photos';
+import { PlexCommand, PlexOverview, PlexSession, PlexSnapshot } from './plex';
+import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyZone } from './homey';
 
 // Mirrors apps/api/Realtime/RealtimeHub.cs.
 
@@ -11,11 +13,17 @@ export interface HomeySnapshot {
   devices: HomeyDevice[];
   flows: HomeyFlow[];
   moods: HomeyMood[];
+  zones: HomeyZone[];
+  flowFolders: HomeyFlowFolder[];
+  /** False until Homey's data first arrived, such as while no Homey account is set up; nothing is missing then. */
+  loaded: boolean;
 }
 
 export interface HomeyCatalog {
   flows: HomeyFlow[];
   moods: HomeyMood[];
+  zones: HomeyZone[];
+  flowFolders: HomeyFlowFolder[];
 }
 
 /** The messages HomeyDash pushes, by name. */
@@ -30,6 +38,12 @@ export interface RealtimeMessages {
   Displays: DisplayInfo[];
   /** Every dashboard, for Management's sidebar. */
   Dashboards: DashboardSummary[];
+  /** Every photo set, whenever one changes. */
+  PhotoSets: PhotoSet[];
+  /** Plex's status, libraries and players, whenever they change. */
+  Plex: PlexOverview;
+  /** What plays on Plex, whenever more than its progress changed. */
+  PlexSessions: PlexSession[];
 }
 
 // Displays run unattended, so reconnecting never gives up; it just slows down.
@@ -82,14 +96,29 @@ export class Realtime {
     return this.hub.invoke<HomeySnapshot>('Homey');
   }
 
+  /** Every photo set with its photos; changes that follow arrive as `PhotoSets`. */
+  photoSets() {
+    return this.hub.invoke<PhotoSet[]>('PhotoSets');
+  }
+
+  /** Plex's libraries and what plays now; changes that follow arrive as `Plex` and `PlexSessions`. */
+  plex() {
+    return this.hub.invoke<PlexSnapshot>('Plex');
+  }
+
+  /** Plays, pauses or skips on a Plex player; fails when the player takes no remote control. */
+  controlPlex(playerId: string, command: PlexCommand) {
+    return this.hub.invoke<void>('ControlPlex', playerId, command);
+  }
+
   /** Joins as the screen with this id: which display it is, or null when it belongs in setup. */
   joinScreen(screenId: string) {
     return this.hub.invoke<ScreenView | null>('JoinScreen', screenId);
   }
 
-  /** Reports the published version this screen shows, or null while it waits for a dashboard. */
-  showing(version: number | null) {
-    return this.hub.invoke<void>('Showing', version);
+  /** Reports the published version of each dashboard this screen offers, by dashboard id; none while it waits. */
+  showing(versions: Record<string, number>) {
+    return this.hub.invoke<void>('Showing', versions);
   }
 
   /** Joins as Management, to receive `Displays` and `Dashboards`; answers with the current display list. */

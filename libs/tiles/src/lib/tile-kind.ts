@@ -14,8 +14,8 @@ export type KindHue =
   | 'climate'
   | 'neutral';
 
-/** What a tile kind points at in Homey. */
-export type TargetType = 'device' | 'flow' | 'mood' | 'insight';
+/** What a tile kind points at: something in Homey, a photo set, or a Plex player or library. */
+export type TargetType = 'device' | 'flow' | 'mood' | 'insight' | 'photoSet' | 'plexPlayer' | 'plexLibrary';
 
 /**
  * A category of tile, registered by exactly one module.
@@ -29,6 +29,13 @@ export interface TileKind<TSettings = unknown> {
   /** Shown in Management, e.g. "Device tile". */
   label: string;
   target: TargetType;
+  /** The tile points at several targets of its type, in `settings.targets`, instead of one in `settings.target`. */
+  multiple?: boolean;
+  /**
+   * False for a kind whose tiles never open a detail view on a press, such as one that is all buttons.
+   * Otherwise a press opens the view where the tile offers one.
+   */
+  details?: boolean;
   sizes: readonly TileSize[];
   defaultSettings: TSettings;
   component: Type<unknown>;

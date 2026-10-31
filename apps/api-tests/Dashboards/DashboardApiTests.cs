@@ -128,18 +128,24 @@ public class DashboardApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
             id, kind = "device", size = "small", position = new { column = slot % 3, row = slot / 3 },
             settings = target is null ? new Dictionary<string, object>() : new Dictionary<string, object> { ["target"] = target },
         };
+        static object WithTargets(string id, int slot, params string[] targets) => new
+        {
+            id, kind = "mood-list", size = "small", position = new { column = slot % 3, row = slot / 3 },
+            settings = new Dictionary<string, object?> { ["target"] = null, ["targets"] = targets },
+        };
 
         await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft", Draft(4,
             WithTarget("known", 0, "living-lamp"), WithTarget("gone", 1, "removed-device"),
             WithTarget("unset", 2, null), WithTarget("log", 3, "homey:device:p1-meter:measure_power"),
             WithTarget("lost-log", 4, "homey:device:removed:measure_power"),
-            WithTarget("weather", 5, "homey:manager:weather:temperature")));
+            WithTarget("weather", 5, "homey:manager:weather:temperature"),
+            WithTargets("moods", 6, "mood-movie", "mood-dinner"), WithTargets("lost-mood", 7, "mood-movie", "removed-mood")));
 
         var list = await _client.GetFromJsonAsync<JsonElement>("/api/dashboards");
         var summary = list.EnumerateArray().Single(d => d.GetProperty("id").GetString() == id);
-        Assert.Equal(2, summary.GetProperty("missingTiles").GetInt32());
+        Assert.Equal(3, summary.GetProperty("missingTiles").GetInt32());
         var detail = await _client.GetFromJsonAsync<JsonElement>($"/api/dashboards/{id}");
-        Assert.Equal(2, detail.GetProperty("missingTiles").GetInt32());
+        Assert.Equal(3, detail.GetProperty("missingTiles").GetInt32());
     }
 
     [Fact]

@@ -15,16 +15,22 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString()!;
     }
 
-    private async Task<string> DashboardAsync(bool publish)
+    private async Task<string> DashboardAsync(bool publish, string name = "Kitchen")
     {
-        var created = await _client.PostAsJsonAsync("/api/dashboards", new { name = "Kitchen" });
+        var created = await _client.PostAsJsonAsync("/api/dashboards", new { name });
         var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString()!;
         if (publish) await _client.PostAsync($"/api/dashboards/{id}/publish", null);
         return id;
     }
 
-    private Task<HttpResponseMessage> AssignAsync(string display, string? dashboard) =>
-        _client.PutAsJsonAsync($"/api/displays/{display}/dashboard", new { dashboardId = dashboard });
+    private Task<HttpResponseMessage> AssignAsync(string display, string? dashboard, params string[] others) =>
+        _client.PutAsJsonAsync($"/api/displays/{display}/dashboard", new { dashboardId = dashboard, otherDashboardIds = others });
+
+    private async Task<JsonElement> ViewAsync(Guid screen) =>
+        await (await ScreenAsync(screen)).Content.ReadFromJsonAsync<JsonElement>();
+
+    private static List<string?> Ids(JsonElement dashboards) =>
+        dashboards.EnumerateArray().Select(d => d.GetProperty("id").GetString()).ToList();
 
     private Task<HttpResponseMessage> ScreenAsync(Guid screen) => _client.GetAsync($"/api/screens/{screen}");
 
@@ -44,7 +50,7 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal(id, view.GetProperty("display").GetProperty("id").GetString());
         Assert.Equal("Hallway", view.GetProperty("display").GetProperty("name").GetString());
-        Assert.Equal(JsonValueKind.Null, view.GetProperty("dashboard").ValueKind);
+        Assert.Equal(0, view.GetProperty("dashboards").GetArrayLength());
     }
 
     [Fact]
@@ -57,7 +63,7 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal(HttpStatusCode.OK, (await AssignAsync(display, dashboard)).StatusCode);
 
-        var shown = (await (await ScreenAsync(screen)).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("dashboard");
+        var shown = (await ViewAsync(screen)).GetProperty("dashboards").EnumerateArray().Single();
         Assert.Equal(dashboard, shown.GetProperty("id").GetString());
         Assert.Equal(1, shown.GetProperty("version").GetInt32());
         Assert.Equal(4, shown.GetProperty("layout").GetProperty("rows").GetInt32()); // not the draft's 6
@@ -88,7 +94,7 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var view = await (await ScreenAsync(newScreen)).Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(display, view.GetProperty("display").GetProperty("id").GetString());
         Assert.Equal("Kitchen wall", view.GetProperty("display").GetProperty("name").GetString());
-        Assert.Equal(dashboard, view.GetProperty("dashboard").GetProperty("id").GetString());
+        Assert.Equal([dashboard], Ids(view.GetProperty("dashboards")));
     }
 
     [Fact]
@@ -116,9 +122,56 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         await _client.DeleteAsync($"/api/dashboards/{dashboard}");
 
-        var view = await (await ScreenAsync(screen)).Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(JsonValueKind.Null, view.GetProperty("dashboard").ValueKind);
+        var view = await ViewAsync(screen);
+        Assert.Equal(0, view.GetProperty("dashboards").GetArrayLength());
         Assert.Equal(JsonValueKind.Null, view.GetProperty("display").GetProperty("dashboardId").ValueKind);
+    }
+
+    [Fact]
+    public async Task ADisplay_OffersItsMainDashboardFirstAndThenTheOthersInOrder()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var (main, garden, kids) = (await DashboardAsync(true, "Main"), await DashboardAsync(true, "Garden"), await DashboardAsync(true, "Kids"));
+
+        // The main one is left out of the others, and a dashboard is offered once.
+        Assert.Equal(HttpStatusCode.OK, (await AssignAsync(display, main, kids, main, garden, kids)).StatusCode);
+
+        var view = await ViewAsync(screen);
+        Assert.Equal([main, kids, garden], Ids(view.GetProperty("dashboards")));
+        Assert.Equal(main, view.GetProperty("display").GetProperty("dashboardId").GetString());
+        Assert.Equal([kids, garden], view.GetProperty("display").GetProperty("otherDashboardIds").EnumerateArray().Select(i => i.GetString()));
+
+        await AssignAsync(display, garden, main);
+        Assert.Equal([garden, main], Ids((await ViewAsync(screen)).GetProperty("dashboards")));
+    }
+
+    [Fact]
+    public async Task OtherDashboards_NeedAMainOneAndAPublishedVersion()
+    {
+        var display = await SetUpAsync(Guid.NewGuid());
+        var (published, draft) = (await DashboardAsync(publish: true), await DashboardAsync(publish: false));
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await AssignAsync(display, null, published)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await AssignAsync(display, published, draft)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await AssignAsync(display, published, Guid.NewGuid().ToString())).StatusCode);
+    }
+
+    [Fact]
+    public async Task DeletingAMainDashboard_MakesTheNextOneMain()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var (main, garden, kids) = (await DashboardAsync(true, "Main"), await DashboardAsync(true, "Garden"), await DashboardAsync(true, "Kids"));
+        await AssignAsync(display, main, garden, kids);
+
+        await _client.DeleteAsync($"/api/dashboards/{main}");
+        Assert.Equal([garden, kids], Ids((await ViewAsync(screen)).GetProperty("dashboards")));
+
+        await _client.DeleteAsync($"/api/dashboards/{kids}");
+        var view = await ViewAsync(screen);
+        Assert.Equal([garden], Ids(view.GetProperty("dashboards")));
+        Assert.Equal(garden, view.GetProperty("display").GetProperty("dashboardId").GetString());
     }
 
     [Fact]

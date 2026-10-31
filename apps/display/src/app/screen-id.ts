@@ -21,7 +21,8 @@ function newUuid(): string {
 }
 
 // Private browsing or blocked storage: the screen still works, but runs setup again after a reload.
-function safeStorage(): Storage | null {
+/** localStorage, or null where the browser refuses it. */
+export function safeStorage(): Storage | null {
   try {
     return window.localStorage;
   } catch {

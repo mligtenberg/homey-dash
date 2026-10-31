@@ -45,12 +45,39 @@ public static class HomeyMapper
         Id: String(json, "id") ?? throw new JsonException("Flow without id"),
         Name: String(json, "name") ?? "",
         Advanced: advanced,
-        Enabled: Bool(json, "enabled") ?? true);
+        Enabled: Bool(json, "enabled") ?? true,
+        FolderId: String(json, "folder"));
+
+    public static HomeyFlowFolder FlowFolder(JsonElement json) => new(
+        Id: String(json, "id") ?? throw new JsonException("Flow folder without id"),
+        Name: String(json, "name") ?? "",
+        ParentId: String(json, "parent"));
+
+    public static HomeyZone Zone(JsonElement json) => new(
+        Id: String(json, "id") ?? throw new JsonException("Zone without id"),
+        Name: String(json, "name") ?? "",
+        ParentId: String(json, "parent"));
 
     public static HomeyMood Mood(JsonElement json) => new(
         Id: String(json, "id") ?? throw new JsonException("Mood without id"),
         Name: String(json, "name") ?? "",
-        ZoneId: String(json, "zone"));
+        ZoneId: String(json, "zone"),
+        Colors: json.TryGetProperty("devices", out var devices)
+            ? Values(devices).Select(d => d.TryGetProperty("state", out var state) ? LightColor(state) : null).OfType<HomeyLightColor>().ToList()
+            : []);
+
+    // A mood's light state, { onoff, dim, light_mode, light_hue, light_saturation, light_temperature }: the colour it
+    // sets, or null when it turns the light off or sets no colour. Without light_mode a hue means colour mode.
+    private static HomeyLightColor? LightColor(JsonElement state)
+    {
+        if (Bool(state, "onoff") == false) return null;
+        var mode = String(state, "light_mode");
+        if (Number(state, "light_hue") is { } hue && mode is "color" or null)
+            return new HomeyLightColor(hue, Number(state, "light_saturation") ?? 1, null);
+        return Number(state, "light_temperature") is { } temperature && mode is "temperature" or null
+            ? new HomeyLightColor(null, null, temperature)
+            : null;
+    }
 
     public static HomeyInsightLog InsightLog(JsonElement json) => new(
         Id: String(json, "id") ?? throw new JsonException("Insight log without id"),
@@ -71,9 +98,6 @@ public static class HomeyMapper
                 .OrderBy(e => e.T)
                 .ToList()
             : [];
-
-    public static Dictionary<string, string> ZoneNames(JsonElement zones) =>
-        Values(zones).ToDictionary(z => String(z, "id") ?? "", z => String(z, "name") ?? "");
 
     // Homey returns collections as objects keyed by id.
     public static IEnumerable<JsonElement> Values(JsonElement json) => json.ValueKind switch

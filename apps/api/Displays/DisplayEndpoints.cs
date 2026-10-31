@@ -12,7 +12,8 @@ public static class DisplayEndpoints
 
     public sealed record Rename(string? Name);
 
-    public sealed record Assignment(Guid? DashboardId);
+    // The main dashboard and the others the display can switch to, in the order it offers them.
+    public sealed record Assignment(Guid? DashboardId, List<Guid>? OtherDashboardIds);
 
     public static void MapDisplays(this RouteGroupBuilder api)
     {
@@ -43,7 +44,7 @@ public static class DisplayEndpoints
                 {
                     await ReleaseScreenAsync(services.Db, body.ScreenId, ct);
                     display.ScreenId = body.ScreenId;
-                    display.ShownVersion = null;
+                    display.Showing(new Dictionary<Guid, int>());
                     return null;
                 }));
 
@@ -55,23 +56,12 @@ public static class DisplayEndpoints
                 return Task.FromResult<IResult?>(null);
             }));
 
-        // Only a published dashboard can be assigned; null makes the display wait.
+        // Only published dashboards can be assigned; no main dashboard makes the display wait.
         displays.MapPut("/{id:guid}/dashboard", (Guid id, Assignment body, [AsParameters] Services services, CancellationToken ct) =>
             Change(id, services, ct, async display =>
-            {
-                if (body.DashboardId is { } dashboardId)
-                {
-                    var dashboard = await services.Db.Dashboards.FindAsync([dashboardId], ct);
-                    if (dashboard is not { Published: not null })
-                        return Results.ValidationProblem(new Dictionary<string, string[]>
-                        {
-                            ["dashboardId"] = [dashboard is null ? "Dashboard not found." : "Only a published dashboard can be assigned."],
-                        });
-                }
-                if (display.DashboardId != body.DashboardId) display.ShownVersion = null;
-                display.DashboardId = body.DashboardId;
-                return null;
-            }));
+                await AssignAsync(services.Db, display, body.DashboardId, body.OtherDashboardIds ?? [], ct) is { } error
+                    ? Results.ValidationProblem(new Dictionary<string, string[]> { ["dashboardId"] = [error] })
+                    : null));
 
         displays.MapDelete("/{id:guid}", async (Guid id, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct) =>
         {
@@ -91,6 +81,24 @@ public static class DisplayEndpoints
 
     // What the endpoints that change a display need.
     public sealed record Services(HomeyDashDbContext Db, DisplayPresence Presence, RealtimeNotifier Notifier);
+
+    /// <summary>
+    /// Assigns a display its main dashboard and the others it can switch to; answers why not when it can't.
+    /// Every dashboard must be published, and only a display with a main dashboard has others.
+    /// </summary>
+    public static async Task<string?> AssignAsync(
+        HomeyDashDbContext db, Display display, Guid? main, IEnumerable<Guid> others, CancellationToken ct)
+    {
+        var rest = others.Where(o => o != main).Distinct().ToList();
+        if (main is null && rest.Count > 0) return "Choose a main dashboard before adding others.";
+        var ids = main is { } m ? [m, .. rest] : rest;
+        var published = await db.Dashboards.Where(d => ids.Contains(d.Id)).ToDictionaryAsync(d => d.Id, d => d.Published is not null, ct);
+        if (ids.Where(id => !published.ContainsKey(id)).Select(id => (Guid?)id).FirstOrDefault() is { } missing)
+            return $"Dashboard {missing} not found.";
+        if (ids.Any(id => !published[id])) return "Only a published dashboard can be assigned.";
+        display.Assign(main, rest);
+        return null;
+    }
 
     // A screen holds at most one display, so whatever it held before is let go.
     private static async Task ReleaseScreenAsync(HomeyDashDbContext db, Guid screenId, CancellationToken ct)

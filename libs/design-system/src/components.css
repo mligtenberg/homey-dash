@@ -7,15 +7,49 @@
   color: var(--ink);
   background: var(--ground);
 }
-.hd-dashboard {
+/* Pages of whole sections, swiped one at a time, over a strip of page dots. Heights mirror cellSize in libs/layout. */
+.hd-dashboard { display: flex; flex-direction: column; }
+.hd-dashboard__pages {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  gap: calc(var(--cell) * var(--section-gap));
-  padding: calc(var(--cell) * var(--cell-gap));
   overflow-x: auto;
   overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
   /* A scrollbar would take height from the cells, which must fill the screen exactly. */
   scrollbar-width: none;
 }
+.hd-dashboard__pages::-webkit-scrollbar { display: none; }
+.hd-dashboard__page {
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  gap: calc(var(--cell) * var(--section-gap));
+  padding: calc(var(--cell) * var(--cell-gap)) calc(var(--cell) * var(--cell-gap)) 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.hd-page-dots {
+  flex: none;
+  height: calc(var(--cell) * .2);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.hd-page-dot {
+  /* A small dot in a touch target as tall as the strip. */
+  width: calc(var(--cell) * .2); height: 100%;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  display: grid; place-items: center;
+}
+.hd-page-dot::before {
+  content: ""; width: calc(var(--cell) * .055); height: calc(var(--cell) * .055); border-radius: 50%;
+  background: var(--ink-muted); opacity: .35; transition: opacity .2s, scale .2s;
+}
+.hd-page-dot[aria-current="true"]::before { opacity: 1; scale: 1.3; }
 .hd-section { display: flex; flex-direction: column; gap: calc(var(--cell) * var(--cell-gap) * .6); flex: none; }
 .hd-section__title { font-size: calc(var(--cell) * .1); line-height: 1.2; font-weight: 700; color: var(--ink-muted); padding-inline: 4px; }
 .hd-section__grid {
@@ -38,10 +72,9 @@
 .hd-tile[data-kind="climate"] { --k-ink: var(--kind-climate-ink); --k-fill: var(--kind-climate-fill); }
 
 .hd-tile {
-  --raised: calc(var(--cell) * .04) calc(var(--cell) * .04) calc(var(--cell) * .1) var(--emboss-shade),
-            calc(var(--cell) * -.035) calc(var(--cell) * -.035) calc(var(--cell) * .09) var(--emboss-light);
-  --pressed: inset calc(var(--cell) * .03) calc(var(--cell) * .03) calc(var(--cell) * .07) var(--emboss-shade),
-             inset calc(var(--cell) * -.02) calc(var(--cell) * -.02) calc(var(--cell) * .05) var(--emboss-light);
+  /* One soft lift; the controls inside a tile sit flat on it. */
+  --raised: 0 1px 2px color-mix(in oklab, var(--emboss-shade) 60%, transparent),
+            0 calc(var(--cell) * .05) calc(var(--cell) * .14) calc(var(--cell) * -.04) var(--emboss-shade);
   position: relative;
   box-sizing: border-box;
   overflow: hidden;
@@ -56,8 +89,10 @@
   font-family: var(--font-sans);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  transition: transform .12s ease, background-color .25s, box-shadow .12s;
+  transition: transform .12s ease, background-color .25s, filter .12s;
 }
+/* A resting tile carries a tint of its kind; an active one fills with it. */
+.hd-tile[data-kind] { background: color-mix(in oklab, var(--k-fill) 22%, var(--tile-surface)); }
 .hd-tile[data-size="small"] { grid-column: span 1; grid-row: span 1; }
 .hd-tile[data-size="wide"] { grid-column: span 2; grid-row: span 1; }
 .hd-tile[data-size="full"] { grid-column: span 3; grid-row: span 1; }
@@ -65,16 +100,37 @@
 .hd-tile[data-size="full-large"] { grid-column: span 3; grid-row: span 2; }
 
 .hd-tile[data-tap] { cursor: pointer; }
-.hd-tile[data-tap]:active { transform: scale(var(--press-scale)); box-shadow: var(--pressed); }
+.hd-tile[data-tap] { -webkit-touch-callout: none; }
+/* Not while the press is on a control, or in the tile's open detail view, which sits inside it in the DOM. */
+.hd-tile[data-tap]:active:not(:has(.hd-details[open], button:active, .hd-slider:active)) { transform: scale(var(--press-scale)); filter: brightness(.97); }
 .hd-tile:focus-visible { outline: 3px solid var(--k-ink); outline-offset: 3px; }
 .hd-tile.is-active, .hd-tile.is-feedback { background: var(--k-fill); }
+/*
+ * A tile in a mood's colours (it sets --tile-tint to a gradient of them), under a veil of the surface so its text stays
+ * readable: a faint wash at rest, a glow while it confirms a press.
+ */
+.hd-tile.has-tint {
+  --veil: color-mix(in oklab, var(--tile-surface) 82%, transparent);
+  background: linear-gradient(var(--veil), var(--veil)), var(--tile-tint);
+}
+.hd-tile.has-tint.is-feedback { --veil: color-mix(in oklab, var(--tile-surface) 55%, transparent); }
 
-.hd-tile__name { font-size: calc(var(--cell) * .12); line-height: 1.15; font-weight: 700; }
-.hd-tile__detail { font-size: calc(var(--cell) * .095); line-height: 1.2; font-weight: 500; color: var(--ink-muted); margin-top: .15em; }
+.hd-tile__name {
+  font-size: calc(var(--cell) * .12); line-height: 1.15; font-weight: 700;
+  /* Two lines at most, so a long name never pushes the detail line out of the tile. */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+  overflow-wrap: break-word;
+}
+.hd-tile__detail {
+  font-size: calc(var(--cell) * .095); line-height: 1.2; font-weight: 500; color: var(--ink-muted); margin-top: .15em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .hd-tile.is-active .hd-tile__detail, .hd-tile.is-feedback .hd-tile__detail, .hd-tile.is-active .hd-unit { color: var(--ink); }
 .hd-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hd-row--top { align-items: flex-start; }
+.hd-value { white-space: nowrap; }
 
-/* Icons: Lucide geometry, duotone */
+/* Icons: Lucide geometry, duotone; a tile's own icon sits in a chip */
 .hd-icon {
   width: calc(var(--cell) * var(--icon-size));
   height: calc(var(--cell) * var(--icon-size));
@@ -86,10 +142,17 @@
   stroke-linejoin: round;
 }
 .hd-icon :is(path, rect, circle, ellipse, polygon) { fill: currentColor; fill-opacity: .22; }
+.hd-tile > .hd-icon,
+.hd-tile > .hd-row > .hd-icon {
+  box-sizing: border-box;
+  width: calc(var(--cell) * .34); height: calc(var(--cell) * .34);
+  padding: calc(var(--cell) * .07); border-radius: 32%;
+  background: color-mix(in oklab, var(--tile-surface) 70%, transparent);
+}
 
 /* Values */
 .hd-value { font-weight: 800; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.hd-value--xl { font-size: calc(var(--cell) * .62); }
+.hd-value--xl { font-size: calc(var(--cell) * .5); font-weight: 700; }
 .hd-value--l { font-size: calc(var(--cell) * .42); }
 .hd-value--m { font-size: calc(var(--cell) * .24); }
 .hd-unit { font-size: .45em; font-weight: 600; letter-spacing: 0; color: var(--ink-muted); margin-left: .08em; }
@@ -99,19 +162,37 @@
 .hd-tile.is-active .hd-chip { color: var(--ink); }
 
 /* Inline controls */
-.hd-round-btns { display: flex; gap: calc(var(--cell) * .07); }
+.hd-round-btns { display: flex; }
 .hd-round-btn {
-  width: max(44px, calc(var(--cell) * var(--control-size)));
-  height: max(44px, calc(var(--cell) * var(--control-size)));
+  position: relative;
+  width: calc(var(--cell) * var(--control-size));
+  height: calc(var(--cell) * var(--control-size));
   border: 0; border-radius: 50%;
-  background: var(--tile-surface); color: var(--ink);
-  box-shadow: var(--raised);
+  background: color-mix(in oklab, var(--k-ink) 12%, transparent); color: var(--k-ink);
+  display: inline-grid; place-items: center;
   font: 700 calc(var(--cell) * .2)/1 var(--font-sans);
   cursor: pointer;
-  transition: transform .1s, box-shadow .1s;
+  transition: transform .1s;
 }
-.hd-round-btn:active { transform: scale(.94); box-shadow: var(--pressed); }
-.hd-tile.is-active .hd-round-btn { background: var(--k-fill); box-shadow: inset 0 0 0 2px var(--k-ink); }
+/* The circle scales with the cell; the touch area stays at least 44px around it. */
+.hd-round-btn::after { content: ""; position: absolute; inset: min(0px, (100% - 44px) / 2); border-radius: 50%; }
+.hd-round-btn > svg { width: 42%; height: 42%; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.hd-round-btn:disabled { opacity: .5; cursor: default; }
+.hd-round-btn:active { transform: scale(.94); }
+/*
+ * A tile's quick action, in its top right corner: smaller than the inline controls, so it fits a small tile, and
+ * the one solid thing on a tile. On an active tile, which is filled with the hue, it turns ink.
+ */
+.hd-tile__action {
+  flex: none;
+  width: calc(var(--cell) * .3); height: calc(var(--cell) * .3);
+  margin: calc(var(--cell) * -.02) calc(var(--cell) * -.02) 0 0;
+  background: var(--k-ink); color: var(--on-kind);
+}
+.hd-tile.is-active .hd-tile__action:not(.hd-details *) { background: var(--ink); color: var(--tile-surface); }
+/* Steppers are one quiet capsule. */
+.hd-round-btns { gap: 0; padding: 3px; border-radius: var(--radius-pill); background: color-mix(in oklab, var(--k-ink) 12%, transparent); }
+.hd-round-btns .hd-round-btn { background: transparent; }
 
 .hd-segmented { display: flex; gap: calc(var(--cell) * .06); }
 .hd-segmented button {
@@ -122,14 +203,75 @@
   border-block: max(0px, (44px - var(--cell) * var(--segment-height)) / 2) solid transparent;
   background-clip: padding-box;
   border-radius: calc(var(--cell) * var(--tile-radius) * .75);
-  background-color: var(--ground); color: var(--ink);
-  box-shadow: var(--pressed);
+  background-color: color-mix(in oklab, var(--k-ink) 10%, transparent); color: var(--ink);
   font: 700 calc(var(--cell) * .095)/1 var(--font-sans);
   cursor: pointer;
   transition: transform .1s;
 }
 .hd-segmented button:active { transform: scale(.96); }
-.hd-segmented button[aria-pressed="true"] { background-color: var(--k-ink); color: var(--on-kind); box-shadow: none; }
+.hd-segmented button[aria-pressed="true"] { background-color: var(--k-ink); color: var(--on-kind); }
+
+/*
+ * A mood list tile: its name and detail (or page dots) share one line above pages of mood buttons. A page holds
+ * what fits at full size; further pages swipe and snap, without moving the dashboard. The tile sets `--columns`.
+ */
+.hd-tile > .hd-row:has(+ .hd-mood-list) .hd-tile__name { -webkit-line-clamp: 1; line-clamp: 1; }
+.hd-tile > .hd-row:has(+ .hd-mood-list) .hd-tile__detail { margin: 0; flex: none; max-width: 60%; }
+.hd-mood-list {
+  flex: 1;
+  min-height: 0;
+  margin: calc(var(--cell) * .06) calc(var(--cell) * var(--tile-padding) * -1) 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.hd-mood-list::-webkit-scrollbar { display: none; }
+.hd-mood-list__page {
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+  /* The tile's padding moves inside the page, so a swipe slides the buttons out to the tile's edge. */
+  padding-inline: calc(var(--cell) * var(--tile-padding));
+  scroll-snap-align: start;
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 2), minmax(0, 1fr));
+  grid-auto-rows: calc(var(--cell) * .24);
+  align-content: end;
+  gap: calc(var(--cell) * .05);
+}
+.hd-mood-list__dots { display: flex; flex: none; height: calc(var(--cell) * .14); margin-right: calc(var(--cell) * -.06); }
+.hd-mood-list__btn {
+  min-width: 0;
+  padding: 0 .6em;
+  border: 0;
+  border-radius: calc(var(--cell) * var(--tile-radius) * .75);
+  background-color: color-mix(in oklab, var(--k-ink) 12%, transparent); color: var(--ink);
+  font: 700 calc(var(--cell) * .08)/1 var(--font-sans);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  position: relative; isolation: isolate;
+  cursor: pointer;
+  transition: transform .1s;
+}
+/*
+ * The mood's colours (the tile sets --mood-tint to a gradient) as a soft wash, so the name stays readable. Pressed,
+ * the colours light up in full; a mood without colours lights up in the kind's ink.
+ */
+.hd-mood-list__btn::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: var(--mood-tint, none); opacity: .35;
+  transition: opacity .2s;
+}
+.hd-mood-list__btn:active { transform: scale(.96); }
+.hd-mood-list__btn:disabled::before { display: none; }
+.hd-mood-list__btn.is-pressed { background-color: var(--k-ink); color: var(--on-kind); }
+.hd-mood-list__btn.is-pressed::before { opacity: 1; }
+/* Mood colours are light in both themes, so their name reads in dark ink. */
+.hd-mood-list__btn.is-pressed.is-tinted { background-color: #fff; color: #1a1c24; }
+.hd-mood-list__btn:disabled { color: var(--danger); opacity: .6; cursor: default; }
+.hd-mood-list__btn:focus-visible { outline: 3px solid var(--k-ink); outline-offset: 2px; }
 
 .hd-slider {
   position: relative;
@@ -139,8 +281,7 @@
   border-block: max(0px, (44px - var(--cell) * var(--slider-height)) / 2) solid transparent;
   background-clip: padding-box;
   border-radius: var(--radius-pill);
-  background-color: var(--ground);
-  box-shadow: var(--pressed);
+  background-color: color-mix(in oklab, var(--k-ink) 14%, transparent);
   overflow: hidden;
   touch-action: none;
   cursor: ew-resize;
@@ -153,12 +294,53 @@
 /* Statistic */
 .hd-stat { justify-content: flex-start; gap: calc(var(--cell) * .04); }
 .hd-stat__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.hd-chart { flex: 1; width: 100%; min-height: 0; overflow: visible; }
+.hd-stat__head > :first-child { min-width: 0; }
+.hd-stat__head > .hd-value { flex: none; }
+.hd-chart { flex: 1; width: 100%; min-height: 0; overflow: visible; font: 600 calc(var(--cell) * .075) var(--font-sans); }
+.hd-chart--scrub { touch-action: pan-y; cursor: crosshair; }
 .hd-chart__grid { stroke: var(--line); stroke-width: 1; }
 .hd-chart__line { fill: none; stroke: var(--k-ink); stroke-width: calc(var(--cell) * .02); stroke-linejoin: round; stroke-linecap: round; }
 .hd-chart__area { fill: var(--k-ink); opacity: .16; }
 .hd-chart__dot { fill: var(--k-ink); stroke: var(--tile-surface); stroke-width: calc(var(--cell) * .015); }
-.hd-chart__axis { font: 600 calc(var(--cell) * .075) var(--font-sans); fill: var(--ink-muted); }
+.hd-chart__axis { fill: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.hd-chart__cursor { stroke: var(--k-ink); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.hd-stat__readout { display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--cell) * .1); }
+
+/* Tile details: a modal from showModal(), inside the tile so it takes the tile's kind hue */
+.hd-details {
+  /* Bigger cells, so every control scales up to a large touch target. */
+  --cell: clamp(130px, 22vmin, 190px);
+  box-sizing: border-box;
+  width: min(100vw - 32px, calc(var(--cell) * 4.4));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--cell) * var(--tile-radius));
+  background: var(--tile-surface);
+  color: var(--ink);
+  box-shadow: 0 calc(var(--cell) * .1) calc(var(--cell) * .4) var(--emboss-shade);
+  font-family: var(--font-sans);
+  cursor: auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.hd-details::backdrop { background: color-mix(in oklab, var(--emboss-shade) 75%, transparent); backdrop-filter: blur(6px); }
+.hd-details[open] { animation: hd-details-in .16s ease-out; }
+@keyframes hd-details-in { from { opacity: 0; transform: scale(.96); } }
+.hd-details__panel { display: flex; flex-direction: column; gap: calc(var(--cell) * .16); padding: calc(var(--cell) * .18); }
+.hd-details__head { display: flex; align-items: center; gap: calc(var(--cell) * .1); }
+.hd-details__titles { flex: 1; min-width: 0; }
+.hd-details__name { margin: 0; font-size: calc(var(--cell) * .16); line-height: 1.15; font-weight: 700; }
+.hd-details__sub { font-size: calc(var(--cell) * .1); line-height: 1.2; font-weight: 500; color: var(--ink-muted); margin-top: .15em; }
+.hd-details__close { flex: none; }
+.hd-details__state { font-size: calc(var(--cell) * .12); line-height: 1.2; font-weight: 600; color: var(--ink-muted); }
+.hd-tile.is-error .hd-details__state { color: var(--danger); }
+.hd-details__row { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--cell) * .1); }
+.hd-details__label { font-size: calc(var(--cell) * .1); line-height: 1.2; font-weight: 700; color: var(--ink-muted); }
+.hd-details__readings { display: grid; grid-template-columns: 1fr auto; gap: calc(var(--cell) * .06) calc(var(--cell) * .12); margin: 0; }
+.hd-details__readings dd { margin: 0; font-size: calc(var(--cell) * .12); font-weight: 700; font-variant-numeric: tabular-nums; text-align: end; }
+.hd-details .hd-chart { flex: none; height: calc(var(--cell) * 1.8); }
+.hd-details :is(.hd-round-btn, .hd-segmented button, .hd-slider):focus-visible { outline: 3px solid var(--k-ink); outline-offset: 3px; }
 
 /* Tile states */
 .hd-tile.is-unavailable { opacity: .6; }
@@ -175,6 +357,9 @@
 
 /* Connection lost */
 .hd-display.is-connection-lost .hd-dashboard .hd-tile { pointer-events: none; filter: saturate(.4); }
+/* An open detail view can still be closed; its controls stop like the tiles'. */
+.hd-display.is-connection-lost .hd-details { pointer-events: auto; }
+.hd-display.is-connection-lost .hd-details__panel > :not(.hd-details__head) { pointer-events: none; filter: saturate(.4); }
 .hd-reconnecting {
   display: inline-flex; align-items: center; gap: 10px;
   padding: 10px 16px; border-radius: var(--radius-pill);
@@ -279,10 +464,165 @@
 .hd-nav__item[aria-current="page"] { background: var(--panel); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
 .hd-dot-warn { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
 
+/* ---------- Dashboard tape ---------- */
+/* Pills floating over the left edge of a display that offers more than one dashboard, main first. Frosted and
+   muted so the dashboard stays in front. Closed, only the toggle shows; it stays put on the left edge while the
+   pills float out of it, each as a circle that stretches into its pill. --i is a pill's index, --n their count. */
+.hd-tape { position: absolute; z-index: 5; left: var(--space-3); top: 50%; }
+.hd-tape__toggle { position: absolute; z-index: 1; left: 0; top: 0; translate: 0 -50%; }
+/* Starts under the toggle, so the pills are not clipped while they float out of it; presses there reach the toggle. */
+.hd-tape__pills {
+  position: absolute; left: 0; top: 0; translate: 0 -50%; width: max-content;
+  padding-left: calc(44px + var(--space-2));
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2);
+  max-height: calc(100dvh - 2 * var(--space-4)); overflow-y: auto; scrollbar-width: none;
+  pointer-events: none;
+}
+.hd-tape__item {
+  pointer-events: auto;
+  animation: hd-tape-out .2s ease-out backwards;
+}
+@keyframes hd-tape-out {
+  from {
+    translate: calc(-44px - var(--space-2)) calc(((var(--n) - 1) / 2 - var(--i)) * (44px + var(--space-2)));
+    clip-path: inset(0 calc(100% - 44px) 0 0 round 22px);
+    opacity: 0;
+  }
+  to { clip-path: inset(0 0 0 0 round 22px); }
+}
+/* Closing runs it backwards. Its own keyframes, as a changed direction alone does not restart a finished animation.
+   The column is kept (by animate.leave) for as long as its own animation runs. */
+@keyframes hd-tape-in {
+  from { clip-path: inset(0 0 0 0 round 22px); }
+  to {
+    translate: calc(-44px - var(--space-2)) calc(((var(--n) - 1) / 2 - var(--i)) * (44px + var(--space-2)));
+    clip-path: inset(0 calc(100% - 44px) 0 0 round 22px);
+    opacity: 0;
+  }
+}
+.hd-tape__pills.is-leaving { animation: hd-tape-hold .1s; }
+.hd-tape__pills.is-leaving .hd-tape__item { pointer-events: none; animation: hd-tape-in .1s ease-in-out forwards; }
+@keyframes hd-tape-hold { to { visibility: visible; } }
+.hd-tape__item, .hd-tape__toggle {
+  flex: none; min-height: 44px; max-width: 200px; padding: 10px 16px;
+  border: 0; border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--panel) 72%, transparent); backdrop-filter: blur(12px);
+  box-shadow: 0 1px 3px color-mix(in oklab, var(--emboss-shade) 60%, transparent);
+  color: var(--ink-muted); font: 600 14px/1.2 var(--font-sans); text-align: left; overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.hd-tape__item[aria-current="page"] { background: var(--panel); color: var(--ink); }
+.hd-tape__toggle { width: 44px; padding: 0; display: grid; place-items: center; }
+.hd-tape__toggle svg { width: 18px; height: 18px; }
+
+/* ---------- Press ripple ---------- */
+/*
+ * ripple.ts adds a .hd-ripple to the pressed surface: a layer clipped to its shape, with a circle that spreads from
+ * the press point. Sizes are fractions of the surface; the timings match SPREAD_MS and FADE_MS there.
+ */
+:is(.hd-btn, .hd-segmented button, .hd-nav__item, .hd-tape__item, .hd-tape__toggle) { position: relative; }
+.hd-ripple {
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity .3s ease-out;
+}
+.hd-ripple.is-fading { opacity: 0; }
+.hd-ripple__wave {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--ripple);
+  translate: -50% -50%;
+  animation: hd-ripple-in .45s cubic-bezier(.2, 0, 0, 1);
+}
+@keyframes hd-ripple-in { from { scale: 0; } }
+
 /* Shared focus ring for Management controls */
-:is(.hd-btn, .hd-nav__item, .hd-input, .hd-select, .hd-sizes button, .hd-slot, .hd-check input):focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+:is(.hd-btn, .hd-nav__item, .hd-tape__item, .hd-tape__toggle, .hd-input, .hd-select, .hd-sizes button, .hd-slot, .hd-check input):focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .hd-tile, .hd-round-btn, .hd-segmented button, .hd-btn { transition: none; }
+  .hd-details[open], .hd-tape__item, .hd-tape__pills.is-leaving, .hd-tape__pills.is-leaving .hd-tape__item { animation: none; }
+  /* The circle already covers the surface, so without its spread and fade it is a plain highlight while pressed. */
+  .hd-ripple, .hd-ripple__wave { transition: none; animation: none; }
   .hd-reconnecting::before { animation-duration: 3s; }
+}
+
+/*
+ * Photo tile: the photo fills the tile edge to edge and is cropped to it; the next one fades in over it. Without a
+ * photo (no set picked, missing, or empty) it is a plain tile.
+ */
+.hd-photo.has-photo { padding: 0; background: var(--tile-surface); }
+.hd-photo__img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  animation: hd-photo-in 1.2s ease-in-out; user-select: none; -webkit-user-drag: none;
+}
+@keyframes hd-photo-in { from { opacity: 0; } }
+.hd-photo__label {
+  position: absolute; inset: auto 0 0 0;
+  padding: calc(var(--cell) * .3) calc(var(--cell) * var(--tile-padding)) calc(var(--cell) * var(--tile-padding));
+  background: linear-gradient(transparent, rgb(0 0 0 / .55));
+  color: #fff; font-size: calc(var(--cell) * .12); line-height: 1.15; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hd-photo-details { display: grid; place-items: center; height: min(60dvh, calc(var(--cell) * 3)); touch-action: pan-y; }
+.hd-photo-details__img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: calc(var(--cell) * .06); user-select: none; }
+@media (prefers-reduced-motion: reduce) {
+  .hd-photo__img { animation: none; }
+}
+
+/*
+ * Plex tiles: what plays over its artwork, darkened so the white text and buttons read, with a thin progress bar
+ * along the bottom; and the newest posters of a library side by side. Without either they are plain tiles.
+ */
+.hd-plex.has-art, .hd-plex-recent.has-art { padding: 0; background: #111; color: #fff; }
+.hd-plex__art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; }
+.hd-plex.has-art::before {
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(rgb(0 0 0 / .15), rgb(0 0 0 / .72));
+}
+.hd-plex__body {
+  position: relative; z-index: 2; flex: 1; min-height: 0;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: calc(var(--cell) * .06);
+  padding: calc(var(--cell) * var(--tile-padding));
+}
+.hd-plex__titles { min-width: 0; }
+.hd-plex__title {
+  font-size: calc(var(--cell) * .14); line-height: 1.15; font-weight: 700;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.hd-plex__sub { font-size: calc(var(--cell) * .1); line-height: 1.25; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-plex__controls { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--cell) * .08); }
+.hd-plex__time { font-size: calc(var(--cell) * .09); font-variant-numeric: tabular-nums; opacity: .8; }
+.hd-plex.has-art .hd-round-btns { background: rgb(255 255 255 / .16); margin-left: auto; }
+.hd-plex.has-art .hd-round-btn { color: #fff; }
+.hd-plex.is-feedback.has-art, .hd-plex.is-error.has-art { background: #111; }
+.hd-plex.is-error .hd-round-btns { outline: 2px solid var(--danger); }
+.hd-plex__progress { position: absolute; inset: auto 0 0 0; z-index: 2; height: calc(var(--cell) * .03); background: rgb(255 255 255 / .2); }
+.hd-plex__progress--inline { position: relative; inset: auto; margin-top: calc(var(--cell) * .04); border-radius: 999px; overflow: hidden; background: var(--line); }
+.hd-plex__progress-fill { height: 100%; background: var(--brand); transition: width 1s linear; }
+.hd-plex-recent__grid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--cols, 1), 1fr); gap: 2px; }
+.hd-plex-recent__grid[data-count="2"] { --cols: 2; }
+.hd-plex-recent__grid[data-count="3"] { --cols: 3; }
+.hd-plex-recent__grid[data-count="4"] { --cols: 2; }
+.hd-plex-recent__grid[data-count="6"] { --cols: 3; }
+.hd-plex-recent__item { position: relative; overflow: hidden; background: #222; }
+.hd-plex-recent__poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; }
+.hd-plex-recent__caption {
+  position: absolute; inset: auto 0 0 0;
+  padding: calc(var(--cell) * .25) calc(var(--cell) * .08) calc(var(--cell) * .07);
+  background: linear-gradient(transparent, rgb(0 0 0 / .7));
+}
+.hd-plex-recent__title { font-size: calc(var(--cell) * .1); line-height: 1.15; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-plex-recent__sub { font-size: calc(var(--cell) * .08); opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-plex-recent.has-art > .hd-photo__label { z-index: 1; }
+.hd-plex-details__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--cell) * .1); max-height: min(60dvh, calc(var(--cell) * 3)); overflow-y: auto; }
+.hd-plex-details__row { display: flex; align-items: center; gap: calc(var(--cell) * .1); }
+.hd-plex-details__poster { width: calc(var(--cell) * .45); aspect-ratio: 2 / 3; object-fit: cover; border-radius: calc(var(--cell) * .04); flex: none; }
+.hd-plex-details__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hd-plex-details__error { margin: 0; color: var(--danger); font-weight: 700; font-size: calc(var(--cell) * .1); }
+@media (prefers-reduced-motion: reduce) {
+  .hd-plex__progress-fill { transition: none; }
 }

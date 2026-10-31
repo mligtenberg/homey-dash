@@ -21,18 +21,39 @@ A configurable smart-home control surface for a Homey Pro, shown on screens plac
 ## Connecting to Homey
 
 The API talks to a Homey Pro over its local API. Create an API key in the Homey web app
-(Settings → API keys) and give the API its address and key, for example with user-secrets:
-
-```sh
-dotnet user-secrets --project apps/api set Homey:Address http://homey-<id>.local
-dotnet user-secrets --project apps/api set Homey:ApiKey <key>
-```
+(Settings → API keys), then open Management → Accounts and enter the Homey's address and the key. HomeyDash keeps
+them in its database and never sends the key back to a browser.
 
 Prefer the Homey's `.local` name over its IP address: the name keeps working when the router gives the Homey a
 new address.
 
-Without an address the API runs against a built-in fake Homey with a few sample devices,
-flows and moods.
+Until Homey is set up, displays show connection lost. To run against a built-in fake Homey with sample devices,
+flows and moods instead, set `Homey:Fake=true` (`npx nx serve api -c simulator` does).
+
+## Photos from Immich
+
+Photo tiles show photo sets from your [Immich](https://immich.app) server. A photo set follows an album, synced every
+15 minutes, or draws photos at random by rules: who should and shouldn't be in them, what they show (such as
+"landscape"), how many, and how often to draw again. HomeyDash fetches each photo from Immich as a display shows it,
+so displays never need to reach Immich themselves.
+
+1. In Immich, under Account Settings → API Keys, make a key with at least the `album.read`, `asset.read`,
+   `asset.view` and `person.read` permissions. Name people in Immich to use them in rules.
+2. In Management → Accounts, enter Immich's address (such as `192.168.1.20:2283`) and the key. HomeyDash checks both
+   with Immich, keeps them in its database and never sends the key back to a browser.
+3. Under Photo sets, add a photo set and choose its album, or its rules.
+
+`Immich:Fake=true` runs against a fake Immich with two sample albums and three people (`npx nx serve api -c simulator` sets it).
+
+## Plex
+
+Plex tiles show what plays on your Plex players, with play/pause and skip buttons, and what was newly added to your
+libraries. In Management → Accounts, press **Sign in with Plex** and approve HomeyDash on Plex's page; with several
+servers, choose one there. The buttons only work on players that take remote control: Plex's own apps with
+**Advertise as player** turned on.
+
+`Plex:Fake=true` runs against a fake Plex with a movie playing and an episode paused (`npx nx serve api -c simulator`
+sets it).
 
 ## Running
 

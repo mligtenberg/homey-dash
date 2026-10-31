@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
-import { DisplayInfo, DisplaysApi, Realtime } from '@homey-dash/api-client';
+import { DashboardVersion, DisplayInfo, DisplaysApi, Realtime } from '@homey-dash/api-client';
 import { DashboardsStore } from './dashboards-store';
 
 /** How long ago an ISO time was, roughly, as of `now` (ms). */
@@ -13,8 +13,8 @@ export function timeAgo(iso: string, now: number): string {
 }
 
 /**
- * Every display, with the dashboard it shows and its display status, kept current over the realtime
- * connection. Displays are added by running setup on a screen.
+ * Every display, with its main dashboard, the others it offers on its tape, and its display status, kept current
+ * over the realtime connection. Displays are added by running setup on a screen.
  */
 @Component({
   selector: 'hd-displays-page',
@@ -44,7 +44,7 @@ export function timeAgo(iso: string, now: number): string {
             />
           </div>
           <div class="hd-field">
-            <label class="hd-field__label" [for]="'dashboard-' + display.id">Dashboard</label>
+            <label class="hd-field__label" [for]="'dashboard-' + display.id">Main dashboard</label>
             <select class="hd-select" [id]="'dashboard-' + display.id" (change)="assign(display, dashboard.value)" #dashboard>
               <option value="" [selected]="!display.dashboardId">None (waiting)</option>
               @for (option of dashboards(); track option.id) {
@@ -65,10 +65,12 @@ export function timeAgo(iso: string, now: number): string {
             }
             @if (!display.dashboardId) {
               <span class="hd-pill hd-pill--dot">Waiting for a dashboard</span>
-            } @else if (status.held && status.shownVersion !== status.latestVersion) {
-              <span class="hd-pill hd-pill--warn">
-                {{ status.shownVersion ? 'Shows version ' + status.shownVersion + ' of ' + status.latestVersion : 'Not showing it yet' }}
-              </span>
+            } @else if (status.held) {
+              @for (version of status.versions; track version.dashboardId) {
+                @if (version.shownVersion !== version.latestVersion) {
+                  <span class="hd-pill hd-pill--warn">{{ behind(version, status.versions.length > 1) }}</span>
+                }
+              }
             }
           </div>
           @if (removing() === display.id) {
@@ -79,6 +81,24 @@ export function timeAgo(iso: string, now: number): string {
             </div>
           } @else {
             <button class="hd-btn hd-btn--danger remove" type="button" (click)="removing.set(display.id)">Remove display</button>
+          }
+          @if (display.dashboardId) {
+            <fieldset class="others">
+              <legend class="hd-field__label">Also on its tape</legend>
+              @for (option of offerable(display); track option.id) {
+                <label class="hd-check">
+                  <input
+                    type="checkbox"
+                    [checked]="display.otherDashboardIds.includes(option.id)"
+                    (change)="offer(display, option.id, check.checked)"
+                    #check
+                  />
+                  {{ option.name }}
+                </label>
+              } @empty {
+                <span class="hint">Publish another dashboard to offer it here.</span>
+              }
+            </fieldset>
           }
         </div>
       }
@@ -97,6 +117,9 @@ export function timeAgo(iso: string, now: number): string {
     .display { display: grid; grid-template-columns: 1fr 1fr auto auto; align-items: end; gap: var(--space-4); padding: var(--space-4); }
     .status { display: flex; flex-wrap: wrap; gap: var(--space-2); padding-bottom: 6px; white-space: nowrap; }
     .remove { padding-bottom: 10px; }
+    .others { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin: 0; padding: 0; border: 0; }
+    .others legend { padding: 0; margin-bottom: var(--space-2); }
+    .hint { color: var(--ink-muted); }
     .confirm { display: flex; align-items: center; gap: var(--space-2); color: var(--ink-muted); }
     .error { margin: 0; color: var(--danger); font-weight: 700; }
     @media (max-width: 860px) {
@@ -150,8 +173,37 @@ export class DisplaysPage {
     this.api.rename(display.id, name).subscribe({ next: (d) => this.replace(d), error: () => this.fail('rename') });
   }
 
+  // Others need a main dashboard, so they go when it does.
   protected assign(display: DisplayInfo, dashboardId: string) {
-    this.api.assign(display.id, dashboardId || null).subscribe({ next: (d) => this.replace(d), error: () => this.fail('assign') });
+    this.save(display, dashboardId || null, dashboardId ? display.otherDashboardIds : []);
+  }
+
+  // The others are kept in the order dashboards are listed, which is the order the tape shows them in.
+  protected offer(display: DisplayInfo, dashboardId: string, offered: boolean) {
+    const others = new Set(display.otherDashboardIds);
+    if (offered) others.add(dashboardId);
+    else others.delete(dashboardId);
+    const ordered = this.dashboards().map((d) => d.id).filter((id) => others.has(id));
+    this.save(display, display.dashboardId, ordered);
+  }
+
+  // The published dashboards it can offer besides its main one.
+  protected offerable(display: DisplayInfo) {
+    return this.dashboards().filter((d) => d.published && d.id !== display.dashboardId);
+  }
+
+  // Named after its dashboard when the display offers more than one.
+  protected behind(version: DashboardVersion, named: boolean) {
+    const text = version.shownVersion
+      ? `Shows version ${version.shownVersion} of ${version.latestVersion}`
+      : 'Not showing it yet';
+    if (!named) return text;
+    const name = this.dashboards().find((d) => d.id === version.dashboardId)?.name ?? 'Dashboard';
+    return `${name}: ${text[0].toLowerCase()}${text.slice(1)}`;
+  }
+
+  private save(display: DisplayInfo, dashboardId: string | null, others: string[]) {
+    this.api.assign(display.id, dashboardId, others).subscribe({ next: (d) => this.replace(d), error: () => this.fail('assign') });
   }
 
   protected remove(display: DisplayInfo) {

@@ -25,10 +25,29 @@ public class HomeyMapperTests
     }
 
     [Fact]
+    public void Mood_MapsTheColoursOfTheLightsItTurnsOn()
+    {
+        var mood = HomeyMapper.Mood(JsonDocument.Parse(HomeyFixtures.Moods).RootElement.GetProperty("m1"));
+
+        // A colour light, then a white one whose hue its temperature mode ignores; the light off and the plug have none.
+        Assert.Equal([new HomeyLightColor(0.6, 0.8, null), new HomeyLightColor(null, null, 1)], mood.Colors);
+    }
+
+    [Fact]
     public void Values_ReadsCollectionsKeyedById()
     {
-        var zones = HomeyMapper.ZoneNames(JsonDocument.Parse(HomeyFixtures.Zones).RootElement);
+        var zones = HomeyMapper.Values(JsonDocument.Parse(HomeyFixtures.Zones).RootElement).Select(HomeyMapper.Zone).ToList();
 
-        Assert.Equal("Living room", zones["zone-living"]);
+        Assert.Equal([new HomeyZone("zone-home", "Home", null), new HomeyZone("zone-living", "Living room", "zone-home")], zones);
+    }
+
+    [Fact]
+    public void Flow_MapsItsFolder()
+    {
+        var flow = HomeyMapper.Flow(JsonDocument.Parse(HomeyFixtures.Flows).RootElement.GetProperty("f1"), advanced: false);
+        var folder = HomeyMapper.FlowFolder(JsonDocument.Parse(HomeyFixtures.FlowFolders).RootElement.GetProperty("ff1"));
+
+        Assert.Equal("ff1", flow.FolderId);
+        Assert.Equal(new HomeyFlowFolder("ff1", "Evening", null), folder);
     }
 }

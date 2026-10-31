@@ -1,5 +1,17 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
-import { HomeyApi, HomeyDevice, HomeyFlow, HomeyInsightLog, HomeyMood, HomeyStatus, Realtime } from '@homey-dash/api-client';
+import {
+  HomeyApi,
+  HomeyCatalog,
+  HomeyDevice,
+  HomeyFlow,
+  HomeyFlowFolder,
+  HomeyInsightLog,
+  HomeyMood,
+  HomeyStatus,
+  HomeyZone,
+  PhotoSet,
+  Realtime,
+} from '@homey-dash/api-client';
 import { TileData } from './tile-data';
 
 function byId<T extends { id: string }>(items: T[]): ReadonlyMap<string, T> {
@@ -17,6 +29,10 @@ export class RealtimeTileData extends TileData {
   readonly flows = signal<ReadonlyMap<string, HomeyFlow>>(new Map());
   readonly moods = signal<ReadonlyMap<string, HomeyMood>>(new Map());
   readonly insights = signal<ReadonlyMap<string, HomeyInsightLog>>(new Map());
+  readonly zones = signal<ReadonlyMap<string, HomeyZone>>(new Map());
+  readonly flowFolders = signal<ReadonlyMap<string, HomeyFlowFolder>>(new Map());
+  readonly photoSets = signal<ReadonlyMap<string, PhotoSet>>(new Map());
+  readonly photoSetsLoaded = signal(false);
   /** HomeyDash's connection to Homey; null until the first snapshot. */
   readonly status = signal<HomeyStatus | null>(null);
 
@@ -39,14 +55,17 @@ export class RealtimeTileData extends TileData {
           }),
         ),
       ),
-      this.realtime.on('Catalog', ({ flows, moods }) =>
+      // Homey sends its catalog once its data first arrives.
+      this.realtime.on('Catalog', (catalog) =>
         this.apply(() => {
-          this.flows.set(byId(flows));
-          this.moods.set(byId(moods));
+          this.setCatalog(catalog);
+          this.loaded.set(true);
         }),
       ),
       this.realtime.on('HomeyStatus', (status) => this.apply(() => this.status.set(status))),
+      this.realtime.on('PhotoSets', (sets) => this.setPhotoSets(sets)),
       this.realtime.whenConnected(() => this.load()),
+      this.realtime.whenConnected(() => this.loadPhotoSets()),
     ];
     inject(DestroyRef).onDestroy(() => stops.forEach((stop) => stop()));
   }
@@ -56,15 +75,34 @@ export class RealtimeTileData extends TileData {
     else change();
   }
 
+  private setCatalog({ flows, moods, zones, flowFolders }: HomeyCatalog) {
+    this.flows.set(byId(flows));
+    this.moods.set(byId(moods));
+    this.zones.set(byId(zones));
+    this.flowFolders.set(byId(flowFolders));
+  }
+
+  private setPhotoSets(sets: PhotoSet[]) {
+    this.photoSets.set(new Map(sets.map((set) => [set.target, set])));
+    this.photoSetsLoaded.set(true);
+  }
+
+  private async loadPhotoSets() {
+    try {
+      this.setPhotoSets(await this.realtime.photoSets());
+    } catch {
+      // The connection dropped again; the next reconnect loads them.
+    }
+  }
+
   private async load() {
     this.queued = [];
     try {
       const snapshot = await this.realtime.homey();
       this.status.set(snapshot.status);
       this.devices.set(byId(snapshot.devices));
-      this.flows.set(byId(snapshot.flows));
-      this.moods.set(byId(snapshot.moods));
-      this.loaded.set(true);
+      this.setCatalog(snapshot);
+      this.loaded.set(snapshot.loaded);
     } catch {
       // The connection dropped again; the next reconnect loads it.
     } finally {

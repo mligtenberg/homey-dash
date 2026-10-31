@@ -3,7 +3,8 @@ import { inject, Injectable } from '@angular/core';
 
 // Mirrors apps/api/Homey/HomeyModels.cs.
 
-export type HomeyConnection = 'connecting' | 'connected' | 'disconnected';
+/** `notSetUp` while no Homey account is set up in Management. */
+export type HomeyConnection = 'connecting' | 'connected' | 'disconnected' | 'notSetUp';
 
 export interface HomeyStatus {
   connection: HomeyConnection;
@@ -39,17 +40,41 @@ export interface HomeyDevice {
   capabilities: Record<string, HomeyCapability>;
 }
 
+/** A room or area in Homey; zones nest, and only the top one (Home) has no parent. */
+export interface HomeyZone {
+  id: string;
+  name: string;
+  parentId: string | null;
+}
+
 export interface HomeyFlow {
   id: string;
   name: string;
   advanced: boolean;
   enabled: boolean;
+  folderId: string | null;
+}
+
+/** A folder of flows in Homey; folders nest. */
+export interface HomeyFlowFolder {
+  id: string;
+  name: string;
+  parentId: string | null;
 }
 
 export interface HomeyMood {
   id: string;
   name: string;
   zoneId: string | null;
+  /** The colours the mood sets, one per light it turns on in colour or white mode. */
+  colors: HomeyLightColor[];
+}
+
+/** A light's colour, each part 0–1: hue and saturation in colour mode, or temperature (0 cool, 1 warm) for white. */
+export interface HomeyLightColor {
+  hue: number | null;
+  saturation: number | null;
+  temperature: number | null;
 }
 
 export interface HomeyInsightLog {

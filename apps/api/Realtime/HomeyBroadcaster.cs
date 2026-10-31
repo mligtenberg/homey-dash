@@ -39,7 +39,8 @@ public sealed class HomeyBroadcaster(HomeyState state, IHubContext<RealtimeHub> 
     {
         DeviceChanged c => ("DeviceChanged", c.Device),
         DeviceRemoved c => ("DeviceRemoved", c.DeviceId),
-        CatalogChanged => ("Catalog", new HomeyCatalog(state.Flows.OrderBy(f => f.Name), state.Moods.OrderBy(m => m.Name))),
+        CatalogChanged => ("Catalog", new HomeyCatalog(state.Flows.OrderBy(f => f.Name), state.Moods.OrderBy(m => m.Name),
+            state.Zones.OrderBy(z => z.Name), state.FlowFolders.OrderBy(f => f.Name))),
         ConnectionChanged c => ("HomeyStatus", c.Status),
         _ => throw new ArgumentOutOfRangeException(nameof(change), change, null),
     });

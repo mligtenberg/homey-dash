@@ -51,6 +51,7 @@ public sealed class ScriptedHomeyServer : IAsyncDisposable
         MapJson("/api/manager/devices/device", HomeyFixtures.Devices);
         MapJson("/api/manager/flow/flow", HomeyFixtures.Flows);
         MapJson("/api/manager/flow/advancedflow", HomeyFixtures.AdvancedFlows);
+        MapJson("/api/manager/flow/flowfolder", HomeyFixtures.FlowFolders);
         MapJson("/api/manager/moods/mood", HomeyFixtures.Moods);
         _app.MapGet("/api/manager/insights/log/{**rest}", (HttpRequest request) =>
         {

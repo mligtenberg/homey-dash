@@ -25,6 +25,11 @@
       "options": {
         "cwd": "apps/api",
         "command": "dotnet watch --non-interactive run"
+      },
+      "configurations": {
+        "simulator": {
+          "command": "dotnet watch --non-interactive run -- --Homey:Fake=true --Immich:Fake=true --Plex:Fake=true"
+        }
       }
     },
     "migration-add": {

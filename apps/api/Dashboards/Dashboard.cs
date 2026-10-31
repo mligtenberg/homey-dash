@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using HomeyDash.Api.Homey;
 
 namespace HomeyDash.Api.Dashboards;
 
@@ -36,19 +35,27 @@ public sealed class Dashboard
         PublishedAt = now;
     }
 
-    // Draft tiles whose target (settings.target) Homey does not know; 0 while Homey is not loaded.
-    public int MissingTiles(HomeyState homey) =>
-        !homey.Loaded
-            ? 0
-            : Draft.Sections.SelectMany(s => s.Tiles).Count(t =>
-                t.Settings.ValueKind == JsonValueKind.Object
-                && t.Settings.TryGetProperty("target", out var target)
-                && target.ValueKind == JsonValueKind.String
-                && !homey.Knows(target.GetString()!));
+    // Draft tiles with a target (settings.target, or one of settings.targets) that no longer exists.
+    public int MissingTiles(TargetCatalog targets) =>
+        Draft.Sections.SelectMany(s => s.Tiles).Count(t => Targets(t.Settings).Any(target => targets.Knows(target) == false));
 
-    public DashboardSummary ToSummary(HomeyState homey) =>
-        new(Id, Name, PublishedVersion, PublishedAt, HasUnpublishedChanges, MissingTiles(homey));
+    // Every target the draft's tiles point at.
+    public IEnumerable<string> Targets() => Draft.Sections.SelectMany(s => s.Tiles).SelectMany(t => Targets(t.Settings));
 
-    public DashboardDetail ToDetail(HomeyState homey) =>
-        new(Id, Name, Draft, Published, PublishedVersion, PublishedAt, HasUnpublishedChanges, MissingTiles(homey));
+    private static IEnumerable<string> Targets(JsonElement settings)
+    {
+        if (settings.ValueKind != JsonValueKind.Object) yield break;
+        if (settings.TryGetProperty("target", out var target) && target.ValueKind == JsonValueKind.String)
+            yield return target.GetString()!;
+        if (settings.TryGetProperty("targets", out var targets) && targets.ValueKind == JsonValueKind.Array)
+            foreach (var item in targets.EnumerateArray())
+                if (item.ValueKind == JsonValueKind.String)
+                    yield return item.GetString()!;
+    }
+
+    public DashboardSummary ToSummary(TargetCatalog targets) =>
+        new(Id, Name, PublishedVersion, PublishedAt, HasUnpublishedChanges, MissingTiles(targets));
+
+    public DashboardDetail ToDetail(TargetCatalog targets) =>
+        new(Id, Name, Draft, Published, PublishedVersion, PublishedAt, HasUnpublishedChanges, MissingTiles(targets));
 }

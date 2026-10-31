@@ -59,8 +59,12 @@ public sealed class RealtimeHubTests(ApiFactory factory) : IClassFixture<ApiFact
         return id;
     }
 
-    private Task AssignAsync(string display, string? dashboard) =>
-        _client.PutAsJsonAsync($"/api/displays/{display}/dashboard", new { dashboardId = dashboard });
+    private Task AssignAsync(string display, string? dashboard, params string[] others) =>
+        _client.PutAsJsonAsync($"/api/displays/{display}/dashboard", new { dashboardId = dashboard, otherDashboardIds = others });
+
+    // Each assigned dashboard's latest and shown version, main first, as "latest:shown".
+    private static string Shown(JsonElement status) => string.Join(" ", status.GetProperty("versions").EnumerateArray().Select(v =>
+        $"{v.GetProperty("latestVersion")}:{(v.GetProperty("shownVersion").ValueKind == JsonValueKind.Null ? "null" : v.GetProperty("shownVersion").ToString())}"));
 
     private static Func<JsonElement, bool> DisplayWhere(string id, Func<JsonElement, bool> status) => list =>
         list.EnumerateArray().Any(d => d.GetProperty("id").GetString() == id && status(d.GetProperty("status")));
@@ -74,19 +78,19 @@ public sealed class RealtimeHubTests(ApiFactory factory) : IClassFixture<ApiFact
     }
 
     [Fact]
-    public async Task Publishing_SwitchesEveryScreenShowingTheDashboard()
+    public async Task Publishing_SwitchesEveryScreenOfferingTheDashboard()
     {
         var (first, second) = (Guid.NewGuid(), Guid.NewGuid());
         var dashboard = await PublishedDashboardAsync();
         await AssignAsync(await SetUpAsync(first), dashboard);
-        await AssignAsync(await SetUpAsync(second), dashboard);
+        await AssignAsync(await SetUpAsync(second), await PublishedDashboardAsync(), dashboard);
         var screens = new List<ChannelReader<JsonElement>>();
         foreach (var screen in new[] { first, second })
         {
             var hub = await ConnectAsync();
             screens.Add(Listen(hub, "Screen"));
             var joined = await hub.InvokeAsync<JsonElement>("JoinScreen", screen);
-            Assert.Equal(1, joined.GetProperty("dashboard").GetProperty("version").GetInt32());
+            Assert.Contains(joined.GetProperty("dashboards").EnumerateArray(), d => d.GetProperty("id").GetString() == dashboard);
         }
 
         await _client.PutAsJsonAsync($"/api/dashboards/{dashboard}/draft", new { rows = 6, sections = Array.Empty<object>() });
@@ -94,7 +98,8 @@ public sealed class RealtimeHubTests(ApiFactory factory) : IClassFixture<ApiFact
 
         foreach (var messages in screens)
         {
-            var shown = (await NextAsync(messages, _ => true)).GetProperty("dashboard");
+            var shown = (await NextAsync(messages, _ => true)).GetProperty("dashboards").EnumerateArray()
+                .Single(d => d.GetProperty("id").GetString() == dashboard);
             Assert.Equal(2, shown.GetProperty("version").GetInt32());
             Assert.Equal(6, shown.GetProperty("layout").GetProperty("rows").GetInt32());
         }
@@ -129,11 +134,13 @@ public sealed class RealtimeHubTests(ApiFactory factory) : IClassFixture<ApiFact
         await NextAsync(displays, DisplayWhere(display, s =>
             s.GetProperty("connected").GetBoolean() && s.GetProperty("lastSeenAt").ValueKind == JsonValueKind.String));
 
-        await AssignAsync(display, await PublishedDashboardAsync());
-        await NextAsync(displays, DisplayWhere(display, s =>
-            s.GetProperty("latestVersion").ValueKind == JsonValueKind.Number && s.GetProperty("shownVersion").ValueKind == JsonValueKind.Null));
-        await hub.InvokeAsync("Showing", 1);
-        await NextAsync(displays, DisplayWhere(display, s => s.GetProperty("shownVersion").ValueKind == JsonValueKind.Number));
+        var (main, other) = (await PublishedDashboardAsync(), await PublishedDashboardAsync());
+        await AssignAsync(display, main, other);
+        await NextAsync(displays, DisplayWhere(display, s => Shown(s) == "1:null 1:null"));
+        await hub.InvokeAsync("Showing", new Dictionary<string, int> { [main] = 1 });
+        await NextAsync(displays, DisplayWhere(display, s => Shown(s) == "1:1 1:null"));
+        await hub.InvokeAsync("Showing", new Dictionary<string, int> { [main] = 1, [other] = 1 });
+        await NextAsync(displays, DisplayWhere(display, s => Shown(s) == "1:1 1:1"));
 
         await hub.StopAsync();
         await NextAsync(displays, DisplayWhere(display, s => !s.GetProperty("connected").GetBoolean()));

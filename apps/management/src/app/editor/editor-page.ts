@@ -250,11 +250,13 @@ export class EditorPage {
 
   protected async deleteDashboard() {
     const dashboard = this.loadedDashboard();
-    const showing = (await firstValueFrom(this.displays.list())).filter((d) => d.dashboardId === dashboard.id);
-    const waiting = showing.length
-      ? ` ${showing.map((d) => `"${d.name}"`).join(', ')} will wait for another dashboard.`
+    const showing = (await firstValueFrom(this.displays.list())).filter(
+      (d) => d.dashboardId === dashboard.id || d.otherDashboardIds.includes(dashboard.id),
+    );
+    const stopping = showing.length
+      ? ` ${showing.map((d) => `"${d.name}"`).join(', ')} will stop showing it.`
       : '';
-    if (!confirm(`Delete the dashboard "${dashboard.name}"? This can't be undone.${waiting}`)) return;
+    if (!confirm(`Delete the dashboard "${dashboard.name}"? This can't be undone.${stopping}`)) return;
     clearTimeout(this.saveTimer);
     this.saveState.set('saved');
     this.api.delete(dashboard.id).subscribe(() => {

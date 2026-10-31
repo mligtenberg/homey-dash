@@ -9,9 +9,9 @@ HomeyDash is a smart-home control surface for a Homey hub. It has two faces: **d
 ## Principles
 
 - **Glanceable first.** A display is read from a distance and touched for a second. Large tiles carry one big value that reads across the room. Small tiles are read at arm's length.
-- **Color means a kind of thing.** Every tile kind owns one hue. An active tile fills with that hue. Nothing else on a display is colored.
-- **Tiles feel like buttons.** Tiles are embossed. Pressing a tile sinks it.
-- **Nothing moves on its own.** Tiles never reflow and dashboards never scroll vertically. Motion is limited to press feedback and state changes.
+- **Color means a kind of thing.** Every tile kind owns one hue. A resting tile carries a light tint of it, and an active tile fills with it. Nothing else on a display is colored.
+- **Tiles feel like buttons.** Tiles rest on one soft lift, and the controls inside them sit flat. Pressing a tile shrinks it slightly.
+- **Nothing moves on its own.** Tiles never reflow and dashboards never scroll vertically. Motion is limited to press feedback and state changes. The exceptions are a [PhotoTile](components/PhotoTile.md), which slowly fades to its next photo, and the [Plex now playing tile](components/PlexTiles.md), whose progress moves with what plays, because that is what they are for. A display that offers more than one dashboard also returns to its main one when left alone (see [DashboardTape](components/DashboardTape.md)).
 - **Management stays out of the way.** Management uses flat panels with hairline borders and one accent, `brand`, so the real tiles in the editor are the most colorful thing on screen.
 
 ## Words
@@ -29,6 +29,8 @@ Use the domain language from `CONTEXT.md` in all UI copy. Users see these words.
 | Connection lost | offline, disconnected |
 | Unavailable (target can't be reached) | offline |
 | Not found in Homey (target is gone) | broken, deleted |
+| Photo set | album, gallery, slideshow |
+| Account | connection, integration |
 
 - Write in plain English, sentence case: "Movie night", "Reading lamp", "Unpublished changes".
 - Tile detail lines are short state phrases joined with a middle dot: `On · 80%`, `Closed · 2 h ago`, `Cotton 40° · Rinsing`.
@@ -40,7 +42,7 @@ Use the domain language from `CONTEXT.md` in all UI copy. Users see these words.
 
 Colors are semantic tokens with a `light` and a `dark` theme. A display follows the device's color-scheme preference. Never hard-code one theme.
 
-**Display neutrals.** `ground` is the display background and the fill of recessed wells. `tile-surface` is a resting tile. `ink` is primary text, and `ink-muted` is secondary text on `ground` and `tile-surface`. The emboss is drawn from `emboss-shade` and `emboss-light`.
+**Display neutrals.** `ground` is the display background and the fill of recessed wells. `tile-surface` is a resting tile. `ink` is primary text, and `ink-muted` is secondary text on `ground` and `tile-surface`. A tile's lift is drawn from `emboss-shade`.
 
 **Kind hues.** Each tile kind has a pair:
 
@@ -77,7 +79,7 @@ Use one family, Rubik, from Google Fonts: `font-sans`.
 
 ## Layout
 
-A display shows a dashboard as sections side by side. Each section is a grid 3 cells wide and `rows` tall. The cell size is the screen height divided by the row count, and the default is **4 rows**. Every display measurement is a ratio from the Cell tokens times `--cell`:
+A display shows a dashboard as sections side by side. Each section is a grid 3 cells wide and `rows` tall. The cell size is the screen height divided by the row count, and the default is **4 rows**. A display shows only as many sections as fit whole across its width, centered, as one page; further sections go on further pages. Swiping moves between pages and snaps to the nearest one, and a dot per page sits at the bottom center when there is more than one. Every display measurement is a ratio from the Cell tokens times `--cell`:
 
 - `cell-gap`: the gap between tiles.
 - `tile-padding`: the padding inside a tile.
@@ -105,8 +107,10 @@ Management uses the `space-*` and `radius-*` tokens. In the editor, tiles render
 
 Depth and pressing:
 
-- **Raised.** Every resting tile, and every round button inside a tile, uses the `tile-raised` emboss.
-- **Pressed.** A pressed tile scales to `press-scale` and switches to `tile-pressed`. Recessed wells, such as the slider track and the segmented control, use `tile-pressed` permanently.
+- **Raised.** Every resting tile uses the `tile-raised` lift: a hairline shadow plus one soft drop. Nothing inside a tile has a shadow.
+- **Pressed.** A pressed tile scales to `press-scale` and darkens slightly.
+- **Ripple.** Every pressable surface, tiles and Management's buttons alike, shows a [Ripple](components/Ripple.md) from the point of the press, in the `ripple` token.
+- **Controls are tinted, not raised.** The slider track, the segmented control and round buttons are filled with the tile's `kind-*-ink` at a low opacity. A thermostat's `−`/`+` share one capsule. The tile's quick action (`.hd-tile__action`) is the one solid control: `kind-*-ink`, or `ink` on an active tile.
 - **Management has no shadows.** Panels get a 1px `line` border instead.
 
 Tile states:
@@ -114,7 +118,7 @@ Tile states:
 - **Active.** The tile background becomes `kind-*-fill`.
 - **Unavailable.** The tile drops to 60% opacity, shows its last known value, and carries an "Unavailable" badge in `warn`.
 - **Missing.** The tile becomes a transparent outline in `line`. The icon and the detail "Not found in Homey" are in `danger`. Missing tiles are never removed automatically.
-- **Connection lost.** The whole dashboard desaturates and stops responding to taps, though it can still scroll horizontally. A "Reconnecting…" pill sits at the bottom center.
+- **Connection lost.** The whole dashboard desaturates and stops responding to taps, though it can still be swiped between pages. A "Reconnecting…" pill sits at the bottom center.
 
 ## Iconography
 
@@ -132,8 +136,8 @@ The icons in these previews were drawn to match Lucide. Use the real Lucide set 
 - Text pairs meet 4.5:1 and icons meet 3:1 in both themes. Every usage note names the backgrounds a color is safe on.
 - Keyboard focus shows a solid 3px ring in `brand` in Management, and in `kind-*-ink` around a display tile.
 - Touch controls are at least 44px, even at small cell sizes.
-- Respect `prefers-reduced-motion`: drop press transitions and slow down the reconnecting spinner.
+- Respect `prefers-reduced-motion`: drop press transitions, turn the ripple into a plain press highlight and slow down the reconnecting spinner.
 
 ## Using it in the Angular apps
 
-Both `display` and `management` load `libs/design-system/src/index.css` (the Rubik font, `tokens.css` and `components.css`) as a global style. Set `--cell` on the display's root from `innerHeight / rows`, and add the `hd-display` class to that root. The component guidelines name the classes and data attributes each component expects. They are plain CSS, with no JavaScript bundle.
+Both `display` and `management` load `libs/design-system/src/index.css` (the Rubik font, `tokens.css` and `components.css`) as a global style. Set `--cell` on the display's root from `innerHeight / rows`, and add the `hd-display` class to that root. The component guidelines name the classes and data attributes each component expects. They are plain CSS. The one piece of script is the [Ripple](components/Ripple.md): each app calls `installRipple()` from `@homey-dash/design-system` once in `main.ts`.

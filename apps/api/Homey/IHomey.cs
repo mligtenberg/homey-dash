@@ -28,11 +28,9 @@ public static class InsightResolutions
     };
 }
 
+// The Homey section of the configuration. Which Homey to connect to is an account set up in Management (ADR-0007).
 public sealed class HomeyOptions
 {
-    // For example http://192.168.1.10. Without it HomeyDash runs against FakeHomey.
-    public string? Address { get; set; }
-
-    // A local API key, created in the Homey web app under Settings → API keys.
-    public string? ApiKey { get; set; }
+    // Runs against FakeHomey instead of a real Homey, for development and tests. Never a fallback.
+    public bool Fake { get; set; }
 }

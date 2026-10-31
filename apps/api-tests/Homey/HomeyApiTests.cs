@@ -43,6 +43,19 @@ public class HomeyApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task InsightEntries_ExistForEveryLog()
+    {
+        var logs = await _client.GetFromJsonAsync<JsonElement>("/api/homey/insights");
+
+        Assert.True(logs.GetArrayLength() > 20);
+        foreach (var log in logs.EnumerateArray().Select(l => l.GetProperty("id").GetString()))
+        {
+            var entries = await _client.GetFromJsonAsync<JsonElement>($"/api/homey/insights/entries?log={log}&resolution=last24Hours");
+            Assert.All(entries.EnumerateArray(), e => Assert.True(e.GetProperty("v").GetDouble() >= 0, log));
+        }
+    }
+
+    [Fact]
     public async Task InsightEntries_RefuseAnUnknownResolutionAndLog()
     {
         var resolution = await _client.GetAsync("/api/homey/insights/entries?log=homey:device:p1-meter:measure_power&resolution=lastYear");

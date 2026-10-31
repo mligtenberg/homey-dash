@@ -94,6 +94,27 @@ const ICONS: Record<string, LucideIconInput> = {
   evcharger: LucideCar,
 };
 
+// Homey device classes whose name is not one capitalized word.
+const TYPES: Record<string, string> = {
+  airconditioning: 'Air conditioning',
+  homealarm: 'Home alarm',
+  windowcoverings: 'Window coverings',
+  garagedoor: 'Garage door',
+  mediaplayer: 'Media player',
+  washingmachine: 'Washing machine',
+  coffeemachine: 'Coffee machine',
+  vacuumcleaner: 'Vacuum cleaner',
+  airpurifier: 'Air purifier',
+  solarpanel: 'Solar panel',
+  evcharger: 'EV charger',
+  tv: 'TV',
+};
+
+/** What kind of device it is, from its Homey device class: `Light`, `Window coverings`. */
+export function deviceType(device: HomeyDevice): string {
+  return TYPES[device.class] ?? device.class.charAt(0).toUpperCase() + device.class.slice(1);
+}
+
 /** The hue and icon for a device, from its Homey device class; sensors go by what they measure. */
 export function deviceLook(device: HomeyDevice | undefined): { hue: KindHue; icon: LucideIconInput } {
   if (!device) return { hue: 'neutral', icon: LucideBox };

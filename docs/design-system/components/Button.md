@@ -7,4 +7,6 @@ Management's buttons: one primary action per view, secondary actions next to it,
 - `.hd-btn--danger`: destructive actions such as **Remove tile**. Put them at the bottom of a settings panel, never beside Publish.
 - Disable Publish when there are no unpublished changes.
 
+Every button shows a [Ripple](Ripple.md) when pressed; a disabled one does not.
+
 Labels are verbs that say exactly what happens. Displays have no buttons other than the controls inside tiles.
