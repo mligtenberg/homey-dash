@@ -13,7 +13,8 @@ import {
   WEEKDAYS,
   withValue,
 } from './rule-text';
-import { groupKey, SignalCatalogue } from './signal-catalogue';
+import { SignalCatalogue } from './signal-catalogue';
+import { SignalPicker } from './signal-picker';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -23,33 +24,13 @@ function localInput(iso: string) {
   return isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** One condition: its signal, picked by where it comes from, then an operator that suits it and a value. */
+/** One condition: its signal, picked in a dialog by where it comes from, then an operator that suits it and a value. */
 @Component({
   selector: 'hd-condition-editor',
-  imports: [NgTemplateOutlet],
+  imports: [NgTemplateOutlet, SignalPicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="signal">
-      <select class="hd-select" aria-label="Signal source" (change)="pickGroup($any($event.target).value)">
-        @if (!signal()) {
-          <option value="" selected>Missing signal</option>
-        }
-        @for (source of sources(); track source.label) {
-          <optgroup [label]="source.label">
-            @for (group of source.groups; track group.key) {
-              <option [value]="group.key" [selected]="group.key === groupKey()">{{ group.label }}</option>
-            }
-          </optgroup>
-        }
-      </select>
-      @if (group(); as group) {
-        <select class="hd-select" aria-label="Signal" (change)="pickSignal($any($event.target).value)">
-          @for (s of group.signals; track s.id) {
-            <option [value]="s.id" [selected]="s.id === condition().signal">{{ s.name }}</option>
-          }
-        </select>
-      }
-    </div>
+    <hd-signal-picker [value]="condition().signal" (picked)="pickSignal($event)" />
     @if (!signal()) {
       <p class="warn">HomeyDash no longer has the signal "{{ condition().signal }}". Pick another, or remove this condition.</p>
     }
@@ -169,7 +150,6 @@ function localInput(iso: string) {
   `,
   styles: `
     :host { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-radius: 10px; }
-    .signal { display: flex; flex-direction: column; gap: var(--space-2); }
     .pick { display: flex; gap: var(--space-2); align-items: center; }
     .pick > .hd-select, .pick > .hd-input { flex: 1; min-width: 0; }
     .not { flex: none; }
@@ -193,20 +173,6 @@ export class ConditionEditor {
   protected readonly ends = ['from', 'to'] as const;
 
   protected readonly signal = computed(() => this.catalogue.byId().get(this.condition().signal));
-  protected readonly groupKey = computed(() => {
-    const signal = this.signal();
-    return signal ? groupKey(signal) : '';
-  });
-  protected readonly group = computed(() => this.catalogue.groups().find((g) => g.key === this.groupKey()));
-  protected readonly sources = computed(() => {
-    const sources = new Map<string, { label: string; groups: { key: string; label: string }[] }>();
-    for (const group of this.catalogue.groups()) {
-      const source = sources.get(group.source) ?? { label: group.source, groups: [] };
-      source.groups.push(group);
-      sources.set(group.source, source);
-    }
-    return [...sources.values()];
-  });
   protected readonly operators = computed(() => operatorsFor(this.signal(), this.condition()));
   protected readonly stale = computed(() => notAllowed(this.condition(), this.signal()));
   protected readonly isNumber = computed(() => this.signal()?.type === 'number' || typeof this.condition().value === 'number');
@@ -224,11 +190,6 @@ export class ConditionEditor {
   protected day(end: 'from' | 'to') {
     const [month, day] = (this.fromTo()[end] ?? '01-01').split('-').map(Number);
     return { month, day };
-  }
-
-  protected pickGroup(key: string) {
-    const first = this.catalogue.groups().find((g) => g.key === key)?.signals[0];
-    if (first) this.changed.emit(onSignal(this.condition(), first, this.signal()));
   }
 
   protected pickSignal(id: string) {
