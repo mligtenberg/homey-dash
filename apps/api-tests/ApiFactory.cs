@@ -1,0 +1,48 @@
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+
+namespace HomeyDash.Api.Tests;
+
+// The API on a throwaway SQLite database, running against FakeHomey.
+public class ApiFactory : WebApplicationFactory<Program>
+{
+    private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"homey-dash-{Guid.NewGuid()}.db");
+
+    protected virtual bool FakeHomey => true;
+
+    protected virtual bool FakeImmich => true;
+
+    protected virtual bool FakePlex => true;
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseSetting("ConnectionStrings:HomeyDash", $"Data Source={_dbPath};Pooling=False");
+        builder.UseSetting("Homey:Fake", FakeHomey ? "true" : "false");
+        builder.UseSetting("Immich:Fake", FakeImmich ? "true" : "false");
+        builder.UseSetting("Plex:Fake", FakePlex ? "true" : "false");
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        File.Delete(_dbPath);
+    }
+}
+
+// The API with a real Homey connection, which waits for a Homey account to be set up in Management.
+public sealed class RealHomeyApiFactory : ApiFactory
+{
+    protected override bool FakeHomey => false;
+}
+
+// The API with the real Immich client, which waits for an Immich account to be set up in Management.
+public sealed class RealImmichApiFactory : ApiFactory
+{
+    protected override bool FakeImmich => false;
+}
+
+// The API with the real Plex client, which waits for someone to sign in with Plex in Management.
+public sealed class RealPlexApiFactory : ApiFactory
+{
+    protected override bool FakePlex => false;
+}

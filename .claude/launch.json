@@ -1,0 +1,155 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "apps/api",
+        "--no-launch-profile",
+        "--artifacts-path",
+        "tmp/claude/api",
+        "--",
+        "--environment",
+        "Development",
+        "--urls",
+        "http://localhost:5212",
+        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash.db"
+      ],
+      "port": 5212
+    },
+    {
+      "name": "api-fake",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "apps/api",
+        "--no-launch-profile",
+        "--artifacts-path",
+        "tmp/claude/api",
+        "--",
+        "--environment",
+        "Development",
+        "--urls",
+        "http://localhost:5212",
+        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash.db",
+        "--Homey:Fake=true",
+        "--Immich:Fake=true",
+        "--Plex:Fake=true"
+      ],
+      "port": 5212
+    },
+    {
+      "name": "display",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NX_WORKSPACE_DATA_DIRECTORY=tmp/claude/nx",
+        "NX_DAEMON=false",
+        "npx",
+        "nx",
+        "serve",
+        "display",
+        "--port",
+        "4300",
+        "--proxy-config",
+        ".claude/proxy.json"
+      ],
+      "port": 4300
+    },
+    {
+      "name": "management",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NX_WORKSPACE_DATA_DIRECTORY=tmp/claude/nx",
+        "NX_DAEMON=false",
+        "npx",
+        "nx",
+        "serve",
+        "management",
+        "--port",
+        "4301",
+        "--proxy-config",
+        ".claude/proxy.json"
+      ],
+      "port": 4301
+    },
+    {
+      "name": "api-fake-b",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "apps/api",
+        "--no-launch-profile",
+        "--artifacts-path",
+        "tmp/claude/api-b",
+        "--",
+        "--environment",
+        "Development",
+        "--urls",
+        "http://localhost:5213",
+        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash-b.db",
+        "--Homey:Fake=true",
+        "--Immich:Fake=true",
+        "--Plex:Fake=true"
+      ],
+      "port": 5213
+    },
+    {
+      "name": "api-b",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "apps/api",
+        "--no-launch-profile",
+        "--artifacts-path",
+        "tmp/claude/api-b",
+        "--",
+        "--environment",
+        "Development",
+        "--urls",
+        "http://localhost:5213",
+        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash-b.db"
+      ],
+      "port": 5213
+    },
+    {
+      "name": "display-b",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NX_WORKSPACE_DATA_DIRECTORY=tmp/claude/nx-b",
+        "NX_DAEMON=false",
+        "npx",
+        "nx",
+        "serve",
+        "display",
+        "--port",
+        "4302",
+        "--proxy-config",
+        ".claude/proxy-b.json"
+      ],
+      "port": 4302
+    },
+    {
+      "name": "management-b",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NX_WORKSPACE_DATA_DIRECTORY=tmp/claude/nx-b",
+        "NX_DAEMON=false",
+        "npx",
+        "nx",
+        "serve",
+        "management",
+        "--port",
+        "4303",
+        "--proxy-config",
+        ".claude/proxy-b.json"
+      ],
+      "port": 4303
+    }
+  ]
+}

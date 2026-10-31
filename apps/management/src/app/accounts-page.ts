@@ -1,0 +1,31 @@
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { HomeyAccountPanel } from './homey-account-panel';
+import { ImmichAccountPanel } from './immich-account-panel';
+import { PlexAccountPanel } from './plex-account-panel';
+
+/**
+ * The accounts HomeyDash holds for the home (ADR-0007): Homeys, each with its address and local API key, Immich
+ * accounts, each with its address and API key, and Plex accounts, signed in on Plex's own page. Keys are write-only;
+ * HomeyDash never sends them back.
+ */
+@Component({
+  selector: 'hd-accounts-page',
+  imports: [HomeyAccountPanel, ImmichAccountPanel, PlexAccountPanel],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <header class="header">
+      <h1>Accounts</h1>
+    </header>
+    <div class="body">
+      <hd-homey-account-panel />
+      <hd-immich-account-panel />
+      <hd-plex-account-panel />
+    </div>
+  `,
+  styles: `
+    .header { display: flex; align-items: center; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line); }
+    h1 { font-size: 22px; font-weight: 800; margin: 0; }
+    .body { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); max-width: 640px; }
+  `,
+})
+export class AccountsPage {}

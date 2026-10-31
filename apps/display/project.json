@@ -1,0 +1,96 @@
+{
+  "name": "display",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "prefix": "hd",
+  "sourceRoot": "apps/display/src",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@angular/build:application",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "dist/apps/display",
+        "browser": "apps/display/src/main.ts",
+        "tsConfig": "apps/display/tsconfig.app.json",
+        "inlineStyleLanguage": "scss",
+        "assets": [
+          {
+            "glob": "**/*",
+            "input": "apps/display/public"
+          }
+        ],
+        "styles": [
+          "libs/design-system/src/index.css",
+          "apps/display/src/styles.scss"
+        ]
+      },
+      "configurations": {
+        "production": {
+          "budgets": [
+            {
+              "type": "initial",
+              "maximumWarning": "500kb",
+              "maximumError": "1mb"
+            },
+            {
+              "type": "anyComponentStyle",
+              "maximumWarning": "4kb",
+              "maximumError": "8kb"
+            }
+          ],
+          "outputHashing": "all"
+        },
+        "development": {
+          "optimization": false,
+          "extractLicenses": false,
+          "sourceMap": true
+        }
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "readyWhen": {
+        "signal": true
+      },
+      "executor": "@angular/build:dev-server",
+      "defaultConfiguration": "development",
+      "options": {
+        "proxyConfig": "apps/display/proxy.conf.json"
+      },
+      "configurations": {
+        "production": {
+          "buildTarget": "display:build:production"
+        },
+        "development": {
+          "buildTarget": "display:build:development"
+        }
+      }
+    },
+    "serve-static": {
+      "continuous": true,
+      "readyWhen": {
+        "signal": true
+      },
+      "dependsOn": ["build"],
+      "executor": "@nx/web:file-server",
+      "options": {
+        "buildTarget": "display:build",
+        "port": 4200,
+        "staticFilePath": "dist/apps/display/browser",
+        "spa": true
+      }
+    },
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "buildTarget": "display:build:development",
+        "tsConfig": "apps/display/tsconfig.spec.json",
+        "runner": "vitest",
+        "watch": false
+      }
+    }
+  },
+  "implicitDependencies": ["design-system"]
+}

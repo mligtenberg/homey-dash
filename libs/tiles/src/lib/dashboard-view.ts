@@ -1,0 +1,111 @@
+import {
+  afterRenderEffect,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  ElementRef,
+  inject,
+  input,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
+import { DashboardLayout } from '@homey-dash/api-client';
+import { sectionsPerPage } from '@homey-dash/layout';
+import { TileHost } from './tile-host';
+
+/**
+ * A dashboard version as displays show it: as many whole sections as fit the width, centered, on pages
+ * that swipe and snap, with a dot per page underneath.
+ * Set `--cell` on an `.hd-display` ancestor (see `cellSize` in libs/layout).
+ */
+@Component({
+  selector: 'hd-dashboard-view',
+  imports: [TileHost],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'hd-dashboard' },
+  template: `
+    <div #pager class="hd-dashboard__pages" (scroll)="onScroll()">
+      @for (page of pages(); track $index) {
+        <div class="hd-dashboard__page">
+          @for (section of page; track section.id) {
+            <div class="hd-section">
+              <div class="hd-section__title">{{ section.title }}</div>
+              <div class="hd-section__grid" [style.--rows]="layout().rows">
+                @for (tile of section.tiles; track tile.id) {
+                  <hd-tile-host [tile]="tile" />
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+    @if (pages().length > 1) {
+      <div class="hd-page-dots">
+        @for (page of pages(); track $index) {
+          <button
+            type="button"
+            class="hd-page-dot"
+            [attr.aria-label]="'Show ' + sectionNames(page)"
+            [attr.aria-current]="$index === current() || null"
+            (click)="go($index)"
+          ></button>
+        }
+      </div>
+    }
+  `,
+})
+export class DashboardView {
+  readonly layout = input.required<DashboardLayout>();
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly pager = viewChild.required<ElementRef<HTMLElement>>('pager');
+
+  private readonly perPage = signal(1);
+  protected readonly current = signal(0);
+  protected readonly pages = computed(() => {
+    const sections = this.layout().sections;
+    const perPage = this.perPage();
+    const pages = [];
+    for (let i = 0; i < sections.length; i += perPage) pages.push(sections.slice(i, i + perPage));
+    return pages;
+  });
+
+  constructor() {
+    // The width and --cell both change with the window, and both decide how many sections fit. Without a
+    // ResizeObserver (as in tests) a page holds one section.
+    if (typeof ResizeObserver !== 'undefined') {
+      const resizes = new ResizeObserver(() => {
+        const cell = parseFloat(getComputedStyle(this.host).getPropertyValue('--cell'));
+        if (cell > 0) this.perPage.set(sectionsPerPage(this.host.clientWidth, cell));
+      });
+      resizes.observe(this.host);
+      inject(DestroyRef).onDestroy(() => resizes.disconnect());
+    }
+
+    // After the pages regroup or resize, stay on the page that was showing.
+    afterRenderEffect(() => {
+      const page = Math.min(untracked(this.current), this.pages().length - 1);
+      const pager = this.pager().nativeElement;
+      if (Math.abs(pager.scrollLeft - page * pager.clientWidth) > 1) {
+        pager.scrollTo({ left: page * pager.clientWidth, behavior: 'instant' });
+      }
+    });
+  }
+
+  protected onScroll() {
+    const pager = this.pager().nativeElement;
+    if (pager.clientWidth > 0) this.current.set(Math.round(pager.scrollLeft / pager.clientWidth));
+  }
+
+  protected go(page: number) {
+    const pager = this.pager().nativeElement;
+    pager.scrollTo({ left: page * pager.clientWidth, behavior: 'smooth' });
+  }
+
+  protected sectionNames(page: { title: string }[]) {
+    return page.map((section) => section.title).join(', ');
+  }
+}

@@ -1,0 +1,151 @@
+/* HomeyDash design tokens. Source of truth: the HomeyDash design system (claude.ai artifact). */
+/* Follows the OS color scheme; data-theme="light" | "dark" on <html> forces one. */
+
+:root {
+  color-scheme: light;
+  --ground: #e4e6ee;
+  --tile-surface: #f1f2f7;
+  --ink: #22252f;
+  --ink-muted: #5f6477;
+  --line: #d4d7e2;
+  --emboss-shade: #c5c8d6;
+  --emboss-light: #ffffff;
+  --chrome: #f7f8fb;
+  --panel: #ffffff;
+  --brand: #4364df;
+  --on-brand: #ffffff;
+  --ok: #1c8742;
+  --warn: #975800;
+  --danger: #c8364a;
+  --on-kind: #ffffff;
+  --kind-light-ink: #8c5700;
+  --kind-light-fill: #f5cb70;
+  --kind-heat-ink: #aa3700;
+  --kind-heat-fill: #ffb695;
+  --kind-flow-ink: #007e5e;
+  --kind-flow-fill: #6febcc;
+  --kind-mood-ink: #7347af;
+  --kind-mood-fill: #ddbfff;
+  --kind-security-ink: #007b2a;
+  --kind-security-fill: #96e7a7;
+  --kind-energy-ink: #0064b9;
+  --kind-energy-fill: #93d7ff;
+  --kind-cover-ink: #00769b;
+  --kind-cover-fill: #63e5ff;
+  --kind-appliance-ink: #007b87;
+  --kind-appliance-fill: #5ce9f0;
+  --kind-climate-ink: #006fab;
+  --kind-climate-fill: #74e0ff;
+  --kind-neutral-ink: #355bbd;
+  --kind-neutral-fill: #aad0ff;
+  --tile-raised: 0 1px 2px color-mix(in oklab, #c5c8d6 60%, transparent), 0 6px 16px -5px #c5c8d6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #1a1c24;
+    --tile-surface: #23262f;
+    --ink: #e6e8f0;
+    --ink-muted: #9095a8;
+    --line: #30343f;
+    --emboss-shade: #0f1015;
+    --emboss-light: #2b2f3a;
+    --chrome: #16181e;
+    --panel: #1f222a;
+    --brand: #85a6ff;
+    --on-brand: #0c142d;
+    --ok: #6fd087;
+    --warn: #f2b45a;
+    --danger: #ff7a8a;
+    --on-kind: #1a1c24;
+    --kind-light-ink: #e7b643;
+    --kind-light-fill: #583d00;
+    --kind-heat-ink: #ff9d77;
+    --kind-heat-fill: #692f1a;
+    --kind-flow-ink: #34dbb9;
+    --kind-flow-fill: #005140;
+    --kind-mood-ink: #cca8ff;
+    --kind-mood-fill: #4a366b;
+    --kind-security-ink: #75d78d;
+    --kind-security-fill: #154f27;
+    --kind-energy-ink: #73c3ff;
+    --kind-energy-fill: #154470;
+    --kind-cover-ink: #0ed4f6;
+    --kind-cover-fill: #004d60;
+    --kind-appliance-ink: #00d8e1;
+    --kind-appliance-fill: #005055;
+    --kind-climate-ink: #43cdff;
+    --kind-climate-fill: #004a69;
+    --kind-neutral-ink: #91bbff;
+    --kind-neutral-fill: #2a4072;
+    --tile-raised: 0 1px 2px color-mix(in oklab, #0f1015 60%, transparent), 0 6px 16px -5px #0f1015;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #1a1c24;
+  --tile-surface: #23262f;
+  --ink: #e6e8f0;
+  --ink-muted: #9095a8;
+  --line: #30343f;
+  --emboss-shade: #0f1015;
+  --emboss-light: #2b2f3a;
+  --chrome: #16181e;
+  --panel: #1f222a;
+  --brand: #85a6ff;
+  --on-brand: #0c142d;
+  --ok: #6fd087;
+  --warn: #f2b45a;
+  --danger: #ff7a8a;
+  --on-kind: #1a1c24;
+  --kind-light-ink: #e7b643;
+  --kind-light-fill: #583d00;
+  --kind-heat-ink: #ff9d77;
+  --kind-heat-fill: #692f1a;
+  --kind-flow-ink: #34dbb9;
+  --kind-flow-fill: #005140;
+  --kind-mood-ink: #cca8ff;
+  --kind-mood-fill: #4a366b;
+  --kind-security-ink: #75d78d;
+  --kind-security-fill: #154f27;
+  --kind-energy-ink: #73c3ff;
+  --kind-energy-fill: #154470;
+  --kind-cover-ink: #0ed4f6;
+  --kind-cover-fill: #004d60;
+  --kind-appliance-ink: #00d8e1;
+  --kind-appliance-fill: #005055;
+  --kind-climate-ink: #43cdff;
+  --kind-climate-fill: #004a69;
+  --kind-neutral-ink: #91bbff;
+  --kind-neutral-fill: #2a4072;
+  --tile-raised: 0 1px 2px color-mix(in oklab, #0f1015 60%, transparent), 0 6px 16px -5px #0f1015;
+}
+
+:root {
+  /* spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  /* radius */
+  --radius-control: 8px;
+  --radius-panel: 10px;
+  --radius-pill: 999px;
+  /* cell */
+  --cell-gap: 0.08;
+  --section-gap: 0.176;
+  --tile-padding: 0.11;
+  --tile-radius: 0.2;
+  --icon-size: 0.27;
+  --control-size: 0.42;
+  --slider-height: 0.24;
+  --segment-height: 0.32;
+  --press-scale: 0.96;
+  /* press ripple: the pressed surface's own text colour, faint, so it reads on any fill in either theme */
+  --ripple: color-mix(in oklab, currentColor 20%, transparent);
+  --font-sans: "Rubik Variable", "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
+}

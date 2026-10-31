@@ -46,3 +46,14 @@ Thumbs.db
 
 .nx/polygraph
 .angular
+
+# .NET
+bin/
+obj/
+*.db
+*.db-shm
+*.db-wal
+
+__screenshots__/
+vitest.config.*.timestamp*
+.vitest

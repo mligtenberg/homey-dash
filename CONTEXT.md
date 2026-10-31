@@ -1,0 +1,203 @@
+# HomeyDash
+
+A configurable smart-home control surface for a Homey hub, shown on screens placed around the home.
+
+## Language
+
+**Dashboard**:
+A named, configured layout of tiles with a fixed number of rows. It exists independently of any physical screen and can be shown on several displays at once.
+_Avoid_: Page, screen, view
+
+**Display**:
+A physical screen in the home that has completed setup, assigned a **Main dashboard** and any number of other dashboards to switch to. Identified by a permanent identity that never changes; its name is only a human-readable label.
+_Avoid_: Screen, device, client, kiosk
+
+**Main dashboard**:
+The dashboard a display shows first and returns to after a minute without a touch. A display has other dashboards only when it has a main one.
+_Avoid_: Home dashboard, default dashboard, primary dashboard
+
+**Dashboard tape**:
+Pills floating over the left edge of a display that offers more than one dashboard, one per dashboard with the **Main dashboard** first, for switching between them. It can be collapsed to one button, which the screen remembers. A display with one dashboard has no tape.
+_Avoid_: Tab bar, menu, dashboard picker
+
+**Display status**:
+What Management knows about a display beyond its configuration: whether it is connected, when it was last seen, and whether it shows the latest published version of its dashboard.
+_Avoid_: Health, heartbeat
+
+**Setup**:
+The first-run step on a screen where it either becomes a new display (and is given a name) or takes over an existing one.
+_Avoid_: Pairing, registration, onboarding
+
+**Takeover**:
+A screen in setup adopting an existing display's identity, name and dashboard. The screen that previously held that identity is no longer that display and returns to setup.
+_Avoid_: Claim, re-pair, restore
+
+**Draft**:
+The working version of a dashboard that is edited in Management. Displays never show a draft.
+_Avoid_: Work in progress, unsaved changes
+
+**Publish**:
+Making a dashboard's draft its published version. Every display showing that dashboard switches to it at once.
+_Avoid_: Deploy, release, save
+
+**Editor**:
+The part of Management where a dashboard's draft is arranged on its grid. Tiles appear with their real content but cannot be operated; they can only be placed, resized and configured.
+_Avoid_: Designer, builder, canvas
+
+**Preview**:
+A realistic rendering of a dashboard's draft in Management, using real tiles and live data, fitted to the size of the Management window.
+_Avoid_: Simulation, mockup
+
+**Published version**:
+The version of a dashboard that displays show.
+_Avoid_: Live version, current version
+
+**Connection lost**:
+The state of a display that cannot reach HomeyDash, or whose HomeyDash cannot reach a Homey the dashboard has tiles of, including when no Homey account is set up yet. The dashboard stays visible with its last known values and shows a reconnecting indicator until it recovers on its own. Without HomeyDash, no tile can be interacted with (horizontal scrolling still works); without a Homey, only that Homey's tiles can't.
+_Avoid_: Offline, stale, disconnected
+
+**Management**:
+A separate application, apart from the one displays run, where dashboards are built and displays are assigned a dashboard. AI assistants can make the same changes through the MCP server (ADR-0006), but Management is the only place where a dashboard is arranged visually and where dashboards and displays are deleted, accounts are set up, and photo sets are made. Opening it never triggers setup.
+_Avoid_: Management environment, admin, settings, backend
+
+**Homey**:
+The smart-home hub (a Homey Pro) that owns all devices and their state. The source of truth for anything in the home. A home can have more than one, each set up as its own **Account**.
+_Avoid_: Hub, controller, gateway
+
+**Device**:
+Something Homey controls or reads, such as a light, sensor, or thermostat. Never a screen.
+_Avoid_: Accessory, thing, appliance
+
+**Account**:
+A sign-in HomeyDash holds for the home, so it can reach a service on everyone's behalf: Homey, Immich or Plex. Set up in Management; displays never hold one. A home can have several accounts of each, such as one Homey per house, one per person's Immich or one per Plex server, each with a name that tells them apart. A Homey or Plex tile points into one account: the one it names, or the oldest.
+_Avoid_: Connection, integration, credential
+
+### Layout
+
+**Section**:
+A group of tiles within a dashboard, laid out on a grid three cells wide and as many rows tall as its dashboard. Cells may be left empty.
+_Avoid_: Group, panel, column, area
+
+**Cell**:
+One unit of a section's grid. Tile sizes are expressed in cells. A cell's size follows from the display's screen height divided by the dashboard's number of rows, so a dashboard always exactly fills the screen height.
+_Avoid_: Slot, unit
+
+### Tiles
+
+**Module**:
+A self-contained extension of HomeyDash that registers one or more tile kinds, each with the tile sizes it supports. New capabilities are added by adding modules.
+_Avoid_: Plugin, extension, package
+
+**Tile**:
+One placed element on a dashboard, belonging to exactly one section. Every tile is of exactly one tile kind.
+_Avoid_: Card, widget, block
+
+**Tile kind**:
+The category of a tile, registered by exactly one module, which determines what it targets, how it is configured, what it shows, and how it is interacted with (tap action or inline controls). The set of tile kinds is expected to grow.
+_Avoid_: Tile type, card type
+
+**Target**:
+The thing a tile points at: something in Homey, such as a device, a flow, a mood or a recorded value, or a photo set. Every tile kind defines what kind of target it takes.
+_Avoid_: Source, binding, subject
+
+**Unavailable**:
+The state of a tile whose target still exists in Homey but cannot currently be reached. The tile shows its last known value marked as unavailable and recovers on its own.
+_Avoid_: Offline, disconnected
+
+**Missing**:
+The state of a tile whose target no longer exists, in Homey or, for a photo set, in HomeyDash. The tile shows that its target was not found, and Management flags every dashboard containing it. It is never removed automatically.
+_Avoid_: Broken, orphaned, deleted
+
+**Tile position**:
+The cell in its section's grid where a tile's top-left corner sits. Set explicitly in Management; tiles never move on their own.
+_Avoid_: Order, slot
+
+**Tile size**:
+How many cells wide and tall a tile is, chosen from one fixed set: **Small** (1×1), **Wide** (2×1), **Full** (3×1), **Large** (2×2) and **Full large** (3×2). Each tile kind supports its own subset of this set, declared by its module.
+_Avoid_: Span, dimensions
+
+**Tap action**:
+A tile interaction where pressing anywhere on the tile performs one action, such as toggling a light or starting a flow.
+_Avoid_: Click action, primary action
+
+**Inline controls**:
+A tile interaction where the tile presents its own controls, such as a slider or several buttons, instead of acting as a single button.
+_Avoid_: Custom control, widget
+
+**Device tile**:
+A tile showing one device, with a chosen subset of that device's capabilities to show and control.
+
+**Flow tile**:
+A tile that starts one Homey flow when pressed.
+
+**Mood tile**:
+A tile that activates one Homey mood when pressed.
+
+**Photo tile**:
+A tile that shows the photos of one photo set, one at a time in shuffled order, fading to the next at a chosen interval.
+_Avoid_: Photo frame, slideshow tile, gallery tile
+
+**Photo set**:
+A named set of photos, made in Management, that follows one album in Immich or is drawn at random from Immich by a **Selection**. HomeyDash keeps the list of its photos, synced with Immich, and fetches each photo from Immich when a display shows it. It exists apart from any tile; photos added to or removed from the album follow at the next sync.
+_Avoid_: Album, gallery, slideshow
+
+**Selection**:
+The rules a **Photo set** draws its photos from Immich by: people who should be in them (at least one), people who should not, what they should show, how many, and how often to draw again.
+_Avoid_: Filter, smart album, query
+
+**Now playing tile**:
+A Plex tile that shows what plays on one Plex player, or any, over its artwork, with buttons to skip back, play or pause, and skip on.
+_Avoid_: Media tile, player tile
+
+**Recently added tile**:
+A Plex tile that shows the newest posters of one Plex library, or every library.
+_Avoid_: New media tile
+
+**Logic tile**:
+A tile that holds an ordered list of other tiles, each with a rule, and shows the first whose rule holds, or its fallback tile when none does; with no fallback it shows nothing, like empty cells. It holds tiles of any kind except another logic tile, and a tile it holds that points at a missing target is shown as **Missing** when chosen, not skipped. The tiles it holds take its size, so it only holds kinds that support that size. It fades from one tile to the next, and once switched it can stay on a tile for a chosen **Minimum show time**, after which it shows whatever its rules then choose.
+_Avoid_: Logic card, conditional tile, switch tile
+
+**Minimum show time**:
+How long a **Logic tile** keeps showing a tile it switched to before it may switch again, however its rules change; none by default.
+_Avoid_: Debounce, hold time, delay
+
+**Statistic tile**:
+A tile showing the history of one recorded value over a chosen time window, with its current value, updating live as new values arrive.
+_Avoid_: Graph tile, chart tile, insight tile
+
+### Logic
+
+**Signal**:
+A named, live value HomeyDash knows, of one of four types: text, yes/no, number, or date and time. Signals come from sources such as a device's capabilities, Homey variables, the clock, the display a dashboard is shown on, or Plex; a module can add its own. A text signal may have a fixed set of values to choose from, such as a thermostat's modes; a condition comparing with a value no longer in that set stays, never holds, and is flagged in **Management**.
+_Avoid_: Variable, token, input, fact
+
+**Condition**:
+One signal compared with a fixed value, by an operator that suits the signal's type, optionally negated.
+_Avoid_: Check, test, filter
+
+**Rule**:
+One or more conditions, of which all, or any, must hold.
+_Avoid_: Expression, logic, formula
+
+## Relationships
+
+- A **Display** offers zero or more **Dashboards**, one of them its **Main dashboard**, and shows one at a time; a **Dashboard** can be offered on zero or more **Displays**.
+- A **Display** with no **Main dashboard** shows a waiting state until one is assigned in **Management**.
+- A **Display** always shows the **Published version** of its **Dashboards**; a **Dashboard** that has never been published cannot be assigned to a **Display**.
+- Deleting a **Display**'s **Main dashboard** makes the next one on its **Dashboard tape** its **Main dashboard**, or makes it wait when there is none.
+- A **Display** in **Connection lost** picks up a newer **Published version** when it recovers.
+- A **Display** only uses its **Dashboard**; it never changes configuration.
+- A **Display** is held by exactly one physical screen at a time; sharing a layout across screens is done by sharing a **Dashboard**.
+- A **Dashboard** is an ordered list of **Sections**; a **Section** holds **Tiles** at explicit **Tile positions**.
+- **Tiles** in a **Section** never overlap and never extend beyond its grid.
+- A **Display** places all **Sections** side by side in one horizontal row. A **Dashboard** never scrolls vertically; when its **Sections** are wider than the screen, it scrolls horizontally.
+- A **Display** never talks to **Homey** directly; HomeyDash is the only party that speaks to **Homey** on its behalf.
+- A tile on **Homey** points into one Homey **Account**; removing that **Account** leaves the tile **Missing** until it is given another.
+- A **Photo set** draws from one Immich **Account**, follows one album in it (or draws by a **Selection**), and can be the **Target** of several tiles; a change to the album, or pointing the set at another, changes every tile showing it. Removing that **Account** leaves the **Photo set**, but its photos can't be shown until it is given another **Account**.
+- A **Display** never talks to Immich; it gets a **Photo set**'s photos through HomeyDash.
+- HomeyDash evaluates every **Rule**, for as long as a shown **Dashboard** asks it to and separately for each **Display** showing it, and tells it at once whenever its answer changes; the **Logic tile** itself picks the first tile whose **Rule** holds. A **Preview** asks HomeyDash too, as if shown on a **Display** chosen in **Management**, or on none.
+- A **Signal** from **Homey** belongs to one Homey **Account**; a **Rule** may mix **Signals** from several. Removing that **Account** makes the **Signal** **Missing**; an unreachable **Homey** makes it **Unavailable**.
+- A **Condition** on a **Display**'s name refers to its permanent identity, so renaming the **Display** keeps the **Condition**, and a **Takeover** carries it over.
+- The **Editor** shows the tile a **Logic tile**'s rules choose now, as the **Preview** would, except while one of the tiles it holds is being configured, which it then shows instead.
+- A **Display** in **Connection lost** keeps showing the tile a **Logic tile** last chose.
+- A **Condition** on an **Unavailable** **Signal** uses its last known value. A **Condition** on a **Missing** **Signal**, or on one that has never had a value, fails even when negated, so its **Logic tile** moves on to the next tile in its list; only a **Missing** one makes **Management** flag the dashboard.

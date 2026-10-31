@@ -1,102 +1,65 @@
 # HomeyDash
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+A configurable smart-home control surface for a Homey Pro, shown on screens placed around the home.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+- Domain language: [CONTEXT.md](CONTEXT.md)
+- Decisions: [docs/adr](docs/adr)
+- Design system: [docs/design-system](docs/design-system/README.md)
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/getting-started/tutorials/angular-monorepo-tutorial?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+## Projects
 
-## Run tasks
+| Project | What it is |
+| --- | --- |
+| `apps/api` | .NET backend. The only client of Homey; serves both apps' data. |
+| `apps/display` | Angular app shown on every display. |
+| `apps/management` | Angular app where dashboards are built and displays assigned. |
+| `libs/design-system` | Tokens and `hd-*` component CSS, loaded by both apps. |
+| `libs/layout` | Tile sizes, cell size and grid rules. |
+| `libs/tiles` | Module registry: the tile kinds and what each supports. |
+| `libs/api-client` | Typed contracts and clients for the API. |
 
-To run the dev server for your app, use:
+## Connecting to Homey
 
-```sh
-npx nx serve dashboard
-```
+The API talks to a Homey Pro over its local API. Create an API key in the Homey web app
+(Settings → API keys), then open Management → Accounts and enter the Homey's address and the key. HomeyDash keeps
+them in its database and never sends the key back to a browser.
 
-To create a production bundle:
+Prefer the Homey's `.local` name over its IP address: the name keeps working when the router gives the Homey a
+new address.
 
-```sh
-npx nx build dashboard
-```
+Until Homey is set up, displays show connection lost. To run against a built-in fake Homey with sample devices,
+flows and moods instead, set `Homey:Fake=true` (`npx nx serve api -c simulator` does).
 
-To see all available targets to run for a project, run:
+## Photos from Immich
 
-```sh
-npx nx show project dashboard
-```
+Photo tiles show photo sets from your [Immich](https://immich.app) server. A photo set follows an album, synced every
+15 minutes, or draws photos at random by rules: who should and shouldn't be in them, what they show (such as
+"landscape"), how many, and how often to draw again. HomeyDash fetches each photo from Immich as a display shows it,
+so displays never need to reach Immich themselves.
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+1. In Immich, under Account Settings → API Keys, make a key with at least the `album.read`, `asset.read`,
+   `asset.view` and `person.read` permissions. Name people in Immich to use them in rules.
+2. In Management → Accounts, enter Immich's address (such as `192.168.1.20:2283`) and the key. HomeyDash checks both
+   with Immich, keeps them in its database and never sends the key back to a browser.
+3. Under Photo sets, add a photo set and choose its album, or its rules.
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+`Immich:Fake=true` runs against a fake Immich with two sample albums and three people (`npx nx serve api -c simulator` sets it).
 
-## Add new projects
+## Plex
 
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
+Plex tiles show what plays on your Plex players, with play/pause and skip buttons, and what was newly added to your
+libraries. In Management → Accounts, press **Sign in with Plex** and approve HomeyDash on Plex's page; with several
+servers, choose one there. The buttons only work on players that take remote control: Plex's own apps with
+**Advertise as player** turned on.
 
-Use the plugin's generator to create new projects.
+`Plex:Fake=true` runs against a fake Plex with a movie playing and an episode paused (`npx nx serve api -c simulator`
+sets it).
 
-To generate a new application, use:
-
-```sh
-npx nx g @nx/angular:app demo
-```
-
-To generate a new library, use:
-
-```sh
-npx nx g @nx/angular:lib mylib
-```
-
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
-
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Set up CI!
-
-### Step 1
-
-To connect to Nx Cloud, run the following command:
-
-```sh
-npx nx connect
-```
-
-Connecting to Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
-
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-### Step 2
-
-Use the following command to configure a CI workflow for your workspace:
+## Running
 
 ```sh
-npx nx g ci-workflow
+npx nx serve api          # API on :5112, which both apps proxy /api to
+npx nx serve display      # display app on :4200
+npx nx serve management   # Management on :4201
+npx nx run-many -t test lint
 ```
-
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Install Nx Console
-
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
-
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Useful links
-
-Learn more:
-
-- [Learn more about this workspace setup](https://nx.dev/getting-started/tutorials/angular-monorepo-tutorial?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-And join the Nx community:
-
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
