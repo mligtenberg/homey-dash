@@ -206,6 +206,23 @@ public class PhotoSetApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal("Garden", album.GetProperty("albumName").GetString());
     }
 
+    // Anna is on the even Summer photos and Bram on every third, each with a face near the top, left on even photos and
+    // right on odd ones; the others have no one on them.
+    [Fact]
+    public async Task ThePhotosFaces_AreReadAfterASync_AndKeptByTheNext()
+    {
+        var id = (await CreateAsync()).GetProperty("id").GetString()!;
+
+        await factory.Services.GetRequiredService<PhotoSync>().ReadFacesAsync(CancellationToken.None);
+        await _client.PostAsync($"/api/photo-sets/{id}/sync", null);
+        var photos = (await SetAsync(id)).GetProperty("photos").EnumerateArray().ToList();
+
+        (double, double) Focus(int n) => (photos[n - 1].GetProperty("focus").GetProperty("x").GetDouble(), photos[n - 1].GetProperty("focus").GetProperty("y").GetDouble());
+        Assert.Equal((.2, .15), Focus(2));
+        Assert.Equal((.8, .15), Focus(3));
+        Assert.Equal((.5, .5), Focus(1));
+    }
+
     [Fact]
     public async Task ADeletedPhotoSet_MakesItsTilesMissing()
     {

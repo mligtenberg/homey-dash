@@ -14,11 +14,12 @@ A photo tile shows a photo set, made in Management: a named link to an album in 
 ## Consequences
 
 - A smart search ranks every photo by how well it matches, so a rule's query only draws from the best matches, twice as many as the photos it draws.
-- Setting up Immich takes its address and an API key with at least the `album.read`, `asset.read`, `asset.view` and `person.read` permissions, entered under Accounts ([ADR-0007](0007-accounts-set-up-in-management.md)). HomeyDash checks both with Immich before keeping them.
+- Setting up Immich takes its address and an API key with at least the `album.read`, `asset.read`, `asset.view`, `face.read` and `person.read` permissions, entered under Accounts ([ADR-0007](0007-accounts-set-up-in-management.md)). HomeyDash checks both with Immich before keeping them.
 - A home can have several Immich accounts, each with a name, such as a server per household or a key per person. A photo set draws from one of them: the oldest unless another is chosen. Choosing an album of another account moves the set to that account. Removing an account leaves its sets without one, keeping their photos list, until they are given another.
 - When Immich can't be reached, photo tiles keep the photo they show and photos browsers have kept (for a day) still show, but new ones don't load. Photo tiles still work without the internet, in line with [ADR-0002](0002-homeydash-is-the-only-homey-client.md), as long as Immich runs on the home network.
 - The photo endpoint only serves photos in a photo set's list, so a display can't use HomeyDash to reach the rest of Immich.
 - An album's photos are read with Immich's `/search/metadata`, since Immich 3 no longer lists them with the album. The client pages by number and, from Immich 3.2, by cursor, so it works with Immich 1.1xx to 3.x.
+- A photo tile crops each photo around the faces Immich found in it. Immich's search no longer returns faces, so after a sync HomeyDash reads them from `/faces` once for each new photo, in the background, and keeps them with the photo. A key without `face.read` leaves photos cropped around their middle.
 - A sync that fails keeps the list as it was and shows why in Management, on the set and in the tile editor.
 - Photo sets picked from Google Photos were deleted by the migration to Immich: they had no album to follow.
 - No person needs to be in a browser to make a photo set any more, so assistants could make them over MCP ([ADR-0006](0006-mcp-server-for-assistants.md)); for now they can only use the ones that exist.

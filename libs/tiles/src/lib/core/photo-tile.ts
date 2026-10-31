@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { Photo, photoUrl, Realtime } from '@homey-dash/api-client';
+import { Focus, Photo, photoUrl, Realtime } from '@homey-dash/api-client';
 import { LucideChevronLeft, LucideChevronRight, LucideDynamicIcon, LucideImage } from '@lucide/angular';
 import { TileSettings } from '../tile-data';
 import { TileDetails } from './tile-details';
@@ -30,6 +30,25 @@ export function shuffled<T>(items: readonly T[], random = Math.random): T[] {
   return result;
 }
 
+/**
+ * Where to crop a photo that covers a box, as its object-position: with its faces in the middle of the box, as far as
+ * the photo's edges allow, given the width-to-height ratios of the photo and the box. The middle, as an image crops by
+ * default, until its faces are read. Before the photo has loaded, the focus lines up with the same fraction of the box,
+ * which keeps it in view however the photo is cropped.
+ */
+export function cropPosition(focus: Focus | null | undefined, photoRatio?: number, boxRatio?: number): string {
+  if (!focus) return '50% 50%';
+  let { x, y } = focus;
+  if (photoRatio && boxRatio) {
+    // How many times the box the covering photo is, along the side it overflows.
+    const over = photoRatio / boxRatio;
+    const middle = (f: number, k: number) => Math.min(1, Math.max(0, (f * k - 0.5) / (k - 1)));
+    if (over > 1) x = middle(x, over);
+    else if (over < 1) y = middle(y, 1 / over);
+  }
+  return `${Math.round(x * 1000) / 10}% ${Math.round(y * 1000) / 10}%`;
+}
+
 /** When a photo was taken, as people say it: 12 August 2026. */
 export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
   return photo.takenAt ? new Date(photo.takenAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
@@ -37,7 +56,7 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
 
 /**
  * The photos of one photo set, one at a time in shuffled order, fading to the next at the tile's interval. Each photo
- * fills the tile and is cropped to it. A press opens the detail view with the photo whole and the date it was taken,
+ * fills the tile and is cropped to it around the faces in it. A press opens the detail view with the photo whole and the date it was taken,
  * where a swipe or the arrows move through the set. While the connection to HomeyDash is lost it keeps its photo.
  */
 @Component({
@@ -48,7 +67,8 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
   template: `
     @if (face().state === 'ok' && layers().length) {
       @for (layer of layers(); track layer.key) {
-        <img class="hd-photo__img" [src]="layer.url" alt="" draggable="false" />
+        <img class="hd-photo__img" [src]="layer.url" [style.object-position]="cropAt(layer)" alt="" draggable="false"
+          (load)="measured(layer.key, $any($event.target))" />
       }
       @if (settings().label) {
         <div class="hd-photo__label">{{ settings().label }}</div>
@@ -104,8 +124,11 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
     return set ? shuffled(set.photos).map((photo) => ({ photo, url: photoUrl(set, photo) })) : [];
   });
 
-  /** The photo shown and, while the next fades in over it, the one before. */
-  protected readonly layers = signal<{ key: number; url: string }[]>([]);
+  // Read from the set as it is now, since faces are read after its photos arrive and leave the order as it is.
+  private readonly photosById = computed(() => new Map(this.set()?.photos.map((p) => [p.id, p])));
+
+  /** The photo shown and, while the next fades in over it, the one before; with their ratios once loaded. */
+  protected readonly layers = signal<PhotoLayer[]>([]);
   private position = 0;
   private nextKey = 0;
 
@@ -136,7 +159,7 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
       const order = this.order();
       untracked(() => {
         this.position = 0;
-        this.layers.set(order.length ? [{ key: this.nextKey++, url: order[0].url }] : []);
+        this.layers.set(order.length ? [{ key: this.nextKey++, id: order[0].photo.id, url: order[0].url }] : []);
       });
     });
 
@@ -155,7 +178,7 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
     const order = this.order();
     if (order.length < 2) return;
     this.position = (this.position + 1) % order.length;
-    const url = order[this.position].url;
+    const { photo, url } = order[this.position];
     // Only once it has loaded, so the fade never shows half a photo.
     const image = new Image();
     image.src = url;
@@ -165,7 +188,18 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
       return;
     }
     if (order !== this.order()) return;
-    this.layers.update((layers) => [...layers.slice(-1), { key: this.nextKey++, url }]);
+    this.layers.update((layers) => [...layers.slice(-1), { key: this.nextKey++, id: photo.id, url }]);
+  }
+
+  protected cropAt(layer: PhotoLayer) {
+    return cropPosition(this.photosById().get(layer.id)?.focus, layer.photoRatio, layer.boxRatio);
+  }
+
+  // The tile is the image's box, since the image fills it.
+  protected measured(key: number, image: HTMLImageElement) {
+    if (!image.naturalHeight || !image.clientHeight) return;
+    const ratios = { photoRatio: image.naturalWidth / image.naturalHeight, boxRatio: image.clientWidth / image.clientHeight };
+    this.layers.update((layers) => layers.map((l) => (l.key === key ? { ...l, ...ratios } : l)));
   }
 
   protected override openDetails() {
@@ -184,6 +218,14 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
     this.swipeStart = null;
     if (Math.abs(dx) > 40) this.step(dx < 0 ? 1 : -1);
   }
+}
+
+interface PhotoLayer {
+  key: number;
+  id: string;
+  url: string;
+  photoRatio?: number;
+  boxRatio?: number;
 }
 
 /** Management's choice of how long a photo tile shows each photo. */

@@ -146,6 +146,34 @@ public sealed class ImmichClient(IHttpClientFactory httpFactory, Random? random 
 
     private static Photo ToPhoto(JsonElement asset) => new(asset.GetProperty("id").GetString()!, TakenAt(asset));
 
+    // The middle of the box around every face, so a group stays together. Immich measures faces in the image it found
+    // them in, the preview, which is turned upright like the one a display shows.
+    public async Task<Focus?> FocusAsync(ImmichAccount account, string photoId, CancellationToken ct)
+    {
+        if (!Guid.TryParse(photoId, out _)) return null;
+        JsonElement faces;
+        try
+        {
+            faces = await SendAsync(account, HttpMethod.Get, $"faces?id={photoId}", null, ct);
+        }
+        catch (ImmichException e) when (e.InnerException is HttpRequestException { StatusCode: HttpStatusCode.NotFound or HttpStatusCode.BadRequest })
+        {
+            return null;
+        }
+        double left = 1, top = 1, right = 0, bottom = 0;
+        foreach (var face in faces.EnumerateArray())
+        {
+            double width = face.GetProperty("imageWidth").GetDouble(), height = face.GetProperty("imageHeight").GetDouble();
+            if (width <= 0 || height <= 0) continue;
+            left = Math.Min(left, face.GetProperty("boundingBoxX1").GetDouble() / width);
+            top = Math.Min(top, face.GetProperty("boundingBoxY1").GetDouble() / height);
+            right = Math.Max(right, face.GetProperty("boundingBoxX2").GetDouble() / width);
+            bottom = Math.Max(bottom, face.GetProperty("boundingBoxY2").GetDouble() / height);
+        }
+        if (right <= left || bottom <= top) return null;
+        return new Focus(Math.Round(Math.Clamp((left + right) / 2, 0, 1), 3), Math.Round(Math.Clamp((top + bottom) / 2, 0, 1), 3));
+    }
+
     public async Task<ImmichPhoto?> PhotoAsync(ImmichAccount account, string photoId, CancellationToken ct)
     {
         if (!Guid.TryParse(photoId, out _)) return null;
@@ -216,7 +244,7 @@ public sealed class ImmichClient(IHttpClientFactory httpFactory, Random? random 
     private static ImmichException Refused(HttpStatusCode status, string what, string? text) => status switch
     {
         HttpStatusCode.Unauthorized => new("Immich does not accept the API key. Make a new one in Immich and enter it under Accounts.", keyRefused: true),
-        HttpStatusCode.Forbidden => new("The API key may not read albums, people and photos. Give it the album.read, asset.read, asset.view and person.read permissions in Immich.", keyRefused: true),
+        HttpStatusCode.Forbidden => new("The API key may not read albums, people, faces and photos. Give it the album.read, asset.read, asset.view, face.read and person.read permissions in Immich.", keyRefused: true),
         _ => new($"Immich answered {(int)status} to {what}" + (string.IsNullOrWhiteSpace(text) ? "." : $": {text}"),
             inner: new HttpRequestException(null, null, status)),
     };

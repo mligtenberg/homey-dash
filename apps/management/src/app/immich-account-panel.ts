@@ -123,7 +123,7 @@ import { ImmichAccount, ImmichAccountApi, ImmichAccounts } from '@homey-dash/api
           <span id="immich-key-hint" [class]="errors()['apiKey'] ? 'field-error' : 'hint'">
             {{
               errors()['apiKey'] ??
-                'Make one in Immich under Account Settings → API Keys, with at least album.read, asset.read, asset.view and person.read.'
+                'Make one in Immich under Account Settings → API Keys, with at least album.read, asset.read, asset.view, face.read and person.read.'
             }}
           </span>
         </div>

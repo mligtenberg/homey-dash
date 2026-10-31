@@ -165,6 +165,7 @@ public static class PhotoEndpoints
             s.Db.PhotoSets.Add(set);
             await s.Db.SaveChangesAsync(ct);
             s.Index.Add(set.Id);
+            s.Sync.WantFaces();
             await s.ChangedAsync(ct, dashboards: true);
             return Results.Created($"/api/photo-sets/{set.Id}", await ViewAsync(s, set, ct));
         });
