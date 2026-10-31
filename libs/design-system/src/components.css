@@ -577,7 +577,8 @@
   color: #fff; font-size: calc(var(--cell) * .12); line-height: 1.15; font-weight: 700;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.hd-photo-details { display: grid; place-items: center; height: min(60dvh, calc(var(--cell) * 3)); touch-action: pan-y; }
+/* A track as big as the box, so the photo's max-height has a height to fit in rather than one sized by the photo. */
+.hd-photo-details { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; height: min(60dvh, calc(var(--cell) * 3)); touch-action: pan-y; }
 .hd-photo-details__img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: calc(var(--cell) * .06); user-select: none; }
 @media (prefers-reduced-motion: reduce) {
   .hd-photo__img { animation: none; }
