@@ -102,7 +102,7 @@ public sealed class LocalHomey(
         try
         {
             // Subscribe before loading, so nothing that changes in between is missed.
-            await Task.WhenAll(new[] { "homey:manager:devices", "homey:manager:flow", "homey:manager:moods", "homey:manager:zones" }
+            await Task.WhenAll(new[] { "homey:manager:devices", "homey:manager:flow", "homey:manager:moods", "homey:manager:zones", "homey:manager:logic" }
                 .Select(uri => SubscribeAsync(socket, uri, ct)));
             await LoadSnapshotAsync(ct);
             await Task.WhenAll(state.Devices.Select(d => SubscribeAsync(socket, DeviceUri(d.Id), ct)));
@@ -139,7 +139,8 @@ public sealed class LocalHomey(
         var advancedFlows = GetJsonAsync("api/manager/flow/advancedflow", ct);
         var flowFolders = GetJsonAsync("api/manager/flow/flowfolder", ct);
         var moods = GetJsonAsync("api/manager/moods/mood", ct);
-        await Task.WhenAll(zones, devices, flows, advancedFlows, flowFolders, moods);
+        var variables = GetVariablesAsync(ct);
+        await Task.WhenAll(zones, devices, flows, advancedFlows, flowFolders, moods, variables);
 
         var zoneList = HomeyMapper.Values(zones.Result).Select(HomeyMapper.Zone).ToList();
         var zoneNames = zoneList.ToDictionary(z => z.Id, z => z.Name);
@@ -149,7 +150,22 @@ public sealed class LocalHomey(
                 .Concat(HomeyMapper.Values(advancedFlows.Result).Select(f => HomeyMapper.Flow(f, advanced: true))),
             HomeyMapper.Values(moods.Result).Select(HomeyMapper.Mood),
             zoneList,
-            HomeyMapper.Values(flowFolders.Result).Select(HomeyMapper.FlowFolder));
+            HomeyMapper.Values(flowFolders.Result).Select(HomeyMapper.FlowFolder),
+            variables.Result);
+    }
+
+    // Variables only feed rules, so an API key that may not read them leaves them out rather than failing.
+    private async Task<List<HomeyVariable>> GetVariablesAsync(CancellationToken ct)
+    {
+        try
+        {
+            return HomeyMapper.Values(await GetJsonAsync("api/manager/logic/variable", ct)).Select(HomeyMapper.Variable).ToList();
+        }
+        catch (HttpRequestException e)
+        {
+            logger.LogWarning("Could not read the variables of Homey {Account}: {Error}", account.Name, e.Message);
+            return [];
+        }
     }
 
     private async Task SubscribeAsync(SocketIoClient socket, string uri, CancellationToken ct) =>
@@ -215,6 +231,12 @@ public sealed class LocalHomey(
                 break;
             case ("homey:manager:zones", "zone.delete"):
                 state.RemoveZone(HomeyMapper.String(data, "id")!);
+                break;
+            case ("homey:manager:logic", "variable.create" or "variable.update"):
+                state.UpsertVariable(HomeyMapper.Variable(data));
+                break;
+            case ("homey:manager:logic", "variable.delete"):
+                state.RemoveVariable(HomeyMapper.String(data, "id")!);
                 break;
         }
     }

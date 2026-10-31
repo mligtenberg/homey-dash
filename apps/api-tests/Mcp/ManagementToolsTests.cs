@@ -49,7 +49,7 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
 
         Assert.Equal(
             ["assign_dashboard", "create_dashboard", "get_dashboard", "list_dashboards", "list_displays",
-                "list_targets", "publish_dashboard", "rename_dashboard", "save_draft"],
+                "list_signals", "list_targets", "publish_dashboard", "rename_dashboard", "save_draft"],
             tools);
     }
 
@@ -131,5 +131,55 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
 
         Assert.NotEqual(0, flows.GetArrayLength());
         Assert.All(flows.EnumerateArray(), f => Assert.Equal(1, f.GetProperty("account").GetInt32()));
+    }
+    [Fact]
+    public async Task ItListsSignals_WithTheirAccountTypeAndAllowedValues()
+    {
+        await using var mcp = await ConnectAsync();
+
+        var homey = Json(await CallAsync(mcp, "list_signals", new { source = "homey" })).EnumerateArray().ToList();
+        var clock = Json(await CallAsync(mcp, "list_signals", new { source = "clock" }));
+
+        var mode = homey.Single(s => s.GetProperty("id").GetString() == "homey:1:variable:var-house-mode");
+        Assert.Equal("text", mode.GetProperty("type").GetString());
+        Assert.Equal(1, mode.GetProperty("account").GetInt32());
+        Assert.All(homey, s => Assert.Equal("homey", s.GetProperty("source").GetString()));
+        Assert.Equal("dateTime", Assert.Single(clock.EnumerateArray()).GetProperty("type").GetString());
+    }
+
+    private static object LogicTile(object rule) => new
+    {
+        id = "t1",
+        kind = "logic",
+        size = "wide",
+        position = new { column = 0, row = 0 },
+        settings = new
+        {
+            target = (string?)null,
+            entries = new[] { new { tile = new { kind = "flow", settings = new { target = "flow-1" } }, rule } },
+            fallback = (object?)null,
+        },
+    };
+
+    [Fact]
+    public async Task SaveDraft_KeepsAValidLogicTile_AndRefusesAnInvalidRuleSayingWhy()
+    {
+        await using var mcp = await ConnectAsync();
+        var id = Json(await CallAsync(mcp, "create_dashboard", new { name = "Kitchen" })).GetProperty("id").GetString();
+        var guests = new { signal = "homey:1:variable:var-guests", @operator = "isTrue" };
+
+        var saved = Json(await CallAsync(mcp, "save_draft", new { dashboardId = id, draft = Draft(LogicTile(new { match = "all", conditions = new[] { guests } })) }));
+        var wrong = await CallAsync(mcp, "save_draft", new
+        {
+            dashboardId = id,
+            draft = Draft(LogicTile(new { match = "all", conditions = new[] { guests with { @operator = "greaterThan" } } })),
+        });
+
+        var rule = saved.GetProperty("draft").GetProperty("sections")[0].GetProperty("tiles")[0].GetProperty("settings")
+            .GetProperty("entries")[0].GetProperty("rule");
+        Assert.Equal("homey:1:variable:var-guests", rule.GetProperty("conditions")[0].GetProperty("signal").GetString());
+        var error = Error(wrong);
+        Assert.Contains("sections[0].tiles[0].settings.entries[0].rule.conditions[0]", error);
+        Assert.Contains("doesn't suit a yes/no signal", error);
     }
 }

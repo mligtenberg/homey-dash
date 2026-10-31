@@ -451,6 +451,13 @@
   cursor: pointer; background: none;
 }
 .hd-slot:hover { border-color: var(--brand); color: var(--brand); }
+/* Which of a logic tile's tiles shows, over it in the Editor: "2 of 3", "Fallback", "Nothing". */
+.hd-logic-badge {
+  position: absolute; top: 6px; left: 6px; z-index: 1; pointer-events: none;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--brand); color: var(--panel);
+  font: 700 11px/1.5 var(--font-sans); white-space: nowrap;
+}
 .hd-handle { position: absolute; width: 14px; height: 14px; border-radius: 4px; background: var(--brand); border: 2px solid var(--panel); cursor: nwse-resize; }
 
 .hd-nav { display: flex; flex-direction: column; gap: 4px; }

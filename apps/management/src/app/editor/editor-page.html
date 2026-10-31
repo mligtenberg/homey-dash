@@ -9,12 +9,15 @@
       <span class="hd-pill">Version {{ dashboard.publishedVersion }}</span>
     }
     @if (saveState() === 'error') {
-      <span class="hd-pill hd-pill--danger" role="alert">Couldn't save the draft</span>
+      <span class="hd-pill hd-pill--danger save-error" role="alert" [title]="saveError() ?? ''">
+        Couldn't save the draft{{ saveError() ? ': ' + saveError() : '' }}
+      </span>
     }
     @if (refused(); as refused) {
       <span class="hd-pill" role="status">{{ refused }}</span>
     }
     <span class="spacer"></span>
+    <hd-as-display-picker />
     <a class="hd-btn" [routerLink]="['/dashboards', dashboard.id, 'preview']">Preview</a>
     <button class="hd-btn hd-btn--primary" type="button" [disabled]="!unpublished() || saveState() === 'error'" (click)="publish()">
       Publish
@@ -66,7 +69,10 @@
               </button>
             }
             @for (tile of section.tiles; track tile.id) {
-              <hd-tile-host [tile]="tile" [class.is-selected]="tile.id === selectedTileId()">
+              <hd-tile-host [tile]="stageTile(tile)" [class.is-selected]="tile.id === selectedTileId()">
+                @if (open()?.tileId === tile.id) {
+                  <span class="hd-logic-badge">Editing {{ open()?.label }}</span>
+                }
                 <button
                   class="overlay"
                   type="button"
@@ -101,14 +107,44 @@
         </div>
         <button class="hd-btn" type="button" (click)="adding.set(null)">Cancel</button>
       } @else if (selected(); as selected) {
-        <hd-tile-panel
-          [tile]="selected.tile"
-          [kind]="kindOf(selected.tile)"
-          [fitsSize]="fitsSize()"
-          (settingsChanged)="updateSettings(selected.tile.id, $event)"
-          (resized)="resize(selected.tile.id, $event)"
-          (removed)="removeTile(selected.tile.id)"
-        />
+        @if (open(); as open) {
+          <button class="hd-btn back" type="button" (click)="openEntry.set(null)">
+            <svg [lucideIcon]="icons.LucideChevronLeft" />
+            Logic tile
+          </button>
+          <p class="hint">{{ open.rule ? 'Tile ' + open.label : 'The fallback' }} of the logic tile, at its size.</p>
+          <hd-tile-panel
+            nested
+            [tile]="open.view"
+            [kind]="kindOf(open.view)"
+            [fitsSize]="fitsSize()"
+            (settingsChanged)="updateOpen(selected.tile.id, { settings: $event })"
+            (removed)="removeOpen(selected.tile.id)"
+          >
+            @if (open.rule; as rule) {
+              <hd-rule-editor [rule]="rule" (changed)="updateOpen(selected.tile.id, { rule: $event })" />
+            }
+          </hd-tile-panel>
+        } @else {
+          <hd-tile-panel
+            [tile]="selected.tile"
+            [kind]="kindOf(selected.tile)"
+            [fitsSize]="fitsSize()"
+            [sizes]="sizesOf(selected.tile)"
+            (settingsChanged)="updateSettings(selected.tile.id, $event)"
+            (resized)="resize(selected.tile.id, $event)"
+            (removed)="removeTile(selected.tile.id)"
+          >
+            @if (logic(); as logic) {
+              <hd-logic-panel
+                [settings]="logic"
+                [size]="selected.tile.size"
+                (changed)="updateSettings(selected.tile.id, $event)"
+                (opened)="openEntry.set($event)"
+              />
+            }
+          </hd-tile-panel>
+        }
       } @else {
         <h2>Dashboard</h2>
         <div class="hd-field">

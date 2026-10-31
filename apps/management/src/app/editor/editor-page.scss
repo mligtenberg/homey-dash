@@ -71,6 +71,11 @@ hd-tile-host.is-selected { outline: 2.5px solid var(--brand); outline-offset: 4p
 .kind { text-align: left; }
 .hint { color: var(--ink-muted); margin: 0; }
 .delete { align-self: flex-start; }
+.back {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-1);
+  svg { width: 16px; height: 16px; }
+}
+.save-error { max-width: 32em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (max-width: 860px) {
   :host { height: auto; }

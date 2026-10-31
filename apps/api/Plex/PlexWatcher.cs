@@ -49,6 +49,9 @@ public sealed class PlexWatcher(
     private readonly ConcurrentDictionary<int, Watch> _watches = new();
     private readonly SemaphoreSlim _accountsChanged = new(0);
 
+    // Raised when an account, its players or what plays changed, beyond the steady progress of playing.
+    public event Action? Changed;
+
     public IReadOnlyList<PlexOverview> Overviews =>
         accounts.All.Select(a => _watches.TryGetValue(a.Id, out var w) ? w.Overview : Initial(a)).ToList();
 
@@ -127,6 +130,7 @@ public sealed class PlexWatcher(
             changed = true;
         }
         if (!changed) return;
+        Changed?.Invoke();
         await SendAsync("Plex", Overviews);
         await SendAsync("PlexSessions", Sessions);
         await PushDashboardsAsync();
@@ -202,6 +206,7 @@ public sealed class PlexWatcher(
             && before.Players.SequenceEqual(overview.Players))
             return;
         watch.Overview = overview;
+        Changed?.Invoke();
         await SendAsync("Plex", Overviews);
         // Libraries coming or going change which tiles are missing.
         if (!before.Libraries.Select(l => l.Id).SequenceEqual(overview.Libraries.Select(l => l.Id)) || before.Loaded != overview.Loaded)
@@ -212,7 +217,9 @@ public sealed class PlexWatcher(
     {
         var before = watch.Sessions;
         watch.Sessions = sessions;
-        if (Differs(before, sessions)) await SendAsync("PlexSessions", Sessions);
+        if (!Differs(before, sessions)) return;
+        Changed?.Invoke();
+        await SendAsync("PlexSessions", Sessions);
     }
 
     // Anything but progress that moves on as tiles expect.

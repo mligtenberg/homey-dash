@@ -1,4 +1,5 @@
 import {
+  booleanAttribute,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -22,7 +23,10 @@ import { SizePicker } from './size-picker';
 import { TargetPicker } from './target-picker';
 import { allOptions, buildTree, TargetNode } from './target-tree';
 
-/** Settings of the selected tile: its target, its kind's own settings, label and size. */
+/**
+ * Settings of the selected tile: its target, its kind's own settings, label and size. A tile a logic tile holds is
+ * `nested`: it takes the logic tile's size. Content projected into it shows below the kind's own settings.
+ */
 @Component({
   selector: 'hd-tile-panel',
   imports: [PhotoSetField, PlexTargetField, SizePicker, TargetPicker],
@@ -44,7 +48,9 @@ import { allOptions, buildTree, TargetNode } from './target-tree';
           </select>
         </div>
       }
-      @if (kind.target === 'photoSet') {
+      @if (kind.target === 'none') {
+        <!-- Points at nothing itself, such as a logic tile. -->
+      } @else if (kind.target === 'photoSet') {
         <hd-photo-set-field [value]="settings().target" (picked)="setTarget($event)" />
       } @else if (kind.target === 'plexPlayer' || kind.target === 'plexLibrary') {
         <hd-plex-target-field
@@ -89,27 +95,34 @@ import { allOptions, buildTree, TargetNode } from './target-tree';
       }
 
       <ng-container #kindSettings />
+      <ng-content />
 
-      <div class="hd-field">
-        <label class="hd-field__label" for="tile-label">Label</label>
-        <input
-          id="tile-label"
-          class="hd-input"
-          [value]="settings().label ?? ''"
-          [placeholder]="labelPlaceholder()"
-          (change)="setLabel($any($event.target).value)"
-        />
-      </div>
+      @if (kind.target !== 'none') {
+        <div class="hd-field">
+          <label class="hd-field__label" for="tile-label">Label</label>
+          <input
+            id="tile-label"
+            class="hd-input"
+            [value]="settings().label ?? ''"
+            [placeholder]="labelPlaceholder()"
+            (change)="setLabel($any($event.target).value)"
+          />
+        </div>
+      }
 
-      <div class="hd-field">
-        <span class="hd-field__label">Size</span>
-        <hd-size-picker [value]="tile().size" [enabled]="sizeEnabled()" (picked)="resized.emit($event)" />
-      </div>
+      @if (!nested()) {
+        <div class="hd-field">
+          <span class="hd-field__label">Size</span>
+          <hd-size-picker [value]="tile().size" [enabled]="sizeEnabled()" (picked)="resized.emit($event)" />
+        </div>
+      }
     } @else {
       <p class="muted">No installed module registers the kind "{{ tile().kind }}". It shows as missing until you remove it.</p>
     }
 
-    <button type="button" class="hd-btn hd-btn--danger remove" (click)="removed.emit()">Remove tile</button>
+    <button type="button" class="hd-btn hd-btn--danger remove" (click)="removed.emit()">
+      {{ nested() ? 'Remove from logic tile' : 'Remove tile' }}
+    </button>
   `,
   styles: `
     :host { display: flex; flex-direction: column; gap: var(--space-4); }
@@ -127,6 +140,10 @@ export class TilePanel {
   readonly kind = input.required<TileKind | undefined>();
   /** Whether the tile could take a size at its position. */
   readonly fitsSize = input.required<(size: TileSize) => boolean>();
+  /** The sizes the tile can take; its kind's, unless a logic tile, which takes only those of every tile it holds. */
+  readonly sizes = input<readonly TileSize[]>();
+  /** A tile a logic tile holds, which takes the logic tile's size. */
+  readonly nested = input(false, { transform: booleanAttribute });
 
   readonly settingsChanged = output<TileSettings>();
   readonly resized = output<TileSize>();
@@ -147,7 +164,7 @@ export class TilePanel {
 
   protected readonly targetNoun = computed(
     () =>
-      ({ device: 'device', flow: 'flow', mood: 'mood', insight: 'recorded value', photoSet: 'photo set', plexPlayer: 'player', plexLibrary: 'library' })[this.kind()?.target ?? 'device'],
+      ({ device: 'device', flow: 'flow', mood: 'mood', insight: 'recorded value', photoSet: 'photo set', plexPlayer: 'player', plexLibrary: 'library', none: 'target' })[this.kind()?.target ?? 'device'],
   );
 
   /** What a kind that takes several targets calls them: `Moods`. */
@@ -230,7 +247,8 @@ export class TilePanel {
   protected readonly sizeEnabled = computed(() => {
     const kind = this.kind();
     const fits = this.fitsSize();
-    return (size: TileSize) => size === this.tile().size || (!!kind?.sizes.includes(size) && fits(size));
+    const sizes = this.sizes() ?? kind?.sizes ?? [];
+    return (size: TileSize) => size === this.tile().size || (sizes.includes(size) && fits(size));
   });
 
   private readonly kindSettings = viewChild('kindSettings', { read: ViewContainerRef });

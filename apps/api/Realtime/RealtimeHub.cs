@@ -4,6 +4,7 @@ using HomeyDash.Api.Displays;
 using HomeyDash.Api.Homey;
 using HomeyDash.Api.Photos;
 using HomeyDash.Api.Plex;
+using HomeyDash.Api.Rules;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,7 +16,8 @@ namespace HomeyDash.Api.Realtime;
 /// again when a Homey account is added, removed or renamed. A screen joins with its screen id and is told which
 /// display it is with <c>Screen</c>; Management joins to receive <c>Displays</c> with every display's status and
 /// <c>Dashboards</c> with the dashboard list. Every connection also receives <c>PhotoSets</c> whenever a photo set changes,
-/// and <c>Plex</c> and <c>PlexSessions</c> as Plex's libraries and what plays change.
+/// and <c>Plex</c> and <c>PlexSessions</c> as Plex's libraries and what plays change. A connection can subscribe to rules
+/// (ADR-0010), whose changed answers arrive as <c>RuleAnswers</c>.
 /// Mirrored in libs/api-client/src/lib/realtime.ts.
 /// </summary>
 public sealed class RealtimeHub(
@@ -28,6 +30,10 @@ public sealed class RealtimeHub(
     PlexWatcher plexWatcher,
     IPlex plex,
     PlexAccounts plexAccounts,
+    RuleEngine rules,
+    RuleSubscriptions subscriptions,
+    DisplayDirectory directory,
+    DisplayTouches touches,
     TimeProvider time) : Hub
 {
     public const string Path = "/api/realtime";
@@ -94,8 +100,32 @@ public sealed class RealtimeHub(
 
     public Task ActivateMood(int? accountId, string moodId) => Perform(ct => homeys.Require(accountId).ActivateMoodAsync(moodId, ct));
 
+    /// <summary>
+    /// Subscribes to a rule under an id the connection chooses, answering whether it holds now. A screen's rules are
+    /// evaluated for the display it holds; Management's as if on <paramref name="asDisplay"/>, or on none.
+    /// </summary>
+    public RuleAnswer SubscribeRule(string id, JsonElement rule, Guid? asDisplay)
+    {
+        var (parsed, error) = RuleSetup.Check(rule, rules);
+        if (parsed is null) throw new HubException(error);
+        var context = Context.Items.TryGetValue(ScreenKey, out var screen) && screen is Guid screenId
+            ? new RuleContext(ScreenId: screenId)
+            : new RuleContext(DisplayId: asDisplay);
+        return subscriptions.Subscribe(Context.ConnectionId, id, parsed, context);
+    }
+
+    public void UnsubscribeRule(string id) => subscriptions.Unsubscribe(Context.ConnectionId, id);
+
+    // The screen was touched; screens report this at most every few seconds.
+    public void Touched()
+    {
+        if (!Context.Items.TryGetValue(ScreenKey, out var screen) || screen is not Guid screenId) throw new HubException("Join as a screen first.");
+        if (directory.ByScreen(screenId) is { } display) touches.Touch(display.Id, time.GetUtcNow());
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
+        subscriptions.Drop(Context.ConnectionId);
         if (Context.Items.TryGetValue(ScreenKey, out var screen) && screen is Guid screenId)
         {
             presence.Disconnect(screenId);

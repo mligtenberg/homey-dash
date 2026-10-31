@@ -14,6 +14,7 @@ public sealed class HomeyBroadcaster(Homeys homeys, IHubContext<RealtimeHub> hub
     // The Homeys listened to, by account, with the handler listening.
     private readonly Dictionary<int, (HomeyState State, Action<HomeyChange> Handler)> _listening = [];
     private readonly ConcurrentDictionary<(int, string), byte> _devices = new();
+    private readonly ConcurrentDictionary<(int, string), byte> _variables = new();
     private int _dashboardsPending;
 
     public Task StartAsync(CancellationToken ct)
@@ -66,22 +67,31 @@ public sealed class HomeyBroadcaster(Homeys homeys, IHubContext<RealtimeHub> hub
     private void OnChanged(int accountId, HomeyState state, HomeyChange change)
     {
         Push(accountId, state, change);
-        // Only changes that can alter a missing-tile count: devices coming or going, the catalog, (re)connecting.
+        // Only changes that can alter a missing-tile count: devices or variables (which rules use) coming or going, the
+        // catalog, (re)connecting.
         var newDevice = change is DeviceChanged c && _devices.TryAdd((accountId, c.Device.Id), 0);
         if (change is DeviceRemoved r) _devices.TryRemove((accountId, r.DeviceId), out _);
-        if (newDevice || change is DeviceRemoved or CatalogChanged or ConnectionChanged { Status.Connection: HomeyConnection.Connected })
+        var newVariable = change is VariableChanged v && _variables.TryAdd((accountId, v.Variable.Id), 0);
+        if (change is VariableRemoved vr) _variables.TryRemove((accountId, vr.VariableId), out _);
+        if (newDevice || newVariable || change is DeviceRemoved or VariableRemoved or CatalogChanged
+                or ConnectionChanged { Status.Connection: HomeyConnection.Connected })
             _ = PushDashboardsAsync();
     }
 
-    private void Push(int accountId, HomeyState state, HomeyChange change) => _ = SendAsync(change switch
+    // Variables only feed rules, which HomeyDash evaluates itself (ADR-0010), so they are not passed on.
+    private void Push(int accountId, HomeyState state, HomeyChange change)
     {
-        DeviceChanged c => ("DeviceChanged", new HomeyDeviceChange(accountId, c.Device)),
-        DeviceRemoved c => ("DeviceRemoved", new HomeyDeviceRemoval(accountId, c.DeviceId)),
-        CatalogChanged => ("Catalog", new HomeyCatalog(accountId, state.Flows.OrderBy(f => f.Name), state.Moods.OrderBy(m => m.Name),
-            state.Zones.OrderBy(z => z.Name), state.FlowFolders.OrderBy(f => f.Name))),
-        ConnectionChanged c => ("HomeyStatus", c.Status),
-        _ => throw new ArgumentOutOfRangeException(nameof(change), change, null),
-    });
+        if (change is VariableChanged or VariableRemoved) return;
+        _ = SendAsync(change switch
+        {
+            DeviceChanged c => ("DeviceChanged", new HomeyDeviceChange(accountId, c.Device)),
+            DeviceRemoved c => ("DeviceRemoved", new HomeyDeviceRemoval(accountId, c.DeviceId)),
+            CatalogChanged => ("Catalog", new HomeyCatalog(accountId, state.Flows.OrderBy(f => f.Name), state.Moods.OrderBy(m => m.Name),
+                state.Zones.OrderBy(z => z.Name), state.FlowFolders.OrderBy(f => f.Name))),
+            ConnectionChanged c => ("HomeyStatus", c.Status),
+            _ => throw new ArgumentOutOfRangeException(nameof(change), change, null),
+        });
+    }
 
     // Coalesces a burst, such as the first load that adds every device, into one push.
     private async Task PushDashboardsAsync()

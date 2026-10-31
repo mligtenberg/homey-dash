@@ -54,4 +54,11 @@ public static class HomeyFixtures
           }
         }
         """;
+
+    public const string Variables = """
+        {
+          "v1": { "id": "v1", "name": "House mode", "type": "string", "value": "Home" },
+          "v2": { "id": "v2", "name": "Guests", "type": "boolean", "value": false }
+        }
+        """;
 }

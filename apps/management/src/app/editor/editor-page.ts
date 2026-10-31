@@ -9,14 +9,30 @@ import {
   signal,
   viewChildren,
 } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
-import { DashboardDetail, DashboardLayout, DashboardsApi, DisplaysApi, Tile } from '@homey-dash/api-client';
+import { DashboardDetail, DashboardLayout, DashboardsApi, DisplaysApi, Rule, Tile } from '@homey-dash/api-client';
 import { TilePosition, TileSize } from '@homey-dash/layout';
-import { TileHost, TileKind, TileKindRegistry, TileSettings } from '@homey-dash/tiles';
+import {
+  choiceLabel,
+  heldTile,
+  HeldTile,
+  LOGIC_KIND,
+  LOGIC_TILE_BADGE,
+  LogicTileSettings,
+  logicSizes,
+  TileHost,
+  TileKind,
+  TileKindRegistry,
+  TileSettings,
+} from '@homey-dash/tiles';
 import { LucideChevronLeft, LucideChevronRight, LucideDynamicIcon, LucidePlus, LucideTrash } from '@lucide/angular';
 import { firstValueFrom, Subscription } from 'rxjs';
+import { AsDisplayPicker } from '../as-display-picker';
 import { DashboardsStore } from '../dashboards-store';
 import * as edits from './draft-edits';
+import { LogicPanel, OpenEntry } from './logic-panel';
+import { RuleEditor } from './rule-editor';
 import { TilePanel } from './tile-panel';
 
 const SAVE_DELAY_MS = 400;
@@ -35,8 +51,10 @@ interface Drag {
 
 @Component({
   selector: 'hd-editor-page',
-  imports: [RouterLink, TileHost, TilePanel, LucideDynamicIcon],
+  imports: [AsDisplayPicker, LogicPanel, RouterLink, RuleEditor, TileHost, TilePanel, LucideDynamicIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // Logic tiles say which of their tiles they show.
+  providers: [{ provide: LOGIC_TILE_BADGE, useValue: true }],
   templateUrl: './editor-page.html',
   styleUrl: './editor-page.scss',
 })
@@ -58,6 +76,10 @@ export class EditorPage {
   protected readonly adding = signal<{ sectionId: string; position: TilePosition } | null>(null);
   protected readonly saveState = signal<'saved' | 'pending' | 'saving' | 'error'>('saved');
   protected readonly refused = signal<string | null>(null);
+  /** Why the draft couldn't be saved, such as an invalid rule. */
+  protected readonly saveError = signal<string | null>(null);
+  /** Which of the selected logic tile's tiles is open in the panel. */
+  protected readonly openEntry = signal<OpenEntry | null>(null);
   protected readonly justPublished = signal(false);
   private readonly drag = signal<Drag | null>(null);
 
@@ -91,6 +113,46 @@ export class EditorPage {
     return id && draft ? edits.findTile(draft, id) : null;
   });
 
+  /** The selected tile's settings when it is a logic tile. */
+  protected readonly logic = computed(() => {
+    const tile = this.selected()?.tile;
+    return tile?.kind === LOGIC_KIND ? (tile.settings as LogicTileSettings) : null;
+  });
+
+  /** The tile of the selected logic tile that is open in the panel, as the stage shows it while it is configured. */
+  protected readonly open = computed(() => {
+    const logic = this.logic();
+    const open = this.openEntry();
+    const tile = this.selected()?.tile;
+    if (!logic || open === null || !tile) return null;
+    const held = open === 'fallback' ? logic.fallback : logic.entries?.[open]?.tile;
+    if (!held) return null;
+    return {
+      tileId: tile.id,
+      held,
+      view: heldTile(`${tile.id}/${open}`, held, tile.size),
+      rule: open === 'fallback' ? null : logic.entries[open].rule,
+      label: open === 'fallback' ? 'Fallback' : choiceLabel(open, logic.entries.length),
+    };
+  });
+
+  // The open tile in its logic tile's place, kept while neither changes so the stage doesn't render it again.
+  private staged: { from: Tile; held: HeldTile; tile: Tile } | null = null;
+
+  /** What the stage renders for a tile: the tile, or the open tile of a logic tile in its place. */
+  protected stageTile(tile: Tile): Tile {
+    const open = this.open();
+    if (open?.tileId !== tile.id) return tile;
+    if (this.staged?.from !== tile || this.staged.held !== open.held)
+      this.staged = { from: tile, held: open.held, tile: { ...tile, kind: open.held.kind, settings: open.held.settings } };
+    return this.staged.tile;
+  }
+
+  /** The sizes a tile can take: its kind's, or for a logic tile those of every tile it holds. */
+  protected sizesOf(tile: Tile) {
+    return tile.kind === LOGIC_KIND ? logicSizes(tile.settings as LogicTileSettings, this.kinds) : (this.kindOf(tile)?.sizes ?? []);
+  }
+
   protected readonly unpublished = computed(
     () => this.saveState() !== 'saved' || (this.dashboard()?.hasUnpublishedChanges ?? false),
   );
@@ -102,6 +164,7 @@ export class EditorPage {
         this.draft.set(dashboard.draft);
         this.saveState.set('saved');
         this.selectedTileId.set(null);
+        this.openEntry.set(null);
         this.adding.set(null);
       });
       onCleanup(() => {
@@ -142,12 +205,14 @@ export class EditorPage {
         if (this.dashboard()?.id !== id) return Promise.resolve();
         this.dashboard.set(saved);
         // Edits made while this save was in flight still need saving.
+        this.saveError.set(null);
         if (this.draft() !== draft) return this.flush();
         this.saveState.set('saved');
         return Promise.resolve();
       },
-      () => {
+      (error: unknown) => {
         this.inFlight = false;
+        this.saveError.set(problem(error));
         this.saveState.set('error');
       },
     );
@@ -187,6 +252,7 @@ export class EditorPage {
 
   protected select(tileId: string | null) {
     this.adding.set(null);
+    if (tileId !== this.selectedTileId()) this.openEntry.set(null);
     this.selectedTileId.set(tileId);
   }
 
@@ -199,6 +265,35 @@ export class EditorPage {
 
   protected updateSettings(tileId: string, settings: TileSettings) {
     this.apply(edits.updateTile(this.current(), tileId, (t) => ({ ...t, settings })));
+  }
+
+  protected updateLogic(tileId: string, change: (logic: LogicTileSettings) => LogicTileSettings) {
+    this.apply(edits.updateTile(this.current(), tileId, (t) => ({ ...t, settings: change(t.settings as LogicTileSettings) })));
+  }
+
+  /** Changes the open tile of a logic tile: its settings, or its rule. */
+  protected updateOpen(tileId: string, change: { settings?: TileSettings; rule?: Rule }) {
+    const open = this.openEntry();
+    if (open === null) return;
+    this.updateLogic(tileId, (logic) =>
+      open === 'fallback'
+        ? { ...logic, fallback: logic.fallback && change.settings ? { ...logic.fallback, settings: change.settings } : logic.fallback }
+        : {
+            ...logic,
+            entries: logic.entries.map((e, i) =>
+              i === open ? { tile: change.settings ? { ...e.tile, settings: change.settings } : e.tile, rule: change.rule ?? e.rule } : e,
+            ),
+          },
+    );
+  }
+
+  protected removeOpen(tileId: string) {
+    const open = this.openEntry();
+    if (open === null) return;
+    this.openEntry.set(null);
+    this.updateLogic(tileId, (logic) =>
+      open === 'fallback' ? { ...logic, fallback: null } : { ...logic, entries: logic.entries.filter((_, i) => i !== open) },
+    );
   }
 
   protected resize(tileId: string, size: TileSize) {
@@ -322,7 +417,7 @@ export class EditorPage {
     } else {
       const { position } = found.tile;
       const wanted = { columns: at.cell.column - position.column + 1, rows: at.cell.row - position.row + 1 };
-      const size = edits.closestSize(draft, drag.tileId, this.kindOf(found.tile)?.sizes ?? [], wanted);
+      const size = edits.closestSize(draft, drag.tileId, this.sizesOf(found.tile), wanted);
       candidate = size ? edits.resizeTile(draft, drag.tileId, size) : null;
     }
     // Keep showing the last valid spot while the pointer is over one that isn't.
@@ -349,4 +444,11 @@ export class EditorPage {
       this.select(null);
     }
   }
+}
+
+/** What the API said is wrong with a draft it refused, such as an invalid rule; null when it said nothing. */
+function problem(error: unknown): string | null {
+  if (!(error instanceof HttpErrorResponse)) return null;
+  const errors = error.error?.errors as Record<string, string[]> | undefined;
+  return errors ? Object.values(errors).flat().join(' ') : null;
 }

@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 
 namespace HomeyDash.Api.Tests;
 
@@ -45,4 +48,18 @@ public sealed class RealImmichApiFactory : ApiFactory
 public sealed class RealPlexApiFactory : ApiFactory
 {
     protected override bool FakePlex => false;
+}
+
+// The API with a clock the tests move on, starting Monday 2 November 2026 at 10:00 in Amsterdam.
+public sealed class ClockApiFactory : ApiFactory
+{
+    public FakeTimeProvider Clock { get; } = new(new DateTimeOffset(2026, 11, 2, 9, 0, 0, TimeSpan.Zero));
+
+    public ClockApiFactory() => Clock.SetLocalTimeZone(TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam"));
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(Clock));
+    }
 }

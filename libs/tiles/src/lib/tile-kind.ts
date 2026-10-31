@@ -14,8 +14,11 @@ export type KindHue =
   | 'climate'
   | 'neutral';
 
-/** What a tile kind points at: something in Homey, a photo set, or a Plex player or library. */
-export type TargetType = 'device' | 'flow' | 'mood' | 'insight' | 'photoSet' | 'plexPlayer' | 'plexLibrary';
+/**
+ * What a tile kind points at: something in Homey, a photo set, or a Plex player or library; or nothing itself, as a
+ * logic tile, whose tiles each have their own.
+ */
+export type TargetType = 'device' | 'flow' | 'mood' | 'insight' | 'photoSet' | 'plexPlayer' | 'plexLibrary' | 'none';
 
 /** Whether a kind's target is something in Homey, read from the Homey of the tile's account. */
 export function isHomeyTarget(target: TargetType) {

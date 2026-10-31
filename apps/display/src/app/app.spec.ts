@@ -6,7 +6,7 @@ import { HomeySnapshot, Realtime, ScreenView, Tile } from '@homey-dash/api-clien
 import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { cellSize } from '@homey-dash/layout';
 import { CORE_TILES, provideTileModules, RealtimeTileData, TileData } from '@homey-dash/tiles';
-import { App, IDLE_MS } from './app';
+import { App, IDLE_MS, TOUCH_REPORT_MS } from './app';
 
 const hallway = { id: 'd1', name: 'Hallway', dashboardId: null, otherDashboardIds: [] };
 const dashboard = (id: string, name: string, version = 1, rows = 4) => ({ id, name, version, layout: { rows, sections: [] } });
@@ -252,6 +252,31 @@ describe('App', () => {
 
       expect(root.querySelector('hd-tile-host')?.classList).not.toContain('is-homey-lost');
       expect(root.querySelector('.hd-reconnecting')).toBeNull();
+    });
+  });
+  describe('touches', () => {
+    beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] }));
+    afterEach(() => vi.useRealTimers());
+
+    it('tells HomeyDash at once, then at most once per interval while touching goes on', async () => {
+      const root = await start(published(1));
+      const touch = () => root.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+
+      touch();
+      touch();
+      expect(realtime.touches).toBe(1);
+
+      vi.advanceTimersByTime(TOUCH_REPORT_MS);
+      touch();
+      expect(realtime.touches).toBe(2);
+    });
+
+    it('reports none while it is in setup', async () => {
+      const root = await start(null);
+
+      root.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+
+      expect(realtime.touches).toBe(0);
     });
   });
 });

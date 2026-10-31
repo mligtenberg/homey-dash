@@ -9,6 +9,7 @@ using HomeyDash.Api.Mcp;
 using HomeyDash.Api.Photos;
 using HomeyDash.Api.Plex;
 using HomeyDash.Api.Realtime;
+using HomeyDash.Api.Rules;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +22,7 @@ builder.Services.AddDbContext<HomeyDashDbContext>(options =>
 builder.Services.AddHomey(builder.Configuration);
 builder.Services.AddPhotos(builder.Configuration);
 builder.Services.AddPlex(builder.Configuration);
+builder.Services.AddRules();
 builder.Services.AddSingleton<TargetCatalog>();
 builder.Services.AddRealtime();
 builder.Services.AddMcpServer()
@@ -35,6 +37,8 @@ using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.LoadAccounts();
     scope.ServiceProvider.LoadPhotoSets();
     scope.ServiceProvider.LoadPlex();
+    await scope.ServiceProvider.GetRequiredService<DisplayDirectory>()
+        .RefreshAsync(scope.ServiceProvider.GetRequiredService<HomeyDashDbContext>(), CancellationToken.None);
 }
 
 if (app.Environment.IsDevelopment())
@@ -51,6 +55,7 @@ api.MapPhotos();
 api.MapPlex();
 api.MapDashboards();
 api.MapDisplays();
+api.MapRules();
 app.MapHub<RealtimeHub>(RealtimeHub.Path);
 app.MapMcp(ManagementTools.Path);
 
