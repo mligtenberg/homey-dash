@@ -5,7 +5,8 @@ namespace HomeyDash.Api.Photos;
 /// <summary>
 /// An Immich that needs no Immich server, used when the configuration sets Immich:Fake. It has two albums: Summer, with
 /// 12 photos and a video, and Garden, with 3 photos. Anna is on the even Summer photos, Bram on every third, and Cas on
-/// the Garden photos. A selection ignores its query. Photos are soft gradients with a number, drawn as SVG.
+/// the Garden photos. A selection ignores its query. Photos are soft gradients with a number, drawn as SVG; one with
+/// someone on it has a white disc for a face, near the top, on the left of even photos and the right of odd ones.
 /// </summary>
 public sealed class FakeImmich(TimeProvider time) : IImmich
 {
@@ -58,11 +59,22 @@ public sealed class FakeImmich(TimeProvider time) : IImmich
         return Task.FromResult<ImmichAlbumContents?>(new ImmichAlbumContents(album.Name, photos, album.Videos));
     }
 
-    // The photo's number is the last two hex digits of its id.
+    public Task<Focus?> FocusAsync(ImmichAccount account, string photoId, CancellationToken ct) =>
+        Task.FromResult(Face(photoId));
+
+    // The photo's number is the last two hex digits of its id, after its album's last two.
+    private static int? Number(string photoId) =>
+        photoId.Length >= 4 && int.TryParse(photoId[^2..], System.Globalization.NumberStyles.HexNumber, null, out var n) ? n : null;
+
+    private static Focus? Face(string photoId)
+    {
+        if (Number(photoId) is not { } n || Albums.FirstOrDefault(a => a.Id[^2..] == photoId[^4..^2]).Id is not { } album) return null;
+        return People(album, n).Length == 0 ? null : new Focus(n % 2 == 0 ? .2 : .8, .15);
+    }
+
     public Task<ImmichPhoto?> PhotoAsync(ImmichAccount account, string photoId, CancellationToken ct)
     {
-        if (photoId.Length < 2 || !int.TryParse(photoId[^2..], System.Globalization.NumberStyles.HexNumber, null, out var n))
-            return Task.FromResult<ImmichPhoto?>(null);
+        if (Number(photoId) is not { } n) return Task.FromResult<ImmichPhoto?>(null);
         var (width, height) = (n % 3) switch { 0 => (1600, 1200), 1 => (1200, 1600), _ => (1920, 1080) };
         var hue = n * 360 / SummerPhotos;
         var svg = $"""
@@ -73,6 +85,7 @@ public sealed class FakeImmich(TimeProvider time) : IImmich
               <rect width="100%" height="100%" fill="url(#g)"/>
               <text x="50%" y="50%" fill="#fff" fill-opacity="0.85" font-family="sans-serif" font-size="{Math.Min(width, height) / 4}"
                 text-anchor="middle" dominant-baseline="central">{n}</text>
+              {(Face(photoId) is { } face ? $"<circle cx=\"{face.X * width}\" cy=\"{face.Y * height}\" r=\"{Math.Min(width, height) / 10}\" fill=\"#fff\"/>" : "")}
             </svg>
             """;
         return Task.FromResult<ImmichPhoto?>(new ImmichPhoto(new MemoryStream(Encoding.UTF8.GetBytes(svg)), "image/svg+xml"));

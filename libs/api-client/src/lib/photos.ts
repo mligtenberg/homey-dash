@@ -9,6 +9,17 @@ export interface Photo {
   id: string;
   /** When it was taken, as Immich knows it. */
   takenAt: string | null;
+  /** What to keep in view when cropping it; null until its faces are read. */
+  focus: Focus | null;
+}
+
+/**
+ * The middle of the faces in a photo, as fractions of its width and height from the top left; the photo's middle when
+ * Immich found none.
+ */
+export interface Focus {
+  x: number;
+  y: number;
 }
 
 /** Someone Immich recognises by their face. */

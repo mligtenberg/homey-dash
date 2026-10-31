@@ -77,8 +77,16 @@ public sealed record PhotoSelection(IReadOnlyList<PersonRef> With, IReadOnlyList
         drawnAt is null || RefreshHours > 0 && now >= drawnAt.Value.AddHours(RefreshHours);
 }
 
-// One photo of a set: Id is its asset id in Immich. TakenAt is when it was taken, as Immich knows it.
-public sealed record Photo(string Id, DateTimeOffset? TakenAt);
+// One photo of a set: Id is its asset id in Immich. TakenAt is when it was taken, as Immich knows it. Focus is what a
+// tile keeps in view when it crops the photo; null until its faces are read.
+public sealed record Photo(string Id, DateTimeOffset? TakenAt, Focus? Focus = null);
+
+// The middle of the faces in a photo, as fractions of its width and height from the top left; the photo's middle when
+// Immich found none.
+public sealed record Focus(double X, double Y)
+{
+    public static readonly Focus Middle = new(.5, .5);
+}
 
 /// <summary>The ids of every photo set, so counting missing tiles needs no database.</summary>
 public sealed class PhotoSetIndex

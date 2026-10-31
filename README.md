@@ -38,7 +38,7 @@ Photo tiles show photo sets from your [Immich](https://immich.app) server. A pho
 so displays never need to reach Immich themselves.
 
 1. In Immich, under Account Settings → API Keys, make a key with at least the `album.read`, `asset.read`,
-   `asset.view` and `person.read` permissions. Name people in Immich to use them in rules.
+   `asset.view`, `face.read` and `person.read` permissions. Name people in Immich to use them in rules.
 2. In Management → Accounts, enter Immich's address (such as `192.168.1.20:2283`) and the key. HomeyDash checks both
    with Immich, keeps them in its database and never sends the key back to a browser.
 3. Under Photo sets, add a photo set and choose its album, or its rules.

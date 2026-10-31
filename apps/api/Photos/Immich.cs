@@ -9,7 +9,7 @@ public sealed class ImmichOptions
 
 /// <summary>
 /// An Immich account (ADR-0007): where an Immich server is and an API key made in it, with at least the album.read,
-/// asset.read, asset.view and person.read permissions. Set up in Management and kept in the database; a home can have
+/// asset.read, asset.view, face.read and person.read permissions. Set up in Management and kept in the database; a home can have
 /// several, told apart by their names, such as one per person's Immich.
 /// </summary>
 public sealed record ImmichAccount(string Address, string ApiKey)
@@ -45,7 +45,7 @@ public sealed record ImmichPhoto(Stream Content, string ContentType);
 
 /// <summary>
 /// What HomeyDash does with Immich (ADR-0008): list albums and people, read one album's photos, draw photos by a
-/// selection, and fetch a photo.
+/// selection, find the faces in a photo, and fetch a photo.
 /// </summary>
 public interface IImmich
 {
@@ -62,6 +62,9 @@ public interface IImmich
 
     // Up to selection.Count photos matching it, at random.
     Task<IReadOnlyList<Photo>> SelectAsync(ImmichAccount account, PhotoSelection selection, CancellationToken ct);
+
+    // Where the faces Immich found in the photo are; null when it found none, or the photo is gone.
+    Task<Focus?> FocusAsync(ImmichAccount account, string photoId, CancellationToken ct);
 
     // Immich's preview of the photo: sharp on a tablet, at a fraction of the original's size.
     Task<ImmichPhoto?> PhotoAsync(ImmichAccount account, string photoId, CancellationToken ct);

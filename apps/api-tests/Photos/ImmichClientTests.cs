@@ -119,6 +119,35 @@ public class ImmichClientTests
         Assert.All(photos, p => Assert.StartsWith("r", p.Id));
     }
 
+    private const string PhotoId = "22222222-2222-4222-8222-222222222222";
+
+    private static object Face(int x1, int y1, int x2, int y2) =>
+        new { boundingBoxX1 = x1, boundingBoxY1 = y1, boundingBoxX2 = x2, boundingBoxY2 = y2, imageWidth = 2000, imageHeight = 1000 };
+
+    [Fact]
+    public async Task APhotosFocus_IsTheMiddleOfAllItsFaces()
+    {
+        var immich = new ScriptedImmich((request, _) => request.RequestUri!.PathAndQuery == $"/api/faces?id={PhotoId}"
+            ? Json(new[] { Face(200, 100, 400, 300), Face(1000, 200, 1200, 500) })
+            : new HttpResponseMessage(HttpStatusCode.BadRequest));
+
+        var focus = await new ImmichClient(immich).FocusAsync(Account, PhotoId, CancellationToken.None);
+
+        Assert.Equal(new Focus(.35, .3), focus);
+    }
+
+    [Fact]
+    public async Task APhotoWithoutFaces_HasNoFocus_AndAKeyWithoutFaceRead_IsRefused()
+    {
+        var none = new ScriptedImmich((_, _) => Json(Array.Empty<object>()));
+        Assert.Null(await new ImmichClient(none).FocusAsync(Account, PhotoId, CancellationToken.None));
+
+        var refused = new ScriptedImmich((_, _) => Json(new { message = "Missing required permission: face.read" }, HttpStatusCode.Forbidden));
+        var e = await Assert.ThrowsAsync<ImmichException>(() => new ImmichClient(refused).FocusAsync(Account, PhotoId, CancellationToken.None));
+        Assert.True(e.KeyRefused);
+        Assert.Contains("face.read", e.Message);
+    }
+
     [Fact]
     public async Task AServerThatRefusesThePing_IsNotImmich()
     {
