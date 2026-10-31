@@ -51,12 +51,12 @@ public sealed class DisplaySignals : ISignalSource, IDisposable
         };
     }
 
-    private SignalInfo NameInfo() => new(Name, "display", SignalType.Text, "Name", "Display")
+    private SignalInfo NameInfo() => new(Name, "display", SignalType.Text, "Name", "Current display")
     {
         AllowedValues = _directory.All.Select(d => new AllowedValue(d.Id.ToString(), d.Name)).ToList(),
     };
 
-    private static readonly SignalInfo TouchedInfo = new(Touched, "display", SignalType.DateTime, "Last touched", "Display");
+    private static readonly SignalInfo TouchedInfo = new(Touched, "display", SignalType.DateTime, "Last touched", "Current display");
 
     private void OnChanged() => Changed?.Invoke();
 
