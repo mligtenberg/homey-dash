@@ -8,7 +8,7 @@ namespace HomeyDash.Api.Realtime;
 
 /// <summary>Tells screens and Management that displays, dashboards or photo sets changed.</summary>
 public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresence presence, TargetCatalog targets, PhotoSync sync,
-    ImmichAccounts immich)
+    ImmichAccounts immich, DisplayDirectory directory)
 {
     public const string ManagementGroup = "management";
 
@@ -23,8 +23,12 @@ public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresen
         await DisplaysChangedAsync(db, ct);
     }
 
-    public async Task DisplaysChangedAsync(HomeyDashDbContext db, CancellationToken ct) =>
+    // Rules on display signals follow, as a display is renamed, taken over or removed.
+    public async Task DisplaysChangedAsync(HomeyDashDbContext db, CancellationToken ct)
+    {
+        await directory.RefreshAsync(db, ct);
         await hub.Clients.Group(ManagementGroup).SendAsync("Displays", await DisplayQueries.ListAsync(db, presence, ct), ct);
+    }
 
     // Management's dashboard list: names, publish state, unpublished changes and tiles whose target is missing.
     public async Task DashboardsChangedAsync(HomeyDashDbContext db, CancellationToken ct) =>

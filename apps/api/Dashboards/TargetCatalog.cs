@@ -1,11 +1,15 @@
 using HomeyDash.Api.Homey;
 using HomeyDash.Api.Photos;
 using HomeyDash.Api.Plex;
+using HomeyDash.Api.Rules;
 
 namespace HomeyDash.Api.Dashboards;
 
-/// <summary>What tiles can point at: things in Homey, photo sets (ADR-0008), and Plex's players and libraries (ADR-0009).</summary>
-public sealed class TargetCatalog(Homeys homeys, PhotoSetIndex photoSets, PlexWatcher plex)
+/// <summary>
+/// What tiles can point at: things in Homey, photo sets (ADR-0008), and Plex's players and libraries (ADR-0009); and the
+/// signals a logic tile's rules use (ADR-0010).
+/// </summary>
+public sealed class TargetCatalog(Homeys homeys, PhotoSetIndex photoSets, PlexWatcher plex, RuleEngine rules)
 {
     public const string PlexPlayerPrefix = "plex-player:";
     public const string PlexLibraryPrefix = "plex-library:";
@@ -19,6 +23,9 @@ public sealed class TargetCatalog(Homeys homeys, PhotoSetIndex photoSets, PlexWa
         : target.StartsWith(PlexPlayerPrefix, StringComparison.Ordinal) || target.StartsWith(PlexLibraryPrefix, StringComparison.Ordinal)
             ? KnowsPlex(target, account)
         : KnowsHomey(target, account);
+
+    // Whether a signal exists; null while that can't be told yet.
+    public bool? KnowsSignal(string signalId) => rules.Knows(signalId);
 
     // As with Plex, a tile naming a removed account is missing.
     private bool? KnowsHomey(string target, int? account) =>

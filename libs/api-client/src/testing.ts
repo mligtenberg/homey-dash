@@ -8,6 +8,8 @@ import {
   PlexSnapshot,
   Realtime,
   RealtimeMessages,
+  Rule,
+  RuleAnswer,
   ScreenView,
 } from './index';
 
@@ -103,6 +105,45 @@ export class FakeRealtime implements Partial<Realtime> {
 
   async joinManagement() {
     return this.displays;
+  }
+
+  /** Rules subscribed to now, by id, with the display they are seen as on. */
+  readonly rules = new Map<string, { rule: Rule; asDisplay: string | null }>();
+  /** How subscribing answers; a rule it returns undefined for is refused, as HomeyDash refuses an invalid one. */
+  answerRule: (rule: Rule, asDisplay: string | null) => boolean | undefined = () => false;
+  /** How many times the screen reported a touch. */
+  touches = 0;
+  private seq = 0;
+
+  async subscribeRule(id: string, rule: Rule, asDisplay: string | null = null): Promise<RuleAnswer> {
+    const holds = this.answerRule(rule, asDisplay);
+    if (holds === undefined) throw new Error('Invalid rule');
+    this.rules.set(id, { rule, asDisplay });
+    return { holds, seq: ++this.seq };
+  }
+
+  async unsubscribeRule(id: string) {
+    this.rules.delete(id);
+  }
+
+  /** Pushes new answers for subscribed rules, picked by a test, as one message. */
+  answer(holds: (rule: Rule) => boolean | undefined) {
+    const answers: Record<string, boolean> = {};
+    for (const [id, { rule }] of this.rules) {
+      const answer = holds(rule);
+      if (answer !== undefined) answers[id] = answer;
+    }
+    this.push('RuleAnswers', { seq: ++this.seq, answers });
+  }
+
+  /** Drops every subscription, as HomeyDash does when the connection closes. */
+  disconnect() {
+    this.connected.set(false);
+    this.rules.clear();
+  }
+
+  async touched() {
+    this.touches++;
   }
 
   setCapability(account: number | undefined, deviceId: string, capabilityId: string, value: CapabilityValue) {

@@ -20,6 +20,12 @@ type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; 
 /** How long a display stays on another dashboard without a touch before it returns to its main one. */
 export const IDLE_MS = 60_000;
 
+/**
+ * How often, at most, a screen tells HomeyDash it is being touched, for rules on when it was last touched; fine enough
+ * for "touched within the last 30 seconds".
+ */
+export const TOUCH_REPORT_MS = 5_000;
+
 /** Where a screen remembers that its tape is open. */
 const TAPE_KEY = 'homeydash.tape';
 
@@ -134,6 +140,7 @@ export class App {
     return dashboards.find((d) => d.id === this.picked()) ?? dashboards[0] ?? null;
   });
   private idle?: ReturnType<typeof setTimeout>;
+  private lastReport = -Infinity;
 
   private readonly storage = safeStorage();
   protected readonly collapsed = signal(this.storage?.getItem(TAPE_KEY) !== 'open');
@@ -173,6 +180,15 @@ export class App {
   protected touched() {
     clearTimeout(this.idle);
     if (this.picked() !== null) this.idle = setTimeout(() => this.picked.set(null), IDLE_MS);
+    this.reportTouch();
+  }
+
+  // The first touch is reported at once; a touch that goes on, once per interval.
+  private reportTouch() {
+    const now = Date.now();
+    if (this.state().kind !== 'display' || !this.realtime.connected() || now - this.lastReport < TOUCH_REPORT_MS) return;
+    this.lastReport = now;
+    this.realtime.touched().catch(() => undefined);
   }
 
   protected async join() {

@@ -8,6 +8,7 @@ using HomeyDash.Api.Homey;
 using HomeyDash.Api.Photos;
 using HomeyDash.Api.Plex;
 using HomeyDash.Api.Realtime;
+using HomeyDash.Api.Rules;
 using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
@@ -20,14 +21,16 @@ namespace HomeyDash.Api.Mcp;
 /// </summary>
 [McpServerToolType]
 public sealed class ManagementTools(
-    HomeyDashDbContext db, Homeys homeys, PlexWatcher plex, TargetCatalog targets, RealtimeNotifier notifier, DisplayPresence presence, TimeProvider time)
+    HomeyDashDbContext db, Homeys homeys, PlexWatcher plex, TargetCatalog targets, RealtimeNotifier notifier, DisplayPresence presence,
+    RuleEngine rules, TimeProvider time)
 {
     public const string Path = "/mcp";
 
     // Arguments and results read and write dashboards as the API does. The SDK needs a resolver set explicitly.
     public static JsonSerializerOptions Json { get; } = new(Dashboard.Json) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() };
 
-    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts and PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts; the API itself never looks inside settings (ADR-0003).
+    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts, PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts and
+    // LOGIC_TILES in libs/tiles/src/lib/logic/logic-tile.ts; the API only looks inside a logic tile's rules (ADR-0003, ADR-0010).
     private const string TileKinds = """
         Tile kinds, with the sizes each supports and the target type its settings.target takes:
         - "device" (small, wide, large): a device; optional settings.capability picks the capability shown (absent: automatic).
@@ -42,9 +45,34 @@ public sealed class ManagementTools(
           settings.target is "plex-player:any" for whatever plays, or a player's target.
         - "plex-recent" (small, wide, full, large, full-large): the posters of what was newly added to Plex; settings.target is
           "plex-library:all" or a library's target.
+        - "logic" (small, wide, full, large, full-large): shows the first of the tiles it holds whose rule holds, else its
+          fallback tile, else nothing (like empty cells). settings.target is null; settings.entries is an ordered list of
+          { "tile": { "kind", "settings" }, "rule": <rule> }; settings.fallback is { "kind", "settings" } or null; optional
+          settings.minShowSeconds keeps a tile it switched to on screen at least that long (default 0). The tiles it holds
+          take its size, so hold only kinds that support that size, and never another logic tile. Keep a dashboard's
+          existing logic tiles as they are when changing other parts of the draft.
         Every tile's settings may have a "label" that overrides its target's name. A home can have several Homey and Plex
         accounts: a Homey or Plex tile's settings.account is the account of its target (list_targets gives it); left out, the
         oldest account. A mood-list tile's moods are all in its one account.
+        """;
+
+    // Mirrors Operators in apps/api/Rules/Operators.cs.
+    private const string RuleSchema = """
+        A rule is { "match": "all" or "any", "conditions": [ { "signal", "operator", "value", "not" } ] }: one level of
+        conditions, of which all or any must hold. "signal" is a signal's id from list_signals; "not" (default false)
+        negates the condition. A condition compares its signal with a fixed value, by an operator that suits the signal's
+        type; the value's shape depends on the operator:
+        - number: "equals", "greaterThan", "lessThan" (a number); "between" ({ "min": 18, "max": 21 }, both included)
+        - yesNo: "isTrue", "isFalse" (no value)
+        - text: "equals", "contains", "startsWith" (a string; for a signal with allowedValues, equals takes one of their
+          "value"s); "isEmpty" (no value)
+        - dateTime: "timeOfDayBetween" ({ "from": "22:00", "to": "06:30" }, may wrap midnight, "HH:mm" or "HH:mm:ss");
+          "onWeekdays" (["saturday", "sunday"]); "withinLast", "longerAgoThan" ({ "amount": 30, "unit": "seconds" },
+          unit seconds, minutes, hours or days); "dateBetween" ({ "from": "12-01", "to": "01-06" }, month-day, both
+          included, every year); "before", "after" (an ISO 8601 moment with offset)
+        "clock:now" is the current time; "display:name" equals the id of a display (its allowedValues list them), and
+        "display:touched" is when that display was last touched. A condition on a missing signal, or one without a value
+        yet, never holds, even negated.
         """;
 
     [McpServerTool(Name = "list_dashboards", ReadOnly = true)]
@@ -87,13 +115,14 @@ public sealed class ManagementTools(
         sections sit side by side and scroll horizontally. A tile's position is the zero-based column and row of its
         top-left cell. Sizes in cells (columns×rows): small 1×1, wide 2×1, full 3×1, large 2×2, full-large 3×2.
         Tiles must stay inside their section's grid and never overlap. Section and tile ids are any unique strings.
-        Find targets with list_targets.
+        Find targets with list_targets, and the signals rules use with list_signals.
         {TileKinds}
+        {RuleSchema}
         """)]
     public async Task<DashboardDetail> SaveDraft(Guid dashboardId, DashboardLayout draft, CancellationToken ct)
     {
         var dashboard = await FindDashboardAsync(dashboardId, ct);
-        var errors = DashboardValidator.Validate(draft);
+        var errors = DashboardEndpoints.Validate(draft, rules);
         if (errors.Count > 0)
             throw new McpException("The draft breaks the layout rules: "
                 + string.Join("; ", errors.Select(e => $"{e.Key}: {string.Join(" ", e.Value)}")));
@@ -165,6 +194,16 @@ public sealed class ManagementTools(
                 .. o.Libraries.Select(l => new Target(TargetCatalog.PlexLibraryPrefix + l.Id, l.Title, $"{l.Type} on {o.AccountName}", o.AccountId))]),
             _ => throw new McpException($"Unknown target type {type}; use device, flow, mood, insight, photoSet, plexPlayer or plexLibrary."),
         };
+
+    [McpServerTool(Name = "list_signals", ReadOnly = true)]
+    [Description("""
+        Lists the signals a logic tile's rules can use: their ids go in a condition's "signal". Each has a type (text,
+        yesNo, number or dateTime) that decides its operators, and may have an account (of Homey or Plex), allowedValues
+        (for text: the values to compare with), a unit and range (number), or what true and false mean (yesNo).
+        """)]
+    public IEnumerable<SignalInfo> ListSignals(
+        [Description("Only signals from this source: homey, clock, display or plex. Left out, every signal.")] string? source = null) =>
+        rules.Signals().Where(s => source is null || s.Source == source);
 
     // Insight logs are fetched from each Homey, which may be out of reach.
     private async Task<List<Target>> InsightLogsAsync(CancellationToken ct)

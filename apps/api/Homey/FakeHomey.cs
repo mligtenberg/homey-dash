@@ -5,7 +5,8 @@ namespace HomeyDash.Api.Homey;
 
 // A Homey with a realistic family home (two floors, an attic, a garden and a garage, with the devices, flows and
 // moods such a home has), used when the configuration sets Homey:Fake. Tests rely on living-lamp, thermostat,
-// front-door, washer, p1-meter, flow-goodnight, mood-movie and mood-dinner; keep those.
+// front-door, washer, p1-meter, living-motion, hall-alarm, flow-goodnight, mood-movie, mood-dinner, var-house-mode
+// and var-guests; keep those.
 public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService, IHomey
 {
     // Its one account, which can't be changed.
@@ -73,7 +74,10 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         Device("hall-light", "Hall light", "hall", "light", OnOff(false)),
         Device("hall-doorbell", "Doorbell", "hall", "doorbell", Alarm("alarm_generic", "Ringing", false)),
         Device("hall-alarm", "Alarm system", "hall", "homealarm",
-            Capability("homealarm_state", "Alarm", "enum", JsonSerializer.SerializeToElement("disarmed"), true)),
+            Capability("homealarm_state", "Alarm", "enum", JsonSerializer.SerializeToElement("disarmed"), true) with
+            {
+                Values = [new("armed", "Armed"), new("disarmed", "Disarmed"), new("partially_armed", "Partially armed")],
+            }),
         Device("toilet-light", "Toilet light", "toilet", "light", OnOff(false)),
         Device("toilet-motion", "Toilet motion sensor", "toilet", "sensor", Alarm("alarm_motion", "Motion", false)),
 
@@ -123,6 +127,15 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         Device("garage-door", "Garage door", "garage", "garagedoor", Capability("garagedoor_closed", "Closed", "boolean", True, true)),
         Device("garage-charger", "EV charger", "garage", "evcharger", OnOff(false), Power(0)),
         Unavailable(Device("garage-camera", "Driveway camera", "garage", "camera", Alarm("alarm_motion", "Motion", false)), "Lost its Wi-Fi connection"),
+    ];
+
+    // House modes as Homey Logic variables, for rules to follow.
+    private static readonly HomeyVariable[] Variables =
+    [
+        new("var-house-mode", "House mode", "string", JsonSerializer.SerializeToElement("Home")),
+        new("var-guests", "Guests", "boolean", False),
+        new("var-night", "Night", "boolean", False),
+        new("var-energy-price", "Energy price", "number", JsonSerializer.SerializeToElement(0.24)),
     ];
 
     private static readonly HomeyFlowFolder[] FlowFolders =
@@ -205,7 +218,7 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
 
     public Task StartAsync(CancellationToken ct)
     {
-        _state.Replace(Devices, Flows, Moods, Zones, FlowFolders);
+        _state.Replace(Devices, Flows, Moods, Zones, FlowFolders, Variables);
         _state.SetStatus(HomeyConnection.Connected, fake: true);
         homeys.Set([new Homeys.Entry(Account.Id, Account.Name, this)]);
         return Task.CompletedTask;
@@ -287,7 +300,10 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
     private static HomeyCapability Power(double watts) => Number("measure_power", "Power", watts, "W", false);
 
     private static HomeyCapability Cover(string position) =>
-        Capability("windowcoverings_state", "Position", "enum", JsonSerializer.SerializeToElement(position), true);
+        Capability("windowcoverings_state", "Position", "enum", JsonSerializer.SerializeToElement(position), true) with
+        {
+            Values = [new("up", "Up"), new("idle", "Stopped"), new("down", "Down")],
+        };
 
     private static HomeyCapability Alarm(string id, string title, bool on) => Capability(id, title, "boolean", on ? True : False, false);
 

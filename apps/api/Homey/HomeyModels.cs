@@ -21,7 +21,13 @@ public sealed record HomeyCapability(
     double? Min,
     double? Max,
     double? Step,
-    DateTimeOffset? LastUpdated);
+    DateTimeOffset? LastUpdated)
+{
+    // The values an enum capability takes, in Homey's order; null for other types.
+    public IReadOnlyList<HomeyEnumValue>? Values { get; init; }
+}
+
+public sealed record HomeyEnumValue(string Id, string Title);
 
 public sealed record HomeyDevice(
     string Id,
@@ -51,6 +57,9 @@ public sealed record HomeyLightColor(double? Hue, double? Saturation, double? Te
 // One point of an insight log; V is null for a gap.
 public sealed record HomeyInsightEntry(DateTimeOffset T, double? V);
 
+// A Homey Logic variable; Type is boolean, number or string.
+public sealed record HomeyVariable(string Id, string Name, string Type, JsonElement Value);
+
 public sealed record HomeyInsightLog(string Id, string OwnerUri, string? OwnerName, string Title, string Type, string? Units);
 
 // Something in Homey changed; raised by HomeyState.
@@ -59,6 +68,10 @@ public abstract record HomeyChange;
 public sealed record DeviceChanged(HomeyDevice Device) : HomeyChange;
 
 public sealed record DeviceRemoved(string DeviceId) : HomeyChange;
+
+public sealed record VariableChanged(HomeyVariable Variable) : HomeyChange;
+
+public sealed record VariableRemoved(string VariableId) : HomeyChange;
 
 // Flows, flow folders, moods or zones were added, renamed, moved or removed.
 public sealed record CatalogChanged : HomeyChange;

@@ -2,6 +2,7 @@ using System.Text.Json;
 using HomeyDash.Api.Data;
 using HomeyDash.Api.Displays;
 using HomeyDash.Api.Realtime;
+using HomeyDash.Api.Rules;
 using Microsoft.EntityFrameworkCore;
 
 namespace HomeyDash.Api.Dashboards;
@@ -59,10 +60,11 @@ public static class DashboardEndpoints
             return Results.NoContent();
         });
 
-        dashboards.MapPut("/{id:guid}/draft", (Guid id, DashboardLayout draft, HomeyDashDbContext db, TargetCatalog targets, RealtimeNotifier notifier, CancellationToken ct) =>
+        dashboards.MapPut("/{id:guid}/draft", (Guid id, DashboardLayout draft, HomeyDashDbContext db, TargetCatalog targets, RealtimeNotifier notifier,
+            RuleEngine rules, CancellationToken ct) =>
             Change(id, db, targets, notifier, ct, dashboard =>
             {
-                var errors = DashboardValidator.Validate(draft);
+                var errors = Validate(draft, rules);
                 if (errors.Count > 0) return Results.ValidationProblem(errors, "The draft breaks the layout rules.");
                 dashboard.SaveDraft(WithSettings(draft));
                 return null;
@@ -98,6 +100,15 @@ public static class DashboardEndpoints
         await db.SaveChangesAsync(ct);
         await notifier.DashboardsChangedAsync(db, ct);
         return Results.Ok(dashboard.ToDetail(targets));
+    }
+
+    // The layout rules, and the rules of its logic tiles (ADR-0010).
+    public static Dictionary<string, string[]> Validate(DashboardLayout draft, RuleEngine rules)
+    {
+        var errors = DashboardValidator.Validate(draft);
+        foreach (var (key, messages) in LogicTiles.Validate(draft, rules))
+            errors[key] = errors.TryGetValue(key, out var existing) ? [.. existing, .. messages] : messages;
+        return errors;
     }
 
     // A tile sent without settings gets an empty object, so every stored tile has one.

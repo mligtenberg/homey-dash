@@ -4,4 +4,5 @@ export * from './lib/photos';
 export * from './lib/plex';
 export * from './lib/dashboards';
 export * from './lib/displays';
+export * from './lib/rules';
 export * from './lib/realtime';

@@ -3,11 +3,12 @@ import { RouterLink } from '@angular/router';
 import { DashboardDetail, DashboardsApi } from '@homey-dash/api-client';
 import { cellSize } from '@homey-dash/layout';
 import { DashboardView } from '@homey-dash/tiles';
+import { AsDisplayPicker } from './as-display-picker';
 
 /** The draft rendered the way a display shows it, fitted to the Management window. */
 @Component({
   selector: 'hd-preview-page',
-  imports: [DashboardView, RouterLink],
+  imports: [AsDisplayPicker, DashboardView, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-display', '[style.--cell.px]': 'cell()', '(window:resize)': 'onResize()' },
   template: `
@@ -15,12 +16,16 @@ import { DashboardView } from '@homey-dash/tiles';
       <!-- A preview shows the draft; it does not operate the home. -->
       <hd-dashboard-view [layout]="dashboard.draft" inert />
     }
-    <a class="hd-btn back" [routerLink]="['/dashboards', id()]">Back to editor</a>
+    <div class="tools">
+      <hd-as-display-picker />
+      <a class="hd-btn" [routerLink]="['/dashboards', id()]">Back to editor</a>
+    </div>
   `,
   styles: `
     :host { display: block; height: 100dvh; overflow: hidden; position: relative; }
     hd-dashboard-view { height: 100%; box-sizing: border-box; }
-    .back { position: fixed; right: var(--space-4); bottom: var(--space-4); text-decoration: none; }
+    .tools { position: fixed; right: var(--space-4); bottom: var(--space-4); display: flex; gap: var(--space-2); }
+    .tools .hd-btn { text-decoration: none; }
   `,
 })
 export class PreviewPage {

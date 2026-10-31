@@ -15,6 +15,7 @@ public sealed class HomeyState(TimeProvider time, int accountId)
     private ImmutableDictionary<string, HomeyMood> _moods = ImmutableDictionary<string, HomeyMood>.Empty;
     private ImmutableDictionary<string, HomeyZone> _zones = ImmutableDictionary<string, HomeyZone>.Empty;
     private ImmutableDictionary<string, HomeyFlowFolder> _flowFolders = ImmutableDictionary<string, HomeyFlowFolder>.Empty;
+    private ImmutableDictionary<string, HomeyVariable> _variables = ImmutableDictionary<string, HomeyVariable>.Empty;
 
     public event Action<HomeyChange>? Changed;
 
@@ -31,10 +32,12 @@ public sealed class HomeyState(TimeProvider time, int accountId)
     public IEnumerable<HomeyMood> Moods => _moods.Values;
     public IEnumerable<HomeyZone> Zones => _zones.Values;
     public IEnumerable<HomeyFlowFolder> FlowFolders => _flowFolders.Values;
+    public IEnumerable<HomeyVariable> Variables => _variables.Values;
 
     public HomeyDevice? FindDevice(string id) => _devices.GetValueOrDefault(id);
     public HomeyFlow? FindFlow(string id) => _flows.GetValueOrDefault(id);
     public HomeyMood? FindMood(string id) => _moods.GetValueOrDefault(id);
+    public HomeyVariable? FindVariable(string id) => _variables.GetValueOrDefault(id);
 
     // Whether a tile target (device, flow or mood id, or an insight log of a known device) exists in Homey.
     public bool Knows(string target) =>
@@ -65,9 +68,9 @@ public sealed class HomeyState(TimeProvider time, int accountId)
         Changed?.Invoke(new ConnectionChanged(status));
     }
 
-    // Replaces everything with a fresh snapshot, raising a change for each device that differs.
+    // Replaces everything with a fresh snapshot, raising a change for each device and variable that differs.
     public void Replace(IEnumerable<HomeyDevice> devices, IEnumerable<HomeyFlow> flows, IEnumerable<HomeyMood> moods,
-        IEnumerable<HomeyZone> zones, IEnumerable<HomeyFlowFolder> flowFolders)
+        IEnumerable<HomeyZone> zones, IEnumerable<HomeyFlowFolder> flowFolders, IEnumerable<HomeyVariable>? variables = null)
     {
         List<HomeyChange> changes = [];
         lock (_lock)
@@ -78,6 +81,12 @@ public sealed class HomeyState(TimeProvider time, int accountId)
                 .Where(d => !_devices.TryGetValue(d.Id, out var old) || !SameDevice(old, d))
                 .Select(d => new DeviceChanged(d)));
             _devices = next;
+            var nextVariables = (variables ?? []).ToImmutableDictionary(v => v.Id);
+            changes.AddRange(_variables.Keys.Where(id => !nextVariables.ContainsKey(id)).Select(id => new VariableRemoved(id)));
+            changes.AddRange(nextVariables.Values
+                .Where(v => !_variables.TryGetValue(v.Id, out var old) || !SameVariable(old, v))
+                .Select(v => new VariableChanged(v)));
+            _variables = nextVariables;
             _flows = flows.ToImmutableDictionary(f => f.Id);
             _moods = moods.ToImmutableDictionary(m => m.Id);
             _zones = zones.ToImmutableDictionary(z => z.Id);
@@ -119,6 +128,23 @@ public sealed class HomeyState(TimeProvider time, int accountId)
         Changed?.Invoke(new DeviceChanged(updated));
     }
 
+    public void UpsertVariable(HomeyVariable variable)
+    {
+        variable = variable with { Value = variable.Value.Clone() };
+        lock (_lock) _variables = _variables.SetItem(variable.Id, variable);
+        Changed?.Invoke(new VariableChanged(variable));
+    }
+
+    public void RemoveVariable(string id)
+    {
+        lock (_lock)
+        {
+            if (!_variables.ContainsKey(id)) return;
+            _variables = _variables.Remove(id);
+        }
+        Changed?.Invoke(new VariableRemoved(id));
+    }
+
     public void UpsertFlow(HomeyFlow flow) => UpdateCatalog(() => _flows = _flows.SetItem(flow.Id, flow));
     public void RemoveFlow(string id) => UpdateCatalog(() => _flows = _flows.Remove(id));
     public void UpsertMood(HomeyMood mood) => UpdateCatalog(() => _moods = _moods.SetItem(mood.Id, mood));
@@ -138,6 +164,10 @@ public sealed class HomeyState(TimeProvider time, int accountId)
         a with { Capabilities = b.Capabilities } == b
         && a.Capabilities.Count == b.Capabilities.Count
         && a.Capabilities.All(kv => b.Capabilities.TryGetValue(kv.Key, out var other)
-            && kv.Value with { Value = default } == other with { Value = default }
+            && kv.Value with { Value = default, Values = null } == other with { Value = default, Values = null }
+            && (kv.Value.Values ?? []).SequenceEqual(other.Values ?? [])
             && JsonElement.DeepEquals(kv.Value.Value, other.Value));
+
+    private static bool SameVariable(HomeyVariable a, HomeyVariable b) =>
+        a with { Value = default } == b with { Value = default } && JsonElement.DeepEquals(a.Value, b.Value);
 }

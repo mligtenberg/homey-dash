@@ -4,6 +4,7 @@ import { DashboardSummary } from './dashboards';
 import { DisplayInfo, ScreenView } from './displays';
 import { PhotoSet } from './photos';
 import { PlexCommand, PlexOverview, PlexSession, PlexSnapshot } from './plex';
+import { Rule, RuleAnswer, RuleAnswers } from './rules';
 import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyZone } from './homey';
 
 // Mirrors apps/api/Realtime/RealtimeHub.cs.
@@ -51,6 +52,8 @@ export interface RealtimeMessages {
   Plex: PlexOverview[];
   /** What plays on Plex, whenever more than its progress changed. */
   PlexSessions: PlexSession[];
+  /** The answers to this connection's rule subscriptions that one change altered. */
+  RuleAnswers: RuleAnswers;
 }
 
 // Displays run unattended, so reconnecting never gives up; it just slows down.
@@ -146,6 +149,24 @@ export class Realtime {
 
   activateMood(account: number | undefined, moodId: string) {
     return this.hub.invoke<void>('ActivateMood', account ?? null, moodId);
+  }
+
+  /**
+   * Subscribes to a rule under an id of this connection's choosing, answering whether it holds now; changes follow as
+   * `RuleAnswers`. A screen's rules are evaluated for its display; Management's as if on `asDisplay`, or on none.
+   * Subscriptions end with the connection, so subscribe again in `whenConnected`. Fails for an invalid rule.
+   */
+  subscribeRule(id: string, rule: Rule, asDisplay: string | null = null) {
+    return this.hub.invoke<RuleAnswer>('SubscribeRule', id, rule, asDisplay);
+  }
+
+  unsubscribeRule(id: string) {
+    return this.hub.invoke<void>('UnsubscribeRule', id);
+  }
+
+  /** Tells HomeyDash this screen was touched, for rules on when it was last touched. */
+  touched() {
+    return this.hub.invoke<void>('Touched');
   }
 
   private start(attempt: number) {

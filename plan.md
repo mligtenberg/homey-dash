@@ -12,6 +12,7 @@ Built in vertical slices; each ends with something that works and has tests. Dom
 | 4. Displays and setup | Done |
 | 5. Realtime and display status | Done |
 | 6. Tile modules | Done |
+| 6d. Logic tile and rule engine | Done; Homey variables not yet seen on the real Homey |
 | 7. Packaging | To do |
 
 ## Defaults
@@ -200,6 +201,29 @@ Built in vertical slices; each ends with something that works and has tests. Dom
   dashboard list order.
 - 136 API tests (4 new), 14 display app tests (5 new), 2 new Management displays page tests. Checked in the
   browser on the fake Homey.
+
+### 6d. Logic tile and rule engine (ADR-0010, [PRD](docs/prd/logic-tile.md))
+
+- `apps/api/Rules`: the rule engine knows signals, conditions and rules, never tile kinds. Signal sources behind
+  `ISignalSource` (a module adds one with `AddSignalSource<T>`): Homey capabilities, when each last changed, and Homey
+  variables, per account (variables are new: read, followed and in FakeHomey); `clock:now`; `display:name` (the
+  display's permanent id, so renaming and takeovers keep rules working) and `display:touched`; Plex playback state.
+  Unavailable signals keep their last value; missing or never-valued ones fail a condition even negated. Time-based
+  conditions wake a timer at the second their answer flips, from the injected `TimeProvider`.
+- Realtime hub `SubscribeRule` / `UnsubscribeRule` (answers changed by one change arrive as one `RuleAnswers`,
+  ordered by `seq`), `Touched`; `GET /api/rules/signals`, `POST /api/rules/evaluate`. Saving a draft validates logic
+  tiles' rules (`LogicTiles`, the one place the API looks inside a kind's settings); missing counts include their
+  rules' signals and the targets of the tiles they hold. MCP `list_signals`; `save_draft` documents the rule schema.
+- `libs/tiles` `LOGIC_TILES`: `LogicTile` subscribes through `RuleAnswers` (`RealtimeRuleAnswers` subscribes again on
+  every reconnect), shows the first entry that holds, else the fallback, else nothing, fades between them and keeps
+  one for its minimum show time. `LOGIC_TILE_BADGE` (the Editor) adds "2 of 3" / "Fallback" / "Nothing" and an
+  empty-state hint.
+- Display: reports touches at most every 5 s (`TOUCH_REPORT_MS`). Management: `LogicPanel` (tiles in order, fallback,
+  minimum show time), each held tile configured in the tile panel as on its own (`nested`) with a `RuleEditor`, signal
+  picker by source then group, a warning for a value no longer allowed, the refused draft's reason in the header, and
+  "As on <display>" in the Editor and Preview. The stage shows the open tile in its logic tile's place.
+- 178 API tests (28 new), 10 logic tile tests, 2 new display app tests, 4 new Management rule text tests. Checked in
+  the browser on the fake Homey.
 
 ### Open
 

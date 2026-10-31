@@ -39,7 +39,21 @@ public static class HomeyMapper
         Min: Number(json, "min"),
         Max: Number(json, "max"),
         Step: Number(json, "step"),
-        LastUpdated: Date(json, "lastUpdated"));
+        LastUpdated: Date(json, "lastUpdated"))
+    {
+        Values = json.TryGetProperty("values", out var values) && values.ValueKind == JsonValueKind.Array
+            ? values.EnumerateArray()
+                .Select(v => String(v, "id") is { } id ? new HomeyEnumValue(id, String(v, "title") ?? id) : null)
+                .OfType<HomeyEnumValue>()
+                .ToList()
+            : null,
+    };
+
+    public static HomeyVariable Variable(JsonElement json) => new(
+        Id: String(json, "id") ?? throw new JsonException("Variable without id"),
+        Name: String(json, "name") ?? "",
+        Type: String(json, "type") ?? "string",
+        Value: json.TryGetProperty("value", out var value) ? value.Clone() : default);
 
     public static HomeyFlow Flow(JsonElement json, bool advanced) => new(
         Id: String(json, "id") ?? throw new JsonException("Flow without id"),

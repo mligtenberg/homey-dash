@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using HomeyDash.Api.Rules;
 
 namespace HomeyDash.Api.Dashboards;
 
@@ -35,18 +36,24 @@ public sealed class Dashboard
         PublishedAt = now;
     }
 
-    // Draft tiles with a target (settings.target, or one of settings.targets) that no longer exists in their account.
+    // Draft tiles with a target (settings.target, or one of settings.targets) that no longer exists in their account,
+    // and logic tiles holding such a tile or with a condition on a signal that no longer exists.
     public int MissingTiles(TargetCatalog targets) =>
-        Draft.Sections.SelectMany(s => s.Tiles)
-            .Count(t => Targets(t.Settings).Any(target => targets.Knows(target, Account(t.Settings)) == false));
+        Draft.Sections.SelectMany(s => s.Tiles).Count(t => Missing(t.Settings, targets)
+            || t.Kind == LogicTiles.Kind && (LogicTiles.Held(t.Settings).Any(held => Missing(held, targets))
+                || LogicTiles.Signals(t.Settings).Any(signal => targets.KnowsSignal(signal) == false)));
+
+    private static bool Missing(JsonElement settings, TargetCatalog targets) =>
+        Targets(settings).Any(target => targets.Knows(target, Account(settings)) == false);
 
     // The account a tile's settings name (settings.account); null for the oldest account of its kind.
     public static int? Account(JsonElement settings) =>
         settings.ValueKind == JsonValueKind.Object && settings.TryGetProperty("account", out var account)
         && account.ValueKind == JsonValueKind.Number && account.TryGetInt32(out var id) ? id : null;
 
-    // Every target the draft's tiles point at.
-    public IEnumerable<string> Targets() => Draft.Sections.SelectMany(s => s.Tiles).SelectMany(t => Targets(t.Settings));
+    // Every target the draft's tiles point at, including those of the tiles logic tiles hold.
+    public IEnumerable<string> Targets() => Draft.Sections.SelectMany(s => s.Tiles).SelectMany(t =>
+        Targets(t.Settings).Concat(t.Kind == LogicTiles.Kind ? LogicTiles.Held(t.Settings).SelectMany(Targets) : []));
 
     private static IEnumerable<string> Targets(JsonElement settings)
     {
