@@ -37,7 +37,14 @@ public sealed record HomeyDevice(
     string Class,
     bool Available,
     string? UnavailableMessage,
-    IReadOnlyDictionary<string, HomeyCapability> Capabilities);
+    IReadOnlyDictionary<string, HomeyCapability> Capabilities)
+{
+    // What a speaker is playing, as a picture; null when Homey has none for the device.
+    public HomeyImage? AlbumArt { get; init; }
+}
+
+// A picture Homey keeps, which HomeyDash serves at /api/homey/images/{Id}. Version changes whenever the picture does.
+public sealed record HomeyImage(string Id, string? Version);
 
 // A room or area in Homey; zones nest, and only the top one (Home) has no parent.
 public sealed record HomeyZone(string Id, string Name, string? ParentId);

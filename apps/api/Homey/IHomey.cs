@@ -12,6 +12,9 @@ public interface IHomey
     Task ActivateMoodAsync(string moodId, CancellationToken ct);
     Task<IReadOnlyList<HomeyInsightLog>> GetInsightLogsAsync(CancellationToken ct);
 
+    // A picture Homey keeps, such as a device's album art; null when Homey has no such picture.
+    Task<(byte[] Content, string ContentType)?> GetImageAsync(string imageId, CancellationToken ct);
+
     // Entries of one insight log, oldest first. Resolution is one of InsightResolutions.
     Task<IReadOnlyList<HomeyInsightEntry>> GetInsightEntriesAsync(string logId, string resolution, CancellationToken ct);
 }

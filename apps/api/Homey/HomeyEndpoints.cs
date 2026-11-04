@@ -48,6 +48,18 @@ public static class HomeyEndpoints
                 return Results.Ok(await homeys.Require(account).GetInsightEntriesAsync(log, resolution, ct));
             }));
 
+        // Only pictures of devices, so HomeyDash does not hand out whatever else Homey keeps. The URL carries the
+        // picture's version, so a new picture is a new URL and an old one can be cached.
+        homey.MapGet("/images/{imageId}", (string imageId, int? account, Homeys homeys, HttpResponse response, CancellationToken ct) =>
+            Perform(async () =>
+            {
+                var homey = homeys.Require(account);
+                if (!homey.State.Devices.Any(d => d.AlbumArt?.Id == imageId)) return Results.NotFound();
+                if (await homey.GetImageAsync(imageId, ct) is not { } image) return Results.NotFound();
+                response.Headers.CacheControl = "public, max-age=86400";
+                return Results.File(image.Content, image.ContentType);
+            }));
+
         homey.MapPut("/devices/{deviceId}/capabilities/{capabilityId}",
             (string deviceId, string capabilityId, int? account, CapabilityValue body, Homeys homeys, CancellationToken ct) =>
                 Perform(async () =>

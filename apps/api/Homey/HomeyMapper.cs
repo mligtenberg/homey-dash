@@ -25,8 +25,28 @@ public static class HomeyMapper
             Class: String(json, "virtualClass") ?? String(json, "class") ?? "other",
             Available: Bool(json, "available") ?? true,
             UnavailableMessage: String(json, "unavailableMessage"),
-            Capabilities: capabilities);
+            Capabilities: capabilities)
+        {
+            AlbumArt = AlbumArt(json),
+        };
     }
+
+    // Homey lists a device's pictures as images: [{ id, type, imageObj: { id, url, lastUpdated } }]; album art is
+    // the one of type media.
+    private static HomeyImage? AlbumArt(JsonElement json)
+    {
+        if (!json.TryGetProperty("images", out var images)) return null;
+        var media = Values(images).FirstOrDefault(i => i.ValueKind == JsonValueKind.Object && String(i, "type") == "media");
+        return media.ValueKind == JsonValueKind.Object && media.TryGetProperty("imageObj", out var image) && String(image, "id") is { } id
+            ? new HomeyImage(id, ImageVersion(image))
+            : null;
+    }
+
+    // When a picture last changed, which Homey gives as a date or a number of milliseconds.
+    public static string? ImageVersion(JsonElement image) =>
+        image.TryGetProperty("lastUpdated", out var v)
+            ? v.ValueKind switch { JsonValueKind.String => v.GetString(), JsonValueKind.Number => v.GetRawText(), _ => null }
+            : null;
 
     public static HomeyCapability Capability(string id, JsonElement json) => new(
         Id: id,

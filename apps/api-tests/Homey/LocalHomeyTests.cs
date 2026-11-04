@@ -87,6 +87,27 @@ public sealed class LocalHomeyTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AnImageEvent_GivesTheAlbumArtItsNewVersion()
+    {
+        await Eventually(() => _state.Status.Connection == HomeyConnection.Connected);
+        Assert.Contains("homey:manager:images", _server.Subscriptions);
+
+        await _server.PushAsync("homey:manager:images", "image.update", new { id = "art-1", lastUpdated = 1792643900000 });
+
+        await Eventually(() => _state.FindDevice("speaker")!.AlbumArt == new HomeyImage("art-1", "1792643900000"));
+    }
+
+    [Fact]
+    public async Task AnImage_ComesFromHomey()
+    {
+        var image = await _homey.GetImageAsync("art-1", CancellationToken.None);
+
+        Assert.Equal([1, 2, 3], image!.Value.Content);
+        Assert.Equal("image/png", image.Value.ContentType);
+        Assert.Null(await _homey.GetImageAsync("art-2", CancellationToken.None));
+    }
+
+    [Fact]
     public async Task SettingACapability_PutsTheValueToHomey()
     {
         await Eventually(() => _state.Status.Connection == HomeyConnection.Connected);

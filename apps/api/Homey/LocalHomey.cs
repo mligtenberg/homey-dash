@@ -104,6 +104,7 @@ public sealed class LocalHomey(
             // Subscribe before loading, so nothing that changes in between is missed.
             await Task.WhenAll(new[] { "homey:manager:devices", "homey:manager:flow", "homey:manager:moods", "homey:manager:zones", "homey:manager:logic" }
                 .Select(uri => SubscribeAsync(socket, uri, ct)));
+            await SubscribeToImagesAsync(socket, ct);
             await LoadSnapshotAsync(ct);
             await Task.WhenAll(state.Devices.Select(d => SubscribeAsync(socket, DeviceUri(d.Id), ct)));
 
@@ -171,6 +172,19 @@ public sealed class LocalHomey(
     private async Task SubscribeAsync(SocketIoClient socket, string uri, CancellationToken ct) =>
         ThrowIfError(await socket.EmitWithAckAsync(_namespace, "subscribe", [uri], ct), $"Homey refused subscribing to {uri}");
 
+    // Album art only adds to a speaker's tile, so a Homey that won't tell when pictures change still connects.
+    private async Task SubscribeToImagesAsync(SocketIoClient socket, CancellationToken ct)
+    {
+        try
+        {
+            await SubscribeAsync(socket, "homey:manager:images", ct);
+        }
+        catch (InvalidOperationException e)
+        {
+            logger.LogWarning("Album art of Homey {Account} won't follow the music: {Error}", account.Name, e.Message);
+        }
+    }
+
     private void OnEvent(string ns, string uri, JsonElement[] args)
     {
         if (ns != _namespace || args is not [{ ValueKind: JsonValueKind.String } eventName, var data, ..]) return;
@@ -204,6 +218,10 @@ public sealed class LocalHomey(
                 break;
             case ("homey:manager:devices", "device.delete"):
                 state.RemoveDevice(HomeyMapper.String(data, "id")!);
+                break;
+            case ("homey:manager:images", "image.update"):
+                if (HomeyMapper.String(data, "id") is { } imageId)
+                    state.UpdateImage(imageId, HomeyMapper.ImageVersion(data));
                 break;
             case ("homey:manager:flow", "flow.create" or "flow.update"):
                 state.UpsertFlow(HomeyMapper.Flow(data, advanced: false));
@@ -281,6 +299,22 @@ public sealed class LocalHomey(
                 throw new HomeyNotFoundException($"Insight log {logId} not found in Homey");
             response.EnsureSuccessStatusCode();
             return HomeyMapper.InsightEntries(await response.Content.ReadFromJsonAsync<JsonElement>(read.Token));
+        }
+        catch (HttpRequestException e)
+        {
+            throw new HomeyUnavailableException("Homey cannot be reached", e);
+        }
+    }
+
+    public async Task<(byte[] Content, string ContentType)?> GetImageAsync(string imageId, CancellationToken ct)
+    {
+        try
+        {
+            using var read = ReadCancellation(ct);
+            using var response = await Http().GetAsync($"api/image/{Uri.EscapeDataString(imageId)}", read.Token);
+            if (response.StatusCode == HttpStatusCode.NotFound) return null;
+            response.EnsureSuccessStatusCode();
+            return (await response.Content.ReadAsByteArrayAsync(read.Token), response.Content.Headers.ContentType?.MediaType ?? "image/jpeg");
         }
         catch (HttpRequestException e)
         {

@@ -51,7 +51,12 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         Device("thermostat", "Thermostat", "living", "thermostat", Target(20.5), Temperature(20.1)),
         Device("living-blinds", "Blinds", "living", "blinds", Cover("idle")),
         Device("living-tv", "TV", "living", "tv", OnOff(false)),
-        Device("living-speaker", "Speaker", "living", "speaker", OnOff(true), Number("volume_set", "Volume", 0.25, null, true, 0, 1, 0.01)),
+        Device("living-speaker", "Speaker", "living", "speaker",
+            Capability("speaker_playing", "Playing", "boolean", True, true),
+            Capability("speaker_track", "Track", "string", JsonSerializer.SerializeToElement("Birds of a Feather"), false),
+            Capability("speaker_artist", "Artist", "string", JsonSerializer.SerializeToElement("Billie Eilish"), false),
+            Capability("speaker_album", "Album", "string", JsonSerializer.SerializeToElement("Hit Me Hard and Soft"), false),
+            Number("volume_set", "Volume", 0.25, null, true, 0, 1, 0.01)) with { AlbumArt = new("fake-album-art", "1") },
         Device("living-vacuum", "Robot vacuum", "living", "vacuumcleaner", OnOff(false), Number("measure_battery", "Battery", 87, "%", false)),
         Device("living-climate", "Climate sensor", "living", "sensor", Temperature(20.3), Humidity(48)),
         Device("living-motion", "Motion sensor", "living", "sensor", Alarm("alarm_motion", "Motion", false), Number("measure_luminance", "Light level", 140, "lx", false)),
@@ -245,6 +250,19 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
 
     public Task<IReadOnlyList<HomeyInsightLog>> GetInsightLogsAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<HomeyInsightLog>>(InsightLogs);
+
+    // A cover of soft blues for the speaker's album art.
+    public Task<(byte[] Content, string ContentType)?> GetImageAsync(string imageId, CancellationToken ct)
+    {
+        const string svg = """
+            <svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+              <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7fb3d5"/><stop offset="1" stop-color="#1b3a5c"/></linearGradient></defs>
+              <rect width="600" height="600" fill="url(#g)"/>
+              <circle cx="300" cy="300" r="160" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="24"/>
+            </svg>
+            """;
+        return Task.FromResult<(byte[], string)?>(imageId == "fake-album-art" ? (System.Text.Encoding.UTF8.GetBytes(svg), "image/svg+xml") : null);
+    }
 
     // A smooth, repeatable curve per log around the reading's starting value, ending now. Meters only go up.
     public Task<IReadOnlyList<HomeyInsightEntry>> GetInsightEntriesAsync(string logId, string resolution, CancellationToken ct)

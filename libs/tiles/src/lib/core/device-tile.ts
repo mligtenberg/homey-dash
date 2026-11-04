@@ -1,7 +1,7 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
-import { CapabilityValue, HomeyCapability, HomeyDevice, Realtime } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucidePower } from '@lucide/angular';
+import { CapabilityValue, HomeyCapability, HomeyDevice, homeyImageUrl, Realtime } from '@homey-dash/api-client';
+import { LucideDynamicIcon, LucideIconInput, LucidePause, LucidePlay, LucidePower } from '@lucide/angular';
 import { TileData, TileSettings } from '../tile-data';
 import { deviceDetail, deviceLook, formatReading } from './device-look';
 import { TileDetails } from './tile-details';
@@ -13,7 +13,7 @@ export interface DeviceTileSettings extends TileSettings {
 }
 
 /** Capabilities a tile can operate, in the order `auto` prefers them. */
-const CONTROLS = ['onoff', 'dim', 'target_temperature', 'windowcoverings_state'];
+const CONTROLS = ['onoff', 'dim', 'target_temperature', 'windowcoverings_state', 'speaker_playing'];
 
 const COVER_STATES = [
   { value: 'up', label: 'Up' },
@@ -37,6 +37,10 @@ export function primaryCapability(device: HomeyDevice, picked: string | undefine
 }
 
 interface DeviceFace extends TileFace {
+  /** The icon on the quick action's button; a power button unless said otherwise. */
+  actionIcon?: LucideIconInput;
+  /** The album art of what the device plays, which the tile shows behind its face. */
+  art?: string;
   reading?: { value: string; units: string };
   /** The `dim` capability when the tile shows a brightness slider. */
   slider?: HomeyCapability;
@@ -50,7 +54,7 @@ interface DeviceFace extends TileFace {
   selector: 'hd-device-tile',
   imports: [LucideDynamicIcon, NgTemplateOutlet, TileDetails],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: TILE_FACE_HOST,
+  host: { ...TILE_FACE_HOST, '[class.has-art]': '!!face().art', '[style.--art]': "face().art ? 'url(' + face().art + ')' : null" },
   template: `
     <ng-template #thermostatButtons let-target>
       <div class="hd-round-btns">
@@ -101,7 +105,7 @@ interface DeviceFace extends TileFace {
         <svg class="hd-icon" [lucideIcon]="face().icon" />
         @if (face().action; as action) {
           <button type="button" class="hd-round-btn hd-tile__action" [attr.aria-label]="action" [disabled]="face().state !== 'ok'" (click)="act()">
-            <svg [lucideIcon]="powerIcon" />
+            <svg [lucideIcon]="face().actionIcon ?? powerIcon" />
           </button>
         } @else if (face().state === 'ok') {
           @if (face().thermostat; as target) {
@@ -214,12 +218,18 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
       case 'windowcoverings_state':
         if (roomy) face.cover = primary;
         break;
+      case 'speaker_playing':
+        face.action = primary.value ? 'Pause' : 'Play';
+        face.actionIcon = primary.value ? LucidePause : LucidePlay;
+        break;
       default:
         if (typeof primary?.value === 'number') {
           face.reading = formatReading(primary.value, primary.units);
           face.detail = primary.title;
         }
     }
+    const accountId = this.homey()?.accountId;
+    if (caps['speaker_playing']?.value === true && device.albumArt && accountId !== undefined) face.art = homeyImageUrl(accountId, device.albumArt);
     if (this.flash() === 'error') face.detail = 'Did not respond';
     face.details = this.addsToFace(face, face.reading && (primary?.id === 'target_temperature' ? 'measure_temperature' : primary?.id));
     return face;
@@ -271,7 +281,9 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
 
   protected override act() {
     const device = this.device();
-    if (device) this.set('onoff', !device.capabilities['onoff']?.value);
+    if (!device) return;
+    const id = primaryCapability(device, this.settings().capability)?.id === 'speaker_playing' ? 'speaker_playing' : 'onoff';
+    this.set(id, !device.capabilities[id]?.value);
   }
 
   protected set(capability: string, value: CapabilityValue) {

@@ -584,6 +584,15 @@
   .hd-photo__img { animation: none; }
 }
 
+/* A device tile while its speaker plays: over the album art (--art), darkened so white text and the button read. */
+.hd-tile.has-art, .hd-tile.has-art.is-active, .hd-tile.has-art.is-feedback {
+  background: linear-gradient(rgb(0 0 0 / .2), rgb(0 0 0 / .72)), var(--art) center / cover no-repeat, #111;
+  color: #fff;
+}
+.hd-tile.has-art :is(.hd-tile__detail, .hd-icon):not(.hd-details *) { color: #fff; }
+.hd-tile.has-art > .hd-row > .hd-icon { background: rgb(255 255 255 / .16); }
+.hd-tile.has-art .hd-tile__action:not(.hd-details *) { background: #fff; color: #111; }
+
 /*
  * Plex tiles: what plays over its artwork, darkened so the white text and buttons read, with a thin progress bar
  * along the bottom; and the newest posters of a library side by side. Without either they are plain tiles.

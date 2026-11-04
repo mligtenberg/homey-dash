@@ -128,6 +128,21 @@ public sealed class HomeyState(TimeProvider time, int accountId)
         Changed?.Invoke(new DeviceChanged(updated));
     }
 
+    // A picture changed in Homey, such as a speaker's album art when the track changes.
+    public void UpdateImage(string imageId, string? version)
+    {
+        List<HomeyDevice> updated;
+        lock (_lock)
+        {
+            updated = _devices.Values
+                .Where(d => d.AlbumArt is { } art && art.Id == imageId && art.Version != version)
+                .Select(d => d with { AlbumArt = new HomeyImage(imageId, version) })
+                .ToList();
+            foreach (var device in updated) _devices = _devices.SetItem(device.Id, device);
+        }
+        foreach (var device in updated) Changed?.Invoke(new DeviceChanged(device));
+    }
+
     public void UpsertVariable(HomeyVariable variable)
     {
         variable = variable with { Value = variable.Value.Clone() };

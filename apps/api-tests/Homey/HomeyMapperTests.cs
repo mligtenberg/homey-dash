@@ -25,6 +25,15 @@ public class HomeyMapperTests
     }
 
     [Fact]
+    public void Device_MapsItsAlbumArt()
+    {
+        var devices = JsonDocument.Parse(HomeyFixtures.Devices).RootElement;
+
+        Assert.Equal(new HomeyImage("art-1", "1792643825559"), HomeyMapper.Device(devices.GetProperty("speaker"), new Dictionary<string, string>()).AlbumArt);
+        Assert.Null(HomeyMapper.Device(devices.GetProperty("lamp"), new Dictionary<string, string>()).AlbumArt);
+    }
+
+    [Fact]
     public void Mood_MapsTheColoursOfTheLightsItTurnsOn()
     {
         var mood = HomeyMapper.Mood(JsonDocument.Parse(HomeyFixtures.Moods).RootElement.GetProperty("m1"));

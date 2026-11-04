@@ -25,6 +25,19 @@ public static class HomeyFixtures
               "dim": { "id": "dim", "type": "number", "title": "Dim level", "value": 0.4, "min": 0, "max": 1, "step": 0.01,
                        "setable": true, "getable": true, "lastUpdated": "2026-10-25T12:00:00.000Z" }
             }
+          },
+          "speaker": {
+            "id": "speaker",
+            "name": "Kitchen",
+            "zone": "zone-living",
+            "class": "speaker",
+            "capabilitiesObj": {
+              "speaker_playing": { "id": "speaker_playing", "type": "boolean", "title": "Playing", "value": true, "setable": true, "getable": true }
+            },
+            "images": [
+              { "id": "albumart", "type": "media",
+                "imageObj": { "id": "art-1", "url": "/api/image/art-1", "lastUpdated": 1792643825559, "ownerUri": "homey:device:speaker" } }
+            ]
           }
         }
         """;

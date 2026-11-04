@@ -59,6 +59,8 @@ public sealed class ScriptedHomeyServer : IAsyncDisposable
             Requests.Enqueue((request.Method, request.Path + request.QueryString, ""));
             return Results.Content("""{"step":300000,"values":[{"t":"2026-10-25T12:05:00.000Z","v":5},{"t":"2026-10-25T12:00:00.000Z","v":4.5},{"t":"2026-10-25T12:10:00.000Z","v":null}]}""", "application/json");
         });
+        _app.MapGet("/api/image/{id}", (string id) =>
+            id == "art-1" ? Results.Bytes([1, 2, 3], "image/png") : Results.NotFound());
         _app.MapMethods("/api/manager/{**rest}", ["PUT", "POST"], async (HttpRequest request) =>
         {
             using var reader = new StreamReader(request.Body);

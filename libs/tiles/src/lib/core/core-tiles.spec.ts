@@ -41,6 +41,7 @@ const device = (capabilities: HomeyCapability[], change: Partial<HomeyDevice> = 
   available: true,
   unavailableMessage: null,
   capabilities: Object.fromEntries(capabilities.map((c) => [c.id, c])),
+  albumArt: null,
   ...change,
 });
 
@@ -124,6 +125,28 @@ describe('core tiles', () => {
       expect(tile.classList).toContain('is-active');
       expect(tile.textContent).toContain('On');
       expect(button(tile, 'Turn off')).toBeTruthy();
+    });
+
+    it("plays and pauses a speaker over its album art while it plays", async () => {
+      const tile = await render(DeviceTile, 'd1');
+      const speaker = (playing: boolean) =>
+        device(
+          [capability('speaker_playing', playing), capability('speaker_track', 'Birds of a Feather'), capability('speaker_artist', 'Billie Eilish')],
+          { class: 'speaker', albumArt: { id: 'art 1', version: '7' } },
+        );
+      await push(speaker(true));
+
+      expect(tile.textContent).toContain('Birds of a Feather · Billie Eilish');
+      expect(tile.classList).toContain('has-art');
+      expect(tile.style.getPropertyValue('--art')).toContain('/api/homey/images/art%201?account=1&v=7');
+      button(tile, 'Pause').click();
+      await settle();
+      expect(realtime.commands).toEqual([['setCapability', undefined, 'd1', 'speaker_playing', false]]);
+
+      await push(speaker(false));
+      expect(tile.textContent).toContain('Not playing');
+      expect(tile.classList).not.toContain('has-art');
+      expect(button(tile, 'Play')).toBeTruthy();
     });
 
     it('opens its details on Enter and Space like a tap', async () => {

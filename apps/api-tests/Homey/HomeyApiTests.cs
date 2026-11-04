@@ -37,6 +37,19 @@ public class HomeyApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(0.8, lamp.GetProperty("capabilities").GetProperty("dim").GetProperty("value").GetDouble());
     }
 
+    [Fact]
+    public async Task AlbumArt_IsServedOnlyForDevicesThatHaveIt()
+    {
+        var devices = await _client.GetFromJsonAsync<JsonElement>("/api/homey/devices");
+        var art = devices.EnumerateArray().Single(d => d.GetProperty("id").GetString() == "living-speaker").GetProperty("albumArt");
+
+        var image = await _client.GetAsync($"/api/homey/images/{art.GetProperty("id").GetString()}?v={art.GetProperty("version").GetString()}");
+
+        Assert.Equal(HttpStatusCode.OK, image.StatusCode);
+        Assert.Equal("image/svg+xml", image.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync("/api/homey/images/something-else")).StatusCode);
+    }
+
     [Theory]
     [InlineData("lastHour")]
     [InlineData("last31Days")]

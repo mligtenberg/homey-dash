@@ -40,6 +40,19 @@ export interface HomeyDevice {
   available: boolean;
   unavailableMessage: string | null;
   capabilities: Record<string, HomeyCapability>;
+  /** What a speaker is playing, as a picture, for `homeyImageUrl`; null when Homey has none for the device. */
+  albumArt: HomeyImage | null;
+}
+
+/** A picture Homey keeps; `version` changes whenever the picture does. */
+export interface HomeyImage {
+  id: string;
+  version: string | null;
+}
+
+/** Where a display gets a picture of a Homey: from HomeyDash, which fetches it from Homey. */
+export function homeyImageUrl(accountId: number, image: HomeyImage) {
+  return `/api/homey/images/${encodeURIComponent(image.id)}?account=${accountId}&v=${encodeURIComponent(image.version ?? '')}`;
 }
 
 /** A room or area in Homey; zones nest, and only the top one (Home) has no parent. */

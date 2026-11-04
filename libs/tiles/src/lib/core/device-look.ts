@@ -144,6 +144,11 @@ export function deviceDetail(device: HomeyDevice): { detail: string; active: boo
   const caps = device.capabilities;
   const value = (id: string) => caps[id]?.value;
 
+  // What plays says more than that the device is on.
+  if (value('speaker_playing') === true) {
+    const playing = [value('speaker_track'), value('speaker_artist')].filter((v) => typeof v === 'string' && v).join(' · ');
+    return { detail: playing || 'Playing', active: true };
+  }
   if (typeof value('onoff') === 'boolean') {
     const on = value('onoff') as boolean;
     const dim = value('dim');
@@ -163,6 +168,8 @@ export function deviceDetail(device: HomeyDevice): { detail: string; active: boo
     const open = Math.round((value('windowcoverings_set') as number) * 100);
     return { detail: open === 0 ? 'Closed' : `${open}% open`, active: open > 0 };
   }
+
+  if (value('speaker_playing') === false) return { detail: 'Not playing', active: false };
 
   const measured = Object.values(caps).filter((c) => typeof c.value === 'number' && c.id.startsWith('measure_'));
   if (measured.length > 0) return { detail: measured.slice(0, 2).map(formatNumber).join(' · '), active: false };
