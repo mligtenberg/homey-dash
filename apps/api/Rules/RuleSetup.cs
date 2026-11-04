@@ -9,6 +9,7 @@ public static class RuleSetup
     {
         services.AddSingleton<DisplayDirectory>();
         services.AddSingleton<DisplayTouches>();
+        services.AddSingleton<DisplayBrightness>();
         services.AddSignalSource<HomeySignals>();
         services.AddSignalSource<ClockSignals>();
         services.AddSignalSource<DisplaySignals>();

@@ -65,6 +65,13 @@
         },
         "development": {
           "buildTarget": "display:build:development"
+        },
+        "https": {
+          "buildTarget": "display:build:development",
+          "host": "0.0.0.0",
+          "ssl": true,
+          "sslKey": "certs/homeydash-key.pem",
+          "sslCert": "certs/homeydash.pem"
         }
       }
     },

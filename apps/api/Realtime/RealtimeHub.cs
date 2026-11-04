@@ -34,6 +34,7 @@ public sealed class RealtimeHub(
     RuleSubscriptions subscriptions,
     DisplayDirectory directory,
     DisplayTouches touches,
+    DisplayBrightness brightness,
     TimeProvider time) : Hub
 {
     public const string Path = "/api/realtime";
@@ -121,6 +122,14 @@ public sealed class RealtimeHub(
     {
         if (!Context.Items.TryGetValue(ScreenKey, out var screen) || screen is not Guid screenId) throw new HubException("Join as a screen first.");
         if (directory.ByScreen(screenId) is { } display) touches.Touch(display.Id, time.GetUtcNow());
+    }
+
+    // How much light falls on the screen in lux, from its light sensor or estimated with its camera; screens measure
+    // every minute or so.
+    public void Brightness(double lux)
+    {
+        if (!Context.Items.TryGetValue(ScreenKey, out var screen) || screen is not Guid screenId) throw new HubException("Join as a screen first.");
+        if (double.IsFinite(lux) && directory.ByScreen(screenId) is { } display) brightness.Measure(display.Id, lux);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)

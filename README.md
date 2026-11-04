@@ -55,6 +55,30 @@ servers, choose one there. The buttons only work on players that take remote con
 `Plex:Fake=true` runs against a fake Plex with a movie playing and an episode paused (`npx nx serve api -c simulator`
 sets it).
 
+## Brightness
+
+Displays measure how much light falls on them, in lux, once a minute, for rules on the **Brightness** signal (see
+[ADR-0011](docs/adr/0011-displays-measure-brightness-with-the-camera.md)). Chrome reads the tablet's light sensor when
+`chrome://flags/#enable-generic-sensor-extra-classes` is enabled; other browsers, and Chrome without the flag, estimate
+the lux with the front camera, which is rough. Browsers only allow the sensor and the camera over https, so serve the
+display app with a certificate the tablets trust:
+
+1. Install [mkcert](https://github.com/FiloSottile/mkcert) (`brew install mkcert`), run `mkcert -install`, then make a
+   certificate for the names the tablets use:
+   `mkdir -p certs && mkcert -key-file certs/homeydash-key.pem -cert-file certs/homeydash.pem homeydash.local 192.168.1.10` (your computer's name and address)
+2. Trust mkcert's root (`mkcert -CAROOT` shows where `rootCA.pem` is) on every tablet:
+   - Android: copy `rootCA.pem` over and install it under Settings → Security → Encryption & credentials → Install a
+     certificate → CA certificate.
+   - iPad: AirDrop or mail `rootCA.pem`, install the profile under Settings → General → VPN & Device Management, then
+     turn on full trust under Settings → General → About → Certificate Trust Settings.
+3. `npx nx serve display -c https`, and open `https://<address>:4200` on the tablet. Allow the camera when asked (on
+   iPad, set Settings → Apps → Safari → Camera to Allow so it doesn't ask again).
+
+The https address is a new origin, so each screen runs setup again: take over its existing display there.
+
+To pick another camera, or see the lux a screen measured last and whether its sensor or camera gave it, tap its
+top-right corner five times quickly to open its screen settings.
+
 ## Running
 
 ```sh

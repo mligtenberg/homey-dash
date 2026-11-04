@@ -225,6 +225,25 @@ public sealed class RuleSubscriptionTests(ClockApiFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task Brightness_IsTheDisplaysLastLux_AndFailsUntilMeasured()
+    {
+        var (screen, _) = await ScreenAsync("Bedroom");
+        var (other, _) = await ScreenAsync("Office");
+        var dark = Rule(When("display:brightness", "lessThan", 20));
+        var notDark = Rule(When("display:brightness", "lessThan", 20, not: true));
+        Assert.False(await SubscribeAsync(screen, "dark", dark));
+        Assert.False(await SubscribeAsync(screen, "notDark", notDark));
+        Assert.False(await SubscribeAsync(other, "dark", dark));
+
+        await screen.Hub.InvokeAsync("Brightness", 12.4);
+        Assert.Equal(new Dictionary<string, bool> { ["dark"] = true }, await NextAsync(screen, "dark"));
+        await NoAnswerAsync(other, "dark");
+
+        await screen.Hub.InvokeAsync("Brightness", 350.0);
+        Assert.Equal(new Dictionary<string, bool> { ["dark"] = false, ["notDark"] = true }, await NextAsync(screen, "dark"));
+    }
+
+    [Fact]
     public async Task ATimeOfDayRule_FlipsAtItsBoundsToTheSecond()
     {
         var connection = await ConnectAsync();

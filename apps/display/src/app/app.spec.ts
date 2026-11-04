@@ -6,7 +6,8 @@ import { Condition, HomeySnapshot, LockWidget, PhotoSet, Realtime, ScreenView, T
 import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { cellSize } from '@homey-dash/layout';
 import { CORE_TILES, provideTileModules, RealtimeRuleAnswers, RealtimeTileData, RuleAnswers, TileData } from '@homey-dash/tiles';
-import { App, IDLE_MS, TOUCH_REPORT_MS } from './app';
+import { App, IDLE_MS, SETTINGS_TAPS, SETTINGS_TAPS_MS, TOUCH_REPORT_MS } from './app';
+import { BRIGHTNESS_MS, LightMeter } from './light-meter';
 
 const hallway = { id: 'd1', name: 'Hallway', dashboardIds: [], idleRules: [], lockWidgets: [] };
 const dashboard = (id: string, name: string, version = 1, rows = 4) => ({ id, name, version, layout: { rows, sections: [] } });
@@ -472,6 +473,100 @@ describe('App', () => {
       root.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
 
       expect(realtime.touches).toBe(0);
+    });
+  });
+
+  describe('brightness', () => {
+    let levels: (number | null)[];
+    let measured: number;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      levels = [];
+      measured = 0;
+      picked = [];
+      TestBed.overrideProvider(LightMeter, {
+        useValue: {
+          available: true,
+          camera: signal<string | null>(null),
+          hasCamera: true,
+          reading: signal(null),
+          cameras: async () => [
+            { deviceId: 'f', label: 'FaceTime HD Camera' },
+            { deviceId: 'i', label: 'iPhone Camera' },
+          ],
+          choose: (deviceId: string | null) => picked.push(deviceId),
+          measure: async () => {
+            measured++;
+            return levels.length ? (levels.shift() as number | null) : 50;
+          },
+        },
+      });
+    });
+    afterEach(() => vi.useRealTimers());
+    let picked: (string | null)[];
+
+    const corner = (root: HTMLElement) =>
+      root.querySelector('.corner')?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    const settings = (root: HTMLElement) => root.querySelector<HTMLDialogElement>('hd-screen-settings dialog');
+
+    it('opens the screen settings after quick taps in the top-right corner, not slow ones', async () => {
+      const root = await start(published(1));
+      for (let i = 1; i < SETTINGS_TAPS; i++) corner(root);
+      vi.advanceTimersByTime(SETTINGS_TAPS_MS);
+      corner(root);
+      expect(settings(root)?.open).toBe(false);
+
+      for (let i = 1; i < SETTINGS_TAPS; i++) corner(root);
+      await vi.advanceTimersByTimeAsync(0);
+      await stable();
+      expect(settings(root)?.open).toBe(true);
+      const select = root.querySelector('#screen-camera') as HTMLSelectElement;
+      expect([...select.options].map((o) => o.textContent?.trim())).toEqual(['Automatic', 'FaceTime HD Camera', 'iPhone Camera']);
+    });
+
+    it('measures again at once with the camera picked there', async () => {
+      const root = await start(published(1));
+      await stable();
+      expect(measured).toBe(1);
+      for (let i = 0; i < SETTINGS_TAPS; i++) corner(root);
+      await vi.advanceTimersByTimeAsync(0);
+      await stable();
+
+      const select = root.querySelector('#screen-camera') as HTMLSelectElement;
+      select.value = 'i';
+      select.dispatchEvent(new Event('change'));
+      await stable();
+
+      expect(picked).toEqual(['i']);
+      expect(measured).toBe(2);
+      expect(realtime.brightnesses).toEqual([50, 50]);
+    });
+
+    it('reports the room\'s brightness once a display, and every while after', async () => {
+      levels = [12, 64];
+      await start(published(1));
+      await stable();
+      expect(realtime.brightnesses).toEqual([12]);
+
+      await vi.advanceTimersByTimeAsync(BRIGHTNESS_MS);
+      expect(realtime.brightnesses).toEqual([12, 64]);
+    });
+
+    it('measures nothing during setup', async () => {
+      await start(null);
+      await vi.advanceTimersByTimeAsync(BRIGHTNESS_MS);
+
+      expect(measured).toBe(0);
+    });
+
+    it('stops once the camera is refused', async () => {
+      levels = [null];
+      await start(published(1));
+      await vi.advanceTimersByTimeAsync(BRIGHTNESS_MS * 3);
+
+      expect(measured).toBe(1);
+      expect(realtime.brightnesses).toEqual([]);
     });
   });
 });

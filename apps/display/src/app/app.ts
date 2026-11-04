@@ -9,13 +9,16 @@ import {
   Injector,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { LucideChevronLeft, LucideDynamicIcon, LucideLayers } from '@lucide/angular';
 import { IdleRule, Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
 import { cellSize } from '@homey-dash/layout';
 import { DashboardView, homeyLost, PhotoTile, RuleAnswers, TileData, TileKindRegistry } from '@homey-dash/tiles';
 import { screenId, safeStorage } from './screen-id';
+import { BRIGHTNESS_MS, LightMeter } from './light-meter';
 import { LockScreen } from './lock-screen';
+import { ScreenSettings } from './screen-settings';
 import { Setup } from './setup';
 
 type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; view: ScreenView };
@@ -31,6 +34,10 @@ export const IDLE_MS = 60_000;
  */
 export const TOUCH_REPORT_MS = 5_000;
 
+/** How many quick taps in the top-right corner open the screen settings, and how quick. */
+export const SETTINGS_TAPS = 5;
+export const SETTINGS_TAPS_MS = 3_000;
+
 /** Where a screen remembers that its tape is open. */
 const TAPE_KEY = 'homeydash.tape';
 
@@ -43,7 +50,7 @@ const TAPE_KEY = 'homeydash.tape';
  * to the rule's dashboard or the one shown before; its lock screen widgets, such as a clock, lie over either.
  */
 @Component({
-  imports: [DashboardView, LockScreen, LucideDynamicIcon, PhotoTile, Setup],
+  imports: [DashboardView, LockScreen, LucideDynamicIcon, PhotoTile, ScreenSettings, Setup],
   selector: 'hd-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -120,6 +127,9 @@ const TAPE_KEY = 'homeydash.tape';
     @if (lost()) {
       <span class="hd-reconnecting reconnecting" role="status">Reconnecting…</span>
     }
+    <!-- Over everything, so the taps that open the screen settings press nothing beneath. -->
+    <span class="corner" aria-hidden="true" (pointerdown)="cornerTap()"></span>
+    <hd-screen-settings (cameraChanged)="remeasure()" />
   `,
   styles: `
     :host { display: block; height: 100dvh; overflow: hidden; position: relative; }
@@ -133,6 +143,7 @@ const TAPE_KEY = 'homeydash.tape';
     @media (prefers-reduced-motion: reduce) { .is-leaving { animation: none; } }
     .slideshow hd-photo-tile { width: 100%; height: 100%; border-radius: 0; box-shadow: none; --cell: calc(100dvh / 3); }
     .reconnecting { position: fixed; z-index: 11; left: 50%; bottom: var(--space-5); translate: -50% 0; }
+    .corner { position: fixed; z-index: 12; top: 0; right: 0; width: 40px; height: 40px; }
   `,
 })
 export class App {
@@ -195,6 +206,13 @@ export class App {
   });
   private idle?: ReturnType<typeof setTimeout>;
   private lastReport = -Infinity;
+  private readonly lightMeter = inject(LightMeter);
+  private readonly destroyRef = inject(DestroyRef);
+  private light?: ReturnType<typeof setTimeout>;
+  private metering = false;
+  private measuring = false;
+  private cornerTaps: number[] = [];
+  private readonly settings = viewChild.required(ScreenSettings);
 
   private readonly storage = safeStorage();
   protected readonly collapsed = signal(this.storage?.getItem(TAPE_KEY) !== 'open');
@@ -228,6 +246,7 @@ export class App {
     const stops = [this.realtime.on('Screen', (view) => this.show(view)), this.realtime.whenConnected(() => this.join())];
     inject(DestroyRef).onDestroy(() => {
       clearTimeout(this.idle);
+      clearTimeout(this.light);
       stops.forEach((stop) => stop());
     });
   }
@@ -278,6 +297,42 @@ export class App {
     this.realtime.touched().catch(() => undefined);
   }
 
+  // From when it first is a display, a screen measures the light falling on it now and every while after, for rules on
+  // its brightness; never during setup, and no more once it has no way to measure or is refused, until a camera is picked.
+  private async measureLight() {
+    if (this.measuring) return;
+    if (this.state().kind === 'display' && this.realtime.connected()) {
+      this.measuring = true;
+      try {
+        const lux = await this.lightMeter.measure();
+        if (lux === null) return;
+        await this.realtime.brightness(lux);
+      } catch {
+        // The camera was busy or the connection dropped; measured again next time.
+      } finally {
+        this.measuring = false;
+      }
+    }
+    if (!this.destroyRef.destroyed) this.light = setTimeout(() => this.measureLight(), BRIGHTNESS_MS);
+  }
+
+  // Measures with the camera just picked at once, rather than at the next measurement.
+  protected remeasure() {
+    if (!this.lightMeter.available || this.measuring) return;
+    clearTimeout(this.light);
+    this.metering = true;
+    void this.measureLight();
+  }
+
+  // Quick taps in the top-right corner, which open the screen settings once there are enough.
+  protected cornerTap() {
+    const now = Date.now();
+    this.cornerTaps = [...this.cornerTaps.filter((at) => now - at < SETTINGS_TAPS_MS), now];
+    if (this.cornerTaps.length < SETTINGS_TAPS) return;
+    this.cornerTaps = [];
+    void this.settings().open();
+  }
+
   protected async join() {
     try {
       this.show(await this.realtime.joinScreen(this.screenId));
@@ -290,6 +345,10 @@ export class App {
   private show(view: ScreenView | null) {
     this.state.set(view ? { kind: 'display', view } : { kind: 'setup' });
     if (!view) return;
+    if (!this.metering && this.lightMeter.available) {
+      this.metering = true;
+      void this.measureLight();
+    }
     const versions = Object.fromEntries(view.dashboards.map((d) => [d.id, d.version]));
     afterNextRender(
       { read: () => void this.realtime.showing(versions).catch(() => undefined) },

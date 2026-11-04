@@ -172,6 +172,11 @@ export class Realtime {
     return this.hub.invoke<void>('Touched');
   }
 
+  /** Tells HomeyDash how much light falls on this screen, in lux, for rules on its brightness. */
+  brightness(lux: number) {
+    return this.hub.invoke<void>('Brightness', lux);
+  }
+
   private start(attempt: number) {
     setTimeout(() => {
       this.hub.start().then(

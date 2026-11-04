@@ -32,6 +32,10 @@ _Avoid_: Tile, complication
 Pills floating over the left edge of a display that offers more than one dashboard, one per dashboard in the display's order, for switching between them. It can be collapsed to one button, which the screen remembers. A display with one dashboard has no tape.
 _Avoid_: Tab bar, menu, dashboard picker
 
+**Screen settings**:
+What is set on one screen itself rather than in **Management**, such as which camera it estimates the light falling on it with. Hidden from the household: five quick taps in the top-right corner open it, during **Setup** too. Kept on the screen, so a **Takeover** doesn't carry it over.
+_Avoid_: Admin menu, debug menu, device settings
+
 **Display status**:
 What Management knows about a display beyond its configuration: whether it is connected, when it was last seen, and whether it shows the latest published version of its dashboard.
 _Avoid_: Health, heartbeat
@@ -217,6 +221,7 @@ _Avoid_: Expression, logic, formula
 - HomeyDash evaluates every **Rule**, for as long as a shown **Dashboard** asks it to and separately for each **Display** showing it, and tells it at once whenever its answer changes; the **Logic tile** itself picks the first tile whose **Rule** holds. A **Preview** asks HomeyDash too, as if shown on a **Display** chosen in **Management**, or on none.
 - A **Signal** from **Homey** belongs to one Homey **Account**; a **Rule** may mix **Signals** from several. Removing that **Account** makes the **Signal** **Missing**; an unreachable **Homey** makes it **Unavailable**.
 - A **Condition** on a **Display**'s name refers to its permanent identity, so renaming the **Display** keeps the **Condition**, and a **Takeover** carries it over.
+- A **Display** measures how much light falls on it in lux, once a minute, with its light sensor or else estimated with its camera, only when opened over https; until it has measured, a **Condition** on its brightness fails.
 - The **Editor** shows the tile a **Logic tile**'s rules choose now, as the **Preview** would, except while one of the tiles it holds is being configured, which it then shows instead.
 - A **Display** in **Connection lost** keeps showing the tile a **Logic tile** last chose.
 - A **Condition** on an **Unavailable** **Signal** uses its last known value. A **Condition** on a **Missing** **Signal**, or on one that has never had a value, fails even when negated, so its **Logic tile** moves on to the next tile in its list; only a **Missing** one makes **Management** flag the dashboard.

@@ -48,3 +48,27 @@ public sealed class DisplayTouches
         Changed?.Invoke();
     }
 }
+
+/// <summary>
+/// How much light falls on each display, in lux, as its screen last measured with its light sensor or estimated with its
+/// camera; a display whose screen has not measured since HomeyDash started has no entry.
+/// </summary>
+public sealed class DisplayBrightness
+{
+    private readonly ConcurrentDictionary<Guid, double> _levels = new();
+
+    public event Action? Changed;
+
+    // Beyond direct sunlight, so a wrong reading can't grow without bound.
+    public const double MaxLux = 200_000;
+
+    public double? Lux(Guid displayId) => _levels.TryGetValue(displayId, out var lux) ? lux : null;
+
+    public void Measure(Guid displayId, double lux)
+    {
+        var level = Math.Round(Math.Clamp(lux, 0, MaxLux));
+        if (_levels.TryGetValue(displayId, out var was) && was == level) return;
+        _levels[displayId] = level;
+        Changed?.Invoke();
+    }
+}

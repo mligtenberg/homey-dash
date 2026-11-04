@@ -114,6 +114,8 @@ export class FakeRealtime implements Partial<Realtime> {
   answerRule: (rule: Rule, asDisplay: string | null) => boolean | undefined = () => false;
   /** How many times the screen reported a touch. */
   touches = 0;
+  /** Each brightness the screen reported, in order. */
+  brightnesses: number[] = [];
   private seq = 0;
 
   async subscribeRule(id: string, rule: Rule, asDisplay: string | null = null): Promise<RuleAnswer> {
@@ -145,6 +147,10 @@ export class FakeRealtime implements Partial<Realtime> {
 
   async touched() {
     this.touches++;
+  }
+
+  async brightness(level: number) {
+    this.brightnesses.push(level);
   }
 
   setCapability(account: number | undefined, deviceId: string, capabilityId: string, value: CapabilityValue) {

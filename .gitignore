@@ -47,6 +47,9 @@ Thumbs.db
 .nx/polygraph
 .angular
 
+# Local https certificates (see README)
+/certs
+
 # .NET
 bin/
 obj/
