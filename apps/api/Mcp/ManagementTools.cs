@@ -110,21 +110,29 @@ public sealed class ManagementTools(
     }
 
     [McpServerTool(Name = "save_draft", Idempotent = true)]
-    [Description($"""
+    [Description($$"""
         Replaces a dashboard's draft. Displays never show a draft; publish it to show it.
         A dashboard has 1 to 12 rows. Each section is a grid 3 columns wide and as many rows tall as the dashboard;
         sections sit side by side and scroll horizontally. A tile's position is the zero-based column and row of its
         top-left cell. Sizes in cells (columns×rows): small 1×1, wide 2×1, full 3×1, large 2×2, full-large 3×2.
         Tiles must stay inside their section's grid and never overlap. Section and tile ids are any unique strings.
         A section with hidden true stays in the draft but displays leave it out; one with a rule is shown only while it holds.
+        "background" sets what shows behind the tiles: { "kind": "color", "color": "#rrggbb" }, { "kind": "gradient",
+        "color": "#rrggbb", "to": "#rrggbb", "angle": 0-359 } (as in CSS: 0 upwards, 90 to the right), or { "kind": "image",
+        "imageId" } for an image uploaded in Management (keep the one the draft has; assistants can't upload), or
+        { "kind": "preset", "preset": "<style>/<subject>" } for a built-in image, drawn by day for the light theme and by
+        night for the dark one: styles geometric, pixel-art, line-art,
+        watercolor, low-poly, flat, synthwave; subjects living-room, bathroom, media, music, kitchen, bedroom, garden,
+        kids-room, office, energy, climate, security, garage, outdoors. Null or left out is the theme's own.
         Find targets with list_targets, and the signals rules use with list_signals.
-        {TileKinds}
-        {RuleSchema}
+        {{TileKinds}}
+        {{RuleSchema}}
         """)]
     public async Task<DashboardDetail> SaveDraft(Guid dashboardId, DashboardLayout draft, CancellationToken ct)
     {
         var dashboard = await FindDashboardAsync(dashboardId, ct);
         var errors = DashboardEndpoints.Validate(draft, rules);
+        if (await BackgroundImageEndpoints.MissingImageAsync(db, draft, ct) is { } missing) errors["background.imageId"] = [missing];
         if (errors.Count > 0)
             throw new McpException("The draft breaks the layout rules: "
                 + string.Join("; ", errors.Select(e => $"{e.Key}: {string.Join(" ", e.Value)}")));

@@ -11,11 +11,13 @@ import {
 } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
-import { DashboardDetail, DashboardLayout, DashboardsApi, DisplaysApi, Rule, Tile } from '@homey-dash/api-client';
+import { DashboardBackground, DashboardDetail, DashboardLayout, DashboardsApi, DisplaysApi, Rule, Tile } from '@homey-dash/api-client';
 import { TilePosition, TileSize } from '@homey-dash/layout';
 import {
   alwaysRule,
+  backgroundStyle,
   choiceLabel,
+  hasImage,
   heldTile,
   HeldTile,
   LOGIC_KIND,
@@ -28,6 +30,7 @@ import {
   TileKindRegistry,
   TileSettings,
 } from '@homey-dash/tiles';
+import { BackgroundField } from './background-field';
 import {
   LucideChevronLeft,
   LucideChevronRight,
@@ -62,7 +65,7 @@ interface Drag {
 
 @Component({
   selector: 'hd-editor-page',
-  imports: [AsDisplayPicker, LogicPanel, RouterLink, RuleEditor, TileHost, TilePanel, LucideDynamicIcon],
+  imports: [AsDisplayPicker, BackgroundField, LogicPanel, RouterLink, RuleEditor, TileHost, TilePanel, LucideDynamicIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // Logic tiles say which of their tiles they show.
   providers: [{ provide: LOGIC_TILE_BADGE, useValue: true }],
@@ -361,6 +364,13 @@ export class EditorPage {
     if (this.adding()?.sectionId === sectionId) this.adding.set(null);
     if (this.openSectionId() === sectionId) this.openSectionId.set(null);
     this.apply(edits.removeSection(this.current(), sectionId));
+  }
+
+  protected readonly stageBackground = computed(() => backgroundStyle(this.layout().background));
+  protected readonly stageHasImage = computed(() => hasImage(this.layout().background));
+
+  protected setBackground(background: DashboardBackground | null) {
+    this.apply({ ...this.current(), background });
   }
 
   protected setRows(rows: number) {

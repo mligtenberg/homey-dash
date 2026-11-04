@@ -41,6 +41,28 @@ namespace HomeyDash.Api.Migrations
                     b.ToTable("HomeyAccounts");
                 });
 
+            modelBuilder.Entity("HomeyDash.Api.Dashboards.BackgroundImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("BackgroundImages");
+                });
+
             modelBuilder.Entity("HomeyDash.Api.Dashboards.Dashboard", b =>
                 {
                     b.Property<Guid>("Id")

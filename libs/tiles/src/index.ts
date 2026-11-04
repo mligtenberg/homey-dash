@@ -8,6 +8,8 @@ export * from './lib/logic/logic-tile';
 export { shownSections } from './lib/logic/shown-sections';
 export { capabilityText, deviceLook, deviceType } from './lib/core/device-look';
 export * from './lib/dashboard-view';
+export { backgroundStyle, hasImage } from './lib/background';
+export { BACKGROUND_STYLES, BACKGROUND_SUBJECTS } from './lib/background-presets';
 export * from './lib/realtime-tile-data';
 export { PhotoTile } from './lib/core/photo-tile';
 export { TileDetails } from './lib/core/tile-details';

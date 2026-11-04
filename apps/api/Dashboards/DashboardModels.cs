@@ -24,8 +24,18 @@ public sealed record Tile(string Id, string Kind, TileSize Size, TilePosition Po
 // The rule stays JSON so a broken one is reported where it is, as a logic tile's is.
 public sealed record Section(string Id, string Title, IReadOnlyList<Tile> Tiles, bool Hidden = false, JsonElement? Rule = null);
 
-// Rows are part of the version: changing them in the draft must not break the published layout.
-public sealed record DashboardLayout(int Rows, IReadOnlyList<Section> Sections)
+// What a dashboard shows behind its tiles: one colour (Color), a gradient from Color to To at Angle degrees (0 is
+// upwards, 90 to the right, as in CSS), an image uploaded to HomeyDash (ImageId, see BackgroundImage), or one of the
+// built-in images the apps ship (Preset, "<style>/<subject>", see libs/design-system/backgrounds). Null is the theme's
+// own ground.
+public sealed record DashboardBackground(
+    string Kind, string? Color = null, string? To = null, int? Angle = null, Guid? ImageId = null, string? Preset = null)
+{
+    public static readonly IReadOnlyList<string> Kinds = ["color", "gradient", "image", "preset"];
+}
+
+// Rows and background are part of the version: changing them in the draft must not change the published layout.
+public sealed record DashboardLayout(int Rows, IReadOnlyList<Section> Sections, DashboardBackground? Background = null)
 {
     public const int DefaultRows = 4;
 

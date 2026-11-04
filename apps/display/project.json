@@ -19,6 +19,12 @@
           {
             "glob": "**/*",
             "input": "apps/display/public"
+          },
+          {
+            "glob": "**/*",
+            "input": "libs/design-system/backgrounds",
+            "output": "backgrounds",
+            "ignore": ["generate.mjs", "index.html", "manifest.json"]
           }
         ],
         "styles": [

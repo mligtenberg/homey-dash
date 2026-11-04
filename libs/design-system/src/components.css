@@ -52,6 +52,17 @@
 .hd-page-dot[aria-current="true"]::before { opacity: 1; scale: 1.3; }
 .hd-section { display: flex; flex-direction: column; gap: calc(var(--cell) * var(--cell-gap) * .6); flex: none; }
 .hd-section__title { font-size: calc(var(--cell) * .1); line-height: 1.2; font-weight: 700; color: var(--ink-muted); padding-inline: 4px; }
+/*
+ * Over a background image tiles turn to glass, so the image shows through while their text stays readable; a tile that
+ * fills with its kind's colour or a mood's stays solid. Titles and page dots get a shadow for the same reason.
+ */
+.hd-has-image .hd-tile:not(.is-active, .is-feedback, .has-tint) {
+  background: color-mix(in oklab, var(--k-fill, transparent) 22%, var(--tile-glass));
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+}
+.hd-has-image .hd-section__title { color: var(--ink); text-shadow: 0 0 6px var(--ground), 0 0 2px var(--ground); }
+.hd-has-image .hd-page-dot { box-shadow: 0 0 0 2px color-mix(in oklab, var(--ground) 60%, transparent); }
 .hd-section__grid {
   display: grid;
   grid-template-columns: repeat(3, var(--cell));

@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { DashboardLayout } from '@homey-dash/api-client';
 import { sectionsPerPage } from '@homey-dash/layout';
+import { backgroundStyle, hasImage } from './background';
 import { shownSections } from './logic/shown-sections';
 import { TileHost } from './tile-host';
 
@@ -25,7 +26,11 @@ import { TileHost } from './tile-host';
   selector: 'hd-dashboard-view',
   imports: [TileHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'hd-dashboard' },
+  host: {
+    class: 'hd-dashboard',
+    '[style.background]': 'background()',
+    '[class.hd-has-image]': 'hasImage()',
+  },
   template: `
     <div #pager class="hd-dashboard__pages" (scroll)="onScroll()">
       @for (page of pages(); track $index) {
@@ -60,6 +65,8 @@ import { TileHost } from './tile-host';
 })
 export class DashboardView {
   readonly layout = input.required<DashboardLayout>();
+  protected readonly background = computed(() => backgroundStyle(this.layout().background));
+  protected readonly hasImage = computed(() => hasImage(this.layout().background));
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly pager = viewChild.required<ElementRef<HTMLElement>>('pager');

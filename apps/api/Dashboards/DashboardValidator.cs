@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace HomeyDash.Api.Dashboards;
 
 /// <summary>
@@ -8,7 +10,7 @@ namespace HomeyDash.Api.Dashboards;
 /// Which sizes a tile kind supports is declared by its module in the front end (ADR-0003), so
 /// Management checks that; the API only knows the fixed set of sizes.
 /// </remarks>
-public static class DashboardValidator
+public static partial class DashboardValidator
 {
     public const int SectionColumns = 3;
     public const int MaxRows = 12;
@@ -36,6 +38,22 @@ public static class DashboardValidator
 
         if (layout.Rows is < 1 or > MaxRows)
             Add("rows", $"A dashboard has 1 to {MaxRows} rows, not {layout.Rows}.");
+
+        if (layout.Background is { } background)
+        {
+            if (!DashboardBackground.Kinds.Contains(background.Kind))
+                Add("background.kind", $"A background is one of {string.Join(", ", DashboardBackground.Kinds)}.");
+            var colours = background.Kind switch { "color" => 1, "gradient" => 2, _ => 0 };
+            foreach (var (name, colour) in new[] { ("color", background.Color), ("to", background.To) }.Take(colours))
+                if (colour is null || !HexColor().IsMatch(colour))
+                    Add($"background.{name}", "A colour is written as #rrggbb, such as #1a1c24.");
+            if (background.Kind == "gradient" && background.Angle is not (>= 0 and < 360))
+                Add("background.angle", "A gradient's angle is 0 to 359 degrees.");
+            if (background.Kind == "image" && background.ImageId is null)
+                Add("background.imageId", "An image background needs an uploaded image.");
+            if (background.Kind == "preset" && (background.Preset is null || !PresetName().IsMatch(background.Preset)))
+                Add("background.preset", "A built-in background is named <style>/<subject>, such as geometric/living-room.");
+        }
 
         // Collections and positions can still be null when the JSON left them out.
         if (layout.Sections is null)
@@ -103,4 +121,10 @@ public static class DashboardValidator
         string.IsNullOrWhiteSpace(name) ? "A dashboard needs a name."
         : name.Trim().Length > MaxNameLength ? $"A dashboard name has at most {MaxNameLength} characters."
         : null;
+
+    [GeneratedRegex("^#[0-9a-fA-F]{6}$")]
+    private static partial Regex HexColor();
+
+    [GeneratedRegex("^[a-z0-9-]+/[a-z0-9-]+$")]
+    private static partial Regex PresetName();
 }

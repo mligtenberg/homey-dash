@@ -57,15 +57,19 @@ public static class DashboardEndpoints
             return Results.NoContent();
         });
 
-        dashboards.MapPut("/{id:guid}/draft", (Guid id, DashboardLayout draft, HomeyDashDbContext db, TargetCatalog targets, RealtimeNotifier notifier,
+        dashboards.MapPut("/{id:guid}/draft", async (Guid id, DashboardLayout draft, HomeyDashDbContext db, TargetCatalog targets, RealtimeNotifier notifier,
             RuleEngine rules, CancellationToken ct) =>
-            Change(id, db, targets, notifier, ct, dashboard =>
+        {
+            var missing = await BackgroundImageEndpoints.MissingImageAsync(db, draft, ct);
+            return await Change(id, db, targets, notifier, ct, dashboard =>
             {
                 var errors = Validate(draft, rules);
+                if (missing is not null) errors["background.imageId"] = [missing];
                 if (errors.Count > 0) return Results.ValidationProblem(errors, "The draft breaks the layout rules.");
                 dashboard.SaveDraft(WithSettings(draft));
                 return null;
-            }));
+            });
+        });
 
         // Every display showing the dashboard switches to the new version at once.
         dashboards.MapPost("/{id:guid}/publish",

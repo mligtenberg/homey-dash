@@ -12,6 +12,7 @@ public class HomeyDashDbContext(DbContextOptions<HomeyDashDbContext> options) : 
 {
     public DbSet<Dashboard> Dashboards => Set<Dashboard>();
     public DbSet<Display> Displays => Set<Display>();
+    public DbSet<BackgroundImage> BackgroundImages => Set<BackgroundImage>();
     public DbSet<HomeyAccount> HomeyAccounts => Set<HomeyAccount>();
     public DbSet<ImmichAccount> ImmichAccounts => Set<ImmichAccount>();
     public DbSet<PlexAccount> PlexAccounts => Set<PlexAccount>();

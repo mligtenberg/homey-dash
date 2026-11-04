@@ -3,8 +3,16 @@
 
 :root {
   color-scheme: light;
+  /*
+   * Switches with the theme inside one value: `var(--hide-in-dark, A) var(--hide-in-light, B)` is A in the light theme
+   * and B in the dark one. Each is empty in its own theme, hiding its fallback, and invalid in the other, showing it.
+   */
+  --hide-in-light: ;
+  --hide-in-dark: initial;
   --ground: #e4e6ee;
   --tile-surface: #f1f2f7;
+  /* A tile over a background image: the surface, see-through, over a blur. */
+  --tile-glass: rgb(241 242 247 / .62);
   --ink: #22252f;
   --ink-muted: #5f6477;
   --line: #d4d7e2;
@@ -44,8 +52,11 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
+    --hide-in-light: initial;
+    --hide-in-dark: ;
     --ground: #1a1c24;
     --tile-surface: #23262f;
+    --tile-glass: rgb(35 38 47 / .58);
     --ink: #e6e8f0;
     --ink-muted: #9095a8;
     --line: #30343f;
@@ -85,8 +96,11 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --hide-in-light: initial;
+  --hide-in-dark: ;
   --ground: #1a1c24;
   --tile-surface: #23262f;
+  --tile-glass: rgb(35 38 47 / .58);
   --ink: #e6e8f0;
   --ink-muted: #9095a8;
   --line: #30343f;

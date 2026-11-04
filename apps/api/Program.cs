@@ -54,6 +54,7 @@ api.MapAccounts();
 api.MapPhotos();
 api.MapPlex();
 api.MapDashboards();
+api.MapBackgrounds();
 api.MapDisplays();
 api.MapRules();
 app.MapHub<RealtimeHub>(RealtimeHub.Path);

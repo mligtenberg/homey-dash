@@ -90,6 +90,10 @@ _Avoid_: Connection, integration, credential
 
 ### Layout
 
+**Background**:
+What a dashboard shows behind its tiles: the theme's own, one colour, a gradient between two colours, a built-in image (one subject, such as the living room or the garden, drawn in one style, such as pixel art, by day in the light theme and by night in the dark one), or an image uploaded in **Management**. It belongs to the dashboard's version, so it changes on displays only when the draft is published. Over an image, tiles turn to glass so they stay readable. An uploaded image no version uses any more is let go after a day.
+_Avoid_: Wallpaper, theme, backdrop
+
 **Section**:
 A group of tiles within a dashboard, laid out on a grid three cells wide and as many rows tall as its dashboard. Cells may be left empty. Displays show it always, never, or only while a **Rule** holds, evaluated as a **Logic tile**'s is; the **Editor** always shows it, dimmed when a display would leave it out.
 _Avoid_: Group, panel, column, area

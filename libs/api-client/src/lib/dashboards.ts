@@ -23,10 +23,33 @@ export interface Section {
   rule?: Rule | null;
 }
 
+/**
+ * What a dashboard shows behind its tiles: one colour, a gradient between two at an angle (as in CSS: 0 upwards, 90 to
+ * the right), an image uploaded to HomeyDash, or one of the built-in images the apps ship, named `<style>/<subject>`,
+ * drawn by day and by night. Colours are `#rrggbb`.
+ */
+export type DashboardBackground =
+  | { kind: 'color'; color: string }
+  | { kind: 'gradient'; color: string; to: string; angle: number }
+  | { kind: 'image'; imageId: string }
+  | { kind: 'preset'; preset: string };
+
+/** Where HomeyDash serves an uploaded background image. */
+export function backgroundImageUrl(imageId: string) {
+  return `/api/backgrounds/${imageId}`;
+}
+
+/** Where the apps serve a built-in background, such as `geometric/living-room`, by day or by night. */
+export function backgroundPresetUrl(preset: string, variant: 'day' | 'night') {
+  return `/backgrounds/${preset}-${variant}.svg`;
+}
+
 /** A dashboard version, draft or published. */
 export interface DashboardLayout {
   rows: number;
   sections: Section[];
+  /** Absent or null: the theme's own ground. */
+  background?: DashboardBackground | null;
 }
 
 export interface DashboardSummary {
@@ -72,6 +95,13 @@ export class DashboardsApi {
 
   saveDraft(id: string, draft: DashboardLayout) {
     return this.http.put<DashboardDetail>(`/api/dashboards/${id}/draft`, draft);
+  }
+
+  /** Uploads a JPEG, PNG or WebP image (at most 15 MB) to be a background; answers its id. */
+  uploadBackground(file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<{ id: string; url: string }>('/api/backgrounds', form);
   }
 
   publish(id: string) {

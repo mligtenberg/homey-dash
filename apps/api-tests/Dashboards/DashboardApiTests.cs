@@ -158,4 +158,103 @@ public class DashboardApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    private static object WithBackground(object background) =>
+        new { rows = 4, sections = Array.Empty<object>(), background };
+
+    private Task<HttpResponseMessage> UploadAsync(byte[] content, string type = "image/png")
+    {
+        var form = new MultipartFormDataContent();
+        var file = new ByteArrayContent(content);
+        file.Headers.ContentType = new(type);
+        form.Add(file, "file", "background.png");
+        return _client.PostAsync("/api/backgrounds", form);
+    }
+
+    // The first bytes of a PNG are all HomeyDash looks at.
+    private static readonly byte[] Png = [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
+
+    [Fact]
+    public async Task ADraft_KeepsAColourOrGradientBackground()
+    {
+        var id = await CreateAsync();
+
+        var saved = await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft",
+            WithBackground(new { kind = "gradient", color = "#102030", to = "#405060", angle = 135 }));
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var background = (await _client.GetFromJsonAsync<JsonElement>($"/api/dashboards/{id}")).GetProperty("draft").GetProperty("background");
+        Assert.Equal("gradient", background.GetProperty("kind").GetString());
+        Assert.Equal("#405060", background.GetProperty("to").GetString());
+        Assert.Equal(135, background.GetProperty("angle").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("pattern", "#102030", null, null)]
+    [InlineData("color", "red", null, null)]
+    [InlineData("gradient", "#102030", null, 90)]
+    [InlineData("gradient", "#102030", "#405060", 360)]
+    [InlineData("image", null, null, null)]
+    public async Task ABackground_NeedsAKnownKindAndWellFormedColours(string kind, string? color, string? to, int? angle)
+    {
+        var id = await CreateAsync();
+
+        var saved = await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft", WithBackground(new { kind, color, to, angle }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, saved.StatusCode);
+    }
+
+    [Fact]
+    public async Task ADraft_KeepsABuiltInBackground()
+    {
+        var id = await CreateAsync();
+
+        var saved = await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft",
+            WithBackground(new { kind = "preset", preset = "pixel-art/living-room" }));
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var background = (await _client.GetFromJsonAsync<JsonElement>($"/api/dashboards/{id}")).GetProperty("draft").GetProperty("background");
+        Assert.Equal("preset", background.GetProperty("kind").GetString());
+        Assert.Equal("pixel-art/living-room", background.GetProperty("preset").GetString());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("living-room")]
+    [InlineData("../secrets/living-room")]
+    public async Task ABuiltInBackground_IsNamedByStyleAndSubject(string? preset)
+    {
+        var id = await CreateAsync();
+
+        var saved = await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft", WithBackground(new { kind = "preset", preset }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, saved.StatusCode);
+    }
+
+    [Fact]
+    public async Task AnUploadedImage_IsServedAndCanBeTheBackground()
+    {
+        var id = await CreateAsync();
+        var uploaded = await UploadAsync(Png, "application/octet-stream");
+        Assert.Equal(HttpStatusCode.Created, uploaded.StatusCode);
+        var image = await uploaded.Content.ReadFromJsonAsync<JsonElement>();
+
+        var served = await _client.GetAsync(image.GetProperty("url").GetString());
+        Assert.Equal("image/png", served.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(Png, await served.Content.ReadAsByteArrayAsync());
+
+        var saved = await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft",
+            WithBackground(new { kind = "image", imageId = image.GetProperty("id").GetString() }));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+    }
+
+    [Fact]
+    public async Task OnlyKnownImages_OfAKnownType_CanBeTheBackground()
+    {
+        var id = await CreateAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await UploadAsync("<svg/>"u8.ToArray(), "image/png")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft", WithBackground(new { kind = "image", imageId = Guid.NewGuid() }))).StatusCode);
+    }
 }
