@@ -88,6 +88,7 @@ public sealed class HomeyBroadcaster(Homeys homeys, IHubContext<RealtimeHub> hub
             DeviceRemoved c => ("DeviceRemoved", new HomeyDeviceRemoval(accountId, c.DeviceId)),
             CatalogChanged => ("Catalog", new HomeyCatalog(accountId, state.Flows.OrderBy(f => f.Name), state.Moods.OrderBy(m => m.Name),
                 state.Zones.OrderBy(z => z.Name), state.FlowFolders.OrderBy(f => f.Name))),
+            WeatherChanged c => ("Weather", new HomeyWeatherChange(accountId, c.Weather)),
             ConnectionChanged c => ("HomeyStatus", c.Status),
             _ => throw new ArgumentOutOfRangeException(nameof(change), change, null),
         });

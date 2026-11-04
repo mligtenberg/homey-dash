@@ -59,10 +59,10 @@ public sealed class RealtimeHubTests(ApiFactory factory) : IClassFixture<ApiFact
         return id;
     }
 
-    private Task AssignAsync(string display, string? dashboard, params string[] others) =>
-        _client.PutAsJsonAsync($"/api/displays/{display}/dashboard", new { dashboardId = dashboard, otherDashboardIds = others });
+    private Task<HttpResponseMessage> AssignAsync(string display, params string[] dashboards) =>
+        _client.PutAsJsonAsync($"/api/displays/{display}/dashboards", new { dashboardIds = dashboards });
 
-    // Each assigned dashboard's latest and shown version, main first, as "latest:shown".
+    // Each assigned dashboard's latest and shown version, in order, as "latest:shown".
     private static string Shown(JsonElement status) => string.Join(" ", status.GetProperty("versions").EnumerateArray().Select(v =>
         $"{v.GetProperty("latestVersion")}:{(v.GetProperty("shownVersion").ValueKind == JsonValueKind.Null ? "null" : v.GetProperty("shownVersion").ToString())}"));
 

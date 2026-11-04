@@ -134,6 +134,33 @@ export function formatReading(value: number, units: string | null): { value: str
   return { value: `${rounded}`, units: units ?? '' };
 }
 
+// What a yes-or-no capability's two values say, where On and Off would not.
+const BOOLEANS: Record<string, [string, string]> = {
+  alarm_contact: ['Open', 'Closed'],
+  alarm_motion: ['Motion', 'No motion'],
+  locked: ['Locked', 'Unlocked'],
+  speaker_playing: ['Playing', 'Not playing'],
+};
+
+/**
+ * A capability's value for reading at a glance: `20.5` and `°C`, `80` and `%` for a fraction such as brightness,
+ * `Closed`, or an enum value's title. Null while it has no value.
+ */
+export function capabilityText(capability: HomeyCapability): { value: string; units: string } | null {
+  const { value, id } = capability;
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'boolean') {
+    const [yes, no] = BOOLEANS[id] ?? (id.startsWith('alarm_') ? ['Yes', 'No'] : ['On', 'Off']);
+    return { value: value ? yes : no, units: '' };
+  }
+  if (typeof value === 'number') {
+    // Fractions Homey keeps 0–1 without units.
+    if (!capability.units && capability.min === 0 && capability.max === 1) return { value: `${Math.round(value * 100)}`, units: '%' };
+    return formatReading(value, capability.units);
+  }
+  return { value: capability.values?.find((v) => v.id === value)?.title ?? value, units: '' };
+}
+
 function formatNumber(capability: HomeyCapability): string {
   const { value, units } = formatReading(capability.value as number, capability.units);
   return units ? `${value}${units.startsWith('°') ? '' : ' '}${units}` : value;

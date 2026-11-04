@@ -76,10 +76,15 @@ namespace HomeyDash.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
-                    b.Property<Guid?>("DashboardId")
+                    b.Property<string>("IdleRules")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<DateTimeOffset?>("LastSeenAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LockWidgets")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
@@ -90,12 +95,7 @@ namespace HomeyDash.Api.Migrations
                     b.Property<Guid?>("ScreenId")
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("ShownVersion")
-                        .HasColumnType("INTEGER");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("DashboardId");
 
                     b.HasIndex("ScreenId")
                         .IsUnique();
@@ -234,14 +234,6 @@ namespace HomeyDash.Api.Migrations
                     b.ToTable("PlexAccounts");
                 });
 
-            modelBuilder.Entity("HomeyDash.Api.Displays.Display", b =>
-                {
-                    b.HasOne("HomeyDash.Api.Dashboards.Dashboard", null)
-                        .WithMany()
-                        .HasForeignKey("DashboardId")
-                        .OnDelete(DeleteBehavior.SetNull);
-                });
-
             modelBuilder.Entity("HomeyDash.Api.Displays.DisplayDashboard", b =>
                 {
                     b.HasOne("HomeyDash.Api.Dashboards.Dashboard", null)
@@ -251,7 +243,7 @@ namespace HomeyDash.Api.Migrations
                         .IsRequired();
 
                     b.HasOne("HomeyDash.Api.Displays.Display", null)
-                        .WithMany("Others")
+                        .WithMany("Dashboards")
                         .HasForeignKey("DisplayId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -259,7 +251,7 @@ namespace HomeyDash.Api.Migrations
 
             modelBuilder.Entity("HomeyDash.Api.Displays.Display", b =>
                 {
-                    b.Navigation("Others");
+                    b.Navigation("Dashboards");
                 });
 #pragma warning restore 612, 618
         }

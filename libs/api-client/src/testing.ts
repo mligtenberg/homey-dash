@@ -67,6 +67,7 @@ export class FakeRealtime implements Partial<Realtime> {
       zones: [],
       flowFolders: [],
       loaded: true,
+      weather: null,
     },
   ];
 

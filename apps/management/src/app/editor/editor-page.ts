@@ -385,7 +385,7 @@ export class EditorPage {
   protected async deleteDashboard() {
     const dashboard = this.loadedDashboard();
     const showing = (await firstValueFrom(this.displays.list())).filter(
-      (d) => d.dashboardId === dashboard.id || d.otherDashboardIds.includes(dashboard.id),
+      (d) => d.dashboardIds.includes(dashboard.id),
     );
     const stopping = showing.length
       ? ` ${showing.map((d) => `"${d.name}"`).join(', ')} will stop showing it.`

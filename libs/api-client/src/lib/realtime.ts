@@ -5,7 +5,7 @@ import { DisplayInfo, ScreenView } from './displays';
 import { PhotoSet } from './photos';
 import { PlexCommand, PlexOverview, PlexSession, PlexSnapshot } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
-import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyZone } from './homey';
+import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone } from './homey';
 
 // Mirrors apps/api/Realtime/RealtimeHub.cs.
 
@@ -22,6 +22,8 @@ export interface HomeySnapshot {
   flowFolders: HomeyFlowFolder[];
   /** False until the Homey's data first arrived; nothing is missing then. */
   loaded: boolean;
+  /** Null until Homey first told it, or when Homey won't. */
+  weather: HomeyWeather | null;
 }
 
 export interface HomeyCatalog {
@@ -40,6 +42,7 @@ export interface RealtimeMessages {
   DeviceRemoved: { accountId: number; deviceId: string };
   Catalog: HomeyCatalog;
   HomeyStatus: HomeyStatus;
+  Weather: { accountId: number; weather: HomeyWeather };
   /** What a joined screen now is and shows; null sends it to setup. */
   Screen: ScreenView | null;
   /** Every display with its status, for Management. */

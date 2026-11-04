@@ -43,16 +43,13 @@ public static class DashboardEndpoints
                 return null;
             }));
 
-        // Its displays stop offering it. One that had it as main dashboard makes its next one main, or waits.
+        // Its displays stop offering it; one left without dashboards waits.
         dashboards.MapDelete("/{id:guid}", async (Guid id, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct) =>
         {
             if (await db.Dashboards.FindAsync([id], ct) is not { } dashboard) return NotFound(id);
             var screens = await DisplayQueries.ScreensShowingAsync(db, id, ct);
-            foreach (var display in await db.Displays.Where(d => d.DashboardId == id).ToListAsync(ct))
-            {
-                var rest = display.DashboardIds.Skip(1).ToList();
-                display.Assign(rest.Count > 0 ? rest[0] : null, rest.Skip(1).ToList());
-            }
+            foreach (var display in await db.Displays.Where(d => d.Dashboards.Any(o => o.DashboardId == id)).ToListAsync(ct))
+                display.Assign(display.DashboardIds.Where(d => d != id).ToList());
             db.Dashboards.Remove(dashboard);
             await db.SaveChangesAsync(ct);
             await notifier.ScreensChangedAsync(db, screens, ct);

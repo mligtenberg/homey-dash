@@ -4,20 +4,25 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   inject,
   Injector,
   signal,
+  untracked,
 } from '@angular/core';
 import { LucideChevronLeft, LucideDynamicIcon, LucideLayers } from '@lucide/angular';
-import { Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
+import { IdleRule, Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
 import { cellSize } from '@homey-dash/layout';
-import { DashboardView, homeyLost, TileData, TileKindRegistry } from '@homey-dash/tiles';
+import { DashboardView, homeyLost, PhotoTile, RuleAnswers, TileData, TileKindRegistry } from '@homey-dash/tiles';
 import { screenId, safeStorage } from './screen-id';
+import { LockScreen } from './lock-screen';
 import { Setup } from './setup';
 
 type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; view: ScreenView };
 
-/** How long a display stays on another dashboard without a touch before it returns to its main one. */
+/**
+ * How long a display stays where it is without a touch before it is left alone, and follows its idle rules.
+ */
 export const IDLE_MS = 60_000;
 
 /**
@@ -32,10 +37,13 @@ const TAPE_KEY = 'homeydash.tape';
 /**
  * A screen: setup until it is a display, then its dashboards' published versions, or waiting for one. A display
  * that offers more than one dashboard floats a tape of pills over its left edge to switch between them, which
- * starts collapsed to a single button and collapses again once one is picked.
+ * starts collapsed to a single button and collapses again once one is picked. It starts on its first dashboard;
+ * left alone, it does what the first idle rule that holds says, and stays where it is while none does. A rule can
+ * show a dashboard, or play a photo set or fill the screen with a colour, over the dashboard, until a touch goes back
+ * to the rule's dashboard or the one shown before; its lock screen widgets, such as a clock, lie over either.
  */
 @Component({
-  imports: [DashboardView, LucideDynamicIcon, Setup],
+  imports: [DashboardView, LockScreen, LucideDynamicIcon, PhotoTile, Setup],
   selector: 'hd-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -44,8 +52,8 @@ const TAPE_KEY = 'homeydash.tape';
     '[style.--cell.px]': 'cell()',
     '(window:resize)': 'onResize()',
     '(pointerdown)': 'touched()',
-    '(keydown)': 'touched()',
-    '(wheel)': 'touched()',
+    '(keydown)': 'wake()',
+    '(wheel)': 'wake()',
   },
   template: `
     @switch (state().kind) {
@@ -87,6 +95,18 @@ const TAPE_KEY = 'homeydash.tape';
             @for (dashboard of [current]; track dashboard.id) {
               <hd-dashboard-view [layout]="dashboard.layout" />
             }
+            <!-- Woken on the click rather than the press, so the touch that ends it presses nothing beneath. -->
+            @if (slideshow(); as set) {
+              <div class="slideshow" role="button" tabindex="0" aria-label="Back to the dashboard" (click)="wake()" animate.leave="is-leaving">
+                <hd-photo-tile [settings]="{ target: set.target }" size="full-large" [detailView]="false" [people]="true" />
+              </div>
+            }
+            @if (fill(); as color) {
+              <div class="fill" role="button" tabindex="0" aria-label="Back to the dashboard" [style.background]="color" (click)="wake()" animate.leave="is-leaving"></div>
+            }
+            @if (playing() && view.display.lockWidgets.length) {
+              <hd-lock-screen [widgets]="view.display.lockWidgets" animate.leave="is-leaving" />
+            }
           } @else {
             <div class="waiting">
               <h1>{{ view.display.name }}</h1>
@@ -107,7 +127,12 @@ const TAPE_KEY = 'homeydash.tape';
     .waiting { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); text-align: center; padding: var(--space-4); box-sizing: border-box; }
     .waiting h1 { margin: 0; font-size: 32px; font-weight: 800; }
     .waiting p { margin: 0; color: var(--ink-muted); }
-    .reconnecting { position: fixed; left: 50%; bottom: var(--space-5); translate: -50% 0; }
+    .slideshow, .fill { position: fixed; inset: 0; z-index: 10; background: #000; }
+    .is-leaving { pointer-events: none; animation: slideshow-out .5s ease-in-out forwards; }
+    @keyframes slideshow-out { to { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .is-leaving { animation: none; } }
+    .slideshow hd-photo-tile { width: 100%; height: 100%; border-radius: 0; box-shadow: none; --cell: calc(100dvh / 3); }
+    .reconnecting { position: fixed; z-index: 11; left: 50%; bottom: var(--space-5); translate: -50% 0; }
   `,
 })
 export class App {
@@ -126,18 +151,47 @@ export class App {
   protected readonly lost = computed(
     () =>
       !this.realtime.connected() ||
-      !!this.current()?.layout.sections.some((s) => s.tiles.some((t) => homeyLost(t, this.kinds.find(t.kind), this.data))),
+      !!this.current()?.layout.sections.some((s) => !s.hidden && s.tiles.some((t) => homeyLost(t, this.kinds.find(t.kind), this.data))),
   );
   protected readonly view = computed(() => {
     const state = this.state();
     return state.kind === 'display' ? state.view : null;
   });
 
-  // The dashboard picked on the tape; null is the main one, which also stands in for one no longer offered.
-  private readonly picked = signal<string | null>(null);
+  // Each idle rule's latest answer: undefined until it first arrives, null when HomeyDash refused the rule.
+  private readonly heard = signal<(boolean | null | undefined)[]>([]);
+  // Compared by value, so joining again with the same rules doesn't subscribe again.
+  private readonly idleRules = computed(() => this.view()?.display.idleRules ?? [], {
+    equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  });
+  // The idle rule that decides; null when none holds, undefined while a rule before the first that holds has not
+  // answered yet, or the photo sets have not arrived. A rule that holds is passed over when its dashboard is not
+  // offered, or its photo set is gone or has no photos; a colour is always there.
+  private readonly idleChoice = computed<IdleRule | null | undefined>(() => {
+    const heard = this.heard();
+    const offered = new Set(this.view()?.dashboards.map((d) => d.id));
+    for (const [i, idle] of this.idleRules().entries()) {
+      if (heard[i] === undefined) return undefined;
+      if (!heard[i]) continue;
+      if (idle.color) return idle;
+      if (!idle.photoSetId) {
+        if (idle.dashboardId && offered.has(idle.dashboardId)) return idle;
+      } else if (!this.data.photoSetsLoaded()) return undefined;
+      else if (this.photoSet(idle.photoSetId)?.photos.length) return idle;
+    }
+    return null;
+  });
+  // The rule whose photo set plays or colour fills the screen, until a touch wakes the display.
+  protected readonly playing = signal<IdleRule | null>(null);
+  protected readonly slideshow = computed(() => this.photoSet(this.playing()?.photoSetId));
+  protected readonly fill = computed(() => this.playing()?.color ?? null);
+  // Left alone, it shows what the idle rules choose; touched, it stays on what it shows or on the one picked on the tape.
+  private readonly alone = signal(true);
+  private readonly shown = signal<string | null>(null);
+  // The first stands in for none shown yet, and for one no longer offered.
   protected readonly current = computed(() => {
     const dashboards = this.view()?.dashboards ?? [];
-    return dashboards.find((d) => d.id === this.picked()) ?? dashboards[0] ?? null;
+    return dashboards.find((d) => d.id === this.shown()) ?? dashboards[0] ?? null;
   });
   private idle?: ReturnType<typeof setTimeout>;
   private lastReport = -Infinity;
@@ -151,6 +205,25 @@ export class App {
   protected readonly cell = computed(() => cellSize(this.height(), this.current()?.layout.rows));
 
   constructor() {
+    const answers = inject(RuleAnswers);
+    effect((onCleanup) => {
+      const rules = this.idleRules();
+      untracked(() => {
+        this.heard.set(rules.map(() => undefined));
+        const stops = rules.map(({ rule }, i) =>
+          answers.subscribe(rule, (holds) => this.heard.update((heard) => heard.map((h, j) => (j === i ? holds : h)))),
+        );
+        onCleanup(() => stops.forEach((stop) => stop()));
+      });
+    });
+    effect(() => {
+      const choice = this.idleChoice();
+      if (!this.alone() || !choice) return;
+      untracked(() => {
+        this.playing.set(choice.photoSetId || choice.color ? choice : null);
+        if (choice.dashboardId) this.shown.set(choice.dashboardId);
+      });
+    });
     // Joining again on every reconnect picks up a version published while the connection was lost.
     const stops = [this.realtime.on('Screen', (view) => this.show(view)), this.realtime.whenConnected(() => this.join())];
     inject(DestroyRef).onDestroy(() => {
@@ -159,10 +232,23 @@ export class App {
     });
   }
 
-  protected select(dashboard: ShownDashboard) {
-    this.picked.set(dashboard.id === this.view()?.dashboards[0]?.id ? null : dashboard.id);
-    this.collapse(true);
+  private photoSet(id: string | null | undefined) {
+    return id ? [...this.data.photoSets().values()].find((s) => s.id === id) : undefined;
+  }
+
+  // A touch that also ends the slideshow, back on the rule's dashboard, or on the one shown before.
+  protected wake() {
     this.touched();
+    const playing = this.playing();
+    if (!playing) return;
+    this.playing.set(null);
+    if (playing.returnDashboardId) this.shown.set(playing.returnDashboardId);
+  }
+
+  protected select(dashboard: ShownDashboard) {
+    this.touched();
+    this.shown.set(dashboard.id);
+    this.collapse(true);
   }
 
   protected toggleTape() {
@@ -176,10 +262,11 @@ export class App {
     else this.storage?.setItem(TAPE_KEY, 'open');
   }
 
-  // Any touch keeps the display where it is; left alone on another dashboard, it returns to the main one.
+  // Any touch keeps the display where it is; left alone for a while, it follows its idle rules again.
   protected touched() {
     clearTimeout(this.idle);
-    if (this.picked() !== null) this.idle = setTimeout(() => this.picked.set(null), IDLE_MS);
+    this.alone.set(false);
+    this.idle = setTimeout(() => this.alone.set(true), IDLE_MS);
     this.reportTouch();
   }
 

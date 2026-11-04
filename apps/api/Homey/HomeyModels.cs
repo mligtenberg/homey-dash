@@ -67,6 +67,10 @@ public sealed record HomeyInsightEntry(DateTimeOffset T, double? V);
 // A Homey Logic variable; Type is boolean, number or string.
 public sealed record HomeyVariable(string Id, string Name, string Type, JsonElement Value);
 
+// The weather where Homey is, as Homey's own weather reports it: degrees Celsius, a condition such as Clouds or Rain,
+// humidity as a fraction 0–1, and the place it is for. Any part Homey leaves out is null.
+public sealed record HomeyWeather(double? Temperature, string? State, double? Humidity, string? City);
+
 public sealed record HomeyInsightLog(string Id, string OwnerUri, string? OwnerName, string Title, string Type, string? Units);
 
 // Something in Homey changed; raised by HomeyState.
@@ -82,6 +86,8 @@ public sealed record VariableRemoved(string VariableId) : HomeyChange;
 
 // Flows, flow folders, moods or zones were added, renamed, moved or removed.
 public sealed record CatalogChanged : HomeyChange;
+
+public sealed record WeatherChanged(HomeyWeather Weather) : HomeyChange;
 
 public sealed record ConnectionChanged(HomeyStatus Status) : HomeyChange;
 

@@ -1,23 +1,34 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { ApplicationRef } from '@angular/core';
+import { ApplicationRef, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { HomeySnapshot, Realtime, ScreenView, Tile } from '@homey-dash/api-client';
+import { Condition, HomeySnapshot, LockWidget, PhotoSet, Realtime, ScreenView, Tile } from '@homey-dash/api-client';
 import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { cellSize } from '@homey-dash/layout';
-import { CORE_TILES, provideTileModules, RealtimeTileData, TileData } from '@homey-dash/tiles';
+import { CORE_TILES, provideTileModules, RealtimeRuleAnswers, RealtimeTileData, RuleAnswers, TileData } from '@homey-dash/tiles';
 import { App, IDLE_MS, TOUCH_REPORT_MS } from './app';
 
-const hallway = { id: 'd1', name: 'Hallway', dashboardId: null, otherDashboardIds: [] };
+const hallway = { id: 'd1', name: 'Hallway', dashboardIds: [], idleRules: [], lockWidgets: [] };
 const dashboard = (id: string, name: string, version = 1, rows = 4) => ({ id, name, version, layout: { rows, sections: [] } });
 const published = (version: number): ScreenView => ({
-  display: { ...hallway, dashboardId: 'k1' },
+  display: { ...hallway, dashboardIds: ['k1'] },
   dashboards: [dashboard('k1', 'Kitchen', version)],
 });
 const several: ScreenView = {
-  display: { ...hallway, dashboardId: 'k1', otherDashboardIds: ['g1', 'c1'] },
+  display: { ...hallway, dashboardIds: ['k1', 'g1', 'c1'] },
   dashboards: [dashboard('k1', 'Kitchen'), dashboard('g1', 'Garden', 3, 6), dashboard('c1', 'Cinema')],
 };
+
+// jsdom has no modal dialogs.
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+    this.open = false;
+    this.dispatchEvent(new Event('close'));
+  };
+});
 
 describe('App', () => {
   let realtime: FakeRealtime;
@@ -33,6 +44,7 @@ describe('App', () => {
         provideTileModules(CORE_TILES),
         { provide: Realtime, useValue: realtime },
         { provide: TileData, useExisting: RealtimeTileData },
+        { provide: RuleAnswers, useExisting: RealtimeRuleAnswers },
       ],
     });
   });
@@ -57,7 +69,7 @@ describe('App', () => {
 
   it('runs setup on a screen that is not a display', async () => {
     const root = await start(null);
-    TestBed.inject(HttpTestingController).expectOne('/api/displays').flush([{ id: 'd1', name: 'Kitchen wall', dashboardId: null }]);
+    TestBed.inject(HttpTestingController).expectOne('/api/displays').flush([{ id: 'd1', name: 'Kitchen wall', dashboardIds: [] }]);
     await stable();
 
     expect(root.querySelector('h1')?.textContent).toBe('Set up this screen');
@@ -120,7 +132,7 @@ describe('App', () => {
     beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }));
     afterEach(() => vi.useRealTimers());
 
-    it('offers them on a tape, main first, and reports the version of each', async () => {
+    it('offers them on a tape, starts on the first, and reports the version of each', async () => {
       const root = await startOpen(several);
 
       expect(tape(root).map((b) => b.textContent?.trim())).toEqual(['Kitchen', 'Garden', 'Cinema']);
@@ -140,20 +152,203 @@ describe('App', () => {
       expect(parseFloat(root.style.getPropertyValue('--cell'))).toBeCloseTo(cellSize(window.innerHeight, 6));
     });
 
-    it('returns to the main one after a while untouched, but not while it is used', async () => {
+    it('stays on the one picked once left alone, when no idle rule holds', async () => {
       const root = await startOpen(several);
       tape(root)[2].click();
       await stable();
 
-      vi.advanceTimersByTime(IDLE_MS - 1);
-      root.dispatchEvent(new Event('pointerdown'));
-      vi.advanceTimersByTime(IDLE_MS - 1);
+      vi.advanceTimersByTime(IDLE_MS);
       await stable();
       expect(await currentName(root)).toBe('Cinema');
+    });
 
-      vi.advanceTimersByTime(1);
-      await stable();
-      expect(await currentName(root)).toBe('Kitchen');
+    describe('with idle rules', () => {
+      // Each rule names its dashboard as its one condition's signal, so a test can say which hold.
+      const rule = (id: string) => ({ dashboardId: id, rule: { match: 'all' as const, conditions: [{ signal: id, operator: 'isTrue' as const }] } });
+      const ruled: ScreenView = { ...several, display: { ...several.display, idleRules: [rule('c1'), rule('g1')] } };
+      let holding: Record<string, boolean>;
+      const hold = async (next: Record<string, boolean>) => {
+        holding = next;
+        realtime.answer((r) => holding[(r.conditions[0] as Condition).signal] ?? false);
+        await stable();
+      };
+
+      beforeEach(() => {
+        holding = {};
+        realtime.answerRule = (r) => holding[(r.conditions[0] as Condition).signal] ?? false;
+      });
+
+      it('shows the first dashboard whose rule holds, and follows them while left alone', async () => {
+        holding = { g1: true };
+        const root = await startOpen(ruled);
+        expect(await currentName(root)).toBe('Garden');
+
+        await hold({ g1: true, c1: true });
+        expect(await currentName(root)).toBe('Cinema');
+      });
+
+      it('starts on the first when none holds, and stays where it is when they stop holding', async () => {
+        const root = await startOpen(ruled);
+        expect(await currentName(root)).toBe('Kitchen');
+
+        await hold({ g1: true });
+        await hold({});
+        expect(await currentName(root)).toBe('Garden');
+      });
+
+      it('stays where it is while used, and follows the rules again once left alone', async () => {
+        const root = await startOpen(ruled);
+        tape(root)[1].click();
+        await stable();
+
+        await hold({ c1: true });
+        expect(await currentName(root)).toBe('Garden');
+
+        vi.advanceTimersByTime(IDLE_MS);
+        await stable();
+        expect(await currentName(root)).toBe('Cinema');
+      });
+
+      it('stays on what it showed when touched, even when the rules change', async () => {
+        holding = { c1: true };
+        const root = await startOpen(ruled);
+        root.dispatchEvent(new Event('pointerdown'));
+
+        await hold({});
+        expect(await currentName(root)).toBe('Cinema');
+      });
+
+      describe('playing a photo set', () => {
+        const summer = (photos: number): PhotoSet => ({
+          id: 's1', name: 'Summer', target: 'photo-set:s1', accountId: 1, accountName: 'Immich', albumId: 'a1',
+          albumName: 'Summer', selection: null, syncedAt: null, skippedVideos: 0, syncError: null, syncing: false, dashboards: [], excluded: [], lockedOwners: [],
+          photos: Array.from({ length: photos }, (_, i) => ({ id: `p${i}`, takenAt: null, place: null, faces: null })),
+        });
+        // Its rule's signal is "s1", so `hold({ s1: true })` plays it.
+        const plays = (returnDashboardId: string | null = null): ScreenView => ({
+          ...several,
+          display: {
+            ...several.display,
+            idleRules: [{ ...rule('s1'), dashboardId: null, photoSetId: 's1', returnDashboardId }, rule('c1')],
+          },
+        });
+        const slideshow = (root: HTMLElement) => root.querySelector<HTMLElement>('.slideshow');
+
+        beforeEach(() => (realtime.photoSetList = [summer(3)]));
+
+        it('plays it full screen over the dashboard, and a touch goes back to the one shown before', async () => {
+          holding = { s1: true };
+          const root = await startOpen(plays());
+          expect(slideshow(root)?.querySelector('.hd-photo__img')).not.toBeNull();
+
+          root.dispatchEvent(new Event('pointerdown'));
+          slideshow(root)!.click();
+          await stable();
+          expect(slideshow(root)).toBeNull();
+          expect(await currentName(root)).toBe('Kitchen');
+        });
+
+        it('goes back to the dashboard its rule names', async () => {
+          holding = { s1: true };
+          const root = await startOpen(plays('g1'));
+
+          slideshow(root)!.click();
+          await stable();
+          expect(await currentName(root)).toBe('Garden');
+        });
+
+        it('plays again once left alone, and stops for a dashboard whose rule holds before it', async () => {
+          holding = { s1: true };
+          const root = await startOpen(plays());
+          slideshow(root)!.click();
+          await stable();
+
+          vi.advanceTimersByTime(IDLE_MS);
+          await stable();
+          expect(slideshow(root)).not.toBeNull();
+
+          const first: ScreenView = { ...plays(), display: { ...plays().display, idleRules: [rule('c1'), ...plays().display.idleRules] } };
+          realtime.push('Screen', first);
+          await hold({ s1: true, c1: true });
+          expect(slideshow(root)).toBeNull();
+          expect(await currentName(root)).toBe('Cinema');
+        });
+
+        it('passes over a set without photos', async () => {
+          realtime.photoSetList = [summer(0)];
+          holding = { s1: true, c1: true };
+          const root = await startOpen(plays());
+
+          expect(slideshow(root)).toBeNull();
+          expect(await currentName(root)).toBe('Cinema');
+        });
+      });
+
+      describe('filling with a colour', () => {
+        // Its rule's signal is "night", so `hold({ night: true })` fills the screen.
+        const fills = (returnDashboardId: string | null = null): ScreenView => ({
+          ...several,
+          display: {
+            ...several.display,
+            idleRules: [{ ...rule('night'), dashboardId: null, color: '#102030', returnDashboardId }, rule('c1')],
+          },
+        });
+        const fill = (root: HTMLElement) => root.querySelector<HTMLElement>('.fill');
+
+        it('fills the screen over the dashboard, and a touch goes back to the one shown before', async () => {
+          holding = { night: true };
+          const root = await startOpen(fills());
+          expect(fill(root)?.style.background).toBe('rgb(16, 32, 48)');
+
+          root.dispatchEvent(new Event('pointerdown'));
+          fill(root)!.click();
+          await stable();
+          expect(fill(root)).toBeNull();
+          expect(await currentName(root)).toBe('Kitchen');
+        });
+
+        it('goes back to the dashboard its rule names', async () => {
+          holding = { night: true };
+          const root = await startOpen(fills('g1'));
+
+          fill(root)!.click();
+          await stable();
+          expect(await currentName(root)).toBe('Garden');
+        });
+
+        it('shows the lock screen widgets over it, until a touch', async () => {
+          const temperature = { id: 'measure_temperature', title: 'Temperature', type: 'number', value: 20.14, units: '°C' };
+          realtime.homeySnapshot = [{
+            ...realtime.homeySnapshot[0],
+            weather: { temperature: 13.4, state: 'Rain', humidity: 0.8, city: 'Utrecht' },
+            devices: [{ id: 'th', name: 'Thermostat', class: 'thermostat', available: true, capabilities: { measure_temperature: temperature } } as never],
+          }];
+          const lockWidgets: LockWidget[] = [
+            { kind: 'clock', spot: 'center' },
+            { kind: 'weather', spot: 'top-right' },
+            { kind: 'value', spot: 'bottom-left', signal: 'homey:1:capability:th:measure_temperature' },
+            { kind: 'value', spot: 'bottom-left', signal: 'homey:1:capability:gone:onoff' },
+          ];
+          holding = { night: true };
+          const root = await startOpen({ ...fills(), display: { ...fills().display, lockWidgets } });
+
+          expect(root.querySelector('.spot--center .clock__time')?.textContent).toMatch(/\d/);
+          expect(root.querySelector('.spot--top-right .weather')?.textContent).toContain('13°');
+          expect(root.querySelector('.spot--top-right .weather')?.textContent).toContain('Rain');
+          // A device that is gone shows nothing.
+          expect([...root.querySelectorAll('.spot--bottom-left .value')].map((v) => v.textContent?.replace(/\s+/g, ' ').trim()))
+            .toEqual(['20.1°CThermostat · Temperature']);
+
+          fill(root)!.click();
+          await stable();
+          expect(root.querySelector('hd-lock-screen')).toBeNull();
+        });
+
+        it('shows no lock screen over a dashboard', async () => {
+          const root = await start({ ...several, display: { ...several.display, lockWidgets: [{ kind: 'clock', spot: 'center' }] } });
+          expect(root.querySelector('hd-lock-screen')).toBeNull();
+        });
+      });
     });
 
     it('starts collapsed to one button, and remembers opening it on this screen', async () => {
@@ -176,7 +371,7 @@ describe('App', () => {
       expect(localStorage.getItem('homeydash.tape')).toBeNull();
     });
 
-    it('returns to the main one when the one shown is no longer offered', async () => {
+    it('returns to the first when the one shown is no longer offered', async () => {
       const root = await startOpen(several);
       tape(root)[1].click();
       await stable();
@@ -223,7 +418,7 @@ describe('App', () => {
       settings: account ? { target: 'lamp', account } : { target: 'lamp' },
     });
     const withTiles = (...tiles: Tile[]): ScreenView => ({
-      display: { ...hallway, dashboardId: 'k1' },
+      display: { ...hallway, dashboardIds: ['k1'] },
       dashboards: [{ ...dashboard('k1', 'Kitchen'), layout: { rows: 4, sections: [{ id: 's1', title: '', tiles }] } }],
     });
     const lost = (accountId: number) =>

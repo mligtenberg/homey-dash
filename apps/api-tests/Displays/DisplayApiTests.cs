@@ -23,8 +23,11 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         return id;
     }
 
-    private Task<HttpResponseMessage> AssignAsync(string display, string? dashboard, params string[] others) =>
-        _client.PutAsJsonAsync($"/api/displays/{display}/dashboard", new { dashboardId = dashboard, otherDashboardIds = others });
+    private Task<HttpResponseMessage> AssignAsync(string display, params string[] dashboards) =>
+        _client.PutAsJsonAsync($"/api/displays/{display}/dashboards", new { dashboardIds = dashboards });
+
+    private static List<string?> DisplayDashboards(JsonElement view) =>
+        view.GetProperty("display").GetProperty("dashboardIds").EnumerateArray().Select(i => i.GetString()).ToList();
 
     private async Task<JsonElement> ViewAsync(Guid screen) =>
         await (await ScreenAsync(screen)).Content.ReadFromJsonAsync<JsonElement>();
@@ -124,41 +127,40 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var view = await ViewAsync(screen);
         Assert.Equal(0, view.GetProperty("dashboards").GetArrayLength());
-        Assert.Equal(JsonValueKind.Null, view.GetProperty("display").GetProperty("dashboardId").ValueKind);
+        Assert.Empty(DisplayDashboards(view));
     }
 
     [Fact]
-    public async Task ADisplay_OffersItsMainDashboardFirstAndThenTheOthersInOrder()
+    public async Task ADisplay_OffersItsDashboardsInOrder()
     {
         var screen = Guid.NewGuid();
         var display = await SetUpAsync(screen);
         var (main, garden, kids) = (await DashboardAsync(true, "Main"), await DashboardAsync(true, "Garden"), await DashboardAsync(true, "Kids"));
 
-        // The main one is left out of the others, and a dashboard is offered once.
+        // A dashboard is offered once.
         Assert.Equal(HttpStatusCode.OK, (await AssignAsync(display, main, kids, main, garden, kids)).StatusCode);
 
         var view = await ViewAsync(screen);
         Assert.Equal([main, kids, garden], Ids(view.GetProperty("dashboards")));
-        Assert.Equal(main, view.GetProperty("display").GetProperty("dashboardId").GetString());
-        Assert.Equal([kids, garden], view.GetProperty("display").GetProperty("otherDashboardIds").EnumerateArray().Select(i => i.GetString()));
+        Assert.Equal([main, kids, garden], DisplayDashboards(view));
 
         await AssignAsync(display, garden, main);
         Assert.Equal([garden, main], Ids((await ViewAsync(screen)).GetProperty("dashboards")));
     }
 
     [Fact]
-    public async Task OtherDashboards_NeedAMainOneAndAPublishedVersion()
+    public async Task EveryDashboard_NeedsAPublishedVersion()
     {
         var display = await SetUpAsync(Guid.NewGuid());
         var (published, draft) = (await DashboardAsync(publish: true), await DashboardAsync(publish: false));
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await AssignAsync(display, null, published)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await AssignAsync(display)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await AssignAsync(display, published, draft)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await AssignAsync(display, published, Guid.NewGuid().ToString())).StatusCode);
     }
 
     [Fact]
-    public async Task DeletingAMainDashboard_MakesTheNextOneMain()
+    public async Task DeletingADashboard_LeavesTheOthersInOrder()
     {
         var screen = Guid.NewGuid();
         var display = await SetUpAsync(screen);
@@ -171,7 +173,7 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         await _client.DeleteAsync($"/api/dashboards/{kids}");
         var view = await ViewAsync(screen);
         Assert.Equal([garden], Ids(view.GetProperty("dashboards")));
-        Assert.Equal(garden, view.GetProperty("display").GetProperty("dashboardId").GetString());
+        Assert.Equal([garden], DisplayDashboards(view));
     }
 
     [Fact]
@@ -193,5 +195,183 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
             (await _client.PostAsJsonAsync("/api/displays", new { name = "", screenId = Guid.NewGuid() })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,
             (await _client.PostAsJsonAsync("/api/displays", new { name = "Hall", screenId = Guid.Empty })).StatusCode);
+    }
+
+    private static object Weekend() => new
+    {
+        match = "all",
+        conditions = new[] { new { signal = "clock:now", @operator = "onWeekdays", value = new[] { "saturday", "sunday" } } },
+    };
+
+    private Task<HttpResponseMessage> IdleRulesAsync(string display, params object[] rules) =>
+        _client.PutAsJsonAsync($"/api/displays/{display}/idle-rules", new { rules });
+
+    [Fact]
+    public async Task IdleRules_ReachTheScreenInOrder()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var (main, garden, kids) = (await DashboardAsync(true, "Main"), await DashboardAsync(true, "Garden"), await DashboardAsync(true, "Kids"));
+        await AssignAsync(display, main, garden, kids);
+
+        var saved = await IdleRulesAsync(display, new { dashboardId = kids, rule = Weekend() }, new { dashboardId = garden, rule = Weekend() });
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var rules = (await ViewAsync(screen)).GetProperty("display").GetProperty("idleRules");
+        Assert.Equal([kids, garden], rules.EnumerateArray().Select(r => r.GetProperty("dashboardId").GetString()).ToList());
+        Assert.Equal("onWeekdays", rules[0].GetProperty("rule").GetProperty("conditions")[0].GetProperty("operator").GetString());
+    }
+
+    [Fact]
+    public async Task IdleRules_OnlyShowOfferedDashboardsByValidRules()
+    {
+        var display = await SetUpAsync(Guid.NewGuid());
+        var (main, elsewhere) = (await DashboardAsync(true, "Main"), await DashboardAsync(true, "Elsewhere"));
+        await AssignAsync(display, main);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await IdleRulesAsync(display, new { dashboardId = elsewhere, rule = Weekend() })).StatusCode);
+        var invalid = new { match = "all", conditions = new[] { new { signal = "clock:now", @operator = "isTrue" } } };
+        Assert.Equal(HttpStatusCode.BadRequest, (await IdleRulesAsync(display, new { dashboardId = main, rule = invalid })).StatusCode);
+    }
+
+    [Fact]
+    public async Task ADashboardNoLongerOffered_LosesItsIdleRule()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var (main, garden, kids) = (await DashboardAsync(true, "Main"), await DashboardAsync(true, "Garden"), await DashboardAsync(true, "Kids"));
+        await AssignAsync(display, main, garden, kids);
+        await IdleRulesAsync(display, new { dashboardId = garden, rule = Weekend() }, new { dashboardId = kids, rule = Weekend() });
+
+        await AssignAsync(display, main, kids);
+        await _client.DeleteAsync($"/api/dashboards/{kids}");
+
+        Assert.Equal(0, (await ViewAsync(screen)).GetProperty("display").GetProperty("idleRules").GetArrayLength());
+    }
+
+    private async Task<string> PhotoSetAsync()
+    {
+        var response = await _client.PostAsJsonAsync("/api/photo-sets", new { name = "Summer", albumId = HomeyDash.Api.Photos.FakeImmich.SummerId });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString()!;
+    }
+
+    [Fact]
+    public async Task AnIdleRule_CanPlayAPhotoSet_AndGoBackToADashboard()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var (main, garden) = (await DashboardAsync(true, "Main"), await DashboardAsync(true, "Garden"));
+        await AssignAsync(display, main, garden);
+        var set = await PhotoSetAsync();
+
+        var saved = await IdleRulesAsync(display,
+            new { photoSetId = set, rule = Weekend() },
+            new { photoSetId = set, rule = Weekend(), returnDashboardId = garden });
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var rules = (await ViewAsync(screen)).GetProperty("display").GetProperty("idleRules");
+        Assert.Equal(set, rules[0].GetProperty("photoSetId").GetString());
+        Assert.Equal(JsonValueKind.Null, rules[0].GetProperty("returnDashboardId").ValueKind);
+        Assert.Equal(garden, rules[1].GetProperty("returnDashboardId").GetString());
+    }
+
+    [Fact]
+    public async Task APhotoSetIdleRule_NeedsAKnownSetAndAnOfferedDashboardToGoBackTo()
+    {
+        var display = await SetUpAsync(Guid.NewGuid());
+        var (main, elsewhere) = (await DashboardAsync(true, "Main"), await DashboardAsync(true, "Elsewhere"));
+        await AssignAsync(display, main);
+        var set = await PhotoSetAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await IdleRulesAsync(display, new { photoSetId = Guid.NewGuid(), rule = Weekend() })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await IdleRulesAsync(display, new { photoSetId = set, rule = Weekend(), returnDashboardId = elsewhere })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await IdleRulesAsync(display, new { photoSetId = set, dashboardId = main, rule = Weekend() })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await IdleRulesAsync(display, new { rule = Weekend() })).StatusCode);
+    }
+
+    [Fact]
+    public async Task AnIdleRule_CanFillWithAColour_AndGoBackToADashboard()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var (main, garden) = (await DashboardAsync(true, "Main"), await DashboardAsync(true, "Garden"));
+        await AssignAsync(display, main, garden);
+
+        var saved = await IdleRulesAsync(display, new { color = "#1a2B3c", rule = Weekend(), returnDashboardId = garden });
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var rule = (await ViewAsync(screen)).GetProperty("display").GetProperty("idleRules").EnumerateArray().Single();
+        Assert.Equal("#1a2B3c", rule.GetProperty("color").GetString());
+        Assert.Equal(garden, rule.GetProperty("returnDashboardId").GetString());
+    }
+
+    [Fact]
+    public async Task AColourIdleRule_NeedsAHexColourAndDoesOneThing()
+    {
+        var display = await SetUpAsync(Guid.NewGuid());
+        var main = await DashboardAsync(true, "Main");
+        await AssignAsync(display, main);
+        var set = await PhotoSetAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await IdleRulesAsync(display, new { color = "black", rule = Weekend() })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await IdleRulesAsync(display, new { color = "#000", rule = Weekend() })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await IdleRulesAsync(display, new { color = "#000000", dashboardId = main, rule = Weekend() })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await IdleRulesAsync(display, new { color = "#000000", photoSetId = set, rule = Weekend() })).StatusCode);
+    }
+
+    [Fact]
+    public async Task ADashboardNoLongerOffered_SendsAPhotoSetBackToTheLastShown()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var (main, garden) = (await DashboardAsync(true, "Main"), await DashboardAsync(true, "Garden"));
+        await AssignAsync(display, main, garden);
+        var set = await PhotoSetAsync();
+        await IdleRulesAsync(display, new { photoSetId = set, rule = Weekend(), returnDashboardId = garden });
+
+        await AssignAsync(display, main);
+
+        var rule = (await ViewAsync(screen)).GetProperty("display").GetProperty("idleRules").EnumerateArray().Single();
+        Assert.Equal(set, rule.GetProperty("photoSetId").GetString());
+        Assert.Equal(JsonValueKind.Null, rule.GetProperty("returnDashboardId").ValueKind);
+    }
+
+    private Task<HttpResponseMessage> LockScreenAsync(string display, params object[] widgets) =>
+        _client.PutAsJsonAsync($"/api/displays/{display}/lock-screen", new { widgets });
+
+    [Fact]
+    public async Task LockWidgets_ReachTheScreenInOrder()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+
+        var saved = await LockScreenAsync(display,
+            new { kind = "clock", spot = "center" },
+            new { kind = "weather", spot = "top-right", account = 1 },
+            new { kind = "value", spot = "bottom-left", signal = "homey:1:capability:thermostat:measure_temperature" });
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var widgets = (await ViewAsync(screen)).GetProperty("display").GetProperty("lockWidgets");
+        Assert.Equal(["clock", "weather", "value"], widgets.EnumerateArray().Select(w => w.GetProperty("kind").GetString()).ToList());
+        Assert.Equal("top-right", widgets[1].GetProperty("spot").GetString());
+        Assert.Equal("homey:1:capability:thermostat:measure_temperature", widgets[2].GetProperty("signal").GetString());
+    }
+
+    [Fact]
+    public async Task ALockWidget_NeedsAKnownKindSpotAndCapability()
+    {
+        var display = await SetUpAsync(Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await LockScreenAsync(display, new { kind = "radio", spot = "center" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await LockScreenAsync(display, new { kind = "clock", spot = "middle" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await LockScreenAsync(display, new { kind = "value", spot = "center" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await LockScreenAsync(display, new { kind = "value", spot = "center", signal = "homey:1:capability:nowhere:onoff" })).StatusCode);
+        // A variable is a signal too, but not a device's value.
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await LockScreenAsync(display, new { kind = "value", spot = "center", signal = "homey:1:variable:var-guests" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await LockScreenAsync(display, Enumerable.Repeat<object>(new { kind = "clock", spot = "center" }, 9).ToArray())).StatusCode);
     }
 }

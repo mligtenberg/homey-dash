@@ -25,6 +25,9 @@ public sealed class LocalHomey(
 
     public static TimeSpan FirstRetryDelay { get; set; } = TimeSpan.FromSeconds(1);
 
+    // Homey doesn't tell when its weather changes, and it changes slowly.
+    public static TimeSpan WeatherInterval { get; set; } = TimeSpan.FromMinutes(10);
+
     public HomeyAccount Account => account;
 
     public HomeyState State => state;
@@ -113,7 +116,17 @@ public sealed class LocalHomey(
             logger.LogInformation("Connected to Homey {Account} ({HomeyId}): {Devices} devices, {Flows} flows, {Moods} moods",
                 account.Name, homeyId, state.Devices.Count(), state.Flows.Count(), state.Moods.Count());
 
-            await socket.Completion.WaitAsync(ct);
+            using var session = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var weather = FollowWeatherAsync(session.Token);
+            try
+            {
+                await socket.Completion.WaitAsync(ct);
+            }
+            finally
+            {
+                await session.CancelAsync();
+                await weather;
+            }
             throw new InvalidOperationException("Homey's realtime connection ended");
         }
         finally
@@ -166,6 +179,36 @@ public sealed class LocalHomey(
         {
             logger.LogWarning("Could not read the variables of Homey {Account}: {Error}", account.Name, e.Message);
             return [];
+        }
+    }
+
+    // Reads Homey's own weather now and every while, for as long as the session lasts. An API key that may not read it
+    // (it needs the geolocation scope) leaves it out rather than failing; so does a Homey that can't tell.
+    private async Task FollowWeatherAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                state.SetWeather(HomeyMapper.Weather(await GetJsonAsync("api/manager/weather/weather", ct)));
+            }
+            catch (HttpRequestException e) when (e.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized or HttpStatusCode.NotFound)
+            {
+                logger.LogWarning("Homey {Account} won't tell its weather: {Error}", account.Name, e.Message);
+                return;
+            }
+            catch (Exception e) when (e is HttpRequestException or JsonException || e is OperationCanceledException && !ct.IsCancellationRequested)
+            {
+                logger.LogDebug("Could not read the weather of Homey {Account}: {Error}", account.Name, e.Message);
+            }
+            try
+            {
+                await Task.Delay(WeatherInterval, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
         }
     }
 

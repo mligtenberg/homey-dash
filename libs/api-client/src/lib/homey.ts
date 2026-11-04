@@ -15,6 +15,17 @@ export interface HomeyStatus {
   fake: boolean;
 }
 
+/**
+ * The weather where Homey is, as Homey's own weather reports it: degrees Celsius, a condition such as `Clouds` or
+ * `Rain`, humidity as a fraction 0–1, and the place it is for. Any part Homey leaves out is null.
+ */
+export interface HomeyWeather {
+  temperature: number | null;
+  state: string | null;
+  humidity: number | null;
+  city: string | null;
+}
+
 export type CapabilityValue = boolean | number | string | null;
 
 export interface HomeyCapability {
@@ -29,6 +40,8 @@ export interface HomeyCapability {
   max: number | null;
   step: number | null;
   lastUpdated: string | null;
+  /** The values an enum capability takes, in Homey's order; absent for other types. */
+  values?: { id: string; title: string }[] | null;
 }
 
 export interface HomeyDevice {

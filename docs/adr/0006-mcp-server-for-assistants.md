@@ -1,6 +1,6 @@
 # AI assistants configure HomeyDash through an MCP server
 
-The backend serves an MCP server at `/mcp`, so an AI assistant can build dashboards, publish them and assign them to displays (a main dashboard and the others on its dashboard tape). Its tools do the same things as the matching Management endpoints, with the same rules, and they notify screens and Management the same way. An open Management window therefore shows an assistant's changes at once. The tools cannot delete dashboards or displays, so an assistant cannot remove anything by mistake; that stays a Management action.
+The backend serves an MCP server at `/mcp`, so an AI assistant can build dashboards, publish them and assign them to displays (the dashboards on its dashboard tape, in order, and the idle rules that choose among them). Its tools do the same things as the matching Management endpoints, with the same rules, and they notify screens and Management the same way. An open Management window therefore shows an assistant's changes at once. The tools cannot delete dashboards or displays, so an assistant cannot remove anything by mistake; that stays a Management action.
 
 ## Considered Options
 

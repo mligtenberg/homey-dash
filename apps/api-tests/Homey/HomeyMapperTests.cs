@@ -42,6 +42,14 @@ public class HomeyMapperTests
         Assert.Equal([new HomeyLightColor(0.6, 0.8, null), new HomeyLightColor(null, null, 1)], mood.Colors);
     }
 
+    [Theory]
+    [InlineData("""{ "city": "Utrecht", "temperature": 13.2, "humidity": 0.81, "state": "Clouds" }""")]
+    [InlineData("""{ "current": { "city": "Utrecht", "temperature": 13.2, "humidity": 81, "condition": "Clouds" } }""")]
+    public void Weather_ReadsHomeysWeatherLeniently(string json)
+    {
+        Assert.Equal(new HomeyWeather(13.2, "Clouds", 0.81, "Utrecht"), HomeyMapper.Weather(JsonDocument.Parse(json).RootElement));
+    }
+
     [Fact]
     public void Values_ReadsCollectionsKeyedById()
     {

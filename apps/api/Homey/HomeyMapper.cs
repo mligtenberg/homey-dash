@@ -133,6 +133,19 @@ public static class HomeyMapper
                 .ToList()
             : [];
 
+    // Homey's own weather, { city, temperature, humidity, state, ... }; read leniently, as Homey doesn't document it.
+    // Humidity comes as a fraction or a percentage, and is kept as a fraction.
+    public static HomeyWeather Weather(JsonElement json)
+    {
+        if (json.TryGetProperty("current", out var current) && current.ValueKind == JsonValueKind.Object) json = current;
+        var humidity = Number(json, "humidity");
+        return new HomeyWeather(
+            Temperature: Number(json, "temperature"),
+            State: String(json, "state") ?? String(json, "condition"),
+            Humidity: humidity > 1 ? humidity / 100 : humidity,
+            City: String(json, "city"));
+    }
+
     // Homey returns collections as objects keyed by id.
     public static IEnumerable<JsonElement> Values(JsonElement json) => json.ValueKind switch
     {

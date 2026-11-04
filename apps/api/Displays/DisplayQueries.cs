@@ -34,10 +34,10 @@ public static class DisplayQueries
     public static async Task<DisplayInfo> InfoAsync(HomeyDashDbContext db, DisplayPresence presence, Display display, CancellationToken ct) =>
         Info(display, presence, await LatestVersionsAsync(db, ct));
 
-    // The screens of the displays that offer this dashboard, as their main one or another.
+    // The screens of the displays that offer this dashboard.
     public static async Task<List<Guid?>> ScreensShowingAsync(HomeyDashDbContext db, Guid dashboardId, CancellationToken ct) =>
         await db.Displays
-            .Where(d => d.DashboardId == dashboardId || d.Others.Any(o => o.DashboardId == dashboardId))
+            .Where(d => d.Dashboards.Any(o => o.DashboardId == dashboardId))
             .Select(d => d.ScreenId)
             .ToListAsync(ct);
 
@@ -47,9 +47,8 @@ public static class DisplayQueries
     private static DisplayInfo Info(Display display, DisplayPresence presence, Dictionary<Guid, int> latest)
     {
         var summary = display.ToSummary();
-        var shown = display.Others.ToDictionary(o => o.DashboardId, o => o.ShownVersion);
-        if (display.DashboardId is { } main) shown[main] = display.ShownVersion;
-        return new(summary.Id, summary.Name, summary.DashboardId, summary.OtherDashboardIds, new DisplayStatus(
+        var shown = display.Dashboards.ToDictionary(o => o.DashboardId, o => o.ShownVersion);
+        return new(summary.Id, summary.Name, summary.DashboardIds, summary.IdleRules, summary.LockWidgets, new DisplayStatus(
             presence.IsConnected(display.ScreenId),
             display.ScreenId is not null,
             display.LastSeenAt,

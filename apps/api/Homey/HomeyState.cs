@@ -24,6 +24,9 @@ public sealed class HomeyState(TimeProvider time, int accountId)
     public HomeyStatus Status { get; private set; } =
         new(accountId, HomeyConnection.Connecting, null, time.GetUtcNow(), Fake: false);
 
+    // Null until Homey first told it, or when Homey won't.
+    public HomeyWeather? Weather { get; private set; }
+
     // False until the first snapshot of Homey has arrived.
     public bool Loaded { get; private set; }
 
@@ -158,6 +161,16 @@ public sealed class HomeyState(TimeProvider time, int accountId)
             _variables = _variables.Remove(id);
         }
         Changed?.Invoke(new VariableRemoved(id));
+    }
+
+    public void SetWeather(HomeyWeather weather)
+    {
+        lock (_lock)
+        {
+            if (Weather == weather) return;
+            Weather = weather;
+        }
+        Changed?.Invoke(new WeatherChanged(weather));
     }
 
     public void UpsertFlow(HomeyFlow flow) => UpdateCatalog(() => _flows = _flows.SetItem(flow.Id, flow));

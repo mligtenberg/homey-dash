@@ -224,6 +224,7 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
     public Task StartAsync(CancellationToken ct)
     {
         _state.Replace(Devices, Flows, Moods, Zones, FlowFolders, Variables);
+        _state.SetWeather(new HomeyWeather(13.2, "Clouds", 0.81, "Utrecht"));
         _state.SetStatus(HomeyConnection.Connected, fake: true);
         homeys.Set([new Homeys.Entry(Account.Id, Account.Name, this)]);
         return Task.CompletedTask;

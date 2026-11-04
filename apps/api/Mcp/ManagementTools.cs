@@ -147,21 +147,65 @@ public sealed class ManagementTools(
     }
 
     [McpServerTool(Name = "list_displays", ReadOnly = true)]
-    [Description("Lists the displays (the screens in the home that completed setup), each with its main dashboard, the other dashboards it can switch to, and whether it is connected and shows the latest published version of each.")]
+    [Description("Lists the displays (the screens in the home that completed setup), each with the dashboards it offers in order, its idle rules, and whether it is connected and shows the latest published version of each.")]
     public Task<List<DisplayInfo>> ListDisplays(CancellationToken ct) => DisplayQueries.ListAsync(db, presence, ct);
 
-    [McpServerTool(Name = "assign_dashboard", Idempotent = true)]
+    [McpServerTool(Name = "assign_dashboards", Idempotent = true)]
     [Description("""
-        Assigns a display its main dashboard, which it shows at once and returns to when left alone, and the other
-        dashboards people can switch to from a tape along the left of the screen, in that order. Every dashboard must
-        be published. Without a dashboard id the display waits for one and has no others.
+        Assigns a display the dashboards it offers, in order; people switch between them from a tape along the left of
+        the screen. It starts on the first, unless an idle rule holds (see set_idle_rules). Every dashboard must be
+        published. Without dashboards the display waits for one. Idle rules on a dashboard that is no longer assigned
+        are dropped; the others stay.
         """)]
-    public async Task<DisplayInfo> AssignDashboard(
-        Guid displayId, Guid? dashboardId = null, Guid[]? otherDashboardIds = null, CancellationToken ct = default)
+    public async Task<DisplayInfo> AssignDashboards(Guid displayId, Guid[] dashboardIds, CancellationToken ct = default)
     {
         if (await db.Displays.FindAsync([displayId], ct) is not { } display)
             throw new McpException($"Display {displayId} not found.");
-        Refuse(await DisplayEndpoints.AssignAsync(db, display, dashboardId, otherDashboardIds ?? [], ct));
+        Refuse(await DisplayEndpoints.AssignAsync(db, display, dashboardIds, ct));
+        await db.SaveChangesAsync(ct);
+        await notifier.ScreensChangedAsync(db, [display.ScreenId], ct);
+        return await DisplayQueries.InfoAsync(db, presence, display, ct);
+    }
+
+    [McpServerTool(Name = "set_idle_rules", Idempotent = true)]
+    [Description($$"""
+        Sets what a display shows once it is left alone for a minute, and while it stays alone: what the first entry in
+        this ordered list whose rule holds says; when none holds, it stays on what it shows (on start, its first
+        dashboard). An entry either shows a dashboard, { "dashboardId", "rule": <rule> }, which must be one the display
+        offers (see list_displays), plays a photo set full screen, { "photoSetId", "rule": <rule>, "returnDashboardId"? },
+        or fills the screen with one colour, { "color": "#rrggbb", "rule": <rule>, "returnDashboardId"? } (such as
+        "#000000" to darken it at night), until someone touches the screen, which goes back to returnDashboardId (a
+        dashboard the display offers) or, without it, to the dashboard shown last. A photo set's id is what follows
+        "photo-set:" in its target (see list_targets). Replaces the display's idle rules as a whole.
+        {{RuleSchema}}
+        """)]
+    public async Task<DisplayInfo> SetIdleRules(Guid displayId, IdleRule[] idleRules, CancellationToken ct = default)
+    {
+        if (await db.Displays.FindAsync([displayId], ct) is not { } display)
+            throw new McpException($"Display {displayId} not found.");
+        if (await DisplayEndpoints.SetIdleRulesAsync(db, display, idleRules, rules, ct) is { } errors)
+            throw new McpException(string.Join(" ", errors.Select(e => $"{e.Key}: {string.Join(" ", e.Value)}")));
+        await db.SaveChangesAsync(ct);
+        await notifier.ScreensChangedAsync(db, [display.ScreenId], ct);
+        return await DisplayQueries.InfoAsync(db, presence, display, ct);
+    }
+
+    [McpServerTool(Name = "set_lock_screen", Idempotent = true)]
+    [Description("""
+        Sets what a display's lock screen shows: widgets laid over the photo set or colour an idle rule plays (see
+        set_idle_rules), in order, at most 8. Each sits in a spot, one of "top-left", "top-right",
+        "center", "bottom-left" or "bottom-right"; widgets in the same spot stack in order. A widget is the time and
+        date, { "kind": "clock", "spot" }, the weather where a Homey is, { "kind": "weather", "spot", "account"? } (the
+        Homey account's id, or the oldest without it), or the value of a device's capability, { "kind": "value", "spot",
+        "signal" }, whose signal is a Homey capability signal (homey:<account>:capability:<device>:<capability>, see
+        list_signals). Replaces the display's lock screen as a whole.
+        """)]
+    public async Task<DisplayInfo> SetLockScreen(Guid displayId, LockWidget[] widgets, CancellationToken ct = default)
+    {
+        if (await db.Displays.FindAsync([displayId], ct) is not { } display)
+            throw new McpException($"Display {displayId} not found.");
+        if (DisplayEndpoints.SetLockScreen(display, widgets, rules) is { } errors)
+            throw new McpException(string.Join(" ", errors.Select(e => $"{e.Key}: {string.Join(" ", e.Value)}")));
         await db.SaveChangesAsync(ct);
         await notifier.ScreensChangedAsync(db, [display.ScreenId], ct);
         return await DisplayQueries.InfoAsync(db, presence, display, ct);

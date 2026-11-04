@@ -1,3 +1,4 @@
+using System.Text.Json;
 using HomeyDash.Api.Dashboards;
 
 namespace HomeyDash.Api.Displays;
@@ -13,53 +14,55 @@ public sealed class Display
     public Guid Id { get; init; } = Guid.NewGuid();
     public required string Name { get; set; }
 
-    // The main dashboard, which the display returns to when left alone. Null while it waits for one.
-    public Guid? DashboardId { get; set; }
+    // The dashboards it offers, by position; it waits while it has none.
+    public List<DisplayDashboard> Dashboards { get; init; } = [];
 
-    // The dashboards it can switch to besides the main one; only a display with a main dashboard has them.
-    public List<DisplayDashboard> Others { get; init; } = [];
+    // Left alone, it does what the first rule that holds says, else stays where it is. Replaced as a whole.
+    public List<IdleRule> IdleRules { get; set; } = [];
+
+    // Shown over a photo set or colour an idle rule plays, in place. Replaced as a whole.
+    public List<LockWidget> LockWidgets { get; set; } = [];
 
     // The id the holding screen keeps in its localStorage. Null once no screen holds this display.
     public Guid? ScreenId { get; set; }
 
-    // Display status, as reported by the screen: when it was last connected, and which published version of its
-    // main dashboard it shows.
+    // Display status, as reported by the screen: when it was last connected. Each dashboard keeps the version shown.
     public DateTimeOffset? LastSeenAt { get; set; }
-    public int? ShownVersion { get; set; }
 
-    // Main first, then the others: the order its screen offers them in.
-    public List<Guid> DashboardIds =>
-        DashboardId is { } main ? [main, .. Others.OrderBy(o => o.Position).Select(o => o.DashboardId)] : [];
+    // The order its screen offers them in; it starts on the first.
+    public List<Guid> DashboardIds => Dashboards.OrderBy(o => o.Position).Select(o => o.DashboardId).ToList();
 
-    public DisplaySummary ToSummary() => new(Id, Name, DashboardId, DashboardIds.Skip(1).ToList());
+    // Rules that show a dashboard it no longer offers, such as a deleted one, are left out; a photo set or colour that
+    // went back to one goes back to the last one shown instead.
+    public List<IdleRule> OfferedIdleRules() => IdleRules
+        .Where(r => r.PhotoSetId is not null || r.Color is not null || r.DashboardId is { } shown && DashboardIds.Contains(shown))
+        .Select(r => r.ReturnDashboardId is { } back && !DashboardIds.Contains(back) ? r with { ReturnDashboardId = null } : r)
+        .ToList();
+
+    public DisplaySummary ToSummary() => new(Id, Name, DashboardIds, OfferedIdleRules(), LockWidgets);
 
     // The published version of each dashboard the screen reports it shows; one it leaves out it doesn't show yet.
     public void Showing(IReadOnlyDictionary<Guid, int> versions)
     {
-        ShownVersion = DashboardId is { } main && versions.TryGetValue(main, out var version) ? version : null;
-        foreach (var other in Others)
-            other.ShownVersion = versions.TryGetValue(other.DashboardId, out var shown) ? shown : null;
+        foreach (var dashboard in Dashboards)
+            dashboard.ShownVersion = versions.TryGetValue(dashboard.DashboardId, out var shown) ? shown : null;
     }
 
     /// <summary>
-    /// Makes <paramref name="main"/> the main dashboard and <paramref name="others"/> the ones besides it, in this
-    /// order. A dashboard that stays assigned keeps the version its screen reported.
+    /// Makes <paramref name="dashboardIds"/> the dashboards it offers, in this order. A dashboard that stays keeps the
+    /// version its screen reported; an idle rule on one that goes goes with it.
     /// </summary>
-    public void Assign(Guid? main, IReadOnlyList<Guid> others)
+    public void Assign(IReadOnlyList<Guid> dashboardIds)
     {
-        var shown = Others.ToDictionary(o => o.DashboardId, o => o.ShownVersion);
-        if (DashboardId is { } previous) shown[previous] = ShownVersion;
-
-        DashboardId = main;
-        ShownVersion = main is { } id ? shown.GetValueOrDefault(id) : null;
         // Rows that stay are changed in place: EF can't track a removed row and a new one with the same key.
-        Others.RemoveAll(o => !others.Contains(o.DashboardId));
-        foreach (var (dashboardId, position) in others.Select((d, i) => (d, i)))
+        Dashboards.RemoveAll(o => !dashboardIds.Contains(o.DashboardId));
+        foreach (var (dashboardId, position) in dashboardIds.Select((d, i) => (d, i)))
         {
-            if (Others.Find(o => o.DashboardId == dashboardId) is not { } other)
-                Others.Add(other = new DisplayDashboard { DashboardId = dashboardId, ShownVersion = shown.GetValueOrDefault(dashboardId) });
-            other.Position = position;
+            if (Dashboards.Find(o => o.DashboardId == dashboardId) is not { } dashboard)
+                Dashboards.Add(dashboard = new DisplayDashboard { DashboardId = dashboardId });
+            dashboard.Position = position;
         }
+        IdleRules = OfferedIdleRules();
     }
 
     public static string? ValidateName(string? name) =>
@@ -68,21 +71,49 @@ public sealed class Display
         : null;
 }
 
-/// <summary>A dashboard a display can switch to besides its main one.</summary>
+/// <summary>A dashboard a display offers.</summary>
 public sealed class DisplayDashboard
 {
     public Guid DisplayId { get; init; }
     public Guid DashboardId { get; init; }
 
-    // Where it sits among the display's other dashboards.
+    // Where it sits among the display's dashboards.
     public int Position { get; set; }
 
     // The published version its screen reports it shows.
     public int? ShownVersion { get; set; }
 }
 
-/// <summary>A display, its main dashboard and the others it can switch to, in the order it offers them.</summary>
-public sealed record DisplaySummary(Guid Id, string Name, Guid? DashboardId, List<Guid> OtherDashboardIds);
+/// <summary>
+/// A rule (ADR-0010) and what a display left alone does while it holds: show one of its dashboards
+/// (<see cref="DashboardId"/>), or play a photo set full screen (<see cref="PhotoSetId"/>) or fill the screen with a
+/// colour (<see cref="Color"/>, such as <c>#000000</c>) until it is touched, which goes back to
+/// <see cref="ReturnDashboardId"/>, or to the dashboard it showed last when that is null. The rule is kept as sent, once
+/// it passed validation.
+/// </summary>
+public sealed record IdleRule(
+    Guid? DashboardId, JsonElement Rule, Guid? PhotoSetId = null, Guid? ReturnDashboardId = null, string? Color = null);
+
+/// <summary>
+/// Something a display shows on its lock screen, over the photo set or colour an idle rule plays, in one of
+/// <see cref="Spots"/>: the time and date (<c>clock</c>), the weather where a Homey is (<c>weather</c>, of the Homey of
+/// <see cref="Account"/>, or the oldest), or the value of a device's capability (<c>value</c>, the Homey signal named
+/// by <see cref="Signal"/>). Widgets in the same spot stack in order.
+/// </summary>
+public sealed record LockWidget(string Kind, string Spot, string? Signal = null, int? Account = null)
+{
+    public const int Max = 8;
+
+    public static readonly IReadOnlyList<string> Kinds = ["clock", "weather", "value"];
+
+    public static readonly IReadOnlyList<string> Spots = ["top-left", "top-right", "center", "bottom-left", "bottom-right"];
+}
+
+/// <summary>
+/// A display, the dashboards it offers in that order, the rules that choose what it shows when left alone, and what
+/// its lock screen shows.
+/// </summary>
+public sealed record DisplaySummary(Guid Id, string Name, List<Guid> DashboardIds, List<IdleRule> IdleRules, List<LockWidget> LockWidgets);
 
 /// <summary>
 /// Which published version of one of its dashboards a display shows. It is on the latest version when
@@ -92,17 +123,18 @@ public sealed record DashboardVersion(Guid DashboardId, int? ShownVersion, int L
 
 /// <summary>
 /// What Management knows about a display beyond its configuration. <see cref="Versions"/> has one entry per
-/// assigned dashboard, main first.
+/// dashboard it offers, in order.
 /// </summary>
 public sealed record DisplayStatus(bool Connected, bool Held, DateTimeOffset? LastSeenAt, List<DashboardVersion> Versions);
 
 /// <summary>A display as Management lists it.</summary>
-public sealed record DisplayInfo(Guid Id, string Name, Guid? DashboardId, List<Guid> OtherDashboardIds, DisplayStatus Status);
+public sealed record DisplayInfo(
+    Guid Id, string Name, List<Guid> DashboardIds, List<IdleRule> IdleRules, List<LockWidget> LockWidgets, DisplayStatus Status);
 
 /// <summary>The published version a display shows.</summary>
 public sealed record ShownDashboard(Guid Id, string Name, int Version, DashboardLayout Layout);
 
 /// <summary>
-/// What a screen needs to know: which display it is and the dashboards it offers, main first (none while waiting).
+/// What a screen needs to know: which display it is and the dashboards it offers, in order (none while waiting).
 /// </summary>
 public sealed record ScreenView(DisplaySummary Display, List<ShownDashboard> Dashboards);

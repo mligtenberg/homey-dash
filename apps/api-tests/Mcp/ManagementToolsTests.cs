@@ -48,8 +48,8 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
         var tools = (await mcp.ListToolsAsync()).Select(t => t.Name).Order();
 
         Assert.Equal(
-            ["assign_dashboard", "create_dashboard", "get_dashboard", "list_dashboards", "list_displays",
-                "list_signals", "list_targets", "publish_dashboard", "rename_dashboard", "save_draft"],
+            ["assign_dashboards", "create_dashboard", "get_dashboard", "list_dashboards", "list_displays",
+                "list_signals", "list_targets", "publish_dashboard", "rename_dashboard", "save_draft", "set_idle_rules", "set_lock_screen"],
             tools);
     }
 
@@ -66,9 +66,9 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
         Assert.Equal("Kitchen", dashboard.GetProperty("name").GetString());
         Json(await CallAsync(mcp, "save_draft", new { dashboardId = id, draft = Draft(Tile("t1", "wide", 0, 0)) }));
         Json(await CallAsync(mcp, "publish_dashboard", new { dashboardId = id }));
-        var info = Json(await CallAsync(mcp, "assign_dashboard", new { displayId = display, dashboardId = id }));
+        var info = Json(await CallAsync(mcp, "assign_dashboards", new { displayId = display, dashboardIds = new[] { id } }));
 
-        Assert.Equal(id, info.GetProperty("dashboardId").GetString());
+        Assert.Equal(id, info.GetProperty("dashboardIds")[0].GetString());
         var shown = (await _client.GetFromJsonAsync<JsonElement>($"/api/screens/{screen}")).GetProperty("dashboards")[0];
         Assert.Equal(1, shown.GetProperty("version").GetInt32());
         var tile = shown.GetProperty("layout").GetProperty("sections")[0].GetProperty("tiles")[0];
@@ -88,7 +88,7 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
     }
 
     [Fact]
-    public async Task OtherDashboards_CanBeAssignedOverMcp()
+    public async Task SeveralDashboards_CanBeAssignedOverMcp()
     {
         await using var mcp = await ConnectAsync();
         var screen = Guid.NewGuid();
@@ -102,9 +102,9 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
             ids.Add(id);
         }
 
-        var info = Json(await CallAsync(mcp, "assign_dashboard", new { displayId = display, dashboardId = ids[0], otherDashboardIds = new[] { ids[1] } }));
+        var info = Json(await CallAsync(mcp, "assign_dashboards", new { displayId = display, dashboardIds = ids }));
 
-        Assert.Equal(ids[1], info.GetProperty("otherDashboardIds")[0].GetString());
+        Assert.Equal(ids, info.GetProperty("dashboardIds").EnumerateArray().Select(i => i.GetString()).ToList());
         var shown = (await _client.GetFromJsonAsync<JsonElement>($"/api/screens/{screen}")).GetProperty("dashboards");
         Assert.Equal(ids, shown.EnumerateArray().Select(d => d.GetProperty("id").GetString()).ToList());
     }
@@ -117,7 +117,7 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
         var display = (await setup.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString();
         var id = Json(await CallAsync(mcp, "create_dashboard", new { name = "Kitchen" })).GetProperty("id").GetString();
 
-        var result = await CallAsync(mcp, "assign_dashboard", new { displayId = display, dashboardId = id });
+        var result = await CallAsync(mcp, "assign_dashboards", new { displayId = display, dashboardIds = new[] { id } });
 
         Assert.Contains("Only a published dashboard", Error(result));
     }

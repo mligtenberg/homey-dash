@@ -164,12 +164,14 @@ public sealed record HomeySnapshot(
     HomeyStatus Status, IEnumerable<HomeyDevice> Devices, IEnumerable<HomeyFlow> Flows, IEnumerable<HomeyMood> Moods,
     IEnumerable<HomeyZone> Zones, IEnumerable<HomeyFlowFolder> FlowFolders,
     // False until the Homey's data first arrived; nothing is missing then.
-    bool Loaded)
+    bool Loaded,
+    // Null until Homey first told it, or when Homey won't.
+    HomeyWeather? Weather)
 {
     public static List<HomeySnapshot> All(Homeys homeys) =>
         homeys.All.Select(e => new HomeySnapshot(e.AccountId, e.Name, e.State.Status, e.State.Devices.OrderBy(d => d.Name),
             e.State.Flows.OrderBy(f => f.Name), e.State.Moods.OrderBy(m => m.Name), e.State.Zones.OrderBy(z => z.Name),
-            e.State.FlowFolders.OrderBy(f => f.Name), e.State.Loaded)).ToList();
+            e.State.FlowFolders.OrderBy(f => f.Name), e.State.Loaded, e.State.Weather)).ToList();
 }
 
 public sealed record HomeyCatalog(
@@ -178,5 +180,8 @@ public sealed record HomeyCatalog(
 
 // A device of the account's Homey changed or was added.
 public sealed record HomeyDeviceChange(int AccountId, HomeyDevice Device);
+
+// The weather of the account's Homey changed.
+public sealed record HomeyWeatherChange(int AccountId, HomeyWeather Weather);
 
 public sealed record HomeyDeviceRemoval(int AccountId, string DeviceId);

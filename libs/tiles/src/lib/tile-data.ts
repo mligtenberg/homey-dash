@@ -6,6 +6,7 @@ import {
   HomeyInsightLog,
   HomeyMood,
   HomeyStatus,
+  HomeyWeather,
   HomeyZone,
   PhotoSet,
 } from '@homey-dash/api-client';
@@ -26,6 +27,8 @@ export interface HomeyData {
   insights: ReadonlyMap<string, HomeyInsightLog>;
   zones: ReadonlyMap<string, HomeyZone>;
   flowFolders: ReadonlyMap<string, HomeyFlowFolder>;
+  /** The weather where this Homey is; null until Homey first told it, or when Homey won't. */
+  weather: HomeyWeather | null;
 }
 
 /**

@@ -170,6 +170,8 @@ export class SignalPicker {
   /** The signal's id; one HomeyDash doesn't have any more shows as missing. */
   readonly value = input.required<string>();
   readonly picked = output<string>();
+  /** Which signals it offers; every one without it. */
+  readonly only = input<(signal: SignalInfo) => boolean>();
 
   protected readonly catalogue = inject(SignalCatalogue);
   private readonly data = inject(TileData);
@@ -181,7 +183,13 @@ export class SignalPicker {
   /** The group open on the right; its place's groups when none is. */
   protected readonly openGroup = signal<string | null>(null);
 
-  protected readonly places = computed(() => buildPlaces(this.catalogue.groups(), this.data.homeys() ?? []));
+  protected readonly places = computed(() => {
+    const only = this.only();
+    const groups = only
+      ? this.catalogue.groups().map((g) => ({ ...g, signals: g.signals.filter(only) })).filter((g) => g.signals.length)
+      : this.catalogue.groups();
+    return buildPlaces(groups, this.data.homeys() ?? []);
+  });
   protected readonly place = computed(() => findPlace(this.places(), this.selected()) ?? this.places()[0]);
   protected readonly groups = computed(() => {
     const place = this.place();

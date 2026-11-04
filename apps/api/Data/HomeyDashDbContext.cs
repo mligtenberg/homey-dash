@@ -35,11 +35,20 @@ public class HomeyDashDbContext(DbContextOptions<HomeyDashDbContext> options) : 
         model.Entity<Display>(display =>
         {
             display.Property(d => d.Name).HasMaxLength(Display.MaxNameLength);
-            // Deleting a dashboard sends the displays showing it back to waiting.
-            display.HasOne<Dashboard>().WithMany().HasForeignKey(d => d.DashboardId).OnDelete(DeleteBehavior.SetNull);
             display.HasIndex(d => d.ScreenId).IsUnique();
-            display.HasMany(d => d.Others).WithOne().HasForeignKey(o => o.DisplayId).OnDelete(DeleteBehavior.Cascade);
-            display.Navigation(d => d.Others).AutoInclude();
+            display.HasMany(d => d.Dashboards).WithOne().HasForeignKey(o => o.DisplayId).OnDelete(DeleteBehavior.Cascade);
+            display.Navigation(d => d.Dashboards).AutoInclude();
+            // A database that ran AddIdleRules before its default became "[]" holds "" for no rules.
+            display.Property(d => d.IdleRules).HasConversion(
+                rules => JsonSerializer.Serialize(rules, Dashboard.Json),
+                json => string.IsNullOrEmpty(json) ? new List<IdleRule>() : JsonSerializer.Deserialize<List<IdleRule>>(json, Dashboard.Json)!,
+                new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<IdleRule>>(
+                    (a, b) => ReferenceEquals(a, b), rules => rules.Count, rules => rules));
+            display.Property(d => d.LockWidgets).HasConversion(
+                widgets => JsonSerializer.Serialize(widgets, Dashboard.Json),
+                json => string.IsNullOrEmpty(json) ? new List<LockWidget>() : JsonSerializer.Deserialize<List<LockWidget>>(json, Dashboard.Json)!,
+                new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<LockWidget>>(
+                    (a, b) => ReferenceEquals(a, b), widgets => widgets.Count, widgets => widgets));
         });
 
         model.Entity<DisplayDashboard>(other =>

@@ -9,15 +9,27 @@ A named, configured layout of tiles with a fixed number of rows. It exists indep
 _Avoid_: Page, screen, view
 
 **Display**:
-A physical screen in the home that has completed setup, assigned a **Main dashboard** and any number of other dashboards to switch to. Identified by a permanent identity that never changes; its name is only a human-readable label.
+A physical screen in the home that has completed setup, assigned an ordered list of dashboards to switch between. It starts on the first. Identified by a permanent identity that never changes; its name is only a human-readable label.
 _Avoid_: Screen, device, client, kiosk
 
-**Main dashboard**:
-The dashboard a display shows first and returns to after a minute without a touch. A display has other dashboards only when it has a main one.
-_Avoid_: Home dashboard, default dashboard, primary dashboard
+**Left alone**:
+The state of a display that nobody has touched for a minute, and that it starts in. Left alone, it shows what its **Idle rules** choose and follows them as they change, and stays on what it shows while none holds; a touch keeps it on what it shows until it is left alone again.
+_Avoid_: Idle mode, screensaver, inactive, main dashboard
+
+**Idle rule**:
+A **Rule** and what a display does while it holds: show one of its dashboards, play a **Photo set** full screen, or fill the screen with one colour (such as black at night); a display has an ordered list of them, set in **Management**. Left alone, the display does what the first rule that holds says, else stays where it is. A photo set or colour stays until a touch, which goes back to the dashboard the rule names, or to the one shown before. It only names a dashboard the display offers; one that shows a dashboard no longer offered goes, and one that went back to it goes back to the one shown before instead. A photo set that is gone or has no photos is passed over.
+_Avoid_: Schedule, home rule, auto-switch
+
+**Lock screen**:
+What a display shows over the photo set or colour an **Idle rule** plays: its **Lock screen widgets**, each in one of five spots (the four corners and the middle), set per display in **Management**. It comes and goes with the photo set or colour, so a touch ends it too; a display never shows it over a dashboard.
+_Avoid_: Screensaver, overlay, clock screen
+
+**Lock screen widget**:
+One thing on a **Lock screen**: the time and date, the weather where a Homey is (Homey's own weather, of the oldest Homey or a chosen one), or the value of one capability of a **Device**. Widgets in the same spot stack in order. One that has nothing to show, such as a weather Homey hasn't told yet or a value whose device is gone, is left out. It can't be operated; touches go through it.
+_Avoid_: Tile, complication
 
 **Dashboard tape**:
-Pills floating over the left edge of a display that offers more than one dashboard, one per dashboard with the **Main dashboard** first, for switching between them. It can be collapsed to one button, which the screen remembers. A display with one dashboard has no tape.
+Pills floating over the left edge of a display that offers more than one dashboard, one per dashboard in the display's order, for switching between them. It can be collapsed to one button, which the screen remembers. A display with one dashboard has no tape.
 _Avoid_: Tab bar, menu, dashboard picker
 
 **Display status**:
@@ -185,10 +197,12 @@ _Avoid_: Expression, logic, formula
 
 ## Relationships
 
-- A **Display** offers zero or more **Dashboards**, one of them its **Main dashboard**, and shows one at a time; a **Dashboard** can be offered on zero or more **Displays**.
-- A **Display** with no **Main dashboard** shows a waiting state until one is assigned in **Management**.
+- A **Display** offers zero or more **Dashboards**, in order, and shows one at a time, starting on the first; a **Dashboard** can be offered on zero or more **Displays**.
+- A **Display** has zero or more **Idle rules**, each on one of the **Dashboards** it offers; HomeyDash evaluates them for that **Display**, as it does a **Logic tile**'s, and the **Display** itself picks the first that holds.
+- A **Display** in **Connection lost** keeps showing the **Dashboard** its **Idle rules** last chose.
+- A **Display** with no **Dashboards** shows a waiting state until one is assigned in **Management**.
 - A **Display** always shows the **Published version** of its **Dashboards**; a **Dashboard** that has never been published cannot be assigned to a **Display**.
-- Deleting a **Display**'s **Main dashboard** makes the next one on its **Dashboard tape** its **Main dashboard**, or makes it wait when there is none.
+- Deleting a **Dashboard** takes it off every **Display**, with its **Idle rules**; a **Display** left with none waits.
 - A **Display** in **Connection lost** picks up a newer **Published version** when it recovers.
 - A **Display** only uses its **Dashboard**; it never changes configuration, but for **Excluded photos**.
 - A **Display** is held by exactly one physical screen at a time; sharing a layout across screens is done by sharing a **Dashboard**.
