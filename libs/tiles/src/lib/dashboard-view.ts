@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { DashboardLayout } from '@homey-dash/api-client';
 import { sectionsPerPage } from '@homey-dash/layout';
+import { shownSections } from './logic/shown-sections';
 import { TileHost } from './tile-host';
 
 /**
@@ -63,10 +64,12 @@ export class DashboardView {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly pager = viewChild.required<ElementRef<HTMLElement>>('pager');
 
+  private readonly shown = shownSections(() => this.layout().sections);
   private readonly perPage = signal(1);
   protected readonly current = signal(0);
   protected readonly pages = computed(() => {
-    const sections = this.layout().sections;
+    const shown = this.shown();
+    const sections = this.layout().sections.filter((s) => shown.has(s.id));
     const perPage = this.perPage();
     const pages = [];
     for (let i = 0; i < sections.length; i += perPage) pages.push(sections.slice(i, i + perPage));

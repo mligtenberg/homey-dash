@@ -116,6 +116,7 @@ public sealed class ManagementTools(
         sections sit side by side and scroll horizontally. A tile's position is the zero-based column and row of its
         top-left cell. Sizes in cells (columns×rows): small 1×1, wide 2×1, full 3×1, large 2×2, full-large 3×2.
         Tiles must stay inside their section's grid and never overlap. Section and tile ids are any unique strings.
+        A section with hidden true stays in the draft but displays leave it out; one with a rule is shown only while it holds.
         Find targets with list_targets, and the signals rules use with list_signals.
         {TileKinds}
         {RuleSchema}

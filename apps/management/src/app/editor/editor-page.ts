@@ -14,6 +14,7 @@ import { Router, RouterLink } from '@angular/router';
 import { DashboardDetail, DashboardLayout, DashboardsApi, DisplaysApi, Rule, Tile } from '@homey-dash/api-client';
 import { TilePosition, TileSize } from '@homey-dash/layout';
 import {
+  alwaysRule,
   choiceLabel,
   heldTile,
   HeldTile,
@@ -21,12 +22,22 @@ import {
   LOGIC_TILE_BADGE,
   LogicTileSettings,
   logicSizes,
+  shownSections,
   TileHost,
   TileKind,
   TileKindRegistry,
   TileSettings,
 } from '@homey-dash/tiles';
-import { LucideChevronLeft, LucideChevronRight, LucideDynamicIcon, LucidePlus, LucideTrash } from '@lucide/angular';
+import {
+  LucideChevronLeft,
+  LucideChevronRight,
+  LucideDynamicIcon,
+  LucideEye,
+  LucideEyeOff,
+  LucideScanEye,
+  LucidePlus,
+  LucideTrash,
+} from '@lucide/angular';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { AsDisplayPicker } from '../as-display-picker';
 import { DashboardsStore } from '../dashboards-store';
@@ -67,7 +78,7 @@ export class EditorPage {
   private readonly router = inject(Router);
   protected readonly kinds = inject(TileKindRegistry);
 
-  protected readonly icons = { LucidePlus, LucideChevronLeft, LucideChevronRight, LucideTrash };
+  protected readonly icons = { LucidePlus, LucideChevronLeft, LucideChevronRight, LucideEye, LucideEyeOff, LucideScanEye, LucideTrash };
   protected readonly rowChoices = Array.from({ length: MAX_ROWS }, (_, i) => i + 1);
 
   protected readonly dashboard = signal<DashboardDetail | null>(null);
@@ -80,6 +91,8 @@ export class EditorPage {
   protected readonly saveError = signal<string | null>(null);
   /** Which of the selected logic tile's tiles is open in the panel. */
   protected readonly openEntry = signal<OpenEntry | null>(null);
+  /** The section whose visibility is open in the panel. */
+  protected readonly openSectionId = signal<string | null>(null);
   protected readonly justPublished = signal(false);
   private readonly drag = signal<Drag | null>(null);
 
@@ -106,6 +119,11 @@ export class EditorPage {
 
   /** The stage's layout, in the template. */
   protected readonly layout = computed(() => this.view() ?? { rows: 4, sections: [] });
+
+  protected readonly openSection = computed(() => this.layout().sections.find((s) => s.id === this.openSectionId()) ?? null);
+
+  /** The sections a display would show now, as the Preview would; the stage dims the others. */
+  protected readonly shown = shownSections(() => this.layout().sections);
 
   protected readonly selected = computed(() => {
     const id = this.selectedTileId();
@@ -165,6 +183,7 @@ export class EditorPage {
         this.saveState.set('saved');
         this.selectedTileId.set(null);
         this.openEntry.set(null);
+        this.openSectionId.set(null);
         this.adding.set(null);
       });
       onCleanup(() => {
@@ -231,6 +250,7 @@ export class EditorPage {
 
   protected startAdding(sectionId: string, position: TilePosition) {
     this.selectedTileId.set(null);
+    this.openSectionId.set(null);
     this.adding.set({ sectionId, position });
   }
 
@@ -252,6 +272,7 @@ export class EditorPage {
 
   protected select(tileId: string | null) {
     this.adding.set(null);
+    this.openSectionId.set(null);
     if (tileId !== this.selectedTileId()) this.openEntry.set(null);
     this.selectedTileId.set(tileId);
   }
@@ -313,6 +334,23 @@ export class EditorPage {
     this.apply(edits.renameSection(this.current(), sectionId, title.trim()));
   }
 
+  /** Opens a section's visibility in the panel, or closes it when it is open. */
+  protected toggleSectionPanel(sectionId: string) {
+    const opening = this.openSectionId() !== sectionId;
+    this.selectedTileId.set(null);
+    this.adding.set(null);
+    this.openSectionId.set(opening ? sectionId : null);
+  }
+
+  protected setVisibility(sectionId: string, choice: 'always' | 'never' | 'rule') {
+    const rule = choice === 'rule' ? (this.openSection()?.rule ?? alwaysRule()) : null;
+    this.apply(edits.setSectionVisibility(this.current(), sectionId, { hidden: choice === 'never', rule }));
+  }
+
+  protected setSectionRule(sectionId: string, rule: Rule) {
+    this.apply(edits.setSectionVisibility(this.current(), sectionId, { rule }));
+  }
+
   protected moveSection(sectionId: string, by: -1 | 1) {
     this.apply(edits.moveSection(this.current(), sectionId, by));
   }
@@ -321,6 +359,7 @@ export class EditorPage {
     if (tiles > 0 && !confirm(`Remove the section "${title || 'Untitled'}" and its ${tiles} tile(s)?`)) return;
     if (this.selected()?.section.id === sectionId) this.selectedTileId.set(null);
     if (this.adding()?.sectionId === sectionId) this.adding.set(null);
+    if (this.openSectionId() === sectionId) this.openSectionId.set(null);
     this.apply(edits.removeSection(this.current(), sectionId));
   }
 

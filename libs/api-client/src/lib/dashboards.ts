@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { TilePosition, TileSize } from '@homey-dash/layout';
+import { Rule } from './rules';
 
 // Mirrors apps/api/Dashboards/DashboardModels.cs.
 
@@ -16,6 +17,10 @@ export interface Section {
   id: string;
   title: string;
   tiles: Tile[];
+  /** Shown in the editor, left out on displays. */
+  hidden?: boolean;
+  /** When set, displays show it only while this holds (ADR-0010). */
+  rule?: Rule | null;
 }
 
 /** A dashboard version, draft or published. */

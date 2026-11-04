@@ -10,6 +10,7 @@ import {
   removeTile,
   resizeTile,
   setRows,
+  setSectionVisibility,
 } from './draft-edits';
 
 const tile = (id: string, column: number, row: number, size: TileSize): Tile => ({
@@ -97,6 +98,16 @@ describe('sections', () => {
   it('swaps a section with its neighbour and ignores moves past the ends', () => {
     expect(moveSection(layout(), 's2', -1).sections.map((s) => s.id)).toEqual(['s2', 's1']);
     expect(moveSection(layout(), 's1', -1).sections.map((s) => s.id)).toEqual(['s1', 's2']);
+  });
+
+  it('sets whether displays show a section', () => {
+    const rule = { match: 'all' as const, conditions: [] };
+    const hidden = setSectionVisibility(layout(), 's2', { hidden: true });
+    const ruled = setSectionVisibility(hidden, 's2', { rule });
+
+    expect(hidden.sections.map((s) => !!s.hidden)).toEqual([false, true]);
+    expect(ruled.sections[1]).toMatchObject({ hidden: false, rule });
+    expect(setSectionVisibility(ruled, 's2', {}).sections[1]).toMatchObject({ hidden: false, rule: null });
   });
 
   it('lists the cells no tile covers', () => {

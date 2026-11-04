@@ -102,12 +102,21 @@ public static class DashboardEndpoints
         return Results.Ok(dashboard.ToDetail(targets));
     }
 
-    // The layout rules, and the rules of its logic tiles (ADR-0010).
+    // The layout rules, and the rules of its sections and logic tiles (ADR-0010).
     public static Dictionary<string, string[]> Validate(DashboardLayout draft, RuleEngine rules)
     {
         var errors = DashboardValidator.Validate(draft);
         foreach (var (key, messages) in LogicTiles.Validate(draft, rules))
             errors[key] = errors.TryGetValue(key, out var existing) ? [.. existing, .. messages] : messages;
+        for (var s = 0; s < (draft.Sections?.Count ?? 0); s++)
+        {
+            if (draft.Sections![s]?.Rule is not { ValueKind: not JsonValueKind.Null } json) continue;
+            var where = $"sections[{s}].rule";
+            var (rule, error) = RuleEngine.Parse(json);
+            if (rule is null) errors[where] = [error!];
+            else foreach (var (key, message) in rules.Validate(rule))
+                errors[$"{where}.{key}"] = errors.TryGetValue($"{where}.{key}", out var existing) ? [.. existing, message] : [message];
+        }
         return errors;
     }
 

@@ -147,6 +147,24 @@ public sealed class RuleApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task ASectionsRule_IsSavedAndCheckedLikeALogicTilesRules()
+    {
+        var id = await CreateDashboardAsync();
+        var hall = new { id = "s1", title = "Hall", tiles = Array.Empty<object>(), rule = Rule(When("clock:now", "timeOfDayBetween", new { from = "07:00:00", to = "09:00:00" })) };
+        var kitchen = new { id = "s2", title = "Kitchen", tiles = Array.Empty<object>(), rule = Rule(When("homey:1:capability:front-door:locked", "equals", true)) };
+
+        var saved = await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft", new { rows = 4, sections = new[] { hall } });
+        var refused = await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft", new { rows = 4, sections = new[] { hall, kitchen } });
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var section = (await saved.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("draft").GetProperty("sections")[0];
+        Assert.Equal("timeOfDayBetween", section.GetProperty("rule").GetProperty("conditions")[0].GetProperty("operator").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        var errors = (await refused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
+        Assert.Contains("doesn't suit a yes/no signal", errors.GetProperty("sections[1].rule.conditions[0]")[0].GetString());
+    }
+
+    [Fact]
     public async Task ALogicTileOnAMissingSignalOrHoldingAMissingTarget_IsFlagged()
     {
         var id = await CreateDashboardAsync();

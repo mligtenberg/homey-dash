@@ -75,7 +75,7 @@ _Avoid_: Connection, integration, credential
 ### Layout
 
 **Section**:
-A group of tiles within a dashboard, laid out on a grid three cells wide and as many rows tall as its dashboard. Cells may be left empty.
+A group of tiles within a dashboard, laid out on a grid three cells wide and as many rows tall as its dashboard. Cells may be left empty. Displays show it always, never, or only while a **Rule** holds, evaluated as a **Logic tile**'s is; the **Editor** always shows it, dimmed when a display would leave it out.
 _Avoid_: Group, panel, column, area
 
 **Cell**:

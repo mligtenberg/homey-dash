@@ -58,6 +58,15 @@ export function renameSection(layout: DashboardLayout, sectionId: string, title:
   return mapSections(layout, (s) => (s.id === sectionId ? { ...s, title } : s));
 }
 
+/** Whether displays show a section: always, never (hidden), or while a rule holds. */
+export function setSectionVisibility(
+  layout: DashboardLayout,
+  sectionId: string,
+  visibility: Pick<Section, 'hidden' | 'rule'>,
+): DashboardLayout {
+  return mapSections(layout, (s) => (s.id === sectionId ? { ...s, hidden: !!visibility.hidden, rule: visibility.rule ?? null } : s));
+}
+
 /** Moves a section one place left (-1) or right (+1). */
 export function moveSection(layout: DashboardLayout, sectionId: string, by: -1 | 1): DashboardLayout {
   const sections = [...layout.sections];

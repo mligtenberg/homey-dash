@@ -5,6 +5,7 @@ export * from './lib/tile-host';
 export * from './lib/core/core-tiles';
 export * from './lib/plex/plex-tiles';
 export * from './lib/logic/logic-tile';
+export { shownSections } from './lib/logic/shown-sections';
 export { deviceLook, deviceType } from './lib/core/device-look';
 export * from './lib/dashboard-view';
 export * from './lib/realtime-tile-data';
