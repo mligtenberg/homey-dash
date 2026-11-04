@@ -45,7 +45,7 @@ The part of Management where a dashboard's draft is arranged on its grid. Tiles 
 _Avoid_: Designer, builder, canvas
 
 **Preview**:
-A realistic rendering of a dashboard's draft in Management, using real tiles and live data, fitted to the size of the Management window.
+A realistic rendering of a dashboard's draft in Management, using real tiles and live data, fitted to the size of the Management window. Its tiles can be operated as on a display, so they operate the home.
 _Avoid_: Simulation, mockup
 
 **Published version**:

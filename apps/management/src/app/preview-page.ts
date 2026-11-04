@@ -13,8 +13,7 @@ import { AsDisplayPicker } from './as-display-picker';
   host: { class: 'hd-display', '[style.--cell.px]': 'cell()', '(window:resize)': 'onResize()' },
   template: `
     @if (dashboard(); as dashboard) {
-      <!-- A preview shows the draft; it does not operate the home. -->
-      <hd-dashboard-view [layout]="dashboard.draft" inert />
+      <hd-dashboard-view [layout]="dashboard.draft" />
     }
     <div class="tools">
       <hd-as-display-picker />
