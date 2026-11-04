@@ -71,14 +71,46 @@ public sealed record RuleContext(Guid? ScreenId = null, Guid? DisplayId = null)
 
 public enum RuleMatch { All, Any }
 
+// What a rule combines: a condition, or a group of conditions, which is a rule of its own.
+[JsonConverter(typeof(TermConverter))]
+public abstract record Term;
+
 /// <summary>
 /// One signal compared with a fixed value by an operator that suits the signal's type, optionally negated. Value's
 /// shape depends on the operator (see <see cref="Operators"/>); is true, is false and is empty take none.
 /// </summary>
-public sealed record Condition(string Signal, string Operator, JsonElement Value = default, bool Not = false);
+public sealed record Condition(string Signal, string Operator, JsonElement Value = default, bool Not = false) : Term;
 
-// One or more conditions, of which all, or any, must hold.
-public sealed record Rule(RuleMatch Match, IReadOnlyList<Condition> Conditions);
+/// <summary>
+/// One or more conditions or groups, of which all, or any, must hold; such as any of (all of A and B) and C.
+/// </summary>
+public sealed record Rule(RuleMatch Match, IReadOnlyList<Term> Conditions) : Term
+{
+    // Its conditions, and those of its groups.
+    public IEnumerable<Condition> AllConditions() =>
+        Conditions.SelectMany(term => term switch
+        {
+            Rule group => group.AllConditions(),
+            Condition condition => [condition],
+            _ => [],
+        });
+}
+
+// A term with "conditions" is a group, any other a condition.
+public sealed class TermConverter : JsonConverter<Term>
+{
+    public override Term? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var json = JsonElement.ParseValue(ref reader);
+        if (json.ValueKind == JsonValueKind.Null) return null;
+        return json.ValueKind == JsonValueKind.Object && json.TryGetProperty("conditions", out _)
+            ? json.Deserialize<Rule>(options)
+            : json.Deserialize<Condition>(options);
+    }
+
+    public override void Write(Utf8JsonWriter writer, Term value, JsonSerializerOptions options) =>
+        JsonSerializer.Serialize(writer, value, value.GetType(), options);
+}
 
 // An answer to a subscription. Seq orders every answer HomeyDash sends, so a client keeps the latest.
 public sealed record RuleAnswer(bool Holds, long Seq);

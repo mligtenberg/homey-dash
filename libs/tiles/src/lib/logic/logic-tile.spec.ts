@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationRef, ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Realtime, Rule } from '@homey-dash/api-client';
+import { Condition, Realtime, Rule } from '@homey-dash/api-client';
 import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { TileSize } from '@homey-dash/layout';
 import { RealtimeTileData } from '../realtime-tile-data';
@@ -52,7 +52,7 @@ describe('logic tile', () => {
   beforeEach(() => {
     realtime = new FakeRealtime();
     holding = {};
-    realtime.answerRule = (rule) => holding[rule.conditions[0].signal];
+    realtime.answerRule = (rule) => holding[(rule.conditions[0] as Condition).signal];
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -83,7 +83,7 @@ describe('logic tile', () => {
   // Answers change as the made-up signals do, in one message.
   async function change(next: Record<string, boolean>) {
     holding = { ...holding, ...next };
-    realtime.answer((rule) => holding[rule.conditions[0].signal]);
+    realtime.answer((rule) => holding[(rule.conditions[0] as Condition).signal]);
     await settle();
   }
 

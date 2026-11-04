@@ -31,8 +31,8 @@ public static class LogicTiles
 
     // Every signal its rules use.
     public static IEnumerable<string> Signals(JsonElement settings) =>
-        Rules(settings).SelectMany(r => RuleEngine.Parse(r.Rule).Rule?.Conditions ?? [])
-            .Select(c => c?.Signal)
+        Rules(settings).SelectMany(r => RuleEngine.Parse(r.Rule).Rule?.AllConditions() ?? [])
+            .Select(c => c.Signal)
             .OfType<string>();
 
     /// <summary>What is wrong with the rules of a draft's logic tiles, keyed as the layout's validation keys its problems.</summary>

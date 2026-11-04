@@ -1,6 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
-import { Condition, ConditionValue, Operator, Rule, SpanUnit, Weekday } from '@homey-dash/api-client';
+import { Condition, ConditionValue, isGroup, Operator, Rule, SpanUnit, Weekday } from '@homey-dash/api-client';
 import { alwaysRule } from '@homey-dash/tiles';
 import {
   defaultValue,
@@ -231,14 +231,18 @@ export class ConditionEditor {
   }
 }
 
-/** A rule: its conditions, and whether all or any of them must hold. */
+/**
+ * A rule: its conditions and groups, and whether all or any of them must hold. A group is a rule of its own, edited the
+ * same way, one level deep.
+ */
 @Component({
   selector: 'hd-rule-editor',
   imports: [ConditionEditor],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.group]': 'group()' },
   template: `
     <div class="head">
-      <span class="hd-field__label">Show when</span>
+      <span class="hd-field__label">{{ group() ? 'Group' : 'Show when' }}</span>
       @if (rule().conditions.length > 1) {
         <select class="hd-select" aria-label="Combine conditions" (change)="setMatch($any($event.target).value)">
           <option value="all" [selected]="rule().match === 'all'">all of these hold</option>
@@ -246,41 +250,75 @@ export class ConditionEditor {
         </select>
       }
     </div>
-    @for (condition of rule().conditions; track $index; let i = $index) {
-      <hd-condition-editor
-        [condition]="condition"
-        [removable]="rule().conditions.length > 1"
-        (changed)="setCondition(i, $event)"
-        (removed)="removeCondition(i)"
-      />
+    @for (term of rule().conditions; track $index; let i = $index) {
+      @if (i > 0) {
+        <span class="joiner">{{ rule().match === 'all' ? 'and' : 'or' }}</span>
+      }
+      @if (isGroup(term)) {
+        <hd-rule-editor
+          [rule]="term"
+          [group]="true"
+          [removable]="rule().conditions.length > 1"
+          (changed)="setTerm(i, $event)"
+          (removed)="removeTerm(i)"
+        />
+      } @else {
+        <hd-condition-editor
+          [condition]="term"
+          [removable]="rule().conditions.length > 1"
+          (changed)="setTerm(i, $event)"
+          (removed)="removeTerm(i)"
+        />
+      }
     }
-    <button type="button" class="hd-btn add" (click)="addCondition()">Add condition</button>
+    <div class="actions">
+      <button type="button" class="hd-btn" (click)="addCondition()">Add condition</button>
+      @if (!group()) {
+        <button type="button" class="hd-btn" (click)="addGroup()">Add group</button>
+      } @else if (removable()) {
+        <button type="button" class="hd-btn" (click)="removed.emit()">Remove group</button>
+      }
+    </div>
   `,
   styles: `
     :host { display: flex; flex-direction: column; gap: var(--space-2); }
+    :host(.group) { padding: var(--space-3); border: 1px dashed var(--line); border-radius: 12px; }
     .head { display: flex; align-items: center; gap: var(--space-2); }
     .head .hd-select { flex: 1; }
-    .add { align-self: flex-start; }
+    .joiner { align-self: center; color: var(--ink-muted); font-size: 13px; }
+    .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
   `,
 })
 export class RuleEditor {
   readonly rule = input.required<Rule>();
+  /** Whether this is a group within a rule, which can be removed but holds no groups of its own. */
+  readonly group = input(false);
+  readonly removable = input(true);
   readonly changed = output<Rule>();
+  readonly removed = output<void>();
+
+  protected readonly isGroup = isGroup;
 
   protected setMatch(match: Rule['match']) {
     this.changed.emit({ ...this.rule(), match });
   }
 
-  protected setCondition(index: number, condition: Condition) {
-    this.changed.emit({ ...this.rule(), conditions: this.rule().conditions.map((c, i) => (i === index ? condition : c)) });
+  protected setTerm(index: number, term: Condition | Rule) {
+    this.changed.emit({ ...this.rule(), conditions: this.rule().conditions.map((c, i) => (i === index ? term : c)) });
   }
 
-  protected removeCondition(index: number) {
+  protected removeTerm(index: number) {
     this.changed.emit({ ...this.rule(), conditions: this.rule().conditions.filter((_, i) => i !== index) });
   }
 
   // Starts as "the clock is on any day", which always holds, until another signal is picked.
   protected addCondition() {
     this.changed.emit({ ...this.rule(), conditions: [...this.rule().conditions, ...alwaysRule().conditions] });
+  }
+
+  // A group combines its conditions the other way than the rule does, or it would change nothing.
+  protected addGroup() {
+    const match = this.rule().match === 'all' ? 'any' : 'all';
+    this.changed.emit({ ...this.rule(), conditions: [...this.rule().conditions, { match, conditions: alwaysRule().conditions }] });
   }
 }

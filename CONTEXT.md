@@ -176,7 +176,7 @@ One signal compared with a fixed value, by an operator that suits the signal's t
 _Avoid_: Check, test, filter
 
 **Rule**:
-One or more conditions, of which all, or any, must hold.
+One or more conditions, of which all, or any, must hold. A **group** among them is a rule of its own, so a rule can say "A and B, or C".
 _Avoid_: Expression, logic, formula
 
 ## Relationships

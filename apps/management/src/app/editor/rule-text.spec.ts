@@ -62,4 +62,19 @@ describe('rule text', () => {
       'not: Thermostat Target temperature is below 18 °C',
     );
   });
+
+  it('sums up a group in brackets', () => {
+    const signals = new Map([door, thermostat].map((s) => [s.id, s]));
+    const group = {
+      match: 'all' as const,
+      conditions: [
+        { signal: door.id, operator: 'isTrue' as const },
+        { signal: thermostat.id, operator: 'lessThan' as const, value: 18 },
+      ],
+    };
+
+    expect(describeRule({ match: 'any', conditions: [group, { signal: door.id, operator: 'isFalse' }] }, signals)).toBe(
+      '(Front door Contact is open and Thermostat Target temperature is below 18 °C) or 1 more',
+    );
+  });
 });

@@ -58,10 +58,11 @@ public sealed class ManagementTools(
 
     // Mirrors Operators in apps/api/Rules/Operators.cs.
     private const string RuleSchema = """
-        A rule is { "match": "all" or "any", "conditions": [ { "signal", "operator", "value", "not" } ] }: one level of
-        conditions, of which all or any must hold. "signal" is a signal's id from list_signals; "not" (default false)
-        negates the condition. A condition compares its signal with a fixed value, by an operator that suits the signal's
-        type; the value's shape depends on the operator:
+        A rule is { "match": "all" or "any", "conditions": [ { "signal", "operator", "value", "not" } ] }: conditions,
+        of which all or any must hold. A group in "conditions" is itself { "match", "conditions" }, so "A and B, or C" is
+        { "match": "any", "conditions": [ { "match": "all", "conditions": [A, B] }, C ] }. "signal" is a signal's id from
+        list_signals; "not" (default false) negates the condition. A condition compares its signal with a fixed value, by
+        an operator that suits the signal's type; the value's shape depends on the operator:
         - number: "equals", "greaterThan", "lessThan" (a number); "between" ({ "min": 18, "max": 21 }, both included)
         - yesNo: "isTrue", "isFalse" (no value)
         - text: "equals", "contains", "startsWith" (a string; for a signal with allowedValues, equals takes one of their

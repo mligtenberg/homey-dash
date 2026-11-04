@@ -96,6 +96,20 @@ public sealed class RuleApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task ThePreviewEndpoint_SaysWhereInAGroupARuleIsWrong()
+    {
+        var group = new { match = "all", conditions = new[] { When("clock:now", "onWeekdays", new[] { "monday" }), When("clock:now", "isTrue") } };
+        var empty = new { match = "any", conditions = Array.Empty<object>() };
+        var response = await _client.PostAsJsonAsync("/api/rules/evaluate",
+            new { rules = new Dictionary<string, object> { ["bad"] = Rule(group, empty) } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var errors = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
+        Assert.Contains("doesn't suit a date and time signal", errors.GetProperty("rules.bad.conditions[0].conditions[1]")[0].GetString());
+        Assert.Equal("A group needs at least one condition.", errors.GetProperty("rules.bad.conditions[1].conditions")[0].GetString());
+    }
+
+    [Fact]
     public async Task ADraftWithAValidLogicTile_IsSaved()
     {
         var id = await CreateDashboardAsync();

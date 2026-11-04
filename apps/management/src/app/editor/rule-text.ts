@@ -1,4 +1,4 @@
-import { Condition, ConditionValue, Operator, OPERATORS, Rule, SignalInfo, SpanUnit, Weekday } from '@homey-dash/api-client';
+import { Condition, ConditionValue, isGroup, Operator, OPERATORS, Rule, SignalInfo, SpanUnit, Weekday } from '@homey-dash/api-client';
 
 export const WEEKDAYS: readonly { id: Weekday; label: string }[] = [
   { id: 'monday', label: 'Mon' },
@@ -128,10 +128,16 @@ export function describeCondition(condition: Condition, signal?: SignalInfo): st
   return condition.not ? `not: ${text}` : text;
 }
 
-/** A rule in a line: its first condition, and how many more. */
+/** A condition, or a group in brackets: "(Floor lamp On is on and Guests is yes)". */
+function describeTerm(term: Condition | Rule, signals: ReadonlyMap<string, SignalInfo>): string {
+  if (!isGroup(term)) return describeCondition(term, signals.get(term.signal));
+  return `(${term.conditions.map((t) => describeTerm(t, signals)).join(term.match === 'all' ? ' and ' : ' or ')})`;
+}
+
+/** A rule in a line: its first condition or group, and how many more. */
 export function describeRule(rule: Rule, signals: ReadonlyMap<string, SignalInfo>): string {
   const [first, ...rest] = rule.conditions;
   if (!first) return 'No conditions';
-  const text = describeCondition(first, signals.get(first.signal));
+  const text = describeTerm(first, signals);
   return rest.length ? `${text} ${rule.match === 'all' ? 'and' : 'or'} ${rest.length} more` : text;
 }

@@ -38,7 +38,7 @@ public sealed class RuleEngine
         {
             var rule = json.ValueKind == JsonValueKind.Object ? json.Deserialize<Rule>(Dashboard.Json) : null;
             return rule?.Conditions is null
-                ? (null, "A rule is { \"match\": \"all\" or \"any\", \"conditions\": [...] }.")
+                ? (null, "A rule is { \"match\": \"all\" or \"any\", \"conditions\": [...] }, and so is a group among its conditions.")
                 : (rule, null);
         }
         catch (JsonException e)
@@ -48,18 +48,27 @@ public sealed class RuleEngine
     }
 
     /// <summary>
-    /// What is wrong with a rule, keyed by where (such as <c>conditions[1]</c>): no conditions, an unknown signal, an
-    /// operator that doesn't suit the signal's type, or a value that doesn't suit the operator. A signal that is missing
-    /// now is checked against every type the operator suits, so a rule on it can still be saved.
+    /// What is wrong with a rule, keyed by where (such as <c>conditions[1]</c>, or <c>conditions[0].conditions[1]</c> in
+    /// a group): no conditions, an unknown signal, an operator that doesn't suit the signal's type, or a value that
+    /// doesn't suit the operator. A signal that is missing now is checked against every type the operator suits, so a
+    /// rule on it can still be saved.
     /// </summary>
-    public List<(string Key, string Message)> Validate(Rule rule)
+    public List<(string Key, string Message)> Validate(Rule rule) => Validate(rule, "");
+
+    private List<(string Key, string Message)> Validate(Rule rule, string prefix)
     {
         List<(string, string)> problems = [];
-        if (rule.Conditions.Count == 0) problems.Add(("conditions", "A rule needs at least one condition."));
+        if (rule.Conditions.Count == 0)
+            problems.Add(($"{prefix}conditions", prefix == "" ? "A rule needs at least one condition." : "A group needs at least one condition."));
         for (var i = 0; i < rule.Conditions.Count; i++)
         {
-            var key = $"conditions[{i}]";
-            var condition = rule.Conditions[i];
+            var key = $"{prefix}conditions[{i}]";
+            if (rule.Conditions[i] is Rule group)
+            {
+                problems.AddRange(Validate(group, $"{key}."));
+                continue;
+            }
+            var condition = rule.Conditions[i] as Condition;
             if (condition is null || string.IsNullOrWhiteSpace(condition.Signal) || string.IsNullOrWhiteSpace(condition.Operator))
             {
                 problems.Add((key, "A condition needs a signal and an operator."));
@@ -90,15 +99,16 @@ public sealed class RuleEngine
     /// value no longer among its signal's allowed values never holds, negated or not. One on an unavailable signal
     /// uses its last known value.
     /// </summary>
-    public (bool Holds, DateTimeOffset? Next) Evaluate(Rule rule, RuleContext context)
+    public (bool Holds, DateTimeOffset? Next) Evaluate(Rule rule, RuleContext context) =>
+        Evaluate(rule, context, _time.GetUtcNow(), _time.LocalTimeZone);
+
+    private (bool Holds, DateTimeOffset? Next) Evaluate(Rule rule, RuleContext context, DateTimeOffset now, TimeZoneInfo zone)
     {
-        var now = _time.GetUtcNow();
-        var zone = _time.LocalTimeZone;
         var answers = new List<bool>();
         DateTimeOffset? next = null;
-        foreach (var condition in rule.Conditions)
+        foreach (var term in rule.Conditions)
         {
-            var (holds, at) = Evaluate(condition, context, now, zone);
+            var (holds, at) = term is Rule group ? Evaluate(group, context, now, zone) : Evaluate((Condition)term, context, now, zone);
             answers.Add(holds);
             if (at is { } a && (next is null || a < next)) next = a;
         }

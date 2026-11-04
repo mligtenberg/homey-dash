@@ -131,6 +131,19 @@ public sealed class RuleSubscriptionTests(ClockApiFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task AGroup_CombinesItsConditionsWithinTheRule()
+    {
+        var connection = await ConnectAsync();
+        var guests = When("homey:1:variable:var-guests", "isTrue");
+        var home = When("homey:1:variable:var-house-mode", "startsWith", "ho");
+        var noGuests = When("homey:1:variable:var-guests", "isTrue", not: true);
+
+        Assert.False(await SubscribeAsync(connection, "neither", Any(Rule(guests, home), Rule(guests))));
+        Assert.True(await SubscribeAsync(connection, "second", Any(Rule(guests, home), Rule(noGuests, home))));
+        Assert.True(await SubscribeAsync(connection, "nested", Rule(home, Any(guests, noGuests))));
+    }
+
+    [Fact]
     public async Task AnUnavailableDevice_KeepsItsLastKnownValue()
     {
         var connection = await ConnectAsync();

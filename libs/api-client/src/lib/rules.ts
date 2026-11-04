@@ -70,10 +70,18 @@ export interface Condition {
   not?: boolean;
 }
 
-/** One or more conditions, of which all, or any, must hold. */
+/**
+ * One or more conditions or groups, of which all, or any, must hold. A group is a rule of its own, so a rule can say
+ * "A and B, or C": `{ match: 'any', conditions: [{ match: 'all', conditions: [a, b] }, c] }`.
+ */
 export interface Rule {
   match: 'all' | 'any';
-  conditions: Condition[];
+  conditions: (Condition | Rule)[];
+}
+
+/** Whether one of a rule's conditions is a group of its own. */
+export function isGroup(term: Condition | Rule): term is Rule {
+  return 'conditions' in term;
 }
 
 /** An answer to a subscription; `seq` orders every answer HomeyDash sends, so the latest wins. */
