@@ -19,6 +19,7 @@ export const DETAILS_IDLE_MS = 60_000;
     <dialog
       #dialog
       class="hd-details"
+      [class.hd-details--fill]="fill()"
       tabindex="-1"
       [attr.aria-label]="name()"
       (close)="onClose()"
@@ -48,6 +49,8 @@ export class TileDetails {
   readonly name = input.required<string>();
   readonly icon = input.required<LucideIconInput>();
   readonly subtitle = input('');
+  /** Whether it takes the whole screen, its content full-bleed under the head, such as for a photo. */
+  readonly fill = input(false);
 
   readonly isOpen = signal(false);
   protected readonly closeIcon = LucideX;

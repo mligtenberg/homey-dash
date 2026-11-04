@@ -29,6 +29,9 @@ public sealed class PhotoSet
     public IReadOnlyList<Photo> Photos { get; set; } = [];
     public DateTimeOffset? SyncedAt { get; set; }
 
+    // The asset ids of photos excluded from it on a display, which no sync brings back, also after another album.
+    public IReadOnlyList<string> Excluded { get; set; } = [];
+
     // Videos and other assets in the album, which a photo set leaves out.
     public int SkippedVideos { get; set; }
 
@@ -45,6 +48,27 @@ public sealed class PhotoSet
         string.IsNullOrWhiteSpace(name) ? "Give the photo set a name."
         : name.Trim().Length > MaxNameLength ? $"Keep the name to {MaxNameLength} characters."
         : null;
+
+    // Leaves the photo out now and at every sync after. False when it is not one of the set's photos.
+    public bool Exclude(string photoId)
+    {
+        if (Excluded.Contains(photoId)) return true;
+        if (!Photos.Any(p => p.Id == photoId)) return false;
+        Excluded = [.. Excluded, photoId];
+        Photos = Photos.Where(p => p.Id != photoId).ToList();
+        return true;
+    }
+
+    // Lets a sync bring the photo back. False when it was not excluded.
+    public bool Restore(string photoId)
+    {
+        if (!Excluded.Contains(photoId)) return false;
+        Excluded = Excluded.Where(id => id != photoId).ToList();
+        return true;
+    }
+
+    // The photos Immich has for it, but those excluded.
+    public List<Photo> Keep(IEnumerable<Photo> photos) => photos.Where(p => !Excluded.Contains(p.Id)).ToList();
 }
 
 // Someone Immich recognises by their face. The name is kept so rules read well while Immich is out of reach.
@@ -52,8 +76,9 @@ public sealed record PersonRef(string Id, string Name);
 
 /// <summary>
 /// Photos drawn at random from Immich: Count of them, showing at least one of With (anyone when empty) and none of
-/// Without, matching Query by what is in them when it is set (Immich's smart search, such as "landscape"). Drawn
-/// again every RefreshHours, or only when asked when that is 0.
+/// Without, matching Query by what is in them when it is set (Immich's smart search, such as "landscape"). The people of
+/// With are drawn about evenly, as far as their photos allow. Drawn again every RefreshHours, or only when asked when
+/// that is 0.
 /// </summary>
 public sealed record PhotoSelection(IReadOnlyList<PersonRef> With, IReadOnlyList<PersonRef> Without, string? Query, int Count, int RefreshHours)
 {
@@ -77,9 +102,19 @@ public sealed record PhotoSelection(IReadOnlyList<PersonRef> With, IReadOnlyList
         drawnAt is null || RefreshHours > 0 && now >= drawnAt.Value.AddHours(RefreshHours);
 }
 
-// One photo of a set: Id is its asset id in Immich. TakenAt is when it was taken, as Immich knows it. Focus is what a
-// tile keeps in view when it crops the photo; null until its faces are read.
-public sealed record Photo(string Id, DateTimeOffset? TakenAt, Focus? Focus = null);
+// One photo of a set: Id is its asset id in Immich. TakenAt is when it was taken and Place where, such as "Utrecht,
+// Netherlands", as Immich knows them. Faces is null until they are read. Version changes when the photo is edited in
+// Immich, such as rotated, so displays fetch it again; null when Immich gives none. OwnerId is the Immich user whose
+// photo it is, such as a partner of the account; null when synced before HomeyDash read it.
+public sealed record Photo(
+    string Id, DateTimeOffset? TakenAt, string? Place = null, Faces? Faces = null, string? Version = null, string? OwnerId = null);
+
+// The faces Immich found in a photo: their middle, which a tile keeps in view when it crops the photo, and the names of
+// the people they are, from left to right.
+public sealed record Faces(Focus Focus, IReadOnlyList<string> People)
+{
+    public static readonly Faces None = new(Focus.Middle, []);
+}
 
 // The middle of the faces in a photo, as fractions of its width and height from the top left; the photo's middle when
 // Immich found none.

@@ -673,11 +673,14 @@ describe('core tiles', () => {
       albumId: 'a1',
       albumName: 'Summer',
       selection: null,
-      photos: Array.from({ length: count }, (_, i) => ({ id: `p${i}`, takenAt: '2026-08-12T10:00:00Z', focus: null })),
+      photos: Array.from({ length: count }, (_, i) => ({ id: `p${i}`, takenAt: '2026-08-12T10:00:00Z', place: null, faces: null })),
       syncedAt: null,
       skippedVideos: 0,
       syncError: null,
+      syncing: false,
       dashboards: [],
+      excluded: [],
+      lockedOwners: [],
       ...change,
     });
 
@@ -705,7 +708,7 @@ describe('core tiles', () => {
 
     it('crops the photo around its faces', async () => {
       const set = photoSet(1);
-      realtime.photoSetList = [{ ...set, photos: [{ ...set.photos[0], focus: { x: 0.2, y: 0.15 } }] }];
+      realtime.photoSetList = [{ ...set, photos: [{ ...set.photos[0], faces: { focus: { x: 0.2, y: 0.15 }, people: [] } }] }];
       expect((await render(PhotoTile, 'photo-set:s1', 'large')).querySelector('img')?.style.objectPosition).toBe('20% 15%');
     });
 
@@ -715,6 +718,36 @@ describe('core tiles', () => {
       const tile = await render(PhotoTile, 'photo-set:s1', 'large', { label: 'Holiday' });
 
       expect(tile.querySelector('.hd-photo__label')?.textContent?.trim()).toBe('Holiday');
+    });
+
+    it('says along the bottom of the photo when and where it was taken', async () => {
+      const set = photoSet(1);
+      realtime.photoSetList = [{ ...set, photos: [{ ...set.photos[0], place: 'Utrecht, Netherlands' }] }];
+
+      const tile = await render(PhotoTile, 'photo-set:s1', 'large');
+
+      expect(tile.querySelector('.hd-photo__label')).toBeNull();
+      const about = tile.querySelector('.hd-photo__about')?.textContent;
+      expect(about).toContain('2026');
+      expect(about).toContain(' · Utrecht, Netherlands');
+    });
+
+    it('names who is on the photo at the bottom right only when asked to', async () => {
+      const set = photoSet(1);
+      realtime.photoSetList = [{ ...set, photos: [{ ...set.photos[0], faces: { focus: { x: 0.5, y: 0.5 }, people: ['Anna', 'Bram'] } }] }];
+      TestBed.inject(TileData);
+      await settle();
+      const fixture = TestBed.createComponent(PhotoTile);
+      fixture.componentRef.setInput('settings', { target: 'photo-set:s1' });
+      fixture.componentRef.setInput('size', 'large');
+      await settle();
+      const tile = fixture.nativeElement as HTMLElement;
+      expect(tile.querySelector('.hd-photo__people')).toBeNull();
+
+      fixture.componentRef.setInput('people', true);
+      await settle();
+
+      expect(tile.querySelector('.hd-photo__people')?.textContent?.trim()).toBe('Anna, Bram');
     });
 
     it('opens the photo whole on a tap, with the date it was taken, and steps through the set', async () => {
@@ -732,6 +765,177 @@ describe('core tiles', () => {
       await settle();
       expect(dialog.querySelector('.hd-photo-details__img')?.getAttribute('src')).not.toBe(first);
       expect(dialog.textContent).toContain('of 3');
+      // Without a place or anyone on them, there is nothing under the photo.
+      expect(dialog.querySelector('.hd-photo-details__meta')).toBeNull();
+    });
+
+    it('steps through the set with the arrow keys while the photo is open', async () => {
+      realtime.photoSetList = [photoSet(3)];
+      const tile = await render(PhotoTile, 'photo-set:s1', 'large');
+      const key = (target: Element, name: string) => target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true }));
+      const position = () => details(tile).querySelector('.hd-details__label')?.textContent?.trim();
+
+      // Closed, the arrows leave the tile as it is.
+      key(tile, 'ArrowRight');
+      tile.click();
+      await settle();
+      expect(position()).toBe('1 of 3');
+
+      key(button(details(tile), 'Close'), 'ArrowRight');
+      await settle();
+      expect(position()).toBe('2 of 3');
+      key(button(details(tile), 'Close'), 'ArrowLeft');
+      key(button(details(tile), 'Close'), 'ArrowLeft');
+      await settle();
+      expect(position()).toBe('3 of 3');
+    });
+
+    it('says where a photo was taken and who is on it', async () => {
+      const set = photoSet(1);
+      const photo = { ...set.photos[0], place: 'Utrecht, Netherlands', faces: { focus: { x: 0.5, y: 0.5 }, people: ['Anna', 'Bram'] } };
+      realtime.photoSetList = [{ ...set, photos: [photo] }];
+      const tile = await render(PhotoTile, 'photo-set:s1', 'large');
+
+      tile.click();
+      await settle();
+
+      const meta = details(tile).querySelector('.hd-photo-details__meta')?.textContent;
+      expect(meta).toContain('Utrecht, Netherlands');
+      expect(meta).toContain('Anna, Bram');
+    });
+
+    describe('rotating a photo', () => {
+      const detailSrc = (tile: HTMLElement) => details(tile).querySelector('.hd-photo-details__img')?.getAttribute('src');
+
+      it('turns the photo in Immich and shows it turned, on the tile too, once HomeyDash has it', async () => {
+        realtime.photoSetList = [photoSet(1)];
+        const tile = await render(PhotoTile, 'photo-set:s1', 'large');
+        tile.click();
+        await settle();
+
+        button(details(tile), 'Rotate right').click();
+        await settle();
+        const request = TestBed.inject(HttpTestingController).expectOne('/api/photo-sets/s1/photos/p0/rotate');
+        expect(request.request.method).toBe('POST');
+        expect(request.request.body).toEqual({ degrees: 90 });
+        expect(details(tile).querySelector('[role="status"]')?.textContent).toContain('Rotating');
+        expect((button(details(tile), 'Rotate left') as HTMLButtonElement).disabled).toBe(true);
+        const turned = photoSet(1, { photos: [{ ...photoSet(1).photos[0], version: 'h/1' }] });
+        realtime.push('PhotoSets', [turned]);
+        request.flush(turned);
+        await settle();
+
+        expect(details(tile).open).toBe(true);
+        expect(detailSrc(tile)).toBe('/api/photos/s1/p0?v=h%2F1');
+        expect(tile.querySelector('.hd-photo__img')?.getAttribute('src')).toBe('/api/photos/s1/p0?v=h%2F1');
+        expect((button(details(tile), 'Rotate left') as HTMLButtonElement).disabled).toBe(false);
+      });
+
+      it('turns it the other way, and says why when Immich could not', async () => {
+        realtime.photoSetList = [photoSet(1)];
+        const tile = await render(PhotoTile, 'photo-set:s1', 'large');
+        tile.click();
+        await settle();
+
+        button(details(tile), 'Rotate left').click();
+        const request = TestBed.inject(HttpTestingController).expectOne('/api/photo-sets/s1/photos/p0/rotate');
+        expect(request.request.body).toEqual({ degrees: -90 });
+        request.flush(
+          { detail: "Immich can't rotate this photo: Editing live photos is not supported." },
+          { status: 502, statusText: 'Bad Gateway' },
+        );
+        await settle();
+
+        expect(details(tile).querySelector('[role="alert"]')?.textContent).toContain('Editing live photos is not supported');
+        expect(detailSrc(tile)).toBe('/api/photos/s1/p0');
+      });
+
+      it("can't turn a partner's photo without a key of theirs", async () => {
+        const set = photoSet(2, { lockedOwners: ['u2'] });
+        realtime.photoSetList = [{ ...set, photos: [{ ...set.photos[0], ownerId: 'u2' }, { ...set.photos[1], ownerId: 'u1' }] }];
+        const tile = await render(PhotoTile, 'photo-set:s1', 'large');
+        tile.click();
+        await settle();
+        const disabled = () => (button(details(tile), 'Rotate right') as HTMLButtonElement).disabled;
+
+        const first = disabled();
+        button(details(tile), 'Next photo').click();
+        await settle();
+
+        // The order is shuffled: one of the two is the partner's.
+        expect([first, disabled()].sort()).toEqual([false, true]);
+      });
+    });
+
+    describe('excluding a photo', () => {
+      // jsdom decodes no images; the tile fades a photo in only once it has.
+      beforeEach(() => {
+        HTMLImageElement.prototype.decode = () => Promise.resolve();
+      });
+      afterEach(() => {
+        delete (HTMLImageElement.prototype as Partial<HTMLImageElement>).decode;
+      });
+
+      const idOf = (img: Element | null | undefined) => img?.getAttribute('src')?.split('/').pop() ?? '';
+      const shownId = (tile: HTMLElement) => idOf([...tile.querySelectorAll('.hd-photo__img')].pop());
+
+      it('excludes the photo in the detail view, closes it and moves the tile on to the next photo', async () => {
+        realtime.photoSetList = [photoSet(3)];
+        const tile = await render(PhotoTile, 'photo-set:s1', 'large');
+        const excluded = shownId(tile);
+        tile.click();
+        await settle();
+
+        button(details(tile), 'Exclude photo').click();
+        const request = TestBed.inject(HttpTestingController).expectOne(`/api/photo-sets/s1/excluded/${excluded}`);
+        expect(request.request.method).toBe('PUT');
+        const left = photoSet(3).photos.filter((p) => p.id !== excluded);
+        // HomeyDash pushes the set without it before it answers.
+        realtime.push('PhotoSets', [photoSet(0, { photos: left })]);
+        request.flush(photoSet(0, { photos: left }));
+        await settle();
+        await settle();
+
+        expect(details(tile).open).toBe(false);
+        expect(shownId(tile)).not.toBe(excluded);
+        expect(left.map((p) => p.id)).toContain(shownId(tile));
+      });
+
+      it('keeps the photo shown on the tile when another one is excluded', async () => {
+        realtime.photoSetList = [photoSet(3)];
+        const tile = await render(PhotoTile, 'photo-set:s1', 'large');
+        const shown = shownId(tile);
+        tile.click();
+        await settle();
+        button(details(tile), 'Next photo').click();
+        await settle();
+        const excluded = idOf(details(tile).querySelector('.hd-photo-details__img'));
+
+        button(details(tile), 'Exclude photo').click();
+        const left = photoSet(3).photos.filter((p) => p.id !== excluded);
+        realtime.push('PhotoSets', [photoSet(0, { photos: left })]);
+        TestBed.inject(HttpTestingController).expectOne(`/api/photo-sets/s1/excluded/${excluded}`).flush(photoSet(0, { photos: left }));
+        await settle();
+
+        expect(shownId(tile)).toBe(shown);
+        expect(tile.querySelectorAll('.hd-photo__img')).toHaveLength(1);
+      });
+
+      it('says so and stays open when HomeyDash could not exclude it', async () => {
+        realtime.photoSetList = [photoSet(2)];
+        const tile = await render(PhotoTile, 'photo-set:s1', 'large');
+        tile.click();
+        await settle();
+
+        button(details(tile), 'Exclude photo').click();
+        TestBed.inject(HttpTestingController)
+          .expectOne((r) => r.url.startsWith('/api/photo-sets/s1/excluded/'))
+          .flush(null, { status: 502, statusText: 'Bad Gateway' });
+        await settle();
+
+        expect(details(tile).open).toBe(true);
+        expect(details(tile).querySelector('[role="alert"]')?.textContent).toContain('Could not exclude the photo');
+      });
     });
 
     it('asks for a photo set, says when its album has no photos, and is missing when it was deleted', async () => {

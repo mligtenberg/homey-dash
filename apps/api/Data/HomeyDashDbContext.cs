@@ -50,7 +50,16 @@ public class HomeyDashDbContext(DbContextOptions<HomeyDashDbContext> options) : 
         });
 
         model.Entity<HomeyAccount>(account => account.Property(a => a.Name).HasMaxLength(AccountEndpoints.MaxNameLength));
-        model.Entity<ImmichAccount>(account => account.Property(a => a.Name).HasMaxLength(AccountEndpoints.MaxNameLength));
+        model.Entity<ImmichAccount>(account =>
+        {
+            account.Property(a => a.Name).HasMaxLength(AccountEndpoints.MaxNameLength);
+            // Replaced as a whole when Management looks again.
+            account.Property(a => a.Partners).HasConversion(
+                partners => JsonSerializer.Serialize(partners, Dashboard.Json),
+                json => string.IsNullOrEmpty(json) ? new List<ImmichPartner>() : JsonSerializer.Deserialize<List<ImmichPartner>>(json, Dashboard.Json)!,
+                new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<IReadOnlyList<ImmichPartner>>(
+                    (a, b) => ReferenceEquals(a, b), partners => partners.Count, partners => partners));
+        });
         model.Entity<PlexAccount>(account =>
         {
             account.Property(a => a.Name).HasMaxLength(AccountEndpoints.MaxNameLength);

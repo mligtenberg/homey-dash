@@ -107,6 +107,10 @@ export abstract class TileView<TSettings extends TileSettings = TileSettings> {
     this.details()?.open();
   }
 
+  protected closeDetails() {
+    this.details()?.close();
+  }
+
   /**
    * The face of a tile whose target is not in its Homey's data: not picked yet, not loaded yet, or missing (also when
    * its account was removed).

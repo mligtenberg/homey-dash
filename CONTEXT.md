@@ -141,6 +141,10 @@ _Avoid_: Photo frame, slideshow tile, gallery tile
 A named set of photos, made in Management, that follows one album in Immich or is drawn at random from Immich by a **Selection**. HomeyDash keeps the list of its photos, synced with Immich, and fetches each photo from Immich when a display shows it. It exists apart from any tile; photos added to or removed from the album follow at the next sync.
 _Avoid_: Album, gallery, slideshow
 
+**Excluded photo**:
+A photo taken out of a **Photo set** from a photo tile's detail view on a **Display**. It leaves every tile showing the set at once, and no sync brings it back, also when the set is pointed at another album or draws again, until it is brought back in **Management**; it stays in Immich.
+_Avoid_: Hidden photo, deleted photo, blocked photo
+
 **Selection**:
 The rules a **Photo set** draws its photos from Immich by: people who should be in them (at least one), people who should not, what they should show, how many, and how often to draw again.
 _Avoid_: Filter, smart album, query
@@ -186,7 +190,7 @@ _Avoid_: Expression, logic, formula
 - A **Display** always shows the **Published version** of its **Dashboards**; a **Dashboard** that has never been published cannot be assigned to a **Display**.
 - Deleting a **Display**'s **Main dashboard** makes the next one on its **Dashboard tape** its **Main dashboard**, or makes it wait when there is none.
 - A **Display** in **Connection lost** picks up a newer **Published version** when it recovers.
-- A **Display** only uses its **Dashboard**; it never changes configuration.
+- A **Display** only uses its **Dashboard**; it never changes configuration, but for **Excluded photos**.
 - A **Display** is held by exactly one physical screen at a time; sharing a layout across screens is done by sharing a **Dashboard**.
 - A **Dashboard** is an ordered list of **Sections**; a **Section** holds **Tiles** at explicit **Tile positions**.
 - **Tiles** in a **Section** never overlap and never extend beyond its grid.
@@ -195,6 +199,7 @@ _Avoid_: Expression, logic, formula
 - A tile on **Homey** points into one Homey **Account**; removing that **Account** leaves the tile **Missing** until it is given another.
 - A **Photo set** draws from one Immich **Account**, follows one album in it (or draws by a **Selection**), and can be the **Target** of several tiles; a change to the album, or pointing the set at another, changes every tile showing it. Removing that **Account** leaves the **Photo set**, but its photos can't be shown until it is given another **Account**.
 - A **Display** never talks to Immich; it gets a **Photo set**'s photos through HomeyDash.
+- An **Excluded photo** belongs to its **Photo set**: excluding it changes every tile showing that set, and no other set.
 - HomeyDash evaluates every **Rule**, for as long as a shown **Dashboard** asks it to and separately for each **Display** showing it, and tells it at once whenever its answer changes; the **Logic tile** itself picks the first tile whose **Rule** holds. A **Preview** asks HomeyDash too, as if shown on a **Display** chosen in **Management**, or on none.
 - A **Signal** from **Homey** belongs to one Homey **Account**; a **Rule** may mix **Signals** from several. Removing that **Account** makes the **Signal** **Missing**; an unreachable **Homey** makes it **Unavailable**.
 - A **Condition** on a **Display**'s name refers to its permanent identity, so renaming the **Display** keeps the **Condition**, and a **Takeover** carries it over.

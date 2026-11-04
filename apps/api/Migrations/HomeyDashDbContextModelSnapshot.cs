@@ -143,6 +143,10 @@ namespace HomeyDash.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Partners")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.ToTable("ImmichAccounts");
@@ -161,6 +165,10 @@ namespace HomeyDash.Api.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("AlbumName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("Excluded")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

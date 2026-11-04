@@ -2,15 +2,17 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { ImmichAccount, ImmichAccountApi, ImmichAccounts } from '@homey-dash/api-client';
+import { ImmichPartners } from './immich-partners';
 
 /**
  * The Immich accounts, whose albums photo sets follow: each a name, the server's address and an API key made in
  * Immich, such as one per person's Immich. HomeyDash checks the address and key with Immich before keeping them.
  * Removing one keeps its photo sets, but displays can't fetch their photos until each set is given another account.
+ * Under each, the partners who share their photos with it, who can be given a key of their own to rotate them.
  */
 @Component({
   selector: 'hd-immich-account-panel',
-  imports: [NgTemplateOutlet],
+  imports: [NgTemplateOutlet, ImmichPartners],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="account hd-panel" aria-labelledby="immich-title">
@@ -29,6 +31,9 @@ import { ImmichAccount, ImmichAccountApi, ImmichAccounts } from '@homey-dash/api
       @if (info(); as info) {
         @if (info.fake) {
           <p class="muted">HomeyDash runs against a fake Immich with sample albums, set in its configuration.</p>
+          @for (account of info.accounts; track account.id) {
+            <div class="item"><hd-immich-partners [account]="account" /></div>
+          }
         } @else {
           <p class="muted">
             Photo sets follow albums in Immich. Add an account for each Immich server, or for each person whose photos you
@@ -53,6 +58,7 @@ import { ImmichAccount, ImmichAccountApi, ImmichAccounts } from '@homey-dash/api
                     <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(account.id)">Remove</button>
                   }
                 </div>
+                <hd-immich-partners [account]="account" />
               }
             </div>
           }

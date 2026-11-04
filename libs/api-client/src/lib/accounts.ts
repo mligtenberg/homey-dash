@@ -50,6 +50,16 @@ export interface ImmichAccount {
   address: string;
 }
 
+/**
+ * Someone who shares their photos with an Immich account through partner sharing. Only they may edit their photos, so
+ * rotating one takes an API key made in their own account; it never leaves HomeyDash.
+ */
+export interface ImmichPartner {
+  id: string;
+  name: string;
+  hasKey: boolean;
+}
+
 export interface ImmichAccounts {
   /** HomeyDash runs against a fake Immich, set in its configuration, whose one account can't be changed. */
   fake: boolean;
@@ -79,5 +89,20 @@ export class ImmichAccountApi {
   /** Its photo sets keep their photos, but displays can't show them until each set is given another account. */
   remove(id: number) {
     return this.http.delete<ImmichAccounts>(`/api/accounts/immich/${id}`);
+  }
+
+  /** Who shares their photos with the account, as Immich says now; by name. */
+  partners(id: number) {
+    return this.http.get<ImmichPartner[]>(`/api/accounts/immich/${id}/partners`);
+  }
+
+  /** Checked with Immich: the key must be the partner's own. Answers with every partner. */
+  setPartnerKey(id: number, partnerId: string, apiKey: string) {
+    return this.http.put<ImmichPartner[]>(`/api/accounts/immich/${id}/partners/${partnerId}`, { apiKey });
+  }
+
+  /** Their photos can't be rotated after. Answers with every partner. */
+  removePartnerKey(id: number, partnerId: string) {
+    return this.http.delete<ImmichPartner[]>(`/api/accounts/immich/${id}/partners/${partnerId}`);
   }
 }

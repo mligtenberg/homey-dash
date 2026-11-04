@@ -21,6 +21,11 @@ export const appRoutes: Route[] = [
         loadComponent: () => import('./photo-sets-page').then((m) => m.PhotoSetsPage),
         title: 'Photo sets · HomeyDash',
       },
+      {
+        path: 'photo-sets/:id',
+        loadComponent: () => import('./photo-set-page').then((m) => m.PhotoSetPage),
+        title: 'Photo set · HomeyDash',
+      },
       { path: 'accounts', loadComponent: () => import('./accounts-page').then((m) => m.AccountsPage), title: 'Accounts · HomeyDash' },
     ],
   },

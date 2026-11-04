@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
+import { filter, switchMap, take, timer } from 'rxjs';
 
 // Mirrors apps/api/Photos/PhotoEndpoints.cs.
 
@@ -9,8 +10,22 @@ export interface Photo {
   id: string;
   /** When it was taken, as Immich knows it. */
   takenAt: string | null;
-  /** What to keep in view when cropping it; null until its faces are read. */
-  focus: Focus | null;
+  /** Where it was taken, such as "Utrecht, Netherlands", as Immich knows it. */
+  place: string | null;
+  /** Null until they are read. */
+  faces: Faces | null;
+  /** Changes when the photo is edited in Immich, such as rotated; null when Immich gives none. */
+  version?: string | null;
+  /** The Immich user whose photo it is, such as a partner of the set's account; null when synced before it was read. */
+  ownerId?: string | null;
+}
+
+/** The faces Immich found in a photo. */
+export interface Faces {
+  /** What to keep in view when cropping it. */
+  focus: Focus;
+  /** The names of the people they are, from left to right. */
+  people: string[];
 }
 
 /**
@@ -73,8 +88,19 @@ export interface PhotoSet {
   skippedVideos: number;
   /** Why the last sync with Immich failed; the photos are then those of the sync before. */
   syncError: string | null;
+  /** A sync someone asked for has not finished; `untilSynced` waits for it. */
+  syncing: boolean;
   /** The dashboards whose draft shows it. */
   dashboards: string[];
+  /** The ids of the photos excluded from it on a display, first excluded first; served at `photoUrl` too. */
+  excluded: string[];
+  /** The partners of its account without a key of their own, whose photos can't be rotated. */
+  lockedOwners: string[];
+}
+
+/** Whether a display may rotate the photo in Immich: not when it is a partner's who gave no key. */
+export function canRotate(set: Pick<PhotoSet, 'lockedOwners'>, photo: Pick<Photo, 'ownerId'>) {
+  return !photo.ownerId || !set.lockedOwners.includes(photo.ownerId);
 }
 
 /** An album in Immich that a photo set can follow. */
@@ -85,8 +111,10 @@ export interface ImmichAlbum {
   assetCount: number;
 }
 
-export function photoUrl(set: Pick<PhotoSet, 'id'>, photo: Pick<Photo, 'id'>) {
-  return `/api/photos/${set.id}/${photo.id}`;
+/** With the photo's version, so a photo edited in Immich is fetched again rather than taken from the cache. */
+export function photoUrl(set: Pick<PhotoSet, 'id'>, photo: Pick<Photo, 'id' | 'version'>) {
+  const url = `/api/photos/${set.id}/${photo.id}`;
+  return photo.version ? `${url}?v=${encodeURIComponent(photo.version)}` : url;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -112,12 +140,25 @@ export class PhotoSetsApi {
     return this.http.post<PhotoSet>('/api/photo-sets', { accountId, albumId, name: name || null });
   }
 
-  /** A set drawn by `selection`; it arrives with its first draw. */
+  get(id: string) {
+    return this.http.get<PhotoSet>(`/api/photo-sets/${id}`);
+  }
+
+  /** Polls the set, every second, until a sync someone asked for has finished; then emits it once. */
+  untilSynced(id: string) {
+    return timer(0, 1000).pipe(
+      switchMap(() => this.get(id)),
+      filter((set) => !set.syncing),
+      take(1),
+    );
+  }
+
+  /** A set drawn by `selection`; it arrives while it draws in the background, see `untilSynced`. */
   createSelection(accountId: number, name: string, selection: PhotoSelection) {
     return this.http.post<PhotoSet>('/api/photo-sets', { accountId, name, selection });
   }
 
-  /** Leave out what stays the same. Another album, selection or account syncs at once. */
+  /** Leave out what stays the same. Another album, selection or account syncs in the background, see `untilSynced`. */
   update(id: string, change: { name?: string; albumId?: string; selection?: PhotoSelection; accountId?: number }) {
     return this.http.patch<PhotoSet>(`/api/photo-sets/${id}`, change);
   }
@@ -126,7 +167,28 @@ export class PhotoSetsApi {
     return this.http.delete<void>(`/api/photo-sets/${id}`);
   }
 
-  /** Syncs with the album, or draws again, now rather than at the next round. */
+  /** Leaves a photo out of the set for good: no sync brings it back. Tiles showing the set move on. */
+  exclude(set: Pick<PhotoSet, 'id'>, photo: Pick<Photo, 'id'>) {
+    return this.http.put<PhotoSet>(`/api/photo-sets/${set.id}/excluded/${encodeURIComponent(photo.id)}`, null);
+  }
+
+  /**
+   * Turns the photo in Immich a quarter turn, clockwise or the other way, and answers once Immich has turned it. Every set
+   * with it then arrives with its new version, and its faces read again.
+   */
+  rotate(set: Pick<PhotoSet, 'id'>, photo: Pick<Photo, 'id'>, clockwise: boolean) {
+    return this.http.post<PhotoSet>(`/api/photo-sets/${set.id}/photos/${encodeURIComponent(photo.id)}/rotate`, { degrees: clockwise ? 90 : -90 });
+  }
+
+  /**
+   * Lets an excluded photo back into the set. An album syncs at once, so it is back if it is still in the album; a
+   * selection draws it again only by chance.
+   */
+  restore(set: Pick<PhotoSet, 'id'>, photoId: string) {
+    return this.http.delete<PhotoSet>(`/api/photo-sets/${set.id}/excluded/${encodeURIComponent(photoId)}`);
+  }
+
+  /** Syncs with the album, or draws again, now rather than at the next round, in the background: see `untilSynced`. */
   sync(id: string) {
     return this.http.post<PhotoSet>(`/api/photo-sets/${id}/sync`, null);
   }

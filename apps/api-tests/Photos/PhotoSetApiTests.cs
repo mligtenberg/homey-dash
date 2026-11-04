@@ -19,6 +19,19 @@ public class PhotoSetApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         return await response.Content.ReadFromJsonAsync<JsonElement>();
     }
 
+    // A sync is accepted at once; its Location is polled until the set is no longer syncing.
+    private async Task<JsonElement> SyncedAsync(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        for (var i = 0; ; i++)
+        {
+            var set = await _client.GetFromJsonAsync<JsonElement>(response.Headers.Location);
+            if (!set.GetProperty("syncing").GetBoolean()) return set;
+            Assert.True(i < 200, "The photo set is still syncing.");
+            await Task.Delay(25);
+        }
+    }
+
     private async Task<JsonElement> SetAsync(string id) =>
         (await _client.GetFromJsonAsync<JsonElement>("/api/photo-sets")).EnumerateArray().Single(s => s.GetProperty("id").GetString() == id);
 
@@ -83,8 +96,7 @@ public class PhotoSetApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var response = await _client.PatchAsJsonAsync($"/api/photo-sets/{id}", new { albumId = FakeImmich.GardenId });
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var changed = await SetAsync(id);
+        var changed = await SyncedAsync(response);
         Assert.Equal(3, changed.GetProperty("photos").GetArrayLength());
         Assert.Equal("Summer", changed.GetProperty("name").GetString());
         Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync($"/api/photos/{id}/{first}")).StatusCode);
@@ -118,12 +130,85 @@ public class PhotoSetApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var response = await _client.PostAsync($"/api/photo-sets/{id}/sync", null);
 
-        var synced = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var synced = await SyncedAsync(response);
         Assert.Equal(JsonValueKind.Null, synced.GetProperty("syncError").ValueKind);
         Assert.Equal(
             set.GetProperty("photos").EnumerateArray().Select(p => p.GetProperty("id").GetString()),
             synced.GetProperty("photos").EnumerateArray().Select(p => p.GetProperty("id").GetString()));
+    }
+
+    private static string[] Ids(JsonElement set) =>
+        [.. set.GetProperty("photos").EnumerateArray().Select(p => p.GetProperty("id").GetString()!)];
+
+    [Fact]
+    public async Task AnExcludedPhoto_LeavesTheSetAndNoSyncBringsItBack()
+    {
+        var set = await CreateAsync();
+        var id = set.GetProperty("id").GetString()!;
+        var photo = Ids(set)[3];
+
+        var response = await _client.PutAsync($"/api/photo-sets/{id}/excluded/{photo}", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var excluded = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.DoesNotContain(photo, Ids(excluded));
+        Assert.Equal([photo], excluded.GetProperty("excluded").EnumerateArray().Select(e => e.GetString()));
+        // Still served, so Management can show what was excluded.
+        Assert.Equal(HttpStatusCode.OK, (await _client.GetAsync($"/api/photos/{id}/{photo}")).StatusCode);
+        var synced = await SyncedAsync(await _client.PostAsync($"/api/photo-sets/{id}/sync", null));
+        Assert.Equal(FakeImmich.SummerPhotos - 1, synced.GetProperty("photos").GetArrayLength());
+        Assert.DoesNotContain(photo, Ids(synced));
+        // Pointed at another album and back, it stays out.
+        await SyncedAsync(await _client.PatchAsJsonAsync($"/api/photo-sets/{id}", new { albumId = FakeImmich.GardenId }));
+        var back = await SyncedAsync(await _client.PatchAsJsonAsync($"/api/photo-sets/{id}", new { albumId = FakeImmich.SummerId }));
+        Assert.DoesNotContain(photo, Ids(back));
+    }
+
+    [Fact]
+    public async Task ABroughtBackPhoto_ReturnsWithTheAlbum()
+    {
+        var set = await CreateAsync();
+        var id = set.GetProperty("id").GetString()!;
+        var photo = Ids(set)[3];
+        await _client.PutAsync($"/api/photo-sets/{id}/excluded/{photo}", null);
+
+        var response = await _client.DeleteAsync($"/api/photo-sets/{id}/excluded/{photo}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var back = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(0, back.GetProperty("excluded").GetArrayLength());
+        Assert.Equal(Ids(set), Ids(back));
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.DeleteAsync($"/api/photo-sets/{id}/excluded/{photo}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ExcludingTwice_IsFine_ButOnlyPhotosOfTheSetCanBe()
+    {
+        var set = await CreateAsync();
+        var id = set.GetProperty("id").GetString()!;
+        var photo = Ids(set)[0];
+
+        await _client.PutAsync($"/api/photo-sets/{id}/excluded/{photo}", null);
+        var again = await _client.PutAsync($"/api/photo-sets/{id}/excluded/{photo}", null);
+
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.Equal(FakeImmich.SummerPhotos - 1, (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("photos").GetArrayLength());
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.PutAsync($"/api/photo-sets/{id}/excluded/not-in-the-set", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.PutAsync($"/api/photo-sets/{Guid.NewGuid()}/excluded/{photo}", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task ASelection_DrawsItsCountWithoutItsExcludedPhotos()
+    {
+        var set = await DrawAsync(Selection(count: 5));
+        var id = set.GetProperty("id").GetString()!;
+        var photo = Ids(set)[0];
+
+        await _client.PutAsync($"/api/photo-sets/{id}/excluded/{photo}", null);
+        var drawn = await SyncedAsync(await _client.PostAsync($"/api/photo-sets/{id}/sync", null));
+
+        Assert.Equal(5, drawn.GetProperty("photos").GetArrayLength());
+        Assert.DoesNotContain(photo, Ids(drawn));
     }
 
     private static object Selection(object[]? with = null, object[]? without = null, int count = 100, int refreshHours = 24) =>
@@ -135,9 +220,7 @@ public class PhotoSetApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
     private async Task<JsonElement> DrawAsync(object selection)
     {
-        var response = await _client.PostAsJsonAsync("/api/photo-sets", new { name = "Family", selection });
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        return await response.Content.ReadFromJsonAsync<JsonElement>();
+        return await SyncedAsync(await _client.PostAsJsonAsync("/api/photo-sets", new { name = "Family", selection }));
     }
 
     private static int[] Numbers(JsonElement set) =>
@@ -195,10 +278,8 @@ public class PhotoSetApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         var id = (await CreateAsync()).GetProperty("id").GetString()!;
 
-        await _client.PatchAsJsonAsync($"/api/photo-sets/{id}", new { selection = Selection(with: [Cas]) });
-        var drawn = await SetAsync(id);
-        await _client.PatchAsJsonAsync($"/api/photo-sets/{id}", new { albumId = FakeImmich.GardenId });
-        var album = await SetAsync(id);
+        var drawn = await SyncedAsync(await _client.PatchAsJsonAsync($"/api/photo-sets/{id}", new { selection = Selection(with: [Cas]) }));
+        var album = await SyncedAsync(await _client.PatchAsJsonAsync($"/api/photo-sets/{id}", new { albumId = FakeImmich.GardenId }));
 
         Assert.Equal(JsonValueKind.Null, drawn.GetProperty("albumId").ValueKind);
         Assert.Equal(3, drawn.GetProperty("photos").GetArrayLength());
@@ -214,13 +295,102 @@ public class PhotoSetApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var id = (await CreateAsync()).GetProperty("id").GetString()!;
 
         await factory.Services.GetRequiredService<PhotoSync>().ReadFacesAsync(CancellationToken.None);
-        await _client.PostAsync($"/api/photo-sets/{id}/sync", null);
+        await SyncedAsync(await _client.PostAsync($"/api/photo-sets/{id}/sync", null));
         var photos = (await SetAsync(id)).GetProperty("photos").EnumerateArray().ToList();
 
-        (double, double) Focus(int n) => (photos[n - 1].GetProperty("focus").GetProperty("x").GetDouble(), photos[n - 1].GetProperty("focus").GetProperty("y").GetDouble());
+        JsonElement Faces(int n) => photos[n - 1].GetProperty("faces");
+        (double, double) Focus(int n) => (Faces(n).GetProperty("focus").GetProperty("x").GetDouble(), Faces(n).GetProperty("focus").GetProperty("y").GetDouble());
+        string[] People(int n) => Faces(n).GetProperty("people").EnumerateArray().Select(p => p.GetString()!).ToArray();
         Assert.Equal((.2, .15), Focus(2));
         Assert.Equal((.8, .15), Focus(3));
         Assert.Equal((.5, .5), Focus(1));
+        Assert.Equal(["Anna", "Bram"], People(6));
+        Assert.Empty(People(1));
+        Assert.Equal("Scheveningen, Netherlands", photos[0].GetProperty("place").GetString());
+        Assert.Equal(JsonValueKind.Null, photos[3].GetProperty("place").ValueKind);
+    }
+
+    // Garden's first photo is upright, 1200 by 1600, with Cas's face near its top right. Turned back after, since the fake
+    // Immich is shared.
+    [Fact]
+    public async Task ARotatedPhoto_IsTurnedInImmich_AndEverySetWithItShowsItTurned()
+    {
+        var first = await CreateAsync("Garden", FakeImmich.GardenId);
+        var other = await CreateAsync("Garden too", FakeImmich.GardenId);
+        string id = first.GetProperty("id").GetString()!, otherId = other.GetProperty("id").GetString()!;
+        var photo = Ids(first)[0];
+        var sync = factory.Services.GetRequiredService<PhotoSync>();
+        await sync.ReadFacesAsync(CancellationToken.None);
+
+        try
+        {
+            var response = await _client.PostAsJsonAsync($"/api/photo-sets/{id}/photos/{photo}/rotate", new { degrees = 90 });
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var rotated = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("photos")[0];
+            Assert.Equal("turned-90", rotated.GetProperty("version").GetString());
+            // Its faces moved with it, so they are read again.
+            Assert.Equal(JsonValueKind.Null, rotated.GetProperty("faces").ValueKind);
+            Assert.Equal("turned-90", (await SetAsync(otherId)).GetProperty("photos")[0].GetProperty("version").GetString());
+            await sync.ReadFacesAsync(CancellationToken.None);
+            var focus = (await SetAsync(id)).GetProperty("photos")[0].GetProperty("faces").GetProperty("focus");
+            Assert.Equal((.85, .8), (focus.GetProperty("x").GetDouble(), focus.GetProperty("y").GetDouble()));
+            var svg = await _client.GetStringAsync($"/api/photos/{id}/{photo}");
+            Assert.Contains("width=\"1600\" height=\"1200\"", svg);
+            // A sync keeps the turned photo's faces.
+            await SyncedAsync(await _client.PostAsync($"/api/photo-sets/{id}/sync", null));
+            Assert.NotEqual(JsonValueKind.Null, (await SetAsync(id)).GetProperty("photos")[0].GetProperty("faces").ValueKind);
+        }
+        finally
+        {
+            await _client.PostAsJsonAsync($"/api/photo-sets/{id}/photos/{photo}/rotate", new { degrees = -90 });
+        }
+        Assert.Equal(JsonValueKind.Null, (await SetAsync(id)).GetProperty("photos")[0].GetProperty("version").ValueKind);
+    }
+
+    [Fact]
+    public async Task OnlyAQuarterTurnOfAPhotoOfTheSet_IsRotated()
+    {
+        var garden = await CreateAsync("Garden", FakeImmich.GardenId);
+        var id = garden.GetProperty("id").GetString()!;
+        var summerPhoto = Ids(await CreateAsync())[0];
+
+        var half = await _client.PostAsJsonAsync($"/api/photo-sets/{id}/photos/{Ids(garden)[0]}/rotate", new { degrees = 180 });
+        var notOfTheSet = await _client.PostAsJsonAsync($"/api/photo-sets/{id}/photos/{summerPhoto}/rotate", new { degrees = 90 });
+
+        Assert.Equal(HttpStatusCode.BadRequest, half.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, notOfTheSet.StatusCode);
+    }
+
+    // In an API of its own, so the key given to Daan stays out of the others' tests.
+    [Fact]
+    public async Task APartnersPhoto_IsRotatedOnlyWithAKeyOfTheirs()
+    {
+        await using var own = new ApiFactory();
+        var client = own.CreateClient();
+        var partners = await client.GetFromJsonAsync<JsonElement>("/api/accounts/immich/1/partners");
+        Assert.Equal("Daan", partners[0].GetProperty("name").GetString());
+        Assert.False(partners[0].GetProperty("hasKey").GetBoolean());
+        var created = await client.PostAsJsonAsync("/api/photo-sets", new { name = "Garden", albumId = FakeImmich.GardenId });
+        var garden = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var (id, photo) = (garden.GetProperty("id").GetString(), Ids(garden)[2]);
+        Assert.Equal(FakeImmich.Daan.Id, garden.GetProperty("photos")[2].GetProperty("ownerId").GetString());
+        Assert.Equal([FakeImmich.Daan.Id], garden.GetProperty("lockedOwners").EnumerateArray().Select(o => o.GetString()));
+        var keyless = await client.PostAsJsonAsync($"/api/photo-sets/{id}/photos/{photo}/rotate", new { degrees = 90 });
+        Assert.Equal(HttpStatusCode.Conflict, keyless.StatusCode);
+
+        var notTheirs = await client.PutAsJsonAsync($"/api/accounts/immich/1/partners/{FakeImmich.Daan.Id}", new { apiKey = FakeImmich.Account.ApiKey });
+        Assert.Equal(HttpStatusCode.BadRequest, notTheirs.StatusCode);
+        Assert.Contains("Fake's", await notTheirs.Content.ReadAsStringAsync());
+        var keyed = await client.PutAsJsonAsync($"/api/accounts/immich/1/partners/{FakeImmich.Daan.Id}", new { apiKey = "daans-key" });
+        Assert.True((await keyed.Content.ReadFromJsonAsync<JsonElement>())[0].GetProperty("hasKey").GetBoolean());
+        var set = (await client.GetFromJsonAsync<JsonElement>($"/api/photo-sets/{id}"));
+        Assert.Empty(set.GetProperty("lockedOwners").EnumerateArray());
+        var rotated = await client.PostAsJsonAsync($"/api/photo-sets/{id}/photos/{photo}/rotate", new { degrees = 90 });
+        Assert.Equal(HttpStatusCode.OK, rotated.StatusCode);
+
+        var removed = await client.DeleteAsync($"/api/accounts/immich/1/partners/{FakeImmich.Daan.Id}");
+        Assert.False((await removed.Content.ReadFromJsonAsync<JsonElement>())[0].GetProperty("hasKey").GetBoolean());
     }
 
     [Fact]
