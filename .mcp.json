@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "homey-dash": {
+      "type": "http",
+      "url": "http://localhost:5112/mcp"
+    }
+  }
+}
