@@ -1,4 +1,5 @@
 import {
+  afterEveryRender,
   afterRenderEffect,
   ChangeDetectionStrategy,
   Component,
@@ -97,12 +98,15 @@ export class DashboardView {
       const resizes = new ResizeObserver(() => {
         const [width, height] = [this.host.clientWidth, this.host.clientHeight];
         if (width > 0 && height > 0 && (this.size()?.[0] !== width || this.size()?.[1] !== height)) this.size.set([width, height]);
-        const cell = parseFloat(getComputedStyle(this.host).getPropertyValue('--cell'));
-        if (cell > 0) this.perPage.set(sectionsPerPage(this.host.clientWidth, cell));
+        this.measurePerPage();
       });
       resizes.observe(this.host);
       inject(DestroyRef).onDestroy(() => resizes.disconnect());
     }
+
+    // --cell also changes without the host resizing (a dashboard with other rows, the window height settling on a
+    // tablet whose browser bars move), so the observer alone leaves perPage stale and sections cut off at the edges.
+    afterEveryRender({ read: () => this.measurePerPage() });
 
     // After the pages regroup or resize, stay on the page that was showing.
     afterRenderEffect(() => {
@@ -112,6 +116,11 @@ export class DashboardView {
         pager.scrollTo({ left: page * pager.clientWidth, behavior: 'instant' });
       }
     });
+  }
+
+  private measurePerPage() {
+    const cell = parseFloat(getComputedStyle(this.host).getPropertyValue('--cell'));
+    if (cell > 0 && this.host.clientWidth > 0) this.perPage.set(sectionsPerPage(this.host.clientWidth, cell));
   }
 
   protected onScroll() {

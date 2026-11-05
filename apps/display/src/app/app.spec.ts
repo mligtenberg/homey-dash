@@ -4,7 +4,7 @@ import { ApplicationRef, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Condition, HomeySnapshot, LockWidget, PhotoSet, Realtime, ScreenView, Tile } from '@homey-dash/api-client';
 import { FakeRealtime } from '@homey-dash/api-client/testing';
-import { cellSize } from '@homey-dash/layout';
+import { fittedCellSize } from '@homey-dash/layout';
 import { CORE_TILES, provideTileModules, RealtimeRuleAnswers, RealtimeTileData, RuleAnswers, TileData } from '@homey-dash/tiles';
 import { App, IDLE_MS, SETTINGS_TAPS, SETTINGS_TAPS_MS, TOUCH_REPORT_MS } from './app';
 import { BRIGHTNESS_MS, LightMeter } from './light-meter';
@@ -150,7 +150,7 @@ describe('App', () => {
       expect(tape(root)).toEqual([]);
       expect(localStorage.getItem('homeydash.tape')).toBeNull();
       expect(await currentName(root)).toBe('Garden');
-      expect(parseFloat(root.style.getPropertyValue('--cell'))).toBeCloseTo(cellSize(window.innerHeight, 6));
+      expect(parseFloat(root.style.getPropertyValue('--cell'))).toBeCloseTo(fittedCellSize(window.innerWidth, window.innerHeight, 6));
     });
 
     it('stays on the one picked once left alone, when no idle rule holds', async () => {

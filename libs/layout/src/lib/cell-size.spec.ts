@@ -1,4 +1,4 @@
-import { cellSize, sectionsPerPage } from './cell-size';
+import { cellSize, fittedCellSize, sectionsPerPage } from './cell-size';
 
 describe('cellSize', () => {
   it('fills the height exactly with rows, gaps, padding, the section title and the page dots', () => {
@@ -28,5 +28,23 @@ describe('sectionsPerPage', () => {
 
   it('shows one section on a screen narrower than a section', () => {
     expect(sectionsPerPage(200, 100)).toBe(1);
+  });
+});
+
+describe('fittedCellSize', () => {
+  const width = (sections: number, cell: number) => (0.08 * 2 + 3.16 * sections + 0.176 * (sections - 1)) * cell;
+
+  it('shrinks the cell to fit one more section when that costs at most 10%', () => {
+    const cell = cellSize(800, 4);
+    const fitted = fittedCellSize(width(3, cell * 0.95), 800, 4);
+
+    expect(fitted).toBeCloseTo(cell * 0.95);
+    expect(sectionsPerPage(width(3, cell * 0.95), fitted)).toBe(3);
+  });
+
+  it('keeps the cell when an extra section would need more than 10% shrink', () => {
+    const cell = cellSize(800, 4);
+
+    expect(fittedCellSize(width(3, cell * 0.85), 800, 4)).toBeCloseTo(cell);
   });
 });

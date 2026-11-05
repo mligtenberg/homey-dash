@@ -37,3 +37,17 @@ export function sectionsPerPage(width: number, cell: number): number {
   const room = width / cell - 2 * DASHBOARD_PADDING;
   return Math.max(1, Math.floor((room + SECTION_GAP) / (SECTION_WIDTH + SECTION_GAP) + 1e-9));
 }
+
+/** How far the cell may shrink (as a fraction of its height-fitted size) to make one more section fit. */
+export const MAX_CELL_SHRINK = 0.1;
+
+/**
+ * Like `cellSize`, but when shrinking the cell by up to 10% lets one more whole section fit
+ * across `width`, shrinks it just enough for that, so the extra section takes the space.
+ */
+export function fittedCellSize(width: number, height: number, rows: number = DEFAULT_ROWS): number {
+  const cell = cellSize(height, rows);
+  const next = sectionsPerPage(width, cell) + 1;
+  const widest = width / (2 * DASHBOARD_PADDING + next * SECTION_WIDTH + (next - 1) * SECTION_GAP);
+  return widest >= cell * (1 - MAX_CELL_SHRINK) ? widest : cell;
+}

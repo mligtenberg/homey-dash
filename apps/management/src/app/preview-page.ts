@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DashboardDetail, DashboardsApi } from '@homey-dash/api-client';
-import { cellSize } from '@homey-dash/layout';
+import { fittedCellSize } from '@homey-dash/layout';
 import { DashboardView } from '@homey-dash/tiles';
 import { AsDisplayPicker } from './as-display-picker';
 
@@ -33,10 +33,12 @@ export class PreviewPage {
   private readonly api = inject(DashboardsApi);
   protected readonly dashboard = signal<DashboardDetail | null>(null);
   protected readonly height = signal(window.innerHeight);
-  protected readonly cell = computed(() => cellSize(this.height(), this.dashboard()?.draft.rows));
+  protected readonly width = signal(window.innerWidth);
+  protected readonly cell = computed(() => fittedCellSize(this.width(), this.height(), this.dashboard()?.draft.rows));
 
   protected onResize() {
     this.height.set(window.innerHeight);
+    this.width.set(window.innerWidth);
   }
 
   constructor() {

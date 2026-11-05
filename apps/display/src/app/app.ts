@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { LucideChevronLeft, LucideDynamicIcon, LucideLayers } from '@lucide/angular';
 import { IdleRule, Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
-import { cellSize } from '@homey-dash/layout';
+import { fittedCellSize } from '@homey-dash/layout';
 import { DashboardView, homeyLost, PhotoTile, RuleAnswers, TileData, TileKindRegistry } from '@homey-dash/tiles';
 import { screenId, safeStorage } from './screen-id';
 import { BRIGHTNESS_MS, LightMeter } from './light-meter';
@@ -220,7 +220,8 @@ export class App {
   protected readonly hideIcon = LucideChevronLeft;
 
   private readonly height = signal(window.innerHeight);
-  protected readonly cell = computed(() => cellSize(this.height(), this.current()?.layout.rows));
+  private readonly width = signal(window.innerWidth);
+  protected readonly cell = computed(() => fittedCellSize(this.width(), this.height(), this.current()?.layout.rows));
 
   constructor() {
     const answers = inject(RuleAnswers);
@@ -358,5 +359,6 @@ export class App {
 
   protected onResize() {
     this.height.set(window.innerHeight);
+    this.width.set(window.innerWidth);
   }
 }
