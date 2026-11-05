@@ -32,10 +32,11 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
+    // A static file server can only serve from the root, so CI serves the production build from the dev server under /admin.
     command: isCI
-      ? 'npx nx run management:serve-static'
+      ? 'npx nx run management:serve:production'
       : 'npx nx run management:serve',
-    url: getReadyUrl('http://localhost:4201'),
+    url: getReadyUrl('http://localhost:4201/admin/'),
     reuseExistingServer: true,
     cwd: workspaceRoot,
   },

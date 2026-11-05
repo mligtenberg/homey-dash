@@ -16,7 +16,9 @@
         "Development",
         "--urls",
         "http://localhost:5212",
-        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash.db"
+        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash.db",
+        "--ReverseProxy:Clusters:display:Destinations:display:Address=http://localhost:4300",
+        "--ReverseProxy:Clusters:management:Destinations:management:Address=http://localhost:4301"
       ],
       "port": 5212
     },
@@ -38,7 +40,9 @@
         "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash.db",
         "--Homey:Fake=true",
         "--Immich:Fake=true",
-        "--Plex:Fake=true"
+        "--Plex:Fake=true",
+        "--ReverseProxy:Clusters:display:Destinations:display:Address=http://localhost:4300",
+        "--ReverseProxy:Clusters:management:Destinations:management:Address=http://localhost:4301"
       ],
       "port": 5212
     },
@@ -94,7 +98,9 @@
         "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash-b.db",
         "--Homey:Fake=true",
         "--Immich:Fake=true",
-        "--Plex:Fake=true"
+        "--Plex:Fake=true",
+        "--ReverseProxy:Clusters:display:Destinations:display:Address=http://localhost:4302",
+        "--ReverseProxy:Clusters:management:Destinations:management:Address=http://localhost:4303"
       ],
       "port": 5213
     },
@@ -113,7 +119,9 @@
         "Development",
         "--urls",
         "http://localhost:5213",
-        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash-b.db"
+        "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash-b.db",
+        "--ReverseProxy:Clusters:display:Destinations:display:Address=http://localhost:4302",
+        "--ReverseProxy:Clusters:management:Destinations:management:Address=http://localhost:4303"
       ],
       "port": 5213
     },
