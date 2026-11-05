@@ -25,6 +25,9 @@
   </header>
 
   <div class="body">
+    @if (stagePreset(); as art) {
+      <hd-background-art [preset]="art.preset" [scheme]="art.scheme" />
+    }
     <div
       class="hd-stage"
       [style.background]="stageBackground()"

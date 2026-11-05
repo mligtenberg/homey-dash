@@ -1,6 +1,6 @@
 import { effect, Signal, signal } from '@angular/core';
 import { backgroundImageUrl, backgroundPresetUrl, DashboardBackground } from '@homey-dash/api-client';
-import { recoloredPresetUrl } from './background-colors';
+import { schemedPresetUrl } from './background-colors';
 
 /** A built-in image's day and night pictures, when not the files the apps ship (such as recoloured ones). */
 export interface PresetUrls {
@@ -38,18 +38,18 @@ export function hasImage(background: DashboardBackground | null | undefined): bo
   return background?.kind === 'image' || background?.kind === 'preset';
 }
 
-/** The CSS background for a dashboard's background, once a built-in image in a colour scheme has been redrawn in it. */
+/** The CSS background for a dashboard's background, once a built-in image in a colour scheme is pre-rendered in it. */
 export async function loadBackgroundStyle(background: DashboardBackground | null | undefined): Promise<string | null> {
   if (background?.kind !== 'preset' || !background.color || background.angle == null) return backgroundStyle(background);
   const scheme = { color: background.color, angle: background.angle };
   const [day, night] = await Promise.all(
-    (['day', 'night'] as const).map((variant) => recoloredPresetUrl(background.preset, variant, scheme)),
+    (['day', 'night'] as const).map((variant) => schemedPresetUrl(background.preset, variant, scheme)),
   );
   return backgroundStyle(background, { day, night });
 }
 
 /**
- * `backgroundStyle` as a signal, for a component to bind. A built-in image in a colour scheme shows once redrawn; until
+ * `backgroundStyle` as a signal, for a component to bind. A built-in image in a colour scheme shows once pre-rendered; until
  * then the previous background stays, or the theme's ground at first, rather than flashing its own colours.
  */
 export function backgroundSignal(source: () => DashboardBackground | null | undefined): Signal<string | null> {

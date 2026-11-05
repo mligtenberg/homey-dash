@@ -10,7 +10,9 @@
 .spacer { flex: 1; }
 
 .body { flex: 1; display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
-.hd-stage { min-width: 0; }
+.hd-stage { min-width: 0; grid-area: 1 / 1; position: relative; }
+// Behind the stage, sharing its cell, so it stays put while the stage scrolls.
+hd-background-art { grid-area: 1 / 1; position: relative; }
 
 .section-head { display: flex; align-items: center; gap: 2px; }
 .title {

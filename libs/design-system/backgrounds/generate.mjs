@@ -511,28 +511,59 @@ const STYLES = {
 
 // ---- Colour schemes ----
 
-// Which of a colour scheme's four colours (0 the picked one, 1 the one at an angle from it, 2 and 3 opposite those) each
-// palette entry takes when Management recolours an image, and whether it is ground (sky, floor, paper) rather than a
-// thing, which keeps it quieter. Entries left out, such as watercolour's paper grain, keep their colour.
+// Which of a colour scheme's four hues (0 the picked colour's, 1 the one at an angle from it, 2 and 3 opposite those)
+// each palette entry takes, and whether it is ground (sky, floor) rather than a thing, which keeps it quieter. Entries
+// left out, such as watercolour's paper grain, keep their colour.
 const ROLES = {
   top: [0, 1], bottom: [0, 1], bands: [0, 1], floor: [0, 1], g: [1, 1],
   a: [0, 0], b: [1, 0], c: [2, 0], d: [3, 0], e: [1, 0], dots: [1, 0], grid: [0, 0],
   deco: (i) => [i % 4, 0], sun: (i) => [2 + i, 0],
 };
+// How vivid ground and things become at least, as a share of the picked colour's chroma.
+const STRENGTH = ['.65', '.3'];
 
-// A palette as [colour, role, ground] entries, each colour once (the first role wins).
+// A palette as [colour, hue, ground] entries, each colour once (the first role wins).
 function roles(palette) {
   const seen = new Map();
   for (const [key, value] of Object.entries(palette)) {
     const role = ROLES[key];
     if (!role) continue;
-    const list = Array.isArray(value) ? value : [value];
-    list.forEach((c, i) => {
-      const [scheme, ground] = typeof role === 'function' ? role(i) : role;
-      if (typeof c === 'string' && !seen.has(c)) seen.set(c, [c, scheme, ground]);
+    (Array.isArray(value) ? value : [value]).forEach((c, i) => {
+      const [hue, ground] = typeof role === 'function' ? role(i) : role;
+      if (typeof c === 'string' && !seen.has(c)) seen.set(c, [c, hue, ground]);
     });
   }
   return [...seen.values()];
+}
+
+const distance = (a, b) => rgb(a).reduce((sum, v, i) => sum + (v - rgb(b)[i]) ** 2, 0);
+
+// Makes an image recolourable by a colour scheme in CSS: every colour gets a class whose rule keeps the colour's own
+// lightness and takes the hue of its nearest palette entry's role, at least as vivid as that role allows. The scheme
+// comes from --scheme-hue, --scheme-angle (degrees, oklch) and --scheme-chroma, set on the inlined SVG or written into
+// it; without them, or in a browser without relative colours, the image keeps its own colours. Ids and classes get the
+// variant in front, so a day and a night image can be inlined side by side.
+function schemed(image, palette, variant) {
+  const entries = roles(palette);
+  const rules = new Map();
+  const body = image
+    .replace(/id="([\w-]+)"/g, `id="${variant}-$1"`)
+    .replace(/url\(#([\w-]+)\)/g, `url(#${variant}-$1)`)
+    .replace(/<(\w+)((?:\s+[\w:-]+="[^"]*")*)\s*(\/?)>/g, (tag, name, attrs, close) => {
+      const classes = [...attrs.matchAll(/\s(fill|stroke|stop-color)="(#[0-9a-f]{6})"/g)].map(([, prop, color]) => {
+        const key = `${prop}${color}`;
+        if (!rules.has(key)) {
+          const [, hue, ground] = entries.reduce((best, e) => (distance(color, e[0]) < distance(color, best[0]) ? e : best));
+          rules.set(key, `.${variant}-k${rules.size}{${prop}:oklch(from ${color} l max(c,calc(var(--scheme-chroma,0)*${STRENGTH[ground]})) var(--scheme-h${hue},h))}`);
+        }
+        return `${variant}-k${[...rules.keys()].indexOf(key)}`;
+      });
+      return classes.length ? `<${name}${attrs} class="${classes.join(' ')}"${close ? '/' : ''}>` : tag;
+    });
+  const hues = '--scheme-h0:var(--scheme-hue);--scheme-h1:calc(var(--scheme-hue) + var(--scheme-angle));' +
+    '--scheme-h2:calc(var(--scheme-hue) + 180);--scheme-h3:calc(var(--scheme-hue) + var(--scheme-angle) + 180)';
+  const style = `<style>@supports (color: oklch(from red l c h)){svg{${hues}}${[...rules.values()].join('')}}</style>`;
+  return body.replace(/^(<svg[^>]*>)/, `$1${style}`);
 }
 
 // ---- Output ----
@@ -548,7 +579,8 @@ for (const { id: style } of styles) {
   for (const { id: subject } of subjects) {
     for (const variant of variants) {
       const scene = SUBJECTS[subject][1](variant === 'night');
-      writeFileSync(join(here, style, `${subject}-${variant}.svg`), draw(scene, `${style}/${subject}`, palettes[variant]));
+      writeFileSync(join(here, style, `${subject}-${variant}.svg`),
+        schemed(draw(scene, `${style}/${subject}`, palettes[variant]), palettes[variant], variant));
     }
   }
 }
@@ -564,13 +596,6 @@ export const BACKGROUND_STYLES = ${list(styles)} as const;
 /** What HomeyDash's built-in backgrounds show, one of each per style, by day and by night. */
 export const BACKGROUND_SUBJECTS = ${list(subjects)} as const;
 
-/**
- * Each style's palette by day and by night, as [colour, which colour of a scheme it takes (0–3), whether it is ground],
- * to recolour its images with (see background-colors.ts).
- */
-export const BACKGROUND_PALETTES: Record<string, Record<'day' | 'night', readonly (readonly [string, number, number])[]>> = {
-${styles.map(({ id }) => `  '${id}': {\n${variants.map((v) => `    ${v}: ${JSON.stringify(roles(STYLES[id][1][v])).replaceAll('"', "'").replaceAll(',', ', ')},`).join('\n')}\n  },`).join('\n')}
-};
 `);
 
 const figures = (variant) => styles.map((t) => `<h2>${t.label}</h2><div class="grid">${subjects.map((s) =>

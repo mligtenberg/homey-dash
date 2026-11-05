@@ -1,16 +1,17 @@
 import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal } from '@angular/core';
-import { ColorScheme, hexToHsl, hslToHex } from '@homey-dash/tiles';
+import { ColorScheme, hexToOklch, oklchToHex, SCHEME_LIGHTNESS, SCHEME_MAX_CHROMA } from '@homey-dash/tiles';
 
-/** Where a hue and saturation sit on the wheel: hue clockwise from the top, saturation out from the centre (0–1). */
+/** Where a hue and chroma (as a share of the most, 0–1) sit on the wheel: hue clockwise from the top, chroma outwards. */
 const point = (hue: number, saturation: number, r = 50) => {
   const a = ((hue - 90) * Math.PI) / 180;
   return { x: 50 + Math.cos(a) * saturation * r, y: 50 + Math.sin(a) * saturation * r };
 };
 
 /**
- * Picks a colour scheme on a hue wheel: drag the first colour round and in or out (how vivid), and the second round to
- * set the angle between them; the third and fourth sit opposite. Changes while dragging are previewed (at most once a
- * frame) and reported on release; arrow keys move a focused handle (left and right round, up and down in or out).
+ * Picks a colour scheme on an oklch hue wheel, as the images are recoloured in: drag the first colour round and in or out
+ * (how vivid, as far as a screen can show it), and the second round to
+ * set the angle between them; the third and fourth sit opposite. Changes while dragging are previewed and reported on
+ * release; arrow keys move a focused handle (left and right round, up and down in or out).
  */
 @Component({
   selector: 'hd-color-scheme-wheel',
@@ -54,8 +55,8 @@ const point = (hue: number, saturation: number, r = 50) => {
   styles: `
     :host { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
     .wheel { position: relative; width: 176px; aspect-ratio: 1; border-radius: 50%; touch-action: none; cursor: crosshair;
-      background: radial-gradient(closest-side, hsl(0 0% 50%), hsl(0 0% 50% / 0)),
-        conic-gradient(hsl(0 100% 50%), hsl(60 100% 50%), hsl(120 100% 50%), hsl(180 100% 50%), hsl(240 100% 50%), hsl(300 100% 50%), hsl(360 100% 50%)); }
+      background: radial-gradient(closest-side, oklch(.7 0 0), oklch(.7 0 0 / 0)),
+        conic-gradient(in oklch longer hue, oklch(.7 .2 0), oklch(.7 .2 359.9)); }
     svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
     polygon { fill: none; stroke: #fff; stroke-width: .8; stroke-opacity: .8; }
     line { stroke: #fff; stroke-width: .5; stroke-opacity: .6; }
@@ -82,14 +83,16 @@ export class ColorSchemeWheel {
   protected readonly dragging = signal<number | null>(null);
   private readonly current = computed(() => this.live() ?? this.scheme());
 
-  protected readonly hue = computed(() => hexToHsl(this.current().color)[0]);
-  private readonly saturation = computed(() => hexToHsl(this.current().color)[1]);
+  private readonly oklch = computed(() => hexToOklch(this.current().color));
+  protected readonly hue = computed(() => this.oklch()[2]);
+  // How vivid, as a share of the most the wheel offers.
+  private readonly saturation = computed(() => Math.min(1, this.oklch()[1] / SCHEME_MAX_CHROMA));
   protected readonly angle = computed(() => this.current().angle);
   private readonly hues = computed(() => {
     const [h, a] = [this.hue(), this.angle()];
     return [h, h + a, h + 180, h + a + 180].map((x) => x % 360);
   });
-  protected readonly colors = computed(() => this.hues().map((h) => hslToHex(h, this.saturation(), 0.5)));
+  protected readonly colors = computed(() => this.hues().map((h) => this.color(h, this.saturation())));
   protected readonly points = computed(() => this.hues().map((h) => point(h, this.saturation())));
   protected readonly outline = computed(() => this.points().map((p) => `${p.x},${p.y}`).join(' '));
 
@@ -102,7 +105,6 @@ export class ColorSchemeWheel {
   }
 
   protected round = Math.round;
-  private frame = 0;
 
   /** Grabbing the wheel itself moves the first colour there. */
   protected grab(event: PointerEvent) {
@@ -126,15 +128,11 @@ export class ColorSchemeWheel {
     const hue = ((Math.atan2(dy, dx) * 180) / Math.PI + 90 + 360) % 360;
     if (which === 0) {
       const saturation = Math.min(1, Math.hypot(dx, dy) / (box.width / 2));
-      this.live.set({ color: hslToHex(hue, saturation, 0.5), angle: this.angle() });
+      this.live.set({ color: this.color(hue, saturation), angle: this.angle() });
     } else {
       this.live.set({ color: this.current().color, angle: Math.round(hue - this.hue() + 360) % 360 });
     }
-    this.frame ||= requestAnimationFrame(() => {
-      this.frame = 0;
-      const live = this.live();
-      if (live && this.dragging() !== null) this.previewed.emit(live);
-    });
+    this.previewed.emit(this.live()!);
   }
 
   protected release() {
@@ -152,8 +150,13 @@ export class ColorSchemeWheel {
     event.preventDefault();
     if (which === 0) {
       const saturation = Math.max(0, Math.min(1, this.saturation() + out));
-      this.changed.emit({ color: hslToHex((this.hue() + round + 360) % 360, saturation, 0.5), angle: this.angle() });
+      this.changed.emit({ color: this.color((this.hue() + round + 360) % 360, saturation), angle: this.angle() });
     } else this.setAngle(this.angle() + round);
+  }
+
+  /** The colour at a hue and saturation (0–1) on the wheel, as near as a screen can show it. */
+  private color(hue: number, saturation: number) {
+    return oklchToHex(SCHEME_LIGHTNESS, saturation * SCHEME_MAX_CHROMA, hue);
   }
 
   protected pick(color: string) {

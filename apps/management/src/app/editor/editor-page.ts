@@ -15,7 +15,8 @@ import { DashboardBackground, DashboardDetail, DashboardLayout, DashboardsApi, D
 import { TilePosition, TileSize } from '@homey-dash/layout';
 import {
   alwaysRule,
-  backgroundSignal,
+  BackgroundArt,
+  backgroundStyle,
   choiceLabel,
   hasImage,
   heldTile,
@@ -65,7 +66,7 @@ interface Drag {
 
 @Component({
   selector: 'hd-editor-page',
-  imports: [AsDisplayPicker, BackgroundField, LogicPanel, RouterLink, RuleEditor, TileHost, TilePanel, LucideDynamicIcon],
+  imports: [AsDisplayPicker, BackgroundArt, BackgroundField, LogicPanel, RouterLink, RuleEditor, TileHost, TilePanel, LucideDynamicIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // Logic tiles say which of their tiles they show.
   providers: [{ provide: LOGIC_TILE_BADGE, useValue: true }],
@@ -368,7 +369,15 @@ export class EditorPage {
 
   // A background being picked on the colour wheel shows on the stage before it is let go of and saved.
   protected readonly previewBackground = signal<DashboardBackground | null>(null);
-  protected readonly stageBackground = backgroundSignal(() => this.previewBackground() ?? this.layout().background);
+  private readonly shownBackground = computed(() => this.previewBackground() ?? this.layout().background);
+  // A built-in image is inlined behind the stage (hd-background-art), recoloured as the scheme changes.
+  protected readonly stagePreset = computed(() => {
+    const background = this.shownBackground();
+    if (background?.kind !== 'preset') return null;
+    const scheme = background.color && background.angle != null ? { color: background.color, angle: background.angle } : null;
+    return { preset: background.preset, scheme };
+  });
+  protected readonly stageBackground = computed(() => (this.stagePreset() ? 'transparent' : backgroundStyle(this.shownBackground())));
   protected readonly stageHasImage = computed(() => hasImage(this.layout().background));
 
   protected setBackground(background: DashboardBackground | null) {

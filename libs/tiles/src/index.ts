@@ -9,7 +9,15 @@ export { shownSections } from './lib/logic/shown-sections';
 export { capabilityText, deviceLook, deviceType } from './lib/core/device-look';
 export * from './lib/dashboard-view';
 export { backgroundSignal, backgroundStyle, hasImage, loadBackgroundStyle } from './lib/background';
-export { type ColorScheme, hexToHsl, hslToHex, schemeHues } from './lib/background-colors';
+export { BackgroundArt } from './lib/background-art';
+export {
+  type ColorScheme,
+  hexToOklch,
+  oklchToHex,
+  SCHEME_LIGHTNESS,
+  SCHEME_MAX_CHROMA,
+  schemeProperties,
+} from './lib/background-colors';
 export { BACKGROUND_STYLES, BACKGROUND_SUBJECTS } from './lib/background-presets';
 export * from './lib/realtime-tile-data';
 export { PhotoTile } from './lib/core/photo-tile';

@@ -145,13 +145,7 @@ export class BackgroundField {
   protected readonly error = signal<string | null>(null);
 
   protected readonly startScheme = START_SCHEME;
-  // The scheme being dragged to on the wheel; cleared once the background changes.
-  private readonly live = signal<ColorScheme | null>(null);
-  private readonly shown = computed(() => {
-    const [background, live] = [this.background(), this.live()];
-    return live && background?.kind === 'preset' ? { ...background, ...live } : background;
-  });
-  protected readonly swatch = backgroundSignal(() => this.shown());
+  protected readonly swatch = backgroundSignal(() => this.background());
   // Each subject's thumbnail in the chosen style and scheme, by day or by night as the theme is, like the dashboard.
   protected readonly thumbs = signal<Record<string, string | null>>({});
   protected readonly colors = computed(() => {
@@ -172,7 +166,7 @@ export class BackgroundField {
     return { style, subject };
   });
 
-  // The saved scheme: thumbnails follow it once the wheel is let go of, as redrawing them all is too slow to follow it.
+  // Thumbnails and the swatch follow the scheme once the wheel is let go of; the stage follows it while dragging.
   protected readonly scheme = computed<ColorScheme | null>(() => {
     const background = this.background();
     return background?.kind === 'preset' && background.color && background.angle != null
@@ -181,10 +175,6 @@ export class BackgroundField {
   });
 
   constructor() {
-    effect(() => {
-      this.background();
-      this.live.set(null);
-    });
     effect(() => {
       if (this.background()?.kind !== 'preset') return;
       const { style } = this.preset();
@@ -216,7 +206,6 @@ export class BackgroundField {
   protected preview(scheme: ColorScheme) {
     const background = this.background();
     if (background?.kind !== 'preset') return;
-    this.live.set(scheme);
     this.previewed.emit({ ...background, ...scheme });
   }
 
