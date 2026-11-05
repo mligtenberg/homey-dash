@@ -109,12 +109,15 @@ export function heldTile(id: string, tile: HeldTile, size: TileSize): Tile {
       </div>
     }
     @if (badge) {
-      @if (unconfigured()) {
+      @if (unconfigured() || !shownTiles().length) {
         <div class="hd-tile hd-logic__empty" [attr.data-size]="size()">
           <div class="hd-tile__name">Logic tile</div>
-          <div class="hd-tile__detail">Add tiles with rules; it shows the first whose rule holds.</div>
+          <div class="hd-tile__detail">
+            {{ unconfigured() ? 'Add tiles with rules; it shows the first whose rule holds.' : 'No rule holds right now, so it shows nothing.' }}
+          </div>
         </div>
-      } @else {
+      }
+      @if (!unconfigured()) {
         <span class="hd-logic-badge">{{ badgeLabel() }}</span>
       }
     }
@@ -123,7 +126,14 @@ export function heldTile(id: string, tile: HeldTile, size: TileSize): Tile {
     :host { flex: 1; position: relative; min-width: 0; min-height: 0; display: flex; }
     .hd-logic__face { position: absolute; inset: 0; display: flex; }
     .hd-logic__face > hd-tile-host { flex: 1; }
-    .hd-logic__empty { flex: 1; border: 2px dashed var(--line); background: transparent; justify-content: center; }
+    /* Brand-tinted and dotted, so it reads as a logic tile rather than an add slot, on a plain stage or a photo. */
+    .hd-logic__empty {
+      flex: 1; justify-content: center;
+      border: 2px dotted var(--brand);
+      background: color-mix(in oklab, var(--brand) 12%, color-mix(in oklab, var(--panel) 60%, transparent));
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    }
+    .hd-logic__empty .hd-tile__name { color: var(--brand); }
     .is-entering { animation: hd-logic-in 400ms ease both; }
     .is-leaving { animation: hd-logic-out 400ms ease both; }
     @keyframes hd-logic-in { from { opacity: 0; } }
