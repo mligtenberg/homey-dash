@@ -336,14 +336,14 @@ function facets(poly, color, random, o) {
     .join('');
 }
 
-// Whether the point lies in the shape, for pixel art.
-function hits(shape, x, y) {
+// Whether the point lies in the shape, for pixel art; lines are at least thick lines wide.
+function hits(shape, x, y, thick) {
   const near = (list, w) =>
     list.slice(1).some(([x2, y2], i) => {
       const [x1, y1] = list[i];
       const dx = x2 - x1, dy = y2 - y1;
       const t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy || 1)));
-      return Math.hypot(x - x1 - t * dx, y - y1 - t * dy) <= Math.max(w / 2, 9);
+      return Math.hypot(x - x1 - t * dx, y - y1 - t * dy) <= Math.max(w / 2, thick / 2);
     });
   switch (shape.s) {
     case 'rect': {
@@ -407,27 +407,59 @@ const STYLES = {
     night: { g: '#2b2540', a: '#4a3f6b', b: '#5b6ba0', c: '#d39a55', d: '#97aed0', e: '#16142a',
       bands: ['#191c36', '#1d2140', '#21264a', '#252b53', '#29305b', '#2d3562'] },
   }, (shapes, seed, p) => {
-    const size = 20, cols = W / size, rows = H / size;
-    const body = [];
+    const size = 5, cols = W / size, rows = H / size;
+    const random = rng(seed);
+    const solid = shapes.map((s) => (s.s === 'arc' ? { ...s, s: 'polyline', pts: arcPoints(s) } : s));
+    // Which solid shape (by its index) is in front at each block, -1 for sky, and the colour so far.
+    const top = Array.from({ length: rows }, () => new Int16Array(cols).fill(-1));
+    const cells = Array.from({ length: rows }, () => new Array(cols));
     for (let row = 0; row < rows; row++) {
       const y = row * size + size / 2;
-      const cells = [];
       for (let col = 0; col < cols; col++) {
         const x = col * size + size / 2;
-        // The sky in bands, dithered where they meet.
+        // The sky in bands, dithered for a few rows where they meet.
         const f = (row / rows) * p.bands.length;
-        let color = p.bands[Math.min(p.bands.length - 1, Math.floor(f + ((row + col) % 2 ? 0.25 : -0.25)))] ?? p.bands[0];
-        for (const s of shapes) if (hits(s, x, y)) color = (s.o ?? 1) < 0.5 ? mix(color, p[s.t], s.o) : p[s.t];
-        cells.push(color);
+        let color = p.bands[Math.min(p.bands.length - 1, Math.floor(f + ((row + col) % 2 ? 0.06 : -0.06)))] ?? p.bands[0];
+        solid.forEach((s, i) => {
+          if (!hits(s, x, y, size * 1.5)) return;
+          if ((s.o ?? 1) < 0.5) color = mix(color, p[s.t], s.o);
+          else [color, top[row][col]] = [p[s.t], i];
+        });
+        cells[row][col] = color;
       }
+    }
+    // Like hand-drawn sprites: things get a dark outline where they stand in front of something else, a light top edge
+    // and a shaded bottom one, and the ground is speckled. Lines stay flat.
+    const owner = (row, col) => (row < 0 || row >= rows || col < 0 || col >= cols ? -1 : top[row][col]);
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const i = top[row][col];
+        if (i < 0) continue;
+        const s = solid[i];
+        if (s.t === 'g') {
+          const r = random();
+          if (r < 0.05) cells[row][col] = shade(cells[row][col], r < 0.025 ? -0.08 : 0.08);
+          continue;
+        }
+        if (s.s === 'polyline') continue;
+        const around = [owner(row - 1, col), owner(row + 1, col), owner(row, col - 1), owner(row, col + 1)];
+        if (around.some((j) => j !== i && j < i)) cells[row][col] = shade(cells[row][col], -0.35);
+        else if (owner(row - 2, col) !== i) cells[row][col] = shade(cells[row][col], 0.18);
+        else if (owner(row + 2, col) !== i) cells[row][col] = shade(cells[row][col], -0.12);
+      }
+    }
+    // Each colour once, as one-block-high strokes along runs of it.
+    const runs = new Map();
+    for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols;) {
         let end = col;
-        while (end + 1 < cols && cells[end + 1] === cells[col]) end++;
-        body.push(`<rect x="${col * size}" y="${row * size}" width="${(end - col + 1) * size}" height="${size}" fill="${cells[col]}"/>`);
+        while (end + 1 < cols && cells[row][end + 1] === cells[row][col]) end++;
+        runs.set(cells[row][col], (runs.get(cells[row][col]) ?? '') + `M${col} ${row}.5h${end - col + 1}`);
         col = end + 1;
       }
     }
-    return svg(`<g shape-rendering="crispEdges">${body.join('')}</g>`);
+    const body = [...runs].map(([color, d]) => `<path stroke="${color}" d="${d}"/>`).join('');
+    return svg(`<g transform="scale(${size})" fill="none" stroke-width="1" shape-rendering="crispEdges">${body}</g>`);
   }],
   'line-art': ['Line art', {
     day: { top: '#eff1f4', bottom: '#e7eaee', g: '#7d8898', a: '#56637a', b: '#6c788c', c: '#c08436', d: '#56637a', e: '#7d8898' },
