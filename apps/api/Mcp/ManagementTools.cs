@@ -29,7 +29,7 @@ public sealed class ManagementTools(
     // Arguments and results read and write dashboards as the API does. The SDK needs a resolver set explicitly.
     public static JsonSerializerOptions Json { get; } = new(Dashboard.Json) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() };
 
-    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts, PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts and
+    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts, PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts, SONOS_TILES in libs/tiles/src/lib/sonos/sonos-tiles.ts and
     // LOGIC_TILES in libs/tiles/src/lib/logic/logic-tile.ts; the API only looks inside a logic tile's rules (ADR-0003, ADR-0010).
     private const string TileKinds = """
         Tile kinds, with the sizes each supports and the target type its settings.target takes:
@@ -45,6 +45,11 @@ public sealed class ManagementTools(
           settings.target is "plex-player:any" for whatever plays, or a player's target.
         - "plex-recent" (small, wide, full, large, full-large): the posters of what was newly added to Plex; settings.target is
           "plex-library:all" or a library's target.
+        - "sonos" (small, wide, full, large, full-large, full-tall): Sonos multiroom; settings.targets lists the ids of the speaker
+          devices in order and settings.target is null. The tile shows what the first room that plays is playing with play/pause
+          (and skip, from wide up) and one volume for its group; a press opens every room with its own volume and a button that
+          adds it to that group. A full-tall tile lists the rooms on the tile too. Speakers are in a group when their sonos_group
+          capability matches. All speakers are in the tile's one account.
         - "logic" (small, wide, full, large, full-large): shows the first of the tiles it holds whose rule holds, else its
           fallback tile, else nothing (like empty cells). settings.target is null; settings.entries is an ordered list of
           { "tile": { "kind", "settings" }, "rule": <rule> }; settings.fallback is { "kind", "settings" } or null; optional
@@ -114,7 +119,7 @@ public sealed class ManagementTools(
         Replaces a dashboard's draft. Displays never show a draft; publish it to show it.
         A dashboard has 1 to 12 rows. Each section is a grid 3 columns wide and as many rows tall as the dashboard;
         sections sit side by side and scroll horizontally. A tile's position is the zero-based column and row of its
-        top-left cell. Sizes in cells (columns×rows): small 1×1, wide 2×1, full 3×1, large 2×2, full-large 3×2.
+        top-left cell. Sizes in cells (columns×rows): small 1×1, wide 2×1, full 3×1, large 2×2, full-large 3×2, full-tall 3×4.
         Tiles must stay inside their section's grid and never overlap. Section and tile ids are any unique strings.
         A section with hidden true stays in the draft but displays leave it out; one with a rule is shown only while it holds.
         "background" sets what shows behind the tiles: { "kind": "color", "color": "#rrggbb" }, { "kind": "gradient",

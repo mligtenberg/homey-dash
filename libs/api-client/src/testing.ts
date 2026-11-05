@@ -165,6 +165,18 @@ export class FakeRealtime implements Partial<Realtime> {
     return this.command('activateMood', account, moodId);
   }
 
+  joinSpeakerGroup(account: number | undefined, deviceId: string, withDeviceId: string) {
+    return this.command('joinSpeakerGroup', account, deviceId, withDeviceId);
+  }
+
+  leaveSpeakerGroup(account: number | undefined, deviceId: string) {
+    return this.command('leaveSpeakerGroup', account, deviceId);
+  }
+
+  setGroupVolume(account: number | undefined, deviceId: string, volume: number) {
+    return this.command('setGroupVolume', account, deviceId, Math.round(volume));
+  }
+
   private async command(...command: unknown[]) {
     this.commands.push(command);
     if (this.failCommands) throw new Error('Homey did not respond');

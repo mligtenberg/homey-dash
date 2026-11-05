@@ -56,12 +56,19 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
             Capability("speaker_track", "Track", "string", JsonSerializer.SerializeToElement("Birds of a Feather"), false),
             Capability("speaker_artist", "Artist", "string", JsonSerializer.SerializeToElement("Billie Eilish"), false),
             Capability("speaker_album", "Album", "string", JsonSerializer.SerializeToElement("Hit Me Hard and Soft"), false),
-            Number("volume_set", "Volume", 0.25, null, true, 0, 1, 0.01)) with { AlbumArt = new("fake-album-art", "1") },
+            Number("volume_set", "Volume", 0.25, null, true, 0, 1, 0.01),
+            Group("Living room")) with { AlbumArt = new("fake-album-art", "1") },
         Device("living-vacuum", "Robot vacuum", "living", "vacuumcleaner", OnOff(false), Number("measure_battery", "Battery", 87, "%", false)),
         Device("living-climate", "Climate sensor", "living", "sensor", Temperature(20.3), Humidity(48)),
         Device("living-motion", "Motion sensor", "living", "sensor", Alarm("alarm_motion", "Motion", false), Number("measure_luminance", "Light level", 140, "lx", false)),
 
         // Kitchen
+        Device("kitchen-speaker", "Kitchen speaker", "kitchen", "speaker",
+            Capability("speaker_playing", "Playing", "boolean", False, true),
+            Capability("speaker_track", "Track", "string", JsonSerializer.SerializeToElement("Birds of a Feather"), false),
+            Capability("speaker_artist", "Artist", "string", JsonSerializer.SerializeToElement("Billie Eilish"), false),
+            Number("volume_set", "Volume", 0.35, null, true, 0, 1, 0.01),
+            Group("Kitchen")),
         Device("kitchen-spots", "Kitchen spots", "kitchen", "light", OnOff(true), Dim(0.6)),
         Device("kitchen-counter", "Counter lights", "kitchen", "light", OnOff(false)),
         Device("kitchen-dishwasher", "Dishwasher", "kitchen", "dishwasher", OnOff(true), Power(1950)),
@@ -239,6 +246,33 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         return Task.CompletedTask;
     }
 
+    public Task JoinSpeakerGroupAsync(string deviceId, string withDeviceId, CancellationToken ct)
+    {
+        var group = GroupOf(withDeviceId);
+        _state.UpdateCapability(deviceId, "sonos_group", JsonSerializer.SerializeToElement(group), null);
+        return Task.CompletedTask;
+    }
+
+    public Task LeaveSpeakerGroupAsync(string deviceId, CancellationToken ct)
+    {
+        var name = _state.FindDevice(deviceId)?.Name ?? throw new HomeyNotFoundException($"Device {deviceId} not found in Homey");
+        _state.UpdateCapability(deviceId, "sonos_group", JsonSerializer.SerializeToElement(name), null);
+        return Task.CompletedTask;
+    }
+
+    public Task SetGroupVolumeAsync(string deviceId, int volume, CancellationToken ct)
+    {
+        if (volume is < 1 or > 100) throw new ArgumentException("Group volume is between 1 and 100");
+        var group = GroupOf(deviceId);
+        foreach (var member in _state.Devices.Where(d => d.Capabilities.TryGetValue("sonos_group", out var g) && g.Value.ToString() == group))
+            _state.UpdateCapability(member.Id, "volume_set", JsonSerializer.SerializeToElement(volume / 100.0), null);
+        return Task.CompletedTask;
+    }
+
+    private string GroupOf(string deviceId) =>
+        _state.FindDevice(deviceId)?.Capabilities.GetValueOrDefault("sonos_group")?.Value.GetString()
+        ?? throw new HomeyNotFoundException($"Device {deviceId} is not a Sonos speaker");
+
     public Task TriggerFlowAsync(string flowId, CancellationToken ct) =>
         _state.FindFlow(flowId) is null
             ? throw new HomeyNotFoundException($"Flow {flowId} not found in Homey")
@@ -323,6 +357,8 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         {
             Values = [new("up", "Up"), new("idle", "Stopped"), new("down", "Down")],
         };
+
+    private static HomeyCapability Group(string name) => Capability("sonos_group", "Group", "string", JsonSerializer.SerializeToElement(name), false);
 
     private static HomeyCapability Alarm(string id, string title, bool on) => Capability(id, title, "boolean", on ? True : False, false);
 

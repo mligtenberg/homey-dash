@@ -10,6 +10,12 @@ public interface IHomey
     Task SetCapabilityValueAsync(string deviceId, string capabilityId, JsonElement value, CancellationToken ct);
     Task TriggerFlowAsync(string flowId, CancellationToken ct);
     Task ActivateMoodAsync(string moodId, CancellationToken ct);
+
+    // Sonos multiroom (through the speaker's own flow actions in Homey). Speakers share a group when their
+    // `sonos_group` capability is equal. Volume is 1-100 and applies to every speaker in the group.
+    Task JoinSpeakerGroupAsync(string deviceId, string withDeviceId, CancellationToken ct);
+    Task LeaveSpeakerGroupAsync(string deviceId, CancellationToken ct);
+    Task SetGroupVolumeAsync(string deviceId, int volume, CancellationToken ct);
     Task<IReadOnlyList<HomeyInsightLog>> GetInsightLogsAsync(CancellationToken ct);
 
     // A picture Homey keeps, such as a device's album art; null when Homey has no such picture.

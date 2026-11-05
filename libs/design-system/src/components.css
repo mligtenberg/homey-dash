@@ -109,6 +109,7 @@
 .hd-tile[data-size="full"] { grid-column: span 3; grid-row: span 1; }
 .hd-tile[data-size="large"] { grid-column: span 2; grid-row: span 2; }
 .hd-tile[data-size="full-large"] { grid-column: span 3; grid-row: span 2; }
+.hd-tile[data-size="full-tall"] { grid-column: span 3; grid-row: span 4; }
 
 .hd-tile[data-tap] { cursor: pointer; }
 .hd-tile[data-tap] { -webkit-touch-callout: none; }
@@ -445,7 +446,7 @@
 .hd-check { display: flex; align-items: center; gap: 10px; font-weight: 600; }
 .hd-check input { width: 18px; height: 18px; accent-color: var(--brand); margin: 0; }
 
-.hd-sizes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.hd-sizes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .hd-sizes button {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 8px 2px;
@@ -457,7 +458,7 @@
 }
 .hd-sizes button[aria-pressed="true"] { background: var(--brand); color: var(--on-brand); border-color: transparent; }
 .hd-sizes button:disabled { opacity: .35; cursor: not-allowed; }
-.hd-sizes svg { width: 30px; height: 20px; fill: currentColor; }
+.hd-sizes svg { width: 30px; height: 40px; fill: currentColor; }
 
 .hd-stage {
   --cell: 92px;
@@ -710,3 +711,49 @@
 @media (prefers-reduced-motion: reduce) {
   .hd-plex__progress-fill { transition: none; }
 }
+
+/*
+ * Sonos tile: the lead room's music over its album art (--art) like a speaker's device tile, a volume slider for the
+ * group, and on large sizes a row per room: name, own volume, and a button that adds it to or takes it out of the group.
+ */
+.hd-sonos { gap: calc(var(--cell) * .06); }
+/* Smaller than a device tile's controls, so a tile holds many rooms; sliders and buttons shrink with the cell. */
+.hd-sonos { --slider-height: .1; }
+.hd-sonos .hd-round-btn:not(.hd-details *) { width: calc(var(--cell) * .34); height: calc(var(--cell) * .34); }
+.hd-sonos .hd-round-btn:not(.hd-details *) svg { width: 50%; height: 50%; }
+.hd-sonos__head { display: flex; align-items: center; gap: calc(var(--cell) * .1); min-height: 0; }
+.hd-sonos__titles { flex: 1; min-width: 0; }
+.hd-sonos__titles .hd-tile__detail { margin: 0; }
+.hd-sonos__rooms { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: calc(var(--cell) * .06); overflow-y: auto; scrollbar-width: none; }
+.hd-sonos__rooms::-webkit-scrollbar { display: none; }
+.hd-sonos__row { flex: none; }
+.hd-sonos__row { display: flex; align-items: center; gap: calc(var(--cell) * .1); }
+.hd-sonos__row .hd-slider { flex: 1; min-width: 0; }
+.hd-sonos__label { flex: 0 0 34%; min-width: 0; font-size: calc(var(--cell) * .12); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-sonos__row:not(.is-in-group) .hd-slider { opacity: .55; }
+.hd-sonos.has-art :is(.hd-round-btn, .hd-sonos__label):not(.hd-details *) { color: #fff; }
+.hd-sonos.has-art .hd-slider:not(.hd-details *) { background-color: rgb(255 255 255 / .25); }
+.hd-sonos.has-art .hd-slider:not(.hd-details *) .hd-slider__fill { background: #fff; }
+.hd-sonos.has-art .hd-round-btns:not(.hd-details *) { background: rgb(255 255 255 / .16); }
+/* A 1×1 tile has room for the music and a play button only. */
+.hd-sonos[data-size="small"] .hd-sonos__head > .hd-icon, .hd-sonos[data-size="small"] .hd-tile__detail { display: none; }
+.hd-details .hd-sonos__row { margin-block: calc(var(--cell) * .06); }
+.hd-sonos[data-size="small"] .hd-sonos__head { flex: 1; flex-direction: column; align-items: stretch; justify-content: space-between; }
+.hd-sonos[data-size="small"] .hd-sonos__titles .hd-tile__name { overflow-wrap: normal; word-break: normal; -webkit-line-clamp: 1; line-clamp: 1; }
+.hd-sonos[data-size="small"] .hd-round-btns { align-self: flex-end; }
+/* A fill narrower than the track is tall would squash its round end into an oval, so it is at least a circle wide. */
+.hd-sonos .hd-slider__fill { min-width: calc(var(--cell) * var(--slider-height)); }
+/*
+ * The slider's touch area is a transparent border, which turns the round ends into ovals when the bar is thin (the
+ * inner corner radius is the outer one minus the border, in one direction only). Here the bar has no border, so
+ * its ends are true semicircles, and the touch area is a pseudo-element around it.
+ */
+.hd-sonos .hd-slider { border: 0; overflow: visible; border-radius: calc(var(--cell) * var(--slider-height) / 2); }
+.hd-sonos .hd-slider::after { content: ""; position: absolute; inset: -10px 0; }
+
+.hd-sonos .hd-round-btn.is-busy::before {
+  content: ""; width: 45%; height: 45%; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: hd-spin 1s linear infinite;
+}
+.hd-sonos .hd-round-btn.is-busy:disabled { opacity: 1; }

@@ -23,6 +23,7 @@ public static partial class DashboardValidator
         TileSize.Full => (3, 1),
         TileSize.Large => (2, 2),
         TileSize.FullLarge => (3, 2),
+        TileSize.FullTall => (3, 4),
         _ => throw new ArgumentOutOfRangeException(nameof(size), size, "Unknown tile size"),
     };
 

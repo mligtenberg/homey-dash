@@ -323,6 +323,39 @@ public sealed class LocalHomey(
         await SendAsync(HttpMethod.Post, $"api/manager/moods/mood/{Uri.EscapeDataString(moodId)}/set", null, ct);
     }
 
+    public async Task JoinSpeakerGroupAsync(string deviceId, string withDeviceId, CancellationToken ct)
+    {
+        var device = state.FindDevice(deviceId) ?? throw new HomeyNotFoundException($"Device {deviceId} not found in Homey");
+        var target = state.FindDevice(withDeviceId) ?? throw new HomeyNotFoundException($"Device {withDeviceId} not found in Homey");
+        var uri = DeviceUri(device.Id);
+        // The card takes the player as one of its autocomplete results, so look it up by the target's name.
+        var found = await SendJsonAsync(HttpMethod.Get,
+            $"{FlowCardAction(uri, "cloud_join_household_player", "autocomplete")}?name=player&query={Uri.EscapeDataString(target.Name)}", null, ct);
+        var player = found.ValueKind == JsonValueKind.Array
+            ? found.EnumerateArray().Cast<JsonElement?>().FirstOrDefault(p => string.Equals(HomeyMapper.String(p!.Value, "name"), target.Name, StringComparison.OrdinalIgnoreCase))
+            : null;
+        if (player is null) throw new HomeyNotFoundException($"Sonos does not know a player called {target.Name}");
+        await SendAsync(HttpMethod.Post, FlowCardAction(uri, "cloud_join_household_player", "run"), new { args = new { player } }, ct);
+    }
+
+    public Task LeaveSpeakerGroupAsync(string deviceId, CancellationToken ct) =>
+        RunSpeakerActionAsync(deviceId, "cloud_leave_current_group", new { }, ct);
+
+    public Task SetGroupVolumeAsync(string deviceId, int volume, CancellationToken ct) =>
+        volume is < 1 or > 100
+            ? throw new ArgumentException("Group volume is between 1 and 100")
+            : RunSpeakerActionAsync(deviceId, "set_group_volume", new { volume }, ct);
+
+    private Task RunSpeakerActionAsync(string deviceId, string card, object args, CancellationToken ct)
+    {
+        if (state.FindDevice(deviceId) is null) throw new HomeyNotFoundException($"Device {deviceId} not found in Homey");
+        return SendAsync(HttpMethod.Post, FlowCardAction(DeviceUri(deviceId), card, "run"), new { args }, ct);
+    }
+
+    // A device's card has the id `<uri>:<card>`, as in the official client.
+    private static string FlowCardAction(string uri, string card, string operation) =>
+        $"api/manager/flow/flowcardaction/{Uri.EscapeDataString(uri)}/{Uri.EscapeDataString($"{uri}:{card}")}/{operation}";
+
     public async Task<IReadOnlyList<HomeyInsightLog>> GetInsightLogsAsync(CancellationToken ct)
     {
         var logs = await GetJsonAsync("api/manager/insights/log", ct);
@@ -400,6 +433,22 @@ public sealed class LocalHomey(
                 throw new HomeyNotFoundException($"Homey does not know {path}");
             if (!response.IsSuccessStatusCode)
                 throw new HomeyUnavailableException($"Homey answered {(int)response.StatusCode} to {method} {path}");
+        }
+    }
+
+    private async Task<JsonElement> SendJsonAsync(HttpMethod method, string path, object? body, CancellationToken ct)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(method, path) { Content = body is null ? null : JsonContent.Create(body) };
+            using var response = await Http().SendAsync(request, ct);
+            if (response.StatusCode == HttpStatusCode.NotFound) throw new HomeyNotFoundException($"Homey does not know {path}");
+            if (!response.IsSuccessStatusCode) throw new HomeyUnavailableException($"Homey answered {(int)response.StatusCode} to {method} {path}");
+            return await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        }
+        catch (HttpRequestException e)
+        {
+            throw new HomeyUnavailableException("Homey cannot be reached", e);
         }
     }
 

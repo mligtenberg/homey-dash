@@ -4,6 +4,7 @@ export * from './lib/tile-data';
 export * from './lib/tile-host';
 export * from './lib/core/core-tiles';
 export * from './lib/plex/plex-tiles';
+export * from './lib/sonos/sonos-tiles';
 export * from './lib/logic/logic-tile';
 export { shownSections } from './lib/logic/shown-sections';
 export { capabilityText, deviceLook, deviceType } from './lib/core/device-look';

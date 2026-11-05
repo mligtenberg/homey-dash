@@ -13,6 +13,7 @@ public enum TileSize
     Full,
     Large,
     [JsonStringEnumMemberName("full-large")] FullLarge,
+    [JsonStringEnumMemberName("full-tall")] FullTall,
 }
 
 public sealed record TilePosition(int Column, int Row);

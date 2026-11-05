@@ -101,6 +101,15 @@ public sealed class RealtimeHub(
 
     public Task ActivateMood(int? accountId, string moodId) => Perform(ct => homeys.Require(accountId).ActivateMoodAsync(moodId, ct));
 
+    public Task JoinSpeakerGroup(int? accountId, string deviceId, string withDeviceId) =>
+        Perform(ct => homeys.Require(accountId).JoinSpeakerGroupAsync(deviceId, withDeviceId, ct));
+
+    public Task LeaveSpeakerGroup(int? accountId, string deviceId) =>
+        Perform(ct => homeys.Require(accountId).LeaveSpeakerGroupAsync(deviceId, ct));
+
+    public Task SetGroupVolume(int? accountId, string deviceId, int volume) =>
+        Perform(ct => homeys.Require(accountId).SetGroupVolumeAsync(deviceId, volume, ct));
+
     /// <summary>
     /// Subscribes to a rule under an id the connection chooses, answering whether it holds now. A screen's rules are
     /// evaluated for the display it holds; Management's as if on <paramref name="asDisplay"/>, or on none.

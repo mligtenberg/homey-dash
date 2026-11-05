@@ -44,6 +44,8 @@ export interface TileKind<TSettings = unknown> {
    * Otherwise a press opens the view where the tile offers one.
    */
   details?: boolean;
+  /** For a device kind: Management only offers devices that have this capability, such as `sonos_group`. */
+  requiresCapability?: string;
   sizes: readonly TileSize[];
   defaultSettings: TSettings;
   component: Type<unknown>;

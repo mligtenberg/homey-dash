@@ -98,6 +98,7 @@ Tile sizes come from a fixed set, set on `data-size`:
 | `full` | 3×1 |
 | `large` | 2×2 |
 | `full-large` | 3×2 |
+| `full-tall` | 3×4 |
 
 Within a section, tiles never overlap and never move on their own.
 

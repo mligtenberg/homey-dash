@@ -176,18 +176,21 @@ export class TilePanel {
     const homey = this.homey();
     if (!homey) return buildTree([], []);
     const zones = homey.zones.values();
+    const required = this.kind()?.requiresCapability;
     switch (this.kind()?.target) {
       case 'device':
         return buildTree(
           zones,
-          [...homey.devices.values()].map((d) => ({
-            id: d.id,
-            label: d.name,
-            summary: d.zoneName ? `${d.name} — ${d.zoneName}` : d.name,
-            type: deviceType(d),
-            ...deviceLook(d),
-            groupId: d.zoneId,
-          })),
+          [...homey.devices.values()]
+            .filter((d) => !required || d.capabilities[required])
+            .map((d) => ({
+              id: d.id,
+              label: d.name,
+              summary: d.zoneName ? `${d.name} — ${d.zoneName}` : d.name,
+              type: deviceType(d),
+              ...deviceLook(d),
+              groupId: d.zoneId,
+            })),
         );
       case 'flow':
         return buildTree(

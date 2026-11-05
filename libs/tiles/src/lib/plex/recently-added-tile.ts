@@ -8,7 +8,7 @@ import { PlexData } from './plex-data';
 import { plexIdle } from './now-playing-tile';
 
 /** How many posters fit a tile: one per cell across, two rows on the large sizes. */
-export const RECENT_POSTERS: Record<TileSize, number> = { small: 1, wide: 2, full: 3, large: 4, 'full-large': 6 };
+export const RECENT_POSTERS: Record<TileSize, number> = { small: 1, wide: 2, full: 3, large: 4, 'full-large': 6, 'full-tall': 12 };
 
 /** How many items the detail view lists. */
 const DETAIL_COUNT = 24;

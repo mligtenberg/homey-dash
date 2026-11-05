@@ -154,6 +154,20 @@ export class Realtime {
     return this.hub.invoke<void>('ActivateMood', account ?? null, moodId);
   }
 
+  /** Puts a Sonos speaker in the group of another (multiroom). */
+  joinSpeakerGroup(account: number | undefined, deviceId: string, withDeviceId: string) {
+    return this.hub.invoke<void>('JoinSpeakerGroup', account ?? null, deviceId, withDeviceId);
+  }
+
+  leaveSpeakerGroup(account: number | undefined, deviceId: string) {
+    return this.hub.invoke<void>('LeaveSpeakerGroup', account ?? null, deviceId);
+  }
+
+  /** Sets the volume (1–100) of every speaker in the speaker's group. */
+  setGroupVolume(account: number | undefined, deviceId: string, volume: number) {
+    return this.hub.invoke<void>('SetGroupVolume', account ?? null, deviceId, Math.round(volume));
+  }
+
   /**
    * Subscribes to a rule under an id of this connection's choosing, answering whether it holds now; changes follow as
    * `RuleAnswers`. A screen's rules are evaluated for its display; Management's as if on `asDisplay`, or on none.

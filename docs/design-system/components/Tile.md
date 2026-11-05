@@ -6,7 +6,7 @@ The cell-sized surface every tile kind is built on, with a size, a kind hue and 
 
 `<div class="hd-tile" data-kind="light" data-size="small">` holding an `.hd-icon` SVG and a block with `.hd-tile__name` and `.hd-tile__detail`. Place it inside an `.hd-section__grid`. It inherits `--cell` from `.hd-display`.
 
-- `data-size`: `small`, `wide`, `full`, `large` or `full-large`. Only use sizes the tile kind's module declares.
+- `data-size`: `small`, `wide`, `full`, `large`, `full-large` or `full-tall`. Only use sizes the tile kind's module declares.
 - `data-kind`: `light`, `heat`, `flow`, `mood`, `security`, `energy`, `cover`, `appliance` or `climate`. Leave it out to get `neutral`. It sets `--k-ink` and `--k-fill` for everything inside.
 - `.is-active`: the device is on, running, open or heating. Fills the tile with `kind-*-fill`; at rest it is `kind-*-fill` at 22% over `tile-surface`.
 - The tile's own `.hd-icon` sits in a rounded chip.

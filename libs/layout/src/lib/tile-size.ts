@@ -1,4 +1,4 @@
-export type TileSize = 'small' | 'wide' | 'full' | 'large' | 'full-large';
+export type TileSize = 'small' | 'wide' | 'full' | 'large' | 'full-large' | 'full-tall';
 
 export interface Span {
   columns: number;
@@ -12,6 +12,7 @@ export const TILE_SIZES: Readonly<Record<TileSize, Span>> = {
   full: { columns: 3, rows: 1 },
   large: { columns: 2, rows: 2 },
   'full-large': { columns: 3, rows: 2 },
+  'full-tall': { columns: 3, rows: 4 },
 };
 
 export const TILE_SIZE_LABELS: Readonly<Record<TileSize, string>> = {
@@ -20,4 +21,5 @@ export const TILE_SIZE_LABELS: Readonly<Record<TileSize, string>> = {
   full: 'Full',
   large: 'Large',
   'full-large': 'Full large',
+  'full-tall': 'Full tall',
 };
