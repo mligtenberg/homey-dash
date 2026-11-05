@@ -226,12 +226,22 @@ public sealed class ManagementTools(
     }
 
     // Account: the account a tile on it names in settings.account, for kinds that can have several.
-    public sealed record Target(string Id, string Name, string? Detail, int? Account = null);
+    // Zone: the room a device or mood is in, with its parents ("Upstairs > Bedroom"); null when it is in none.
+    public sealed record Target(string Id, string Name, string? Detail, int? Account = null, string? Zone = null);
+
+    private static string? ZonePath(HomeyDash.Api.Homey.HomeyState state, string? zoneId)
+    {
+        List<string> names = [];
+        for (var zone = zoneId is null ? null : state.Zones.FirstOrDefault(z => z.Id == zoneId); zone is not null && names.Count < 10;
+            zone = zone.ParentId is null ? null : state.Zones.FirstOrDefault(z => z.Id == zone.ParentId))
+            names.Insert(0, zone.Name);
+        return names.Count == 0 ? null : string.Join(" > ", names);
+    }
 
     [McpServerTool(Name = "list_targets", ReadOnly = true)]
     [Description("""
         Lists what tiles can point at: their ids go in a tile's settings.target. Devices, flows, moods and insight logs are in
-        Homey; a device's detail lists its capability ids, for a device tile's settings.capability. Photo sets follow an Immich
+        Homey; a device's and a mood's zone is the room it is in; a device's detail lists its capability ids, for a device tile's settings.capability. Photo sets follow an Immich
         album and are made in Management, so assistants can only use the ones that exist.
         """)]
     public async Task<IEnumerable<Target>> ListTargets(
@@ -239,10 +249,10 @@ public sealed class ManagementTools(
         type switch
         {
             "device" => homeys.All.SelectMany(h => h.State.Devices.OrderBy(d => d.Name).Select(d =>
-                new Target(d.Id, d.Name, $"{d.Class} in {d.ZoneName ?? "no zone"} on {h.Name}; capabilities: {string.Join(", ", d.Capabilities.Keys)}", h.AccountId))),
+                new Target(d.Id, d.Name, $"{d.Class} in {d.ZoneName ?? "no zone"} on {h.Name}; capabilities: {string.Join(", ", d.Capabilities.Keys)}", h.AccountId, ZonePath(h.State, d.ZoneId)))),
             "flow" => homeys.All.SelectMany(h => h.State.Flows.OrderBy(f => f.Name).Select(f =>
                 new Target(f.Id, f.Name, f.Enabled ? $"on {h.Name}" : $"on {h.Name}, turned off", h.AccountId))),
-            "mood" => homeys.All.SelectMany(h => h.State.Moods.OrderBy(m => m.Name).Select(m => new Target(m.Id, m.Name, $"on {h.Name}", h.AccountId))),
+            "mood" => homeys.All.SelectMany(h => h.State.Moods.OrderBy(m => m.Name).Select(m => new Target(m.Id, m.Name, $"on {h.Name}", h.AccountId, ZonePath(h.State, m.ZoneId)))),
             "insight" => await InsightLogsAsync(ct),
             "photoSet" => (await db.PhotoSets.AsNoTracking().ToListAsync(ct)).OrderBy(p => p.Name).Select(p =>
                 new Target(p.Target, p.Name, (p.Photos.Count == 1 ? "1 photo" : $"{p.Photos.Count} photos") + (p.Selection is null ? $" from the Immich album {p.AlbumName}" : " drawn at random from Immich"))),
@@ -254,6 +264,15 @@ public sealed class ManagementTools(
                 .. o.Libraries.Select(l => new Target(TargetCatalog.PlexLibraryPrefix + l.Id, l.Title, $"{l.Type} on {o.AccountName}", o.AccountId))]),
             _ => throw new McpException($"Unknown target type {type}; use device, flow, mood, insight, photoSet, plexPlayer or plexLibrary."),
         };
+
+    public sealed record ZoneInfo(string Id, string Name, string Path, string? ParentId, string Homey, int Account, int Devices, int Moods);
+
+    [McpServerTool(Name = "list_zones", ReadOnly = true)]
+    [Description("Lists the zones (rooms) in Homey, with their parent, full path and how many devices and moods are in each. Use list_targets to see which device or mood is in which zone.")]
+    public IEnumerable<ZoneInfo> ListZones() =>
+        homeys.All.SelectMany(h => h.State.Zones.OrderBy(z => z.Name).Select(z => new ZoneInfo(
+            z.Id, z.Name, ZonePath(h.State, z.Id)!, z.ParentId, h.Name, h.AccountId,
+            h.State.Devices.Count(d => d.ZoneId == z.Id), h.State.Moods.Count(m => m.ZoneId == z.Id))));
 
     [McpServerTool(Name = "list_signals", ReadOnly = true)]
     [Description("""

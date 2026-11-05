@@ -105,6 +105,16 @@ export interface HomeyLightColor {
   temperature: number | null;
 }
 
+/** Something a Sonos speaker can play; `item` is handed back to play it. */
+export interface SpeakerMusic {
+  name: string;
+  description: string | null;
+  image: string | null;
+  item: unknown;
+}
+
+export type SpeakerMusicKind = 'favorite' | 'playlist';
+
 export interface HomeyInsightLog {
   id: string;
   ownerUri: string;

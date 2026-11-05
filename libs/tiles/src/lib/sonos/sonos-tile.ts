@@ -5,21 +5,171 @@ import {
   computed,
   effect,
   inject,
+  input,
   signal,
 } from '@angular/core';
-import { HomeyDevice, homeyImageUrl, Realtime } from '@homey-dash/api-client';
 import {
+  HomeyDevice,
+  homeyImageUrl,
+  Realtime,
+  SpeakerMusic,
+  SpeakerMusicKind,
+} from '@homey-dash/api-client';
+import {
+  LucideAudioLines,
   LucideDynamicIcon,
   LucideLink,
+  LucideMusic,
   LucidePause,
   LucidePlay,
   LucideSkipBack,
   LucideSkipForward,
+  LucideSearch,
   LucideSpeaker,
   LucideUnlink,
 } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
+
+/** What a result of the music picker plays as, with where it came from. */
+interface MusicItem {
+  kind: SpeakerMusicKind;
+  music: SpeakerMusic;
+}
+
+/**
+ * What a speaker can play, picked in the detail view: its Sonos favorites and playlists from Homey, with their
+ * covers. Plays in the speaker's group. It renders only while its tab is open, so it asks
+ * Homey only then.
+ */
+@Component({
+  selector: 'hd-sonos-music',
+  imports: [LucideDynamicIcon],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'hd-sonos__music' },
+  template: `
+    <label class="hd-sonos__search">
+      <svg [lucideIcon]="searchIcon" />
+      <input
+        type="search"
+        autocomplete="off"
+        [placeholder]="kind() === 'favorite' ? 'Search favorites' : 'Search playlists'"
+        [attr.aria-label]="kind() === 'favorite' ? 'Search favorites' : 'Search playlists'"
+        [value]="query()"
+        (input)="query.set($any($event.target).value)"
+      />
+    </label>
+    @if (error()) {
+      <div class="hd-sonos__note">{{ error() }}</div>
+    } @else if (items() === null) {
+      <div class="hd-sonos__note">Loading…</div>
+    } @else {
+      <div class="hd-sonos__list">
+        @for (item of shown(); track item.kind + item.music.name) {
+          <button
+            type="button"
+            class="hd-sonos__item"
+            [class.is-playing]="playing() === key(item)"
+            [attr.aria-pressed]="playing() === key(item)"
+            (click)="play(item)"
+          >
+            <span class="hd-sonos__cover">
+              @if (item.music.image && !broken().has(item.music.image)) {
+                <img
+                  [src]="item.music.image"
+                  alt=""
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                  (error)="broke(item.music.image)"
+                />
+              } @else {
+                <svg [lucideIcon]="noteIcon" />
+              }
+              @if (playing() === key(item)) {
+                <span class="hd-sonos__cover-state"
+                  ><svg [lucideIcon]="playingIcon"
+                /></span>
+              }
+            </span>
+            <span class="hd-sonos__item-text">
+              <span class="hd-sonos__item-name">{{ item.music.name }}</span>
+              @if (item.music.description) {
+                <span class="hd-sonos__item-sub">{{
+                  item.music.description
+                }}</span>
+              }
+            </span>
+          </button>
+        } @empty {
+          <div class="hd-sonos__note">
+            {{ query().trim() ? 'No matches' : 'Nothing here yet' }}
+          </div>
+        }
+      </div>
+    }
+  `,
+})
+export class SonosMusic {
+  private readonly realtime = inject(Realtime);
+
+  protected readonly noteIcon = LucideMusic;
+  protected readonly searchIcon = LucideSearch;
+  protected readonly playingIcon = LucideAudioLines;
+
+  readonly account = input<number>();
+  readonly deviceId = input.required<string>();
+  readonly kind = input.required<SpeakerMusicKind>();
+
+  protected readonly items = signal<MusicItem[] | null>(null);
+  /** What is typed in the search bar; the music shown is what matches. */
+  protected readonly query = signal('');
+  protected readonly shown = computed(() => {
+    const words = this.query().toLowerCase().split(/\s+/).filter(Boolean);
+    return (this.items() ?? []).filter((i) => {
+      const text = `${i.music.name} ${i.music.description ?? ''}`.toLowerCase();
+      return words.every((w) => text.includes(w));
+    });
+  });
+  protected readonly error = signal('');
+  protected readonly playing = signal('');
+  /** Covers that did not load, so the note shows instead of a broken picture. */
+  protected readonly broken = signal<ReadonlySet<string>>(new Set());
+
+  constructor() {
+    effect((onCleanup) => {
+      const [account, deviceId, kind] = [this.account(), this.deviceId(), this.kind()];
+      this.error.set('');
+      this.items.set(null);
+      this.query.set('');
+      let stale = false;
+      onCleanup(() => (stale = true));
+      this.realtime.speakerMusic(account, deviceId, kind).then(
+        (found) =>
+          !stale && this.items.set(found.map((music): MusicItem => ({ kind, music }))),
+        () => !stale && this.error.set('Homey did not respond'),
+      );
+    });
+  }
+
+  protected key(item: MusicItem) {
+    return `${item.kind}:${item.music.name}`;
+  }
+
+  protected broke(image: string) {
+    this.broken.update((b) => new Set(b).add(image));
+  }
+
+  protected play(item: MusicItem) {
+    this.playing.set(this.key(item));
+    this.error.set('');
+    this.realtime
+      .playSpeakerMusic(this.account(), this.deviceId(), item.kind, item.music)
+      .catch(() => {
+        this.playing.set('');
+        this.error.set(`Could not play ${item.music.name}`);
+      });
+  }
+}
 
 /** One of the tile's speakers; `found` is false for a device Homey does not have (any more). */
 interface Room {
@@ -49,7 +199,7 @@ interface Drag {
  */
 @Component({
   selector: 'hd-sonos-tile',
-  imports: [LucideDynamicIcon, NgTemplateOutlet, TileDetails],
+  imports: [LucideDynamicIcon, NgTemplateOutlet, SonosMusic, TileDetails],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     ...TILE_FACE_HOST,
@@ -186,12 +336,36 @@ interface Drag {
       <ng-container *ngTemplateOutlet="roomList" />
     }
     <hd-tile-details
+      #details
+      [screen]="true"
       [name]="face().name"
       [icon]="speakerIcon"
       [subtitle]="face().detail"
     >
-      <ng-container *ngTemplateOutlet="groupRow" />
-      <ng-container *ngTemplateOutlet="roomList" />
+      <div class="hd-segmented" hdDetailsHead role="group" aria-label="Show">
+        @for (t of tabs; track t.id) {
+          <button
+            type="button"
+            [attr.aria-pressed]="tab() === t.id"
+            (click)="tab.set(t.id)"
+          >
+            {{ t.label }}
+          </button>
+        }
+      </div>
+      <div class="hd-sonos__pane">
+        @let current = tab();
+        @if (current === 'devices') {
+          <ng-container *ngTemplateOutlet="groupRow" />
+          <ng-container *ngTemplateOutlet="roomList" />
+        } @else if (lead(); as lead) {
+          <hd-sonos-music
+            [account]="settings().account"
+            [deviceId]="lead.id"
+            [kind]="current"
+          />
+        }
+      </div>
     </hd-tile-details>
   `,
 })
@@ -205,6 +379,13 @@ export class SonosTile extends TileView {
   protected readonly pauseIcon = LucidePause;
   protected readonly linkIcon = LucideLink;
   protected readonly unlinkIcon = LucideUnlink;
+
+  protected readonly tabs = [
+    { id: 'devices', label: 'Devices' },
+    { id: 'favorite', label: 'Favorites' },
+    { id: 'playlist', label: 'Playlists' },
+  ] as const;
+  protected readonly tab = signal<'devices' | SpeakerMusicKind>('devices');
 
   protected readonly drag = signal<Drag | null>(null);
   /** Rooms whose group change Homey is still working on, by the membership they are waiting for. */

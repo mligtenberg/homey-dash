@@ -119,8 +119,11 @@ export class DashboardView {
   }
 
   private measurePerPage() {
-    const cell = parseFloat(getComputedStyle(this.host).getPropertyValue('--cell'));
-    if (cell > 0 && this.host.clientWidth > 0) this.perPage.set(sectionsPerPage(this.host.clientWidth, cell));
+    const style = getComputedStyle(this.host);
+    const cell = parseFloat(style.getPropertyValue('--cell'));
+    // Only the content box holds sections: a host may be padded (the display leaves a gutter for its dashboard switch).
+    const width = this.host.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    if (cell > 0 && width > 0) this.perPage.set(sectionsPerPage(width, cell));
   }
 
   protected onScroll() {

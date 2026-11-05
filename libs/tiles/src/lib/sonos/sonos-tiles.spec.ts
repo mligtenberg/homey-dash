@@ -155,6 +155,62 @@ describe('Sonos tile', () => {
     expect(button(tile, 'Play in Kitchen')).toBeTruthy();
   });
 
+  it('lists favorites in the detail view and plays one', async () => {
+    HTMLDialogElement.prototype.showModal ??= function (
+      this: HTMLDialogElement,
+    ) {
+      this.open = true;
+    };
+    realtime.music = {
+      favorite: [{ name: 'Dinner jazz', description: null, image: null, item: {} }],
+    };
+    const tile = await render([speaker('a', 'Living room', 'Living room')], 'small');
+    tile.click();
+    await settle();
+    (Array.from(tile.querySelectorAll('.hd-details .hd-segmented button')).find(
+      (b) => b.textContent?.includes('Favorites'),
+    ) as HTMLElement).click();
+    await settle();
+    await new Promise((resolve) => setTimeout(resolve));
+    await settle();
+    (Array.from(tile.querySelectorAll('.hd-sonos__item')).find((b) =>
+      b.textContent?.includes('Dinner jazz'),
+    ) as HTMLElement).click();
+    await settle();
+    expect(realtime.commands).toEqual([
+      ['speakerMusic', undefined, 'a', 'favorite'],
+      ['playSpeakerMusic', undefined, 'a', 'favorite', 'Dinner jazz'],
+    ]);
+  });
+
+  it('filters favorites with the search bar', async () => {
+    HTMLDialogElement.prototype.showModal ??= function (
+      this: HTMLDialogElement,
+    ) {
+      this.open = true;
+    };
+    const item = (name: string) => ({ name, description: null, image: null, item: {} });
+    realtime.music = { favorite: [item('Dinner jazz'), item('Morning radio')] };
+    const tile = await render([speaker('a', 'Living room', 'Living room')], 'small');
+    tile.click();
+    await settle();
+    const press = (match: (b: Element) => boolean) =>
+      (Array.from(tile.querySelectorAll('.hd-details button')).find(match) as HTMLElement).click();
+    press((b) => !!b.textContent?.includes('Favorites'));
+    await settle();
+    await new Promise((resolve) => setTimeout(resolve));
+    await settle();
+    const input = tile.querySelector('input[type=search]') as HTMLInputElement;
+    input.value = 'jazz';
+    input.dispatchEvent(new Event('input'));
+    await settle();
+    expect(
+      Array.from(tile.querySelectorAll('.hd-sonos__item-name')).map((n) => n.textContent),
+    ).toEqual(['Dinner jazz']);
+    // The music itself is only asked once: filtering is on the screen.
+    expect(realtime.commands.filter((c) => c[0] === 'speakerMusic')).toHaveLength(1);
+  });
+
   it('registers the kind for several devices', () => {
     expect(SONOS_TILES.kinds.map((k) => [k.id, k.target, k.multiple])).toEqual([
       ['sonos', 'device', true],

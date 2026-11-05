@@ -49,7 +49,7 @@ public class ManagementToolsTests(ApiFactory factory) : IClassFixture<ApiFactory
 
         Assert.Equal(
             ["assign_dashboards", "create_dashboard", "get_dashboard", "list_dashboards", "list_displays",
-                "list_signals", "list_targets", "publish_dashboard", "rename_dashboard", "save_draft", "set_idle_rules", "set_lock_screen"],
+                "list_signals", "list_targets", "list_zones", "publish_dashboard", "rename_dashboard", "save_draft", "set_idle_rules", "set_lock_screen"],
             tools);
     }
 

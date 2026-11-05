@@ -5,7 +5,7 @@ import { DisplayInfo, ScreenView } from './displays';
 import { PhotoSet } from './photos';
 import { PlexCommand, PlexOverview, PlexSession, PlexSnapshot } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
-import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone } from './homey';
+import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
 
 // Mirrors apps/api/Realtime/RealtimeHub.cs.
 
@@ -161,6 +161,16 @@ export class Realtime {
 
   leaveSpeakerGroup(account: number | undefined, deviceId: string) {
     return this.hub.invoke<void>('LeaveSpeakerGroup', account ?? null, deviceId);
+  }
+
+  /** The favorites or playlists a Sonos speaker can play. */
+  speakerMusic(account: number | undefined, deviceId: string, kind: SpeakerMusicKind) {
+    return this.hub.invoke<SpeakerMusic[]>('SpeakerMusic', account ?? null, deviceId, kind);
+  }
+
+  /** Plays one of `speakerMusic` in the speaker's group. */
+  playSpeakerMusic(account: number | undefined, deviceId: string, kind: SpeakerMusicKind, music: SpeakerMusic) {
+    return this.hub.invoke<void>('PlaySpeakerMusic', account ?? null, deviceId, kind, music.item);
   }
 
   /** Sets the volume (1–100) of every speaker in the speaker's group. */

@@ -20,6 +20,7 @@ export const DETAILS_IDLE_MS = 60_000;
       #dialog
       class="hd-details"
       [class.hd-details--fill]="fill()"
+      [class.hd-details--screen]="screen()"
       tabindex="-1"
       [attr.aria-label]="name()"
       (close)="onClose()"
@@ -35,6 +36,7 @@ export const DETAILS_IDLE_MS = 60_000;
               <h2 class="hd-details__name">{{ name() }}</h2>
               <div class="hd-details__sub">{{ subtitle() }}</div>
             </div>
+            <ng-content select="[hdDetailsHead]" />
             <button type="button" class="hd-round-btn hd-details__close" aria-label="Close" autofocus (click)="close()">
               <svg [lucideIcon]="closeIcon" />
             </button>
@@ -51,6 +53,8 @@ export class TileDetails {
   readonly subtitle = input('');
   /** Whether it takes the whole screen, its content full-bleed under the head, such as for a photo. */
   readonly fill = input(false);
+  /** Whether it takes the whole screen but keeps the theme, its content scrolling under the head and tabs. */
+  readonly screen = input(false);
   /** Whether a tap on the backdrop closes it. */
   readonly closeOnBackdrop = input(true);
 

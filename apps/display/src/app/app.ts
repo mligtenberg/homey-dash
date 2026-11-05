@@ -100,7 +100,7 @@ const TAPE_KEY = 'homeydash.tape';
             }
             <!-- One at a time, so switching starts the next dashboard at its first page. -->
             @for (dashboard of [current]; track dashboard.id) {
-              <hd-dashboard-view [layout]="dashboard.layout" />
+              <hd-dashboard-view [layout]="dashboard.layout" [class.has-tape]="view.dashboards.length > 1" />
             }
             <!-- Woken on the click rather than the press, so the touch that ends it presses nothing beneath. -->
             @if (slideshow(); as set) {
@@ -134,6 +134,8 @@ const TAPE_KEY = 'homeydash.tape';
   styles: `
     :host { display: block; height: 100dvh; overflow: hidden; position: relative; }
     hd-dashboard-view { height: 100%; box-sizing: border-box; }
+    /* A gutter for the dashboard tape's toggle, so it floats beside the tiles rather than over them. */
+    hd-dashboard-view.has-tape { padding-left: calc(44px + var(--space-3) * 2); }
     .waiting { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); text-align: center; padding: var(--space-4); box-sizing: border-box; }
     .waiting h1 { margin: 0; font-size: 32px; font-weight: 800; }
     .waiting p { margin: 0; color: var(--ink-muted); }

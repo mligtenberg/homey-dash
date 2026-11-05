@@ -110,6 +110,16 @@ public sealed class RealtimeHub(
     public Task SetGroupVolume(int? accountId, string deviceId, int volume) =>
         Perform(ct => homeys.Require(accountId).SetGroupVolumeAsync(deviceId, volume, ct));
 
+    public async Task<IReadOnlyList<SpeakerMusic>> SpeakerMusic(int? accountId, string deviceId, string kind)
+    {
+        IReadOnlyList<SpeakerMusic> music = [];
+        await Perform(async ct => music = await homeys.Require(accountId).ListSpeakerMusicAsync(deviceId, kind, ct));
+        return music;
+    }
+
+    public Task PlaySpeakerMusic(int? accountId, string deviceId, string kind, JsonElement item) =>
+        Perform(ct => homeys.Require(accountId).PlaySpeakerMusicAsync(deviceId, kind, item, ct));
+
     /// <summary>
     /// Subscribes to a rule under an id the connection chooses, answering whether it holds now. A screen's rules are
     /// evaluated for the display it holds; Management's as if on <paramref name="asDisplay"/>, or on none.

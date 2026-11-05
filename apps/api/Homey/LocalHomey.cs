@@ -346,6 +346,31 @@ public sealed class LocalHomey(
             ? throw new ArgumentException("Group volume is between 1 and 100")
             : RunSpeakerActionAsync(deviceId, "set_group_volume", new { volume }, ct);
 
+    // The speaker's flow cards: `cloud_play_sonos_favorite` and `cloud_play_sonos_playlist`, whose one argument is an autocomplete.
+    private static (string Card, string Arg) MusicCard(string kind) => kind switch
+    {
+        SpeakerMusicKinds.Favorite => ("cloud_play_sonos_favorite", "favorite"),
+        SpeakerMusicKinds.Playlist => ("cloud_play_sonos_playlist", "playlist"),
+        _ => throw new ArgumentException($"Unknown kind of music {kind}; use favorite or playlist"),
+    };
+
+    public async Task<IReadOnlyList<SpeakerMusic>> ListSpeakerMusicAsync(string deviceId, string kind, CancellationToken ct)
+    {
+        var (card, arg) = MusicCard(kind);
+        if (state.FindDevice(deviceId) is null) throw new HomeyNotFoundException($"Device {deviceId} not found in Homey");
+        var found = await SendJsonAsync(HttpMethod.Get,
+            $"{FlowCardAction(DeviceUri(deviceId), card, "autocomplete")}?name={arg}&query=", null, ct);
+        return found.ValueKind != JsonValueKind.Array ? []
+            : found.EnumerateArray().Select(i => new SpeakerMusic(HomeyMapper.String(i, "name") ?? "?",
+                HomeyMapper.String(i, "description"), HomeyMapper.String(i, "image"), i.Clone())).ToList();
+    }
+
+    public Task PlaySpeakerMusicAsync(string deviceId, string kind, JsonElement item, CancellationToken ct)
+    {
+        var (card, arg) = MusicCard(kind);
+        return RunSpeakerActionAsync(deviceId, card, new Dictionary<string, JsonElement> { [arg] = item }, ct);
+    }
+
     private Task RunSpeakerActionAsync(string deviceId, string card, object args, CancellationToken ct)
     {
         if (state.FindDevice(deviceId) is null) throw new HomeyNotFoundException($"Device {deviceId} not found in Homey");

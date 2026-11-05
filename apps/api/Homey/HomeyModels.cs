@@ -71,6 +71,15 @@ public sealed record HomeyVariable(string Id, string Name, string Type, JsonElem
 // humidity as a fraction 0–1, and the place it is for. Any part Homey leaves out is null.
 public sealed record HomeyWeather(double? Temperature, string? State, double? Humidity, string? City);
 
+// Something a Sonos speaker can play, as its flow card offers it. Item is the card's own answer, handed back to play it.
+public sealed record SpeakerMusic(string Name, string? Description, string? Image, JsonElement Item);
+
+public static class SpeakerMusicKinds
+{
+    public const string Favorite = "favorite";
+    public const string Playlist = "playlist";
+}
+
 public sealed record HomeyInsightLog(string Id, string OwnerUri, string? OwnerName, string Title, string Type, string? Units);
 
 // Something in Homey changed; raised by HomeyState.

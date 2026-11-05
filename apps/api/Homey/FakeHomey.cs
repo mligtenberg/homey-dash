@@ -269,6 +269,40 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         return Task.CompletedTask;
     }
 
+    private static readonly Dictionary<string, string[]> Music = new()
+    {
+        [SpeakerMusicKinds.Favorite] = ["Morning radio", "Dinner jazz", "Kids' songs"],
+        [SpeakerMusicKinds.Playlist] = ["Chill", "Workout", "Road trip"],
+    };
+
+    public Task<IReadOnlyList<SpeakerMusic>> ListSpeakerMusicAsync(string deviceId, string kind, CancellationToken ct)
+    {
+        GroupOf(deviceId);
+        return Music.TryGetValue(kind, out var names)
+            ? Task.FromResult<IReadOnlyList<SpeakerMusic>>(names.Select(n => new SpeakerMusic(n, kind == SpeakerMusicKinds.Favorite ? "Sonos Radio" : "Apple Music", MusicCover(n), JsonSerializer.SerializeToElement(new { name = n }))).ToList())
+            : throw new ArgumentException($"Unknown kind of music {kind}; use favorite or playlist");
+    }
+
+    // A plain coloured cover per name, so the picker has something to show.
+    private static string MusicCover(string name)
+    {
+        var hue = Math.Abs(name.Aggregate(7, (h, c) => h * 31 + c)) % 360;
+        return $"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'%3E%3Crect width='4' height='4' fill='hsl({hue} 55% 45%)'/%3E%3C/svg%3E";
+    }
+
+    public Task PlaySpeakerMusicAsync(string deviceId, string kind, JsonElement item, CancellationToken ct)
+    {
+        var group = GroupOf(deviceId);
+        var name = item.TryGetProperty("name", out var n) ? n.GetString() : null;
+        if (name is null || !Music.GetValueOrDefault(kind, []).Contains(name)) throw new HomeyNotFoundException($"Sonos does not know {name ?? "that"}");
+        foreach (var member in _state.Devices.Where(d => d.Capabilities.TryGetValue("sonos_group", out var g) && g.Value.ToString() == group))
+        {
+            _state.UpdateCapability(member.Id, "speaker_playing", JsonSerializer.SerializeToElement(true), null);
+            _state.UpdateCapability(member.Id, "speaker_track", JsonSerializer.SerializeToElement(name), null);
+        }
+        return Task.CompletedTask;
+    }
+
     private string GroupOf(string deviceId) =>
         _state.FindDevice(deviceId)?.Capabilities.GetValueOrDefault("sonos_group")?.Value.GetString()
         ?? throw new HomeyNotFoundException($"Device {deviceId} is not a Sonos speaker");

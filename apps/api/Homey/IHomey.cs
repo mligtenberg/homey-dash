@@ -16,6 +16,12 @@ public interface IHomey
     Task JoinSpeakerGroupAsync(string deviceId, string withDeviceId, CancellationToken ct);
     Task LeaveSpeakerGroupAsync(string deviceId, CancellationToken ct);
     Task SetGroupVolumeAsync(string deviceId, int volume, CancellationToken ct);
+
+    // What a Sonos speaker can play: kind is a SpeakerMusicKinds value. Play takes an Item from the list; it plays in the
+    // speaker's group.
+    Task<IReadOnlyList<SpeakerMusic>> ListSpeakerMusicAsync(string deviceId, string kind, CancellationToken ct);
+    Task PlaySpeakerMusicAsync(string deviceId, string kind, JsonElement item, CancellationToken ct);
+
     Task<IReadOnlyList<HomeyInsightLog>> GetInsightLogsAsync(CancellationToken ct);
 
     // A picture Homey keeps, such as a device's album art; null when Homey has no such picture.

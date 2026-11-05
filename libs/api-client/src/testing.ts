@@ -11,6 +11,8 @@ import {
   Rule,
   RuleAnswer,
   ScreenView,
+  SpeakerMusic,
+  SpeakerMusicKind,
 } from './index';
 
 /**
@@ -175,6 +177,18 @@ export class FakeRealtime implements Partial<Realtime> {
 
   setGroupVolume(account: number | undefined, deviceId: string, volume: number) {
     return this.command('setGroupVolume', account, deviceId, Math.round(volume));
+  }
+
+  /** What `speakerMusic` answers, by kind. */
+  music: Partial<Record<SpeakerMusicKind, SpeakerMusic[]>> = {};
+
+  async speakerMusic(account: number | undefined, deviceId: string, kind: SpeakerMusicKind) {
+    await this.command('speakerMusic', account, deviceId, kind);
+    return this.music[kind] ?? [];
+  }
+
+  playSpeakerMusic(account: number | undefined, deviceId: string, kind: SpeakerMusicKind, music: SpeakerMusic) {
+    return this.command('playSpeakerMusic', account, deviceId, kind, music.name);
   }
 
   private async command(...command: unknown[]) {
