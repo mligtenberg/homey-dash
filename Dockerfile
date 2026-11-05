@@ -34,6 +34,6 @@ COPY --from=api --chown=$APP_UID:$APP_UID /data /data
 ENV ASPNETCORE_HTTP_PORTS=8080 \
     ConnectionStrings__HomeyDash="Data Source=/data/homey-dash.db"
 VOLUME /data
-EXPOSE 8080
+EXPOSE 8080 8443
 USER $APP_UID
 ENTRYPOINT ["dotnet", "HomeyDash.Api.dll"]

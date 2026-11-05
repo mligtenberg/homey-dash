@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using HomeyDash.Api;
 using HomeyDash.Api.Accounts;
 using HomeyDash.Api.Dashboards;
 using HomeyDash.Api.Data;
@@ -31,6 +32,18 @@ builder.Services.AddMcpServer()
     .WithTools<ManagementTools>(ManagementTools.Json);
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+
+// Optional HTTPS without a proxy: with SelfSignedCertificatePath set, every https endpoint
+// (e.g. ASPNETCORE_HTTPS_PORTS=8443) uses a self-signed certificate created on first boot.
+var certificatePath = builder.Configuration["SelfSignedCertificatePath"];
+if (!string.IsNullOrWhiteSpace(certificatePath))
+{
+    var certificate = SelfSignedCertificate.LoadOrCreate(
+        certificatePath,
+        (builder.Configuration["SelfSignedCertificateHosts"] ?? "").Split(','));
+    builder.WebHost.ConfigureKestrel(kestrel =>
+        kestrel.ConfigureHttpsDefaults(https => https.ServerCertificate = certificate));
+}
 
 var app = builder.Build();
 

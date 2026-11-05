@@ -7,6 +7,8 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+      # HTTPS with a self-signed certificate, see the environment below.
+      # - "8443:8443"
     volumes:
       # The SQLite database (accounts, dashboards, displays, rules).
       # A bind mount must be writable by the container user, UID 1654:
@@ -14,6 +16,11 @@ services:
       - ./data:/data
     environment:
       TZ: Europe/Amsterdam
+      # HTTPS on 8443 with a self-signed certificate created on first boot and kept in /data.
+      # Browsers warn once; the hosts below are added to the certificate (the address you browse to).
+      # ASPNETCORE_HTTPS_PORTS: "8443"
+      # SelfSignedCertificatePath: /data/https/homey-dash.pfx
+      # SelfSignedCertificateHosts: "192.168.1.23,nas.local"
       # Defaults, only change if you move things:
       # ConnectionStrings__HomeyDash: "Data Source=/data/homey-dash.db"
       # ASPNETCORE_HTTP_PORTS: "8080"
