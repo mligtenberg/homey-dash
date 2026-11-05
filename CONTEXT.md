@@ -95,7 +95,7 @@ What a dashboard shows behind its tiles: the theme's own, one colour, a gradient
 _Avoid_: Wallpaper, theme, backdrop
 
 **Colour scheme**:
-Four colours a built-in image is redrawn in: one picked colour, a second a chosen angle further around the hue wheel, and the two opposite those. Only their hues and how vivid they are carry over; how light each part is stays the image's own, so it stays light by day and dark by night.
+Four colours a built-in image is redrawn in: one picked colour, a second a chosen angle further around the hue wheel, and the two opposite those. Only their hues and how vivid they are carry over; how light each part is stays the image's own, so it stays light by day and dark by night. Displays show the image as HomeyDash renders it for their screen, rather than drawing it themselves.
 _Avoid_: Palette, tint
 
 **Section**:

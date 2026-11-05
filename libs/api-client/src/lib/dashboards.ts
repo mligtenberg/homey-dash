@@ -45,6 +45,24 @@ export function backgroundPresetUrl(preset: string, variant: 'day' | 'night') {
   return `/backgrounds/${preset}-${variant}.svg`;
 }
 
+/**
+ * A built-in background as HomeyDash renders it, in its colour scheme, as a WebP covering width × height pixels: what
+ * displays show, rather than drawing the SVG themselves.
+ */
+export function renderedPresetUrl(
+  background: { preset: string; color?: string | null; angle?: number | null },
+  variant: 'day' | 'night',
+  width: number,
+  height: number,
+) {
+  const query = new URLSearchParams({ width: `${width}`, height: `${height}` });
+  if (background.color && background.angle != null) {
+    query.set('color', background.color);
+    query.set('angle', `${background.angle}`);
+  }
+  return `/api/backgrounds/presets/${background.preset}-${variant}.webp?${query}`;
+}
+
 /** A dashboard version, draft or published. */
 export interface DashboardLayout {
   rows: number;

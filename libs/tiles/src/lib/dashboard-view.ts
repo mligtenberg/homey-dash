@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { DashboardLayout } from '@homey-dash/api-client';
 import { sectionsPerPage } from '@homey-dash/layout';
-import { backgroundSignal, hasImage } from './background';
+import { backgroundStyle, hasImage, renderedBackgroundStyle } from './background';
 import { shownSections } from './logic/shown-sections';
 import { TileHost } from './tile-host';
 
@@ -65,7 +65,13 @@ import { TileHost } from './tile-host';
 })
 export class DashboardView {
   readonly layout = input.required<DashboardLayout>();
-  protected readonly background = backgroundSignal(() => this.layout().background);
+  // How large the dashboard is, for a built-in image HomeyDash renders to fit it; unknown until first measured.
+  private readonly size = signal<readonly [number, number] | null>(null);
+  protected readonly background = computed(() => {
+    const [background, size] = [this.layout().background, this.size()];
+    if (background?.kind !== 'preset') return backgroundStyle(background);
+    return size ? renderedBackgroundStyle(background, ...size) : null;
+  });
   protected readonly hasImage = computed(() => hasImage(this.layout().background));
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
@@ -84,10 +90,13 @@ export class DashboardView {
   });
 
   constructor() {
-    // The width and --cell both change with the window, and both decide how many sections fit. Without a
+    // The width and --cell both change with the window, and both decide how many sections fit (and the size, how large a
+    // built-in background is rendered). Without a
     // ResizeObserver (as in tests) a page holds one section.
     if (typeof ResizeObserver !== 'undefined') {
       const resizes = new ResizeObserver(() => {
+        const [width, height] = [this.host.clientWidth, this.host.clientHeight];
+        if (width > 0 && height > 0 && (this.size()?.[0] !== width || this.size()?.[1] !== height)) this.size.set([width, height]);
         const cell = parseFloat(getComputedStyle(this.host).getPropertyValue('--cell'));
         if (cell > 0) this.perPage.set(sectionsPerPage(this.host.clientWidth, cell));
       });

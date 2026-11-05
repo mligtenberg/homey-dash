@@ -15,6 +15,13 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.13" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.148.0" />
+    <PackageReference Include="Svg.Skia" Version="5.2.3" />
+  </ItemGroup>
+
+  <!-- The built-in backgrounds, rendered for displays (see PresetBackgrounds). -->
+  <ItemGroup>
+    <Content Include="../../libs/design-system/backgrounds/*/*.svg" LinkBase="backgrounds" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

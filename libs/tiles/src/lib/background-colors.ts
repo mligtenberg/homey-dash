@@ -55,12 +55,6 @@ export function schemeProperties({ color, angle }: ColorScheme) {
   return { '--scheme-hue': +hue.toFixed(1), '--scheme-angle': angle, '--scheme-chroma': +chroma.toFixed(3) };
 }
 
-/** A built-in image's SVG with the scheme written into it, so it shows recoloured wherever it is an image. */
-export function bakeScheme(svg: string, scheme: ColorScheme): string {
-  const properties = Object.entries(schemeProperties(scheme)).map(([name, value]) => `${name}:${value}`).join(';');
-  return svg.replace(/^(<svg[^>]*>)/, `$1<style>svg{${properties}}</style>`);
-}
-
 const sources = new Map<string, Promise<string>>();
 
 /** A built-in image's SVG, such as `flat/garden` by day, fetched once. */
@@ -73,9 +67,4 @@ export function presetSvg(preset: string, variant: 'day' | 'night'): Promise<str
     sources.set(url, text);
   }
   return text;
-}
-
-/** A built-in image, by day or by night, pre-rendered in the scheme, as a data URL. */
-export async function schemedPresetUrl(preset: string, variant: 'day' | 'night', scheme: ColorScheme): Promise<string> {
-  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(bakeScheme(await presetSvg(preset, variant), scheme));
 }

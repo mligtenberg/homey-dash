@@ -1,4 +1,4 @@
-import { backgroundStyle, hasImage } from './background';
+import { backgroundStyle, hasImage, renderedBackgroundStyle } from './background';
 
 describe('backgroundStyle', () => {
   it('is the theme ground without a background', () => {
@@ -32,5 +32,20 @@ describe('backgroundStyle', () => {
     expect(hasImage({ kind: 'preset', preset: 'flat/garden' })).toBe(true);
     expect(hasImage({ kind: 'color', color: '#102030' })).toBe(false);
     expect(hasImage(null)).toBe(false);
+  });
+});
+
+describe('renderedBackgroundStyle', () => {
+  it('asks HomeyDash for a built-in image at the screen’s size, in its colour scheme', () => {
+    expect(renderedBackgroundStyle({ kind: 'preset', preset: 'flat/garden', color: '#3d7ae0', angle: 30 }, 1280, 800, 1.5)).toBe(
+      'center / cover no-repeat ' +
+        'var(--hide-in-dark, url("/api/backgrounds/presets/flat/garden-day.webp?width=1920&height=1200&color=%233d7ae0&angle=30")) ' +
+        'var(--hide-in-light, url("/api/backgrounds/presets/flat/garden-night.webp?width=1920&height=1200&color=%233d7ae0&angle=30"))',
+    );
+  });
+
+  it('rounds sizes up to a step, and paints anything else as it is', () => {
+    expect(renderedBackgroundStyle({ kind: 'preset', preset: 'flat/garden' }, 1001, 10, 1)).toContain('width=1008&height=16"');
+    expect(renderedBackgroundStyle({ kind: 'color', color: '#102030' }, 100, 100)).toBe('#102030');
   });
 });

@@ -8,7 +8,7 @@ export * from './lib/logic/logic-tile';
 export { shownSections } from './lib/logic/shown-sections';
 export { capabilityText, deviceLook, deviceType } from './lib/core/device-look';
 export * from './lib/dashboard-view';
-export { backgroundSignal, backgroundStyle, hasImage, loadBackgroundStyle } from './lib/background';
+export { backgroundStyle, hasImage, renderedBackgroundStyle } from './lib/background';
 export { BackgroundArt } from './lib/background-art';
 export {
   type ColorScheme,

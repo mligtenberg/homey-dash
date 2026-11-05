@@ -1,8 +1,6 @@
-import { effect, Signal, signal } from '@angular/core';
-import { backgroundImageUrl, backgroundPresetUrl, DashboardBackground } from '@homey-dash/api-client';
-import { schemedPresetUrl } from './background-colors';
+import { backgroundImageUrl, backgroundPresetUrl, DashboardBackground, renderedPresetUrl } from '@homey-dash/api-client';
 
-/** A built-in image's day and night pictures, when not the files the apps ship (such as recoloured ones). */
+/** A built-in image's day and night pictures, when not the SVGs the apps ship (such as rendered ones). */
 export interface PresetUrls {
   day: string;
   night: string;
@@ -38,28 +36,21 @@ export function hasImage(background: DashboardBackground | null | undefined): bo
   return background?.kind === 'image' || background?.kind === 'preset';
 }
 
-/** The CSS background for a dashboard's background, once a built-in image in a colour scheme is pre-rendered in it. */
-export async function loadBackgroundStyle(background: DashboardBackground | null | undefined): Promise<string | null> {
-  if (background?.kind !== 'preset' || !background.color || background.angle == null) return backgroundStyle(background);
-  const scheme = { color: background.color, angle: background.angle };
-  const [day, night] = await Promise.all(
-    (['day', 'night'] as const).map((variant) => schemedPresetUrl(background.preset, variant, scheme)),
-  );
-  return backgroundStyle(background, { day, night });
-}
-
 /**
- * `backgroundStyle` as a signal, for a component to bind. A built-in image in a colour scheme shows once pre-rendered; until
- * then the previous background stays, or the theme's ground at first, rather than flashing its own colours.
+ * `backgroundStyle` with a built-in image rendered by HomeyDash for width × height CSS pixels at the screen's pixel
+ * density (rounded up, so slightly different sizes share an image), in its colour scheme.
  */
-export function backgroundSignal(source: () => DashboardBackground | null | undefined): Signal<string | null> {
-  const loaded = signal<string | null>(null);
-  effect(() => {
-    const background = source();
-    loadBackgroundStyle(background).then(
-      (style) => source() === background && loaded.set(style),
-      () => source() === background && loaded.set(backgroundStyle(background)),
-    );
+export function renderedBackgroundStyle(
+  background: DashboardBackground | null | undefined,
+  width: number,
+  height: number,
+  density = globalThis.devicePixelRatio || 1,
+): string | null {
+  if (background?.kind !== 'preset') return backgroundStyle(background);
+  const side = (css: number) => Math.min(4096, Math.max(16, Math.ceil((css * density) / 16) * 16));
+  const [w, h] = [side(width), side(height)];
+  return backgroundStyle(background, {
+    day: renderedPresetUrl(background, 'day', w, h),
+    night: renderedPresetUrl(background, 'night', w, h),
   });
-  return loaded.asReadonly();
 }

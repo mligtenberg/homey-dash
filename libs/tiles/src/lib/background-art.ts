@@ -4,7 +4,7 @@ import { ColorScheme, presetSvg, schemeProperties } from './background-colors';
 /**
  * A built-in image inlined behind its parent's content (position the parent), by day in the light theme and by night in
  * the dark one, recoloured by its colour scheme through CSS custom properties, so changing the scheme shows at once. For
- * the Editor's stage; displays show a pre-rendered image (`loadBackgroundStyle`).
+ * the Editor's stage; displays show one HomeyDash renders (`renderedBackgroundStyle`).
  */
 @Component({
   selector: 'hd-background-art',

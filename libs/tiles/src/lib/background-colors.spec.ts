@@ -1,4 +1,4 @@
-import { bakeScheme, hexToOklch, oklchToHex, schemeProperties } from './background-colors';
+import { hexToOklch, oklchToHex, schemeProperties } from './background-colors';
 
 describe('hexToOklch and oklchToHex', () => {
   it('go there and back', () => {
@@ -23,13 +23,5 @@ describe('hexToOklch and oklchToHex', () => {
 describe('schemeProperties', () => {
   it('is the picked colour’s hue and chroma, and the angle', () => {
     expect(schemeProperties({ color: '#0000ff', angle: 30 })).toEqual({ '--scheme-hue': 264.1, '--scheme-angle': 30, '--scheme-chroma': 0.313 });
-  });
-});
-
-describe('bakeScheme', () => {
-  it('writes the scheme into the SVG, first thing inside it', () => {
-    expect(bakeScheme('<svg a="1"><rect/></svg>', { color: '#0000ff', angle: 30 })).toBe(
-      '<svg a="1"><style>svg{--scheme-hue:264.1;--scheme-angle:30;--scheme-chroma:0.313}</style><rect/></svg>',
-    );
   });
 });

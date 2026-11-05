@@ -1,11 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { DashboardBackground, DashboardsApi } from '@homey-dash/api-client';
 import {
   BACKGROUND_STYLES,
   BACKGROUND_SUBJECTS,
-  backgroundSignal,
   ColorScheme,
-  loadBackgroundStyle,
+  renderedBackgroundStyle,
 } from '@homey-dash/tiles';
 import { ColorSchemeWheel } from './color-scheme-wheel';
 
@@ -145,9 +144,16 @@ export class BackgroundField {
   protected readonly error = signal<string | null>(null);
 
   protected readonly startScheme = START_SCHEME;
-  protected readonly swatch = backgroundSignal(() => this.background());
-  // Each subject's thumbnail in the chosen style and scheme, by day or by night as the theme is, like the dashboard.
-  protected readonly thumbs = signal<Record<string, string | null>>({});
+  protected readonly swatch = computed(() => renderedBackgroundStyle(this.background(), 36, 36));
+  // Each subject's thumbnail in the chosen style and scheme, by day or by night as the theme is, rendered as displays
+  // show it.
+  protected readonly thumbs = computed(() => {
+    const { style } = this.preset();
+    const scheme = this.scheme();
+    return Object.fromEntries(
+      this.subjects.map((s) => [s.id, renderedBackgroundStyle({ kind: 'preset', preset: `${style}/${s.id}`, ...scheme }, 80, 50)]),
+    );
+  });
   protected readonly colors = computed(() => {
     const background = this.background();
     return {
@@ -173,21 +179,6 @@ export class BackgroundField {
       ? { color: background.color, angle: background.angle }
       : null;
   });
-
-  constructor() {
-    effect(() => {
-      if (this.background()?.kind !== 'preset') return;
-      const { style } = this.preset();
-      const scheme = this.scheme();
-      Promise.all(this.subjects.map((s) => loadBackgroundStyle({ kind: 'preset', preset: `${style}/${s.id}`, ...scheme }))).then(
-        (styles) => {
-          if (this.preset().style !== style || this.scheme() !== scheme) return;
-          this.thumbs.set(Object.fromEntries(this.subjects.map((s, i) => [s.id, styles[i]])));
-        },
-        () => this.error.set('Could not recolour the built-in images.'),
-      );
-    });
-  }
 
   protected setKind(kind: string) {
     this.error.set(null);

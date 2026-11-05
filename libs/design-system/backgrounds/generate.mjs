@@ -254,7 +254,9 @@ function arcPoints({ cx, cy, r, a0, a1 }, steps = 24) {
 }
 
 const opacity = (shape, extra = 1) => (shape.o ?? 1) * extra;
-const op = (o) => (o < 1 ? ` opacity="${n(o)}"` : '');
+// As fill and stroke opacity rather than opacity, which is the same for one shape and which the API's renderer (Svg.Skia)
+// leaves out inside a filtered group.
+const op = (o) => (o < 1 ? ` fill-opacity="${n(o)}" stroke-opacity="${n(o)}"` : '');
 
 // An outline-free shape in plain SVG; lines and arcs are strokes.
 function plain(shape, fill, extra = 1, round = true) {
@@ -451,7 +453,7 @@ const STYLES = {
       `<filter id="bleed" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency=".03" numOctaves="2" seed="${Math.floor(random() * 100)}"/><feDisplacementMap in="SourceGraphic" scale="40"/><feGaussianBlur stdDeviation="6"/></filter>` +
       `<filter id="paper"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2"/><feColorMatrix values="0 0 0 0 ${grain.split(' ')[0]} 0 0 0 0 ${grain.split(' ')[1]} 0 0 0 0 ${grain.split(' ')[2]} 0 0 0 .5 0"/></filter>`;
     const blooms = Array.from({ length: 5 }, () =>
-      `<circle cx="${n(random() * W)}" cy="${n(random() * H * 0.7)}" r="${n(160 + random() * 200)}" fill="${[p.a, p.b, p.c][Math.floor(random() * 3)]}" opacity=".12"/>`).join('');
+      `<circle cx="${n(random() * W)}" cy="${n(random() * H * 0.7)}" r="${n(160 + random() * 200)}" fill="${[p.a, p.b, p.c][Math.floor(random() * 3)]}" fill-opacity=".12"/>`).join('');
     const body = shapes.map((s) => plain(s, p[s.t], 0.55)).join('');
     return svg(`<rect width="${W}" height="${H}" fill="url(#bg)"/><g filter="url(#bleed)">${blooms}</g>` +
       `<g filter="url(#bleed)" opacity=".5">${body}</g><g filter="url(#wash)">${body}</g>` +
