@@ -191,7 +191,7 @@
             }
           </select>
         </div>
-        <hd-background-field [background]="layout().background ?? null" (changed)="setBackground($event)" />
+        <hd-background-field [background]="layout().background ?? null" (previewed)="previewBackground.set($event)" (changed)="setBackground($event)" />
         <p class="hint">Press an empty cell to add a tile. Drag a tile to move it, or its corner to resize it.</p>
         <button class="hd-btn hd-btn--danger delete" type="button" (click)="deleteDashboard()">Delete dashboard</button>
       }

@@ -93,7 +93,7 @@ const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
             My own colours
           </label>
           @if (scheme(); as scheme) {
-            <hd-color-scheme-wheel [scheme]="scheme" (changed)="setScheme($event)" />
+            <hd-color-scheme-wheel [scheme]="scheme" (previewed)="preview($event)" (changed)="setScheme($event)" />
           }
         }
       }
@@ -131,6 +131,8 @@ const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
 export class BackgroundField {
   readonly background = input.required<DashboardBackground | null>();
   readonly changed = output<DashboardBackground | null>();
+  /** A background being picked on the colour wheel, to show until it is let go of (and `changed`). */
+  readonly previewed = output<DashboardBackground>();
 
   private readonly api = inject(DashboardsApi);
 
@@ -143,7 +145,13 @@ export class BackgroundField {
   protected readonly error = signal<string | null>(null);
 
   protected readonly startScheme = START_SCHEME;
-  protected readonly swatch = backgroundSignal(() => this.background());
+  // The scheme being dragged to on the wheel; cleared once the background changes.
+  private readonly live = signal<ColorScheme | null>(null);
+  private readonly shown = computed(() => {
+    const [background, live] = [this.background(), this.live()];
+    return live && background?.kind === 'preset' ? { ...background, ...live } : background;
+  });
+  protected readonly swatch = backgroundSignal(() => this.shown());
   // Each subject's thumbnail in the chosen style and scheme, by day or by night as the theme is, like the dashboard.
   protected readonly thumbs = signal<Record<string, string | null>>({});
   protected readonly colors = computed(() => {
@@ -164,6 +172,7 @@ export class BackgroundField {
     return { style, subject };
   });
 
+  // The saved scheme: thumbnails follow it once the wheel is let go of, as redrawing them all is too slow to follow it.
   protected readonly scheme = computed<ColorScheme | null>(() => {
     const background = this.background();
     return background?.kind === 'preset' && background.color && background.angle != null
@@ -172,6 +181,10 @@ export class BackgroundField {
   });
 
   constructor() {
+    effect(() => {
+      this.background();
+      this.live.set(null);
+    });
     effect(() => {
       if (this.background()?.kind !== 'preset') return;
       const { style } = this.preset();
@@ -198,6 +211,13 @@ export class BackgroundField {
 
   protected setPreset(style: string, subject: string) {
     this.changed.emit({ kind: 'preset', preset: `${style}/${subject}`, ...this.scheme() });
+  }
+
+  protected preview(scheme: ColorScheme) {
+    const background = this.background();
+    if (background?.kind !== 'preset') return;
+    this.live.set(scheme);
+    this.previewed.emit({ ...background, ...scheme });
   }
 
   protected setScheme(scheme: ColorScheme | null) {

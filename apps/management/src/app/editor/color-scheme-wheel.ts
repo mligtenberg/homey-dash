@@ -9,8 +9,8 @@ const point = (hue: number, saturation: number, r = 50) => {
 
 /**
  * Picks a colour scheme on a hue wheel: drag the first colour round and in or out (how vivid), and the second round to
- * set the angle between them; the third and fourth sit opposite. Changes while dragging show here and are reported on
- * release; arrow keys move a focused handle (left and right round, up and down in or out).
+ * set the angle between them; the third and fourth sit opposite. Changes while dragging are previewed (at most once a
+ * frame) and reported on release; arrow keys move a focused handle (left and right round, up and down in or out).
  */
 @Component({
   selector: 'hd-color-scheme-wheel',
@@ -74,6 +74,8 @@ const point = (hue: number, saturation: number, r = 50) => {
 export class ColorSchemeWheel {
   readonly scheme = input.required<ColorScheme>();
   readonly changed = output<ColorScheme>();
+  /** The scheme being dragged to, before it is let go of. */
+  readonly previewed = output<ColorScheme>();
 
   // While dragging, the wheel shows the scheme being picked rather than the one saved.
   private readonly live = signal<ColorScheme | null>(null);
@@ -100,6 +102,7 @@ export class ColorSchemeWheel {
   }
 
   protected round = Math.round;
+  private frame = 0;
 
   /** Grabbing the wheel itself moves the first colour there. */
   protected grab(event: PointerEvent) {
@@ -127,6 +130,11 @@ export class ColorSchemeWheel {
     } else {
       this.live.set({ color: this.current().color, angle: Math.round(hue - this.hue() + 360) % 360 });
     }
+    this.frame ||= requestAnimationFrame(() => {
+      this.frame = 0;
+      const live = this.live();
+      if (live && this.dragging() !== null) this.previewed.emit(live);
+    });
   }
 
   protected release() {

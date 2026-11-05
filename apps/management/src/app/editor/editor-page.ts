@@ -366,10 +366,13 @@ export class EditorPage {
     this.apply(edits.removeSection(this.current(), sectionId));
   }
 
-  protected readonly stageBackground = backgroundSignal(() => this.layout().background);
+  // A background being picked on the colour wheel shows on the stage before it is let go of and saved.
+  protected readonly previewBackground = signal<DashboardBackground | null>(null);
+  protected readonly stageBackground = backgroundSignal(() => this.previewBackground() ?? this.layout().background);
   protected readonly stageHasImage = computed(() => hasImage(this.layout().background));
 
   protected setBackground(background: DashboardBackground | null) {
+    this.previewBackground.set(null);
     this.apply({ ...this.current(), background });
   }
 
