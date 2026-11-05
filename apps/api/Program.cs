@@ -11,6 +11,7 @@ using HomeyDash.Api.Plex;
 using HomeyDash.Api.Realtime;
 using HomeyDash.Api.Rules;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,6 +64,33 @@ api.MapRules();
 app.MapHub<RealtimeHub>(RealtimeHub.Path);
 app.MapMcp(ManagementTools.Path);
 // Everything outside /api and /mcp is a frontend: Management under /admin, the display app at the root.
-app.MapReverseProxy();
+// In the container the built frontends sit next to the API and are served from disk;
+// otherwise (development) the requests are forwarded to the frontend dev servers.
+var frontends = Path.Combine(app.Environment.ContentRootPath, "frontends");
+if (Directory.Exists(frontends))
+{
+    var admin = new PhysicalFileProvider(Path.Combine(frontends, "admin"));
+    app.Map("/admin", branch =>
+    {
+        branch.UseStaticFiles(new StaticFileOptions { FileProvider = admin });
+        branch.Run(context =>
+        {
+            context.Response.ContentType = "text/html";
+            return context.Response.SendFileAsync(admin.GetFileInfo("index.html"));
+        });
+    });
+
+    var display = new PhysicalFileProvider(Path.Combine(frontends, "display"));
+    app.UseStaticFiles(new StaticFileOptions { FileProvider = display });
+    app.MapFallback("{*path:regex(^(?!api/|mcp).*$)}", context =>
+    {
+        context.Response.ContentType = "text/html";
+        return context.Response.SendFileAsync(display.GetFileInfo("index.html"));
+    });
+}
+else
+{
+    app.MapReverseProxy();
+}
 
 app.Run();
