@@ -14,7 +14,7 @@ import { Camera, LightMeter } from './light-meter';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
-    <hd-tile-details name="Screen settings" subtitle="This screen only" [icon]="icon">
+    <hd-tile-details name="Screen settings" [closeOnBackdrop]="false" subtitle="This screen only" [icon]="icon">
       <div class="hd-details__row">
         <label class="hd-details__label" for="screen-camera">Camera for light</label>
         @if (meter.hasCamera) {

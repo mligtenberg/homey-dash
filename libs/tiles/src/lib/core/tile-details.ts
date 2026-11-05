@@ -51,6 +51,8 @@ export class TileDetails {
   readonly subtitle = input('');
   /** Whether it takes the whole screen, its content full-bleed under the head, such as for a photo. */
   readonly fill = input(false);
+  /** Whether a tap on the backdrop closes it. */
+  readonly closeOnBackdrop = input(true);
 
   readonly isOpen = signal(false);
   protected readonly closeIcon = LucideX;
@@ -94,7 +96,7 @@ export class TileDetails {
   // The panel fills the dialog, so a click on the dialog itself is on the backdrop. A drag that started on a
   // control, such as the slider, may end there too; that is not a tap outside.
   protected onClick(event: Event) {
-    if (event.target === event.currentTarget && this.downOnBackdrop) this.close();
+    if (this.closeOnBackdrop() && event.target === event.currentTarget && this.downOnBackdrop) this.close();
     this.downOnBackdrop = false;
   }
 }
