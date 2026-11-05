@@ -26,8 +26,9 @@ public sealed record Section(string Id, string Title, IReadOnlyList<Tile> Tiles,
 
 // What a dashboard shows behind its tiles: one colour (Color), a gradient from Color to To at Angle degrees (0 is
 // upwards, 90 to the right, as in CSS), an image uploaded to HomeyDash (ImageId, see BackgroundImage), or one of the
-// built-in images the apps ship (Preset, "<style>/<subject>", see libs/design-system/backgrounds). Null is the theme's
-// own ground.
+// built-in images the apps ship (Preset, "<style>/<subject>", see libs/design-system/backgrounds), in its own colours
+// or recoloured from Color and Angle: the second colour Angle degrees on around the hue wheel, the third and fourth
+// opposite those two. Null is the theme's own ground.
 public sealed record DashboardBackground(
     string Kind, string? Color = null, string? To = null, int? Angle = null, Guid? ImageId = null, string? Preset = null)
 {

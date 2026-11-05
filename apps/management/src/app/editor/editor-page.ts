@@ -15,7 +15,7 @@ import { DashboardBackground, DashboardDetail, DashboardLayout, DashboardsApi, D
 import { TilePosition, TileSize } from '@homey-dash/layout';
 import {
   alwaysRule,
-  backgroundStyle,
+  backgroundSignal,
   choiceLabel,
   hasImage,
   heldTile,
@@ -366,7 +366,7 @@ export class EditorPage {
     this.apply(edits.removeSection(this.current(), sectionId));
   }
 
-  protected readonly stageBackground = computed(() => backgroundStyle(this.layout().background));
+  protected readonly stageBackground = backgroundSignal(() => this.layout().background);
   protected readonly stageHasImage = computed(() => hasImage(this.layout().background));
 
   protected setBackground(background: DashboardBackground | null) {

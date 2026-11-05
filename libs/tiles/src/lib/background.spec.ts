@@ -16,8 +16,14 @@ describe('backgroundStyle', () => {
 
   it('paints a built-in image by day in the light theme and by night in the dark one', () => {
     expect(backgroundStyle({ kind: 'preset', preset: 'flat/garden' })).toBe(
-      'center / cover no-repeat var(--hide-in-dark, url(/backgrounds/flat/garden-day.svg)) ' +
-        'var(--hide-in-light, url(/backgrounds/flat/garden-night.svg))',
+      'center / cover no-repeat var(--hide-in-dark, url("/backgrounds/flat/garden-day.svg")) ' +
+        'var(--hide-in-light, url("/backgrounds/flat/garden-night.svg"))',
+    );
+  });
+
+  it('paints a built-in image from other pictures, such as recoloured ones', () => {
+    expect(backgroundStyle({ kind: 'preset', preset: 'flat/garden' }, { day: 'data:a', night: 'data:b' })).toBe(
+      'center / cover no-repeat var(--hide-in-dark, url("data:a")) var(--hide-in-light, url("data:b"))',
     );
   });
 

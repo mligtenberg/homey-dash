@@ -509,6 +509,32 @@ const STYLES = {
   }],
 };
 
+// ---- Colour schemes ----
+
+// Which of a colour scheme's four colours (0 the picked one, 1 the one at an angle from it, 2 and 3 opposite those) each
+// palette entry takes when Management recolours an image, and whether it is ground (sky, floor, paper) rather than a
+// thing, which keeps it quieter. Entries left out, such as watercolour's paper grain, keep their colour.
+const ROLES = {
+  top: [0, 1], bottom: [0, 1], bands: [0, 1], floor: [0, 1], g: [1, 1],
+  a: [0, 0], b: [1, 0], c: [2, 0], d: [3, 0], e: [1, 0], dots: [1, 0], grid: [0, 0],
+  deco: (i) => [i % 4, 0], sun: (i) => [2 + i, 0],
+};
+
+// A palette as [colour, role, ground] entries, each colour once (the first role wins).
+function roles(palette) {
+  const seen = new Map();
+  for (const [key, value] of Object.entries(palette)) {
+    const role = ROLES[key];
+    if (!role) continue;
+    const list = Array.isArray(value) ? value : [value];
+    list.forEach((c, i) => {
+      const [scheme, ground] = typeof role === 'function' ? role(i) : role;
+      if (typeof c === 'string' && !seen.has(c)) seen.set(c, [c, scheme, ground]);
+    });
+  }
+  return [...seen.values()];
+}
+
 // ---- Output ----
 
 const styles = Object.entries(STYLES).map(([id, [label]]) => ({ id, label }));
@@ -537,6 +563,14 @@ export const BACKGROUND_STYLES = ${list(styles)} as const;
 
 /** What HomeyDash's built-in backgrounds show, one of each per style, by day and by night. */
 export const BACKGROUND_SUBJECTS = ${list(subjects)} as const;
+
+/**
+ * Each style's palette by day and by night, as [colour, which colour of a scheme it takes (0–3), whether it is ground],
+ * to recolour its images with (see background-colors.ts).
+ */
+export const BACKGROUND_PALETTES: Record<string, Record<'day' | 'night', readonly (readonly [string, number, number])[]>> = {
+${styles.map(({ id }) => `  '${id}': {\n${variants.map((v) => `    ${v}: ${JSON.stringify(roles(STYLES[id][1][v])).replaceAll('"', "'").replaceAll(',', ', ')},`).join('\n')}\n  },`).join('\n')}
+};
 `);
 
 const figures = (variant) => styles.map((t) => `<h2>${t.label}</h2><div class="grid">${subjects.map((s) =>

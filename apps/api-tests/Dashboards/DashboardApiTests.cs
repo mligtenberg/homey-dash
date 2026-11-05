@@ -218,6 +218,35 @@ public class DashboardApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal("pixel-art/living-room", background.GetProperty("preset").GetString());
     }
 
+    [Fact]
+    public async Task ABuiltInBackground_KeepsItsColourScheme()
+    {
+        var id = await CreateAsync();
+
+        var saved = await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft",
+            WithBackground(new { kind = "preset", preset = "flat/garden", color = "#3366cc", angle = 30 }));
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var background = (await _client.GetFromJsonAsync<JsonElement>($"/api/dashboards/{id}")).GetProperty("draft").GetProperty("background");
+        Assert.Equal("#3366cc", background.GetProperty("color").GetString());
+        Assert.Equal(30, background.GetProperty("angle").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("#3366cc", null)]
+    [InlineData(null, 30)]
+    [InlineData("blue", 30)]
+    [InlineData("#3366cc", 360)]
+    public async Task ABuiltInBackgroundsColourScheme_IsAColourAndAnAngle(string? color, int? angle)
+    {
+        var id = await CreateAsync();
+
+        var saved = await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft",
+            WithBackground(new { kind = "preset", preset = "flat/garden", color, angle }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, saved.StatusCode);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("living-room")]

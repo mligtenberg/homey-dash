@@ -91,8 +91,12 @@ _Avoid_: Connection, integration, credential
 ### Layout
 
 **Background**:
-What a dashboard shows behind its tiles: the theme's own, one colour, a gradient between two colours, a built-in image (one subject, such as the living room or the garden, drawn in one style, such as pixel art, by day in the light theme and by night in the dark one), or an image uploaded in **Management**. It belongs to the dashboard's version, so it changes on displays only when the draft is published. Over an image, tiles turn to glass so they stay readable. An uploaded image no version uses any more is let go after a day.
+What a dashboard shows behind its tiles: the theme's own, one colour, a gradient between two colours, a built-in image (one subject, such as the living room or the garden, drawn in one style, such as pixel art, by day in the light theme and by night in the dark one, in its own colours or in a **Colour scheme**), or an image uploaded in **Management**. It belongs to the dashboard's version, so it changes on displays only when the draft is published. Over an image, tiles turn to glass so they stay readable. An uploaded image no version uses any more is let go after a day.
 _Avoid_: Wallpaper, theme, backdrop
+
+**Colour scheme**:
+Four colours a built-in image is redrawn in: one picked colour, a second a chosen angle further around the hue wheel, and the two opposite those. Only their hues and how vivid they are carry over; how light each part is stays the image's own, so it stays light by day and dark by night.
+_Avoid_: Palette, tint
 
 **Section**:
 A group of tiles within a dashboard, laid out on a grid three cells wide and as many rows tall as its dashboard. Cells may be left empty. Displays show it always, never, or only while a **Rule** holds, evaluated as a **Logic tile**'s is; the **Editor** always shows it, dimmed when a display would leave it out.

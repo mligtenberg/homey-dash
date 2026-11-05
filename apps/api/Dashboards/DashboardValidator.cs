@@ -49,6 +49,14 @@ public static partial class DashboardValidator
                     Add($"background.{name}", "A colour is written as #rrggbb, such as #1a1c24.");
             if (background.Kind == "gradient" && background.Angle is not (>= 0 and < 360))
                 Add("background.angle", "A gradient's angle is 0 to 359 degrees.");
+            // A built-in image keeps its own colours, or takes a colour and the angle to its second around the hue wheel.
+            if (background.Kind == "preset" && (background.Color is not null || background.Angle is not null))
+            {
+                if (background.Color is null || !HexColor().IsMatch(background.Color))
+                    Add("background.color", "A colour is written as #rrggbb, such as #1a1c24.");
+                if (background.Angle is not (>= 0 and < 360))
+                    Add("background.angle", "The angle to the second colour is 0 to 359 degrees.");
+            }
             if (background.Kind == "image" && background.ImageId is null)
                 Add("background.imageId", "An image background needs an uploaded image.");
             if (background.Kind == "preset" && (background.Preset is null || !PresetName().IsMatch(background.Preset)))

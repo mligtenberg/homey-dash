@@ -121,7 +121,8 @@ public sealed class ManagementTools(
         "color": "#rrggbb", "to": "#rrggbb", "angle": 0-359 } (as in CSS: 0 upwards, 90 to the right), or { "kind": "image",
         "imageId" } for an image uploaded in Management (keep the one the draft has; assistants can't upload), or
         { "kind": "preset", "preset": "<style>/<subject>" } for a built-in image, drawn by day for the light theme and by
-        night for the dark one: styles geometric, pixel-art, line-art,
+        night for the dark one, optionally recoloured with "color": "#rrggbb" and "angle": 0-359 (the second colour that
+        many degrees on around the hue wheel, the third and fourth opposite the first two): styles geometric, pixel-art, line-art,
         watercolor, low-poly, flat, synthwave; subjects living-room, bathroom, media, music, kitchen, bedroom, garden,
         kids-room, office, energy, climate, security, garage, outdoors. Null or left out is the theme's own.
         Find targets with list_targets, and the signals rules use with list_signals.

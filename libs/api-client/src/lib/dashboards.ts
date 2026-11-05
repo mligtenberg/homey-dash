@@ -26,13 +26,14 @@ export interface Section {
 /**
  * What a dashboard shows behind its tiles: one colour, a gradient between two at an angle (as in CSS: 0 upwards, 90 to
  * the right), an image uploaded to HomeyDash, or one of the built-in images the apps ship, named `<style>/<subject>`,
- * drawn by day and by night. Colours are `#rrggbb`.
+ * drawn by day and by night, in its own colours or recoloured from a colour and the angle to a second one around the hue
+ * wheel (the third and fourth opposite those). Colours are `#rrggbb`.
  */
 export type DashboardBackground =
   | { kind: 'color'; color: string }
   | { kind: 'gradient'; color: string; to: string; angle: number }
   | { kind: 'image'; imageId: string }
-  | { kind: 'preset'; preset: string };
+  | { kind: 'preset'; preset: string; color?: string | null; angle?: number | null };
 
 /** Where HomeyDash serves an uploaded background image. */
 export function backgroundImageUrl(imageId: string) {

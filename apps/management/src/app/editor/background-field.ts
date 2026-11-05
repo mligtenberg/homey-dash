@@ -1,6 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { DashboardBackground, DashboardsApi } from '@homey-dash/api-client';
-import { BACKGROUND_STYLES, BACKGROUND_SUBJECTS, backgroundStyle } from '@homey-dash/tiles';
+import {
+  BACKGROUND_STYLES,
+  BACKGROUND_SUBJECTS,
+  backgroundSignal,
+  ColorScheme,
+  loadBackgroundStyle,
+} from '@homey-dash/tiles';
+import { ColorSchemeWheel } from './color-scheme-wheel';
 
 /** The directions a gradient runs in, as CSS angles: towards the top, clockwise. */
 export const GRADIENT_ANGLES = [
@@ -17,6 +24,9 @@ export const GRADIENT_ANGLES = [
 /** What a new colour or gradient starts as: the dark theme's ground, into a deep blue. */
 const START = { color: '#1a1c24', to: '#1f3b5c' };
 
+/** The colour scheme a built-in image is first recoloured in: a blue, and a violet 30° on. */
+const START_SCHEME: ColorScheme = { color: '#3d7ae0', angle: 30 };
+
 /** The built-in image picked first: the first style's first subject. */
 const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
 
@@ -24,10 +34,11 @@ const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
  * Picks a dashboard's background: the theme's own, one colour, a gradient between two, one of the built-in images (a
  * style, then a subject drawn in it, by day in the light theme and by night in the dark one), or an image uploaded from
  * this computer. A colour or gradient keeps its colours
- * when switching between the two.
+ * when switching between the two; a built-in image keeps its colour scheme when switching image.
  */
 @Component({
   selector: 'hd-background-field',
+  imports: [ColorSchemeWheel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="hd-field">
@@ -73,10 +84,17 @@ const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
                 [attr.aria-label]="subject.label"
                 (click)="setPreset(preset().style, subject.id)"
               >
-                <span class="thumb" [style.background]="thumb(preset().style, subject.id)"></span>
+                <span class="thumb" [style.background]="thumbs()[subject.id]"></span>
               </button>
             }
           </div>
+          <label class="recolor">
+            <input type="checkbox" [checked]="!!scheme()" (change)="setScheme($any($event.target).checked ? startScheme : null)" />
+            My own colours
+          </label>
+          @if (scheme(); as scheme) {
+            <hd-color-scheme-wheel [scheme]="scheme" (changed)="setScheme($event)" />
+          }
         }
       }
       @if (background()?.kind === 'image' || picking()) {
@@ -107,6 +125,7 @@ const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
     .thumb { display: block; width: 100%; aspect-ratio: 16 / 10; }
     .preset[aria-pressed='true'] { border-color: var(--brand); }
     .preset:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+    .recolor { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; }
   `,
 })
 export class BackgroundField {
@@ -123,7 +142,10 @@ export class BackgroundField {
   protected readonly uploading = signal(false);
   protected readonly error = signal<string | null>(null);
 
-  protected readonly swatch = computed(() => backgroundStyle(this.background()));
+  protected readonly startScheme = START_SCHEME;
+  protected readonly swatch = backgroundSignal(() => this.background());
+  // Each subject's thumbnail in the chosen style and scheme, by day or by night as the theme is, like the dashboard.
+  protected readonly thumbs = signal<Record<string, string | null>>({});
   protected readonly colors = computed(() => {
     const background = this.background();
     return {
@@ -142,6 +164,28 @@ export class BackgroundField {
     return { style, subject };
   });
 
+  protected readonly scheme = computed<ColorScheme | null>(() => {
+    const background = this.background();
+    return background?.kind === 'preset' && background.color && background.angle != null
+      ? { color: background.color, angle: background.angle }
+      : null;
+  });
+
+  constructor() {
+    effect(() => {
+      if (this.background()?.kind !== 'preset') return;
+      const { style } = this.preset();
+      const scheme = this.scheme();
+      Promise.all(this.subjects.map((s) => loadBackgroundStyle({ kind: 'preset', preset: `${style}/${s.id}`, ...scheme }))).then(
+        (styles) => {
+          if (this.preset().style !== style || this.scheme() !== scheme) return;
+          this.thumbs.set(Object.fromEntries(this.subjects.map((s, i) => [s.id, styles[i]])));
+        },
+        () => this.error.set('Could not recolour the built-in images.'),
+      );
+    });
+  }
+
   protected setKind(kind: string) {
     this.error.set(null);
     this.picking.set(kind === 'image');
@@ -152,13 +196,15 @@ export class BackgroundField {
     else if (kind === 'preset') this.changed.emit({ kind, preset: FIRST_PRESET });
   }
 
-  /** A subject's thumbnail in the style, by day or by night as the theme is, like the dashboard. */
-  protected thumb(style: string, subject: string) {
-    return backgroundStyle({ kind: 'preset', preset: `${style}/${subject}` });
+  protected setPreset(style: string, subject: string) {
+    this.changed.emit({ kind: 'preset', preset: `${style}/${subject}`, ...this.scheme() });
   }
 
-  protected setPreset(style: string, subject: string) {
-    this.changed.emit({ kind: 'preset', preset: `${style}/${subject}` });
+  protected setScheme(scheme: ColorScheme | null) {
+    const background = this.background();
+    if (background?.kind !== 'preset') return;
+    const { preset } = background;
+    this.changed.emit(scheme ? { kind: 'preset', preset, ...scheme } : { kind: 'preset', preset });
   }
 
   protected setColor(which: 'color' | 'to', value: string) {
