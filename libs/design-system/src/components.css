@@ -478,10 +478,16 @@
   color: var(--ink-muted); font-size: 22px;
   cursor: pointer; background: none;
 }
-.hd-slot:hover { border-color: var(--brand); color: var(--brand); }
+/* Over a photo the faint dashed outline disappears, so back the slot with glass and a firmer edge. */
+.hd-has-image .hd-slot {
+  border-color: var(--ink-muted); color: var(--ink);
+  background: color-mix(in oklab, var(--panel) 60%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.hd-slot:hover, .hd-has-image .hd-slot:hover { border-color: var(--brand); color: var(--brand); }
 /* Which of a logic tile's tiles shows, over it in the Editor: "2 of 3", "Fallback", "Nothing". */
 .hd-logic-badge {
-  position: absolute; top: 6px; left: 6px; z-index: 1; pointer-events: none;
+  position: absolute; top: calc(var(--cell) * var(--tile-radius) * .4); left: calc(var(--cell) * var(--tile-radius) * .6); z-index: 1; pointer-events: none;
   padding: 2px 8px; border-radius: 999px;
   background: var(--brand); color: var(--panel);
   font: 700 11px/1.5 var(--font-sans); white-space: nowrap;

@@ -7,12 +7,13 @@ import {
   inject,
   input,
   signal,
+  viewChild,
   viewChildren,
 } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { DashboardBackground, DashboardDetail, DashboardLayout, DashboardsApi, DisplaysApi, Rule, Tile } from '@homey-dash/api-client';
-import { TilePosition, TileSize } from '@homey-dash/layout';
+import { cellSize, TilePosition, TileSize } from '@homey-dash/layout';
 import {
   alwaysRule,
   BackgroundArt,
@@ -100,6 +101,14 @@ export class EditorPage {
   protected readonly justPublished = signal(false);
   private readonly drag = signal<Drag | null>(null);
 
+  private readonly stage = viewChild<ElementRef<HTMLElement>>('stage');
+  /** The stage's height, which sizes the cells the way a display's height does. */
+  private readonly stageHeight = signal(0);
+  /** Matches the stage's vertical padding in components.css. */
+  private static readonly STAGE_PADDING = 44;
+  protected readonly cell = computed(() =>
+    this.stageHeight() > 0 ? cellSize(Math.max(1, this.stageHeight() - EditorPage.STAGE_PADDING), this.layout().rows) : null,
+  );
   private readonly grids = viewChildren<ElementRef<HTMLElement>>('grid');
   private saveTimer: ReturnType<typeof setTimeout> | undefined;
   private saving: Promise<void> = Promise.resolve();
@@ -180,6 +189,13 @@ export class EditorPage {
   );
 
   constructor() {
+    effect((onCleanup) => {
+      const stage = this.stage()?.nativeElement;
+      if (!stage) return;
+      const observer = new ResizeObserver(() => this.stageHeight.set(stage.clientHeight));
+      observer.observe(stage);
+      onCleanup(() => observer.disconnect());
+    });
     effect((onCleanup) => {
       const loading: Subscription = this.api.get(this.id()).subscribe((dashboard) => {
         this.dashboard.set(dashboard);

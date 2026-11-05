@@ -29,7 +29,9 @@
       <hd-background-art [preset]="art.preset" [scheme]="art.scheme" />
     }
     <div
+      #stage
       class="hd-stage"
+      [style.--cell.px]="cell()"
       [style.background]="stageBackground()"
       [class.hd-has-image]="stageHasImage()"
       (pointermove)="onPointerMove($event)"
