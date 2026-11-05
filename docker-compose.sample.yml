@@ -1,0 +1,20 @@
+# Copy to docker-compose.yml and adjust. Starts HomeyDash on http://<host>:8080
+# (display app at /, Management at /admin/).
+services:
+  homey-dash:
+    image: ghcr.io/mligtenberg/homey-dash:latest
+    container_name: homey-dash
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # The SQLite database (accounts, dashboards, displays, rules).
+      # A bind mount must be writable by the container user, UID 1654:
+      #   mkdir -p ./data && chown 1654:1654 ./data
+      - ./data:/data
+    environment:
+      TZ: Europe/Amsterdam
+      # Defaults, only change if you move things:
+      # ConnectionStrings__HomeyDash: "Data Source=/data/homey-dash.db"
+      # ASPNETCORE_HTTP_PORTS: "8080"
+      # Logging__LogLevel__Default: Information
