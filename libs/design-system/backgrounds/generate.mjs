@@ -39,10 +39,20 @@ const star = (cx, cy, r, t) =>
     const d = i % 2 ? r * 0.45 : r;
     return [cx + d * Math.cos(a), cy + d * Math.sin(a)];
   }), t);
-const cloud = (cx, cy, s, t) => [
+// Shapes that belong together get a group, so a style that outlines things draws one outline round all of them.
+let groups = 0;
+const together = (list) => { const grp = ++groups; return list.map((s) => ({ ...s, grp })); };
+const cloud = (cx, cy, s, t) => together([
   C(cx - 70 * s, cy + 10 * s, 50 * s, t), C(cx, cy - 20 * s, 70 * s, t), C(cx + 75 * s, cy + 5 * s, 55 * s, t),
   R(cx - 120 * s, cy + 10 * s, 250 * s, 50 * s, t, 25 * s),
-];
+]);
+// A tube with a rounded top and a round bulb at its foot, as one polygon (a thermometer, its mercury).
+const tube = (cx, top, halfW, bulbY, bulbR, t, o) => {
+  const k = Math.acos(halfW / bulbR) * (180 / Math.PI), p = [];
+  for (let a = 180; a <= 360; a += 15) p.push([cx + halfW * Math.cos((a * Math.PI) / 180), top + halfW + halfW * Math.sin((a * Math.PI) / 180)]);
+  for (let a = -k; a <= 180 + k; a += 10) p.push([cx + bulbR * Math.cos((a * Math.PI) / 180), bulbY + bulbR * Math.sin((a * Math.PI) / 180)]);
+  return P(p, t, o);
+};
 const note = (x, y, t) => [E(x, y, 28, 20, t), L(x + 25, y, x + 25, y - 110, t, 8), L(x + 25, y - 110, x + 70, y - 80, t, 8)];
 const wave = (x, y, len, amp, t, w = 6) =>
   PL(Array.from({ length: 13 }, (_, i) => [x + amp * Math.sin((i / 12) * Math.PI * 2), y - (i / 12) * len]), t, w);
@@ -190,7 +200,7 @@ const SUBJECTS = {
     wave(400, 520, 160, 14, 'c'), wave(550, 520, 190, 14, 'c'), wave(700, 520, 160, 14, 'c'),
     C(1100, 360, 120, 'b'), C(1100, 360, 96, 'e'), A(1100, 360, 96, 135, 405, 'a', 14), A(1100, 360, 96, 135, 300, 'c', 14),
     C(1100, 360, 34, 'd', 0.8),
-    R(1380, 230, 50, 340, 'd', 25), C(1405, 600, 50, 'd'), R(1395, 360, 30, 240, 'c', 10), C(1405, 600, 36, 'c'),
+    tube(1405, 230, 25, 600, 50, 'd'), tube(1405, 360, 15, 600, 36, 'c'),
     ...[280, 340, 400, 460].map((y) => L(1440, y, 1465, y, 'd', 5)),
     ...[0, 60, 120].map((a) => {
       const r = (a * Math.PI) / 180;
@@ -327,9 +337,17 @@ function polygons(shape) {
 function facets(poly, color, random, o) {
   const [cx, cy] = poly.reduce(([x, y], [px, py]) => [x + px / poly.length, y + py / poly.length], [0, 0]);
   if (poly.length === 4 && Math.abs(poly[0][1] - poly[1][1]) < 1e-6 && Math.abs(poly[1][0] - poly[2][0]) < 1e-6) {
-    // An upright rectangle splits along a diagonal into two faces.
-    return [[poly[0], poly[1], poly[2]], [poly[0], poly[2], poly[3]]]
-      .map((t, i) => `<polygon points="${pts(t)}" fill="${shade(color, i ? -0.08 : 0.04)}"${op(o)}/>`).join('');
+    // An upright rectangle becomes a grid of triangles, lit from the top left with a little chance in each face.
+    const [x0, y0, x1, y1] = [poly[0][0], poly[0][1], poly[2][0], poly[2][1]];
+    const [cx, cy] = [Math.max(1, Math.round((x1 - x0) / 110)), Math.max(1, Math.round((y1 - y0) / 110))];
+    const faces = [];
+    for (let r = 0; r < cy; r++) for (let c = 0; c < cx; c++) {
+      const [a, b, d, e] = [[x0 + ((x1 - x0) * c) / cx, y0 + ((y1 - y0) * r) / cy], [x0 + ((x1 - x0) * (c + 1)) / cx, y0 + ((y1 - y0) * r) / cy],
+        [x0 + ((x1 - x0) * (c + 1)) / cx, y0 + ((y1 - y0) * (r + 1)) / cy], [x0 + ((x1 - x0) * c) / cx, y0 + ((y1 - y0) * (r + 1)) / cy]];
+      const light = 0.07 - ((c + r) / (cx + cy)) * 0.14;
+      for (const [t, k] of [[[a, b, d], -0.02], [[a, d, e], 0.02]]) faces.push(`<polygon points="${pts(t)}" fill="${shade(color, light + k + (random() - 0.5) * 0.07)}"${op(o)}/>`);
+    }
+    return faces.join('');
   }
   return poly
     .map((p, i) => `<polygon points="${pts([p, poly[(i + 1) % poly.length], [cx, cy]])}" fill="${shade(color, (random() - 0.5) * 0.18)}"${op(o)}/>`)
@@ -378,6 +396,41 @@ const svg = (body, defs = '') =>
 const gradient = (id, top, bottom) =>
   `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bottom}"/></linearGradient>`;
 
+
+const bbox = (s) => {
+  switch (s.s) {
+    case 'rect': return [s.x, s.y, s.x + s.w, s.y + s.h];
+    case 'circle': return [s.cx - s.r, s.cy - s.r, s.cx + s.r, s.cy + s.r];
+    case 'ellipse': return [s.cx - s.rx, s.cy - s.ry, s.cx + s.rx, s.cy + s.ry];
+    case 'poly': return [Math.min(...s.pts.map((q) => q[0])), Math.min(...s.pts.map((q) => q[1])), Math.max(...s.pts.map((q) => q[0])), Math.max(...s.pts.map((q) => q[1]))];
+  }
+};
+// Soft contact shadows on the ground under the things that stand on it, for the styles that fill their shapes.
+const shadows = (shapes, color, o = 0.16) => {
+  const seen = new Set();
+  return shapes.filter((s) => s.t !== 'g' && s.s !== 'polyline' && s.s !== 'arc' && (s.o ?? 1) >= 0.9).map(bbox)
+    .filter(([x0, y0, x1, y1]) => y1 >= FLOOR - 10 && y1 <= FLOOR + 130 && x1 - x0 >= 60 && x1 - x0 < 700 && y1 - y0 > 30)
+    .map(([x0, , x1, y1]) => {
+      const key = `${Math.round(x0)}-${Math.round(x1)}-${Math.round(y1)}`;
+      if (seen.has(key)) return '';
+      seen.add(key);
+      return `<ellipse cx="${n((x0 + x1) / 2)}" cy="${n(y1 + 3)}" rx="${n(((x1 - x0) / 2) * 1.04)}" ry="${n(Math.min(20, (x1 - x0) / 9))}" fill="${color}" fill-opacity="${o}"/>`;
+    }).join('');
+};
+// A rounded-box shape lit from the top left: a light edge along its top and a shade down its right side.
+const lit = (s, light, dark, o = 0.5) => {
+  if (s.s !== 'rect' || s.t === 'g' || (s.o ?? 1) < 0.9 || s.w < 50 || s.h < 40) return '';
+  const e = Math.min(14, s.h / 6), side = Math.min(s.w * 0.2, 44), r = Math.min(s.r ?? 0, e);
+  return `<rect x="${n(s.x + s.w - side)}" y="${n(s.y)}" width="${n(side)}" height="${n(s.h)}" rx="${s.r ? Math.min(s.r, side / 2) : 0}" fill="${dark}" fill-opacity="${n(0.1 * o * 2)}"/>` +
+    `<rect x="${n(s.x)}" y="${n(s.y)}" width="${n(s.w)}" height="${n(e)}" rx="${r}" fill="${light}" fill-opacity="${n(0.3 * o * 2)}"/>`;
+};
+
+// Shapes of one group drawn as a single outlined thing, for styles that draw outlines over a background: the outline goes
+// round all of them and none runs through them, as strokes first and then the fills, in colours worked out against the
+// background so nothing is see-through.
+const unioned = (members, stroke, width, fill, background) =>
+  members.map((s) => outline(s, stroke, width * 2)).join('') + members.map((s) => plain(s, fill)).join('') + (background ?? '');
+
 // ---- Styles ----
 
 // Every style has a palette for day and one for night: the day one light and soft, for the light theme's pale glass
@@ -399,7 +452,10 @@ const STYLES = {
     const dots = Array.from({ length: 6 }, (_, row) => Array.from({ length: 8 }, (_, col) =>
       `<circle cx="${60 + col * 28}" cy="${640 + row * 28}" r="4" fill="${p.dots}" opacity=".25"/>`).join('')).join('');
     return svg(`<rect width="${W}" height="${H}" fill="url(#bg)"/>${big.join('')}${dots}` +
-      shapes.map((s) => plain(s, p[s.t], 0.9, false)).join(''), gradient('bg', p.top, p.bottom));
+      shapes.filter((s) => s.t === 'g').map((s) => plain(s, p.g, 0.9, false)).join('') +
+      `<rect y="${FLOOR}" width="${W}" height="6" fill="${p.e}" fill-opacity=".12"/>` + shadows(shapes, p.e, 0.2) +
+      shapes.filter((s) => s.t !== 'g').map((s) => plain(s, p[s.t], 1, false) + lit(s, p.d, p.e, 0.6)).join(''),
+      gradient('bg', p.top, p.bottom));
   }],
   'pixel-art': ['Pixel art', {
     day: { g: '#cbc0a6', a: '#93a3c6', b: '#aabfe0', c: '#eeae5e', d: '#f5f7fc', e: '#5b6589',
@@ -411,6 +467,8 @@ const STYLES = {
     const random = rng(seed);
     const solid = shapes.map((s) => (s.s === 'arc' ? { ...s, s: 'polyline', pts: arcPoints(s) } : s));
     // Which solid shape (by its index) is in front at each block, -1 for sky, and the colour so far.
+    // Shapes in a group count as one, so there is no outline between them.
+    const rank = solid.map((s, i) => (s.grp ? solid.findIndex((q) => q.grp === s.grp) : i));
     const top = Array.from({ length: rows }, () => new Int16Array(cols).fill(-1));
     const cells = Array.from({ length: rows }, () => new Array(cols));
     for (let row = 0; row < rows; row++) {
@@ -423,7 +481,7 @@ const STYLES = {
         solid.forEach((s, i) => {
           if (!hits(s, x, y, size * 1.5)) return;
           if ((s.o ?? 1) < 0.5) color = mix(color, p[s.t], s.o);
-          else [color, top[row][col]] = [p[s.t], i];
+          else [color, top[row][col]] = [p[s.t], rank[i]];
         });
         cells[row][col] = color;
       }
@@ -462,17 +520,29 @@ const STYLES = {
     return svg(`<g transform="scale(${size})" fill="none" stroke-width="1" shape-rendering="crispEdges">${body}</g>`);
   }],
   'line-art': ['Line art', {
-    day: { top: '#eff1f4', bottom: '#e7eaee', g: '#7d8898', a: '#56637a', b: '#6c788c', c: '#c08436', d: '#56637a', e: '#7d8898' },
-    night: { top: '#1a1e26', bottom: '#20252e', g: '#8d9aab', a: '#c3cedb', b: '#a9b6c6', c: '#dcae6c', d: '#c3cedb', e: '#8d9aab' },
+    day: { top: '#f4efe4', bottom: '#ebe6da', g: '#6d7889', a: '#3f4c63', b: '#56637a', c: '#c0742a', d: '#3f4c63', e: '#6d7889' },
+    night: { top: '#171b24', bottom: '#1e232d', g: '#8d9aab', a: '#d4deea', b: '#b3c0d0', c: '#e8b673', d: '#d4deea', e: '#8d9aab' },
   }, (shapes, seed, p) => {
+    const drawn = new Set();
     const body = shapes.map((s) => {
+      if (s.grp) {
+        if (drawn.has(s.grp)) return '';
+        drawn.add(s.grp);
+        const members = shapes.filter((q) => q.grp === s.grp);
+        const back = mix(p.top, p.bottom, (bbox(s)[1] + 100) / H);
+        return unioned(members, mix(back, p[s.t], 0.72), 2.5, mix(back, p[s.t], 0.07));
+      }
       // The ground is a horizon, not a box.
       if (s.t === 'g' && s.s === 'rect') return `<line x1="0" y1="${s.y}" x2="${W}" y2="${s.y}" stroke="${p.g}" stroke-width="4" opacity=".35"/>`;
-      const extra = s.t === 'c' ? 0.6 : 0.42;
+      const extra = s.t === 'c' ? 0.9 : 0.72;
       if (s.s === 'polyline' || s.s === 'arc') return plain({ ...s, w: Math.min(s.w, 5) }, p[s.t], extra);
-      return outline(s, p[s.t], 4, extra) + (s.t === 'c' ? plain(s, p.c, 0.08) : '');
+      return plain(s, p[s.t], s.t === 'c' ? 0.2 : s.t === 'd' ? 0.05 : 0.07) + outline(s, p[s.t], s.t === 'd' ? 3 : 5, extra);
     });
-    return svg(`<rect width="${W}" height="${H}" fill="url(#bg)"/>${body.join('')}`, gradient('bg', p.top, p.bottom));
+    // A second, offset pass of fine hatching under the floor line, as if shaded with a pencil.
+    const hatch = Array.from({ length: 70 }, (_, i) => `<line x1="${40 + i * 23}" y1="${FLOOR + 30 + (i % 3) * 22}" x2="${22 + i * 23}" y2="${FLOOR + 58 + (i % 3) * 22}"/>`).join('');
+    return svg(`<rect width="${W}" height="${H}" fill="url(#bg)"/><g stroke="${p.g}" stroke-width="3" stroke-linecap="round" opacity=".28">${hatch}</g>` +
+      `<g filter="url(#pencil)">${body.join('')}</g>`,
+      gradient('bg', p.top, p.bottom) + `<filter id="pencil" x="-2%" y="-2%" width="104%" height="104%"><feTurbulence type="fractalNoise" baseFrequency=".02" numOctaves="2" seed="3"/><feDisplacementMap in="SourceGraphic" scale="5"/></filter>`);
   }],
   watercolor: ['Watercolour', {
     day: { top: '#f0ebe1', bottom: '#e9e3d7', g: '#c6d4bd', a: '#8eafc3', b: '#a7c5b2', c: '#e8a882', d: '#fbfaf6', e: '#6c808f', paper: '#7a6a50' },
@@ -482,17 +552,23 @@ const STYLES = {
     const grain = rgb(p.paper).map((v) => n(v / 255)).join(' ');
     const defs = gradient('bg', p.top, p.bottom) +
       `<filter id="wash" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency=".018" numOctaves="3" seed="${Math.floor(random() * 100)}"/><feDisplacementMap in="SourceGraphic" scale="22"/></filter>` +
+      `<filter id="line" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency=".03" numOctaves="2" seed="${Math.floor(random() * 100)}"/><feDisplacementMap in="SourceGraphic" scale="5"/></filter>` +
       `<filter id="bleed" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency=".03" numOctaves="2" seed="${Math.floor(random() * 100)}"/><feDisplacementMap in="SourceGraphic" scale="40"/><feGaussianBlur stdDeviation="6"/></filter>` +
       `<filter id="paper"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2"/><feColorMatrix values="0 0 0 0 ${grain.split(' ')[0]} 0 0 0 0 ${grain.split(' ')[1]} 0 0 0 0 ${grain.split(' ')[2]} 0 0 0 .5 0"/></filter>`;
     const blooms = Array.from({ length: 5 }, () =>
       `<circle cx="${n(random() * W)}" cy="${n(random() * H * 0.7)}" r="${n(160 + random() * 200)}" fill="${[p.a, p.b, p.c][Math.floor(random() * 3)]}" fill-opacity=".12"/>`).join('');
-    const body = shapes.map((s) => plain(s, p[s.t], 0.55)).join('');
+    // Pigment pools at the edge of a wash: a darker, thin rim, and the lines stay lines.
+    const wash = shapes.filter((s) => s.s !== 'polyline' && s.s !== 'arc');
+    const lines = shapes.filter((s) => s.s === 'polyline' || s.s === 'arc').map((s) => plain(s, p[s.t], 0.7)).join('');
+    const rims = wash.filter((s) => s.t !== 'g' && (s.o ?? 1) >= 0.9).map((s) => outline(s, shade(p[s.t], p.paper === '#ffffff' ? 0.2 : -0.22), 3, 0.35)).join('');
+    const body = wash.map((s) => plain(s, p[s.t], 0.6)).join('');
     return svg(`<rect width="${W}" height="${H}" fill="url(#bg)"/><g filter="url(#bleed)">${blooms}</g>` +
-      `<g filter="url(#bleed)" opacity=".5">${body}</g><g filter="url(#wash)">${body}</g>` +
-      `<rect width="${W}" height="${H}" filter="url(#paper)" opacity=".05"/>`, defs);
+      `<g filter="url(#bleed)" opacity=".45">${body}</g><g filter="url(#wash)">${body}</g>` +
+      `<g filter="url(#wash)">${rims}</g><g filter="url(#line)">${lines}</g>` +
+      `<rect width="${W}" height="${H}" filter="url(#paper)" opacity=".09"/>`, defs);
   }],
   'low-poly': ['Low poly', {
-    day: { top: '#c6d7e7', bottom: '#e2eaf1', g: '#c0cbb3', a: '#9daec6', b: '#b4c4d6', c: '#e2a672', d: '#f3f6f9', e: '#6b788e' },
+    day: { top: '#b9d0e6', bottom: '#e2eaf1', g: '#c0cbb3', a: '#9daec6', b: '#b4c4d6', c: '#e2a672', d: '#f3f6f9', e: '#6b788e' },
     night: { top: '#1f2538', bottom: '#2c3652', g: '#2c3843', a: '#44526b', b: '#566b82', c: '#c4885c', d: '#9bb0c0', e: '#1b212e' },
   }, (shapes, seed, p) => {
     const random = rng(seed);
@@ -509,20 +585,28 @@ const STYLES = {
         sky.push(`<polygon points="${pts(tri)}" fill="${shade(mix(p.top, p.bottom, y / H), (random() - 0.5) * 0.12)}" stroke-width="1" stroke="${mix(p.top, p.bottom, y / H)}" stroke-opacity=".3"/>`);
       }
     }
-    const body = shapes.flatMap((s) => polygons(s).map((poly) => facets(poly, p[s.t], random, opacity(s, 0.95)))).join('');
-    return svg(sky.join('') + body);
+    const body = (list) => list.flatMap((s) => polygons(s).map((poly) => facets(poly, p[s.t], random, opacity(s, 1)))).join('');
+    return svg(sky.join('') + body(shapes.filter((s) => s.t === 'g')) + shadows(shapes, p.e, 0.22) + body(shapes.filter((s) => s.t !== 'g')));
   }],
   flat: ['Flat', {
-    day: { top: '#e7e9ed', bottom: '#e2e5ea', g: '#d7dbe1', a: '#c6ccd5', b: '#bac1cb', c: '#9bbead', d: '#ced3da', e: '#8e97a4' },
-    night: { top: '#21242a', bottom: '#25282f', g: '#2a2e35', a: '#3a4049', b: '#474f5a', c: '#7c9a8d', d: '#5c6672', e: '#1c1f24' },
-  }, (shapes, seed, p) =>
-    svg(`<rect width="${W}" height="${H}" fill="url(#bg)"/>` + shapes.map((s) => plain(s, p[s.t])).join(''), gradient('bg', p.top, p.bottom))],
+    day: { top: '#cfe2ef', bottom: '#eaf0f4', g: '#d9d6cc', a: '#b4c6d6', b: '#9db4c8', c: '#8fc0a6', d: '#f6f8fa', e: '#6f8196' },
+    night: { top: '#17202e', bottom: '#222c3c', g: '#2a303a', a: '#38495c', b: '#486079', c: '#6fae93', d: '#7189a3', e: '#161c26' },
+  }, (shapes, seed, p, night) => {
+    // Flat design: clean fills, a long diagonal shadow behind what stands on the floor, a lit edge and a shaded side.
+    const long = shapes.filter((s) => s.t !== 'g' && s.s !== 'polyline' && s.s !== 'arc' && (s.o ?? 1) >= 0.9).map(bbox)
+      .filter(([x0, y0, x1, y1]) => y1 >= FLOOR - 10 && y1 <= FLOOR + 130 && x1 - x0 >= 60 && x1 - x0 < 700 && y1 - y0 > 30)
+      .map(([x0, y0, x1, y1]) => `<polygon points="${pts([[x0 + 10, y1], [x1, y1], [x1 + (y1 - y0) * 0.45, y1 + 45], [x0 + 10 + (y1 - y0) * 0.1, y1 + 45]])}" fill="${p.e}" fill-opacity="${night ? 0.25 : 0.11}"/>`);
+    const draw = (s) => plain(s, p[s.t]) + lit(s, p.d, p.e, 0.5);
+    return svg(`<rect width="${W}" height="${H}" fill="url(#bg)"/>` + shapes.filter((s) => s.t === 'g').map(draw).join('') +
+      `<rect y="${FLOOR}" width="${W}" height="10" fill="${p.e}" fill-opacity=".07"/>` + long.join('') +
+      shapes.filter((s) => s.t !== 'g').map(draw).join(''), gradient('bg', p.top, p.bottom));
+  }],
   synthwave: ['Synthwave', {
     day: { top: '#b9cdfa', bottom: '#f8cfe4', floor: '#f2dcef', grid: '#d2589e', sun: ['#ffd36e', '#ff8fbf'], sunOpacity: 0.55,
       a: '#d8417f', b: '#7d52cf', c: '#d9811f', d: '#1f98a8', e: '#5f4392', glow: 3 },
     night: { top: '#120a24', bottom: '#2a1043', floor: '#160a28', grid: '#ff5fa2', sun: ['#ffb45a', '#ff5fa2'], sunOpacity: 0.35,
       a: '#ff5fa2', b: '#a86bff', c: '#ffb45a', d: '#4fd8e4', e: '#7a4bb0', glow: 5 },
-  }, (shapes, seed, p) => {
+  }, (shapes, seed, p, night) => {
     const defs = gradient('bg', p.top, p.bottom) + gradient('sun', ...p.sun) +
       `<filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${p.glow}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` +
       `<clipPath id="stripes">${Array.from({ length: 9 }, (_, i) => `<rect x="0" y="${520 + i * 30}" width="${W}" height="${30 - Math.min(i * 2.5, 18)}"/>`).join('')}</clipPath>`;
@@ -531,12 +615,25 @@ const STYLES = {
         .map((y) => `<line x1="0" y1="${n(y)}" x2="${W}" y2="${n(y)}"/>`),
       ...Array.from({ length: 21 }, (_, i) => i - 10).map((k) => `<line x1="${800 + k * 50}" y1="${FLOOR}" x2="${800 + k * 400}" y2="${H}"/>`),
     ];
+    const drawn = new Set();
     const body = shapes.filter((s) => s.t !== 'g').map((s) =>
+      s.grp ? (drawn.has(s.grp) ? '' : (drawn.add(s.grp), unioned(shapes.filter((q) => q.grp === s.grp), mix(mix(p.top, p.bottom, 0.4), p[s.t], 0.7), 2, mix(mix(p.top, p.bottom, 0.4), p[s.t], 0.07)))) :
       s.s === 'polyline' || s.s === 'arc'
         ? plain({ ...s, w: Math.min(s.w, 6) }, p[s.t], 0.7)
         : outline(s, p[s.t], 4, 0.7) + plain(s, p[s.t], 0.07));
-    return svg(`<rect width="${W}" height="${H}" fill="url(#bg)"/>` +
+    const random = rng(seed);
+    const ridge = (base, amp, step) => {
+      const list = [[-50, FLOOR]];
+      for (let x = -50; x <= W + 50; x += step) list.push([x, base - random() * amp]);
+      list.push([W + 50, FLOOR]);
+      return list;
+    };
+    const far = ridge(FLOOR - 60, 140, 110), near = ridge(FLOOR - 20, 70, 90);
+    const starry = night ? Array.from({ length: 50 }, () => `<circle cx="${n(random() * W)}" cy="${n(random() * 420)}" r="${n(1 + random() * 2)}" fill="#ffffff" opacity="${n(0.3 + random() * 0.5)}"/>`).join('') : '';
+    return svg(`<rect width="${W}" height="${H}" fill="url(#bg)"/>${starry}` +
       `<circle cx="800" cy="${FLOOR}" r="280" fill="url(#sun)" opacity="${p.sunOpacity}" clip-path="url(#stripes)"/>` +
+      `<polygon points="${pts(far)}" fill="${p.e}" fill-opacity=".22" stroke="${p.grid}" stroke-opacity=".4" stroke-width="2"/>` +
+      `<polygon points="${pts(near)}" fill="${p.top}" fill-opacity=".5" stroke="${p.grid}" stroke-opacity=".55" stroke-width="2"/>` +
       `<rect y="${FLOOR}" width="${W}" height="${H - FLOOR}" fill="${p.floor}"/>` +
       `<g stroke="${p.grid}" stroke-width="2" opacity=".35">${grid.join('')}</g>` +
       `<g filter="url(#glow)">${body.join('')}</g>`, defs);
@@ -600,6 +697,39 @@ function schemed(image, palette, variant) {
   return body.replace(/^(<svg[^>]*>)/, `$1${style}`);
 }
 
+// ---- Colour moods ----
+
+// Every subject has its own mood within a style: the style's palette with its blues turned to the subject's hue (degrees,
+// from the base palettes' blue), a little more colour in what was grey, and the accents (c, d), sun and paper left as they
+// are. Lightness stays, so day images stay light and night ones dark.
+const MOODS = { 'living-room': 0, bathroom: -35, media: 50, music: 85, kitchen: -190, bedroom: 30, garden: 0, 'kids-room': 120,
+  office: -20, energy: 0, climate: -25, security: -70, garage: -150, outdoors: 0 };
+// How much of the mood a style takes: synthwave keeps its neon.
+const MOOD_SCALE = { synthwave: 0.35, 'line-art': 0.8 };
+const KEEP = new Set(['c', 'd', 'sun', 'paper']);
+
+function toHsl(color) {
+  const [r, g, b] = rgb(color).map((v) => v / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  if (!d) return [0, 0, l];
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [(h * 60 + 360) % 360, d / (1 - Math.abs(2 * l - 1)), l];
+}
+function fromHsl([h, s, l]) {
+  const k = (m) => (m + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  return hex([0, 8, 4].map((m) => 255 * (l - a * Math.max(-1, Math.min(k(m) - 3, 9 - k(m), 1)))));
+}
+const turn = (color, degrees) => {
+  if (typeof color !== 'string' || !/^#[0-9a-f]{6}$/.test(color)) return color;
+  const [h, s, l] = toHsl(color);
+  return fromHsl([(h + degrees + 360) % 360, Math.min(1, Math.max(s, 0.12) + (degrees ? 0.04 : 0)), l]);
+};
+const mood = (palette, style, subject) => {
+  const degrees = (MOODS[subject] ?? 0) * (MOOD_SCALE[style] ?? 1);
+  return Object.fromEntries(Object.entries(palette).map(([key, value]) =>
+    [key, KEEP.has(key) || !degrees ? value : Array.isArray(value) ? value.map((c) => turn(c, degrees)) : turn(value, degrees)]));
+};
+
 // ---- Output ----
 
 const styles = Object.entries(STYLES).map(([id, [label]]) => ({ id, label }));
@@ -613,8 +743,9 @@ for (const { id: style } of styles) {
   for (const { id: subject } of subjects) {
     for (const variant of variants) {
       const scene = SUBJECTS[subject][1](variant === 'night');
+      const palette = mood(palettes[variant], style, subject);
       writeFileSync(join(here, style, `${subject}-${variant}.svg`),
-        schemed(draw(scene, `${style}/${subject}`, palettes[variant]), palettes[variant], variant));
+        schemed(draw(scene, `${style}/${subject}`, palette, variant === 'night'), palette, variant));
     }
   }
 }
