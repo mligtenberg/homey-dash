@@ -12,6 +12,7 @@
       "defaultConfiguration": "production",
       "options": {
         "outputPath": "dist/apps/management",
+        "baseHref": "/admin/",
         "browser": "apps/management/src/main.ts",
         "tsConfig": "apps/management/tsconfig.app.json",
         "inlineStyleLanguage": "scss",
@@ -82,20 +83,6 @@
         "tsConfig": "apps/management/tsconfig.spec.json",
         "runner": "vitest",
         "watch": false
-      }
-    },
-    "serve-static": {
-      "continuous": true,
-      "readyWhen": {
-        "signal": true
-      },
-      "dependsOn": ["build"],
-      "executor": "@nx/web:file-server",
-      "options": {
-        "buildTarget": "management:build",
-        "port": 4201,
-        "staticFilePath": "dist/apps/management/browser",
-        "spa": true
       }
     }
   },

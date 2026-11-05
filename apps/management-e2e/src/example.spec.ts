@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 test('shows the app name', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/admin/');
 
-  expect(await page.locator('h1').innerText()).toContain('HomeyDash');
+  await expect(page.getByRole('link', { name: 'HomeyDash' })).toHaveAttribute(
+    'href',
+    '/admin/',
+  );
 });

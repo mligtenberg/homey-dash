@@ -82,8 +82,12 @@ top-right corner five times quickly to open its screen settings.
 ## Running
 
 ```sh
-npx nx serve api          # API on :5112, which both apps proxy /api to
+npx nx serve api          # API on :5112, which proxies the two apps below
 npx nx serve display      # display app on :4200
-npx nx serve management   # Management on :4201
+npx nx serve management   # Management on :4201, under /admin
 npx nx run-many -t test lint
 ```
+
+Open everything through the API: the display app at `http://localhost:5112/` and Management at
+`http://localhost:5112/admin/`. The API forwards every path outside `/api` and `/mcp` to the apps with YARP, so both
+run on one origin. Set where it forwards to under `ReverseProxy:Clusters` in `apps/api/appsettings.json`.

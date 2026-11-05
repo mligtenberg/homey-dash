@@ -28,6 +28,8 @@ builder.Services.AddRealtime();
 builder.Services.AddMcpServer()
     .WithHttpTransport(options => options.Stateless = true)
     .WithTools<ManagementTools>(ManagementTools.Json);
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
 var app = builder.Build();
 
@@ -59,5 +61,7 @@ api.MapDisplays();
 api.MapRules();
 app.MapHub<RealtimeHub>(RealtimeHub.Path);
 app.MapMcp(ManagementTools.Path);
+// Everything outside /api and /mcp is a frontend: Management under /admin, the display app at the root.
+app.MapReverseProxy();
 
 app.Run();
