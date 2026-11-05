@@ -11,6 +11,8 @@ RUN NX_DAEMON=false npx nx run-many -t build -p display management
 # --- API ---------------------------------------------------------------------
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS api
 ARG TARGETARCH
+# bash, for the ${TARGETARCH/amd64/x64} substitution that dash lacks
+SHELL ["/bin/bash", "-c"]
 WORKDIR /src
 COPY apps/api/HomeyDash.Api.csproj apps/api/
 RUN dotnet restore apps/api/HomeyDash.Api.csproj -a ${TARGETARCH/amd64/x64}
