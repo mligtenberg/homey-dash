@@ -44,6 +44,29 @@ using (var scope = app.Services.CreateScope())
         .RefreshAsync(scope.ServiceProvider.GetRequiredService<HomeyDashDbContext>(), CancellationToken.None);
 }
 
+// Static files must run before routing: once routing has picked the catch-all fallback endpoint,
+// the static file middleware steps aside and every asset would come back as index.html.
+string? frontends = Path.Combine(app.Environment.ContentRootPath, "frontends");
+if (Directory.Exists(frontends))
+{
+    var admin = new PhysicalFileProvider(Path.Combine(frontends, "admin"));
+    app.Map("/admin", branch =>
+    {
+        branch.UseStaticFiles(new StaticFileOptions { FileProvider = admin });
+        branch.Run(context =>
+        {
+            context.Response.ContentType = "text/html";
+            return context.Response.SendFileAsync(admin.GetFileInfo("index.html"));
+        });
+    });
+    app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(Path.Combine(frontends, "display")) });
+}
+else
+{
+    frontends = null;
+}
+app.UseRouting();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -66,31 +89,20 @@ app.MapMcp(ManagementTools.Path);
 // Everything outside /api and /mcp is a frontend: Management under /admin, the display app at the root.
 // In the container the built frontends sit next to the API and are served from disk;
 // otherwise (development) the requests are forwarded to the frontend dev servers.
-var frontends = Path.Combine(app.Environment.ContentRootPath, "frontends");
-if (Directory.Exists(frontends))
+if (frontends is null)
 {
-    var admin = new PhysicalFileProvider(Path.Combine(frontends, "admin"));
-    app.Map("/admin", branch =>
-    {
-        branch.UseStaticFiles(new StaticFileOptions { FileProvider = admin });
-        branch.Run(context =>
-        {
-            context.Response.ContentType = "text/html";
-            return context.Response.SendFileAsync(admin.GetFileInfo("index.html"));
-        });
-    });
-
-    var display = new PhysicalFileProvider(Path.Combine(frontends, "display"));
-    app.UseStaticFiles(new StaticFileOptions { FileProvider = display });
-    app.MapFallback("{*path:regex(^(?!api/|mcp).*$)}", context =>
-    {
-        context.Response.ContentType = "text/html";
-        return context.Response.SendFileAsync(display.GetFileInfo("index.html"));
-    });
+    app.MapReverseProxy();
 }
 else
 {
-    app.MapReverseProxy();
+    var display = new PhysicalFileProvider(Path.Combine(frontends, "display"));
+    Task Index(HttpContext context)
+    {
+        context.Response.ContentType = "text/html";
+        return context.Response.SendFileAsync(display.GetFileInfo("index.html"));
+    }
+    app.MapGet("/", Index);
+    app.MapFallback("{*path:regex(^(?!api/|mcp).*$)}", Index);
 }
 
 app.Run();
