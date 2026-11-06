@@ -358,8 +358,14 @@ export class App {
     void this.settings().open();
   }
 
+  // The build the backend ran when this page first connected; a different one on a later connect means an update.
+  private build: string | undefined;
+
   protected async join() {
     try {
+      const build = await this.realtime.build();
+      if (this.build !== undefined && this.build !== build) return location.reload();
+      this.build = build;
       this.show(await this.realtime.joinScreen(this.screenId));
       this.reportDetails();
     } catch {

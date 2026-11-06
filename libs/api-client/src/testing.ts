@@ -32,11 +32,17 @@ export class FakeRealtime implements Partial<Realtime> {
   readonly commands: unknown[][] = [];
   /** Makes commands fail, as when Homey does not respond. */
   failCommands = false;
+  /** What the backend's build id answers; change it to simulate an update. */
+  buildId = 'build-1';
   /** Called as a screen reports the versions it shows. */
   onShowing: (versions: Record<string, number>) => void = () => undefined;
 
   private readonly joins = new Set<() => void>();
   private readonly handlers = new Map<string, ((message: unknown) => void)[]>();
+
+  build() {
+    return Promise.resolve(this.buildId);
+  }
 
   whenConnected(join: () => void) {
     this.joins.add(join);

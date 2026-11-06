@@ -127,6 +127,11 @@ export class Realtime {
     return this.hub.invoke<void>('ControlPlex', accountId, playerId, command);
   }
 
+  /** Identifies the running build of the backend; it differs after an update was installed. */
+  build() {
+    return this.hub.invoke<string>('Build');
+  }
+
   /** Joins as the screen with this id: which display it is, or null when it belongs in setup. */
   joinScreen(screenId: string) {
     return this.hub.invoke<ScreenView | null>('JoinScreen', screenId);

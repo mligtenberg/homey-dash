@@ -66,6 +66,11 @@ public sealed class RealtimeHub(
         plexWatcher.Wake(accountId);
     }
 
+    // Identifies the running build; it changes when an update is installed, so a screen that sees it change reloads.
+    public string Build() => BuildId;
+
+    private static readonly string BuildId = typeof(RealtimeHub).Assembly.ManifestModule.ModuleVersionId.ToString();
+
     // A screen joins with the id it keeps in localStorage. Null sends it to setup; later changes arrive as Screen.
     public async Task<ScreenView?> JoinScreen(Guid screenId)
     {
