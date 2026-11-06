@@ -52,6 +52,8 @@ public static class DisplayQueries
             presence.IsConnected(display.ScreenId),
             display.ScreenId is not null,
             display.LastSeenAt,
-            display.DashboardIds.Select(id => new DashboardVersion(id, shown[id], latest.GetValueOrDefault(id))).ToList()));
+            display.DashboardIds.Select(id => new DashboardVersion(id, shown[id], latest.GetValueOrDefault(id))).ToList(),
+            presence.IsKiosk(display.ScreenId),
+            presence.Lux(display.ScreenId)));
     }
 }

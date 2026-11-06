@@ -17,6 +17,7 @@ import { fittedCellSize } from '@homey-dash/layout';
 import { DashboardView, homeyLost, PhotoTile, RuleAnswers, TileData, TileKindRegistry } from '@homey-dash/tiles';
 import { screenId, safeStorage } from './screen-id';
 import { BRIGHTNESS_MS, LightMeter } from './light-meter';
+import { KioskScreen } from './kiosk-screen';
 import { LockScreen } from './lock-screen';
 import { ScreenSettings } from './screen-settings';
 import { Setup } from './setup';
@@ -111,7 +112,7 @@ const TAPE_KEY = 'homeydash.tape';
             @if (fill(); as color) {
               <div class="fill" role="button" tabindex="0" aria-label="Back to the dashboard" [style.background]="color" (click)="wake()" animate.leave="is-leaving"></div>
             }
-            @if (playing() && view.display.lockWidgets.length) {
+            @if (playing() && !playing()?.screenOff && view.display.lockWidgets.length) {
               <hd-lock-screen [widgets]="view.display.lockWidgets" animate.leave="is-leaving" />
             }
           } @else {
@@ -150,6 +151,7 @@ const TAPE_KEY = 'homeydash.tape';
 })
 export class App {
   protected readonly realtime = inject(Realtime);
+  private readonly kiosk = inject(KioskScreen);
   private readonly data = inject(TileData);
   private readonly kinds = inject(TileKindRegistry);
   private readonly injector = inject(Injector);
@@ -186,7 +188,7 @@ export class App {
     for (const [i, idle] of this.idleRules().entries()) {
       if (heard[i] === undefined) return undefined;
       if (!heard[i]) continue;
-      if (idle.color) return idle;
+      if (idle.color || idle.screenOff) return idle;
       if (!idle.photoSetId) {
         if (idle.dashboardId && offered.has(idle.dashboardId)) return idle;
       } else if (!this.data.photoSetsLoaded()) return undefined;
@@ -197,7 +199,7 @@ export class App {
   // The rule whose photo set plays or colour fills the screen, until a touch wakes the display.
   protected readonly playing = signal<IdleRule | null>(null);
   protected readonly slideshow = computed(() => this.photoSet(this.playing()?.photoSetId));
-  protected readonly fill = computed(() => this.playing()?.color ?? null);
+  protected readonly fill = computed(() => this.playing()?.color ?? (this.playing()?.screenOff && !this.kiosk.available ? '#000000' : null));
   // Left alone, it shows what the idle rules choose; touched, it stays on what it shows or on the one picked on the tape.
   private readonly alone = signal(true);
   private readonly shown = signal<string | null>(null);
@@ -227,6 +229,10 @@ export class App {
 
   constructor() {
     const answers = inject(RuleAnswers);
+    // Fully Kiosk Browser turns its screen off while a rule says so, and on again when the rule lets go, a touch ends
+    // it, or it sees motion (a touch can't reach a screen that is off).
+    this.kiosk.onMotion(() => this.wake());
+    effect(() => this.kiosk.setOff(!!this.playing()?.screenOff));
     effect((onCleanup) => {
       const rules = this.idleRules();
       untracked(() => {
@@ -241,7 +247,7 @@ export class App {
       const choice = this.idleChoice();
       if (!this.alone() || !choice) return;
       untracked(() => {
-        this.playing.set(choice.photoSetId || choice.color ? choice : null);
+        this.playing.set(choice.photoSetId || choice.color || choice.screenOff ? choice : null);
         if (choice.dashboardId) this.shown.set(choice.dashboardId);
       });
     });
@@ -339,6 +345,7 @@ export class App {
   protected async join() {
     try {
       this.show(await this.realtime.joinScreen(this.screenId));
+      if (this.kiosk.available) this.realtime.kiosk().catch(() => undefined);
     } catch {
       // The connection dropped again; joining happens again on reconnect.
     }

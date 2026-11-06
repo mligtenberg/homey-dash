@@ -1,3 +1,4 @@
+import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import {
   DashboardVersion,
@@ -51,7 +52,7 @@ export function timeAgo(iso: string, now: number): string {
  */
 @Component({
   selector: 'hd-displays-page',
-  imports: [RuleEditor, SignalPicker],
+  imports: [DecimalPipe, RuleEditor, SignalPicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="header">
@@ -85,6 +86,14 @@ export function timeAgo(iso: string, now: number): string {
               <span class="hd-pill hd-pill--ok hd-pill--dot">Connected</span>
             } @else {
               <span class="hd-pill hd-pill--dot">{{ status.lastSeenAt ? 'Last seen ' + ago(status.lastSeenAt) : 'Never connected' }}</span>
+            }
+            @if (status.connected) {
+              @if (status.kiosk) {
+                <span class="hd-pill hd-pill--ok" title="This screen runs in Fully Kiosk Browser, so idle rules can turn it off.">Fully Kiosk</span>
+              }
+              @if (status.lux !== null) {
+                <span class="hd-pill" title="Light falling on the screen">{{ status.lux | number: '1.0-0' }} lx</span>
+              }
             }
             @if (!display.dashboardIds.length) {
               <span class="hd-pill hd-pill--dot">Waiting for a dashboard</span>
@@ -161,6 +170,9 @@ export function timeAgo(iso: string, now: number): string {
                     <optgroup label="Fill with colour">
                       <option value="color" [selected]="!!idle.color">Colour</option>
                     </optgroup>
+                    <optgroup label="Screen">
+                      <option value="screen-off" [selected]="!!idle.screenOff">Turn screen off</option>
+                    </optgroup>
                   </select>
                   @if (idle.color) {
                     <input
@@ -171,7 +183,7 @@ export function timeAgo(iso: string, now: number): string {
                       (change)="setIdleColor(display, i, $any($event.target).value)"
                     />
                   }
-                  @if (idle.photoSetId || idle.color) {
+                  @if (idle.photoSetId || idle.color || idle.screenOff) {
                     <select
                       class="hd-select"
                       [attr.aria-label]="'Where a touch goes back to for rule ' + (i + 1)"
@@ -388,12 +400,12 @@ export class DisplaysPage {
   }
 
   // `dashboard:<id>` shows that dashboard; `photos:<id>` plays that photo set and `color` fills with black until
-  // another colour is picked, both going back to the last used.
+  // another colour is picked, all going back to the last used. `screen-off` turns the screen off (Fully Kiosk Browser; black elsewhere).
   protected setIdleAction(display: DisplayInfo, index: number, action: string) {
     const [kind, id] = action.split(':');
-    const none = { dashboardId: null, photoSetId: null, color: null, returnDashboardId: null };
+    const none = { dashboardId: null, photoSetId: null, color: null, screenOff: false, returnDashboardId: null };
     const change =
-      kind === 'photos' ? { ...none, photoSetId: id } : kind === 'color' ? { ...none, color: '#000000' } : { ...none, dashboardId: id };
+      kind === 'photos' ? { ...none, photoSetId: id } : kind === 'color' ? { ...none, color: '#000000' } : kind === 'screen-off' ? { ...none, screenOff: true } : { ...none, dashboardId: id };
     this.saveIdle(display, display.idleRules.map((r, i) => (i === index ? { ...r, ...change } : r)));
   }
 

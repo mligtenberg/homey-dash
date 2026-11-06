@@ -35,7 +35,7 @@ public sealed class Display
     // Rules that show a dashboard it no longer offers, such as a deleted one, are left out; a photo set or colour that
     // went back to one goes back to the last one shown instead.
     public List<IdleRule> OfferedIdleRules() => IdleRules
-        .Where(r => r.PhotoSetId is not null || r.Color is not null || r.DashboardId is { } shown && DashboardIds.Contains(shown))
+        .Where(r => r.PhotoSetId is not null || r.Color is not null || r.ScreenOff || r.DashboardId is { } shown && DashboardIds.Contains(shown))
         .Select(r => r.ReturnDashboardId is { } back && !DashboardIds.Contains(back) ? r with { ReturnDashboardId = null } : r)
         .ToList();
 
@@ -92,7 +92,7 @@ public sealed class DisplayDashboard
 /// it passed validation.
 /// </summary>
 public sealed record IdleRule(
-    Guid? DashboardId, JsonElement Rule, Guid? PhotoSetId = null, Guid? ReturnDashboardId = null, string? Color = null);
+    Guid? DashboardId, JsonElement Rule, Guid? PhotoSetId = null, Guid? ReturnDashboardId = null, string? Color = null, bool ScreenOff = false);
 
 /// <summary>
 /// Something a display shows on its lock screen, over the photo set or colour an idle rule plays, in one of
@@ -125,7 +125,7 @@ public sealed record DashboardVersion(Guid DashboardId, int? ShownVersion, int L
 /// What Management knows about a display beyond its configuration. <see cref="Versions"/> has one entry per
 /// dashboard it offers, in order.
 /// </summary>
-public sealed record DisplayStatus(bool Connected, bool Held, DateTimeOffset? LastSeenAt, List<DashboardVersion> Versions);
+public sealed record DisplayStatus(bool Connected, bool Held, DateTimeOffset? LastSeenAt, List<DashboardVersion> Versions, bool Kiosk = false, double? Lux = null);
 
 /// <summary>A display as Management lists it.</summary>
 public sealed record DisplayInfo(

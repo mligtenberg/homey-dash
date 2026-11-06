@@ -13,6 +13,8 @@ const status = (change: Partial<DisplayStatus>): DisplayStatus => ({
   held: true,
   lastSeenAt: null,
   versions: [],
+  kiosk: false,
+  lux: null,
   ...change,
 });
 
@@ -81,6 +83,12 @@ describe('DisplaysPage', () => {
     ]);
   });
 
+  it('shows a connected display running in Fully Kiosk with its light', async () => {
+    const root = await render([display('1', 'Hallway', ['k'], status({ connected: true, kiosk: true, lux: 1234, versions: [version('k', 3, 3)] }))]);
+
+    expect(pills(root)).toEqual(['Connected', 'Fully Kiosk', '1,234 lx']);
+  });
+
   describe('dashboards', () => {
     const checks = (root: HTMLElement) => [...root.querySelectorAll<HTMLInputElement>('.dashboards input')];
     const assigned = () => TestBed.inject(HttpTestingController).expectOne('/api/displays/1/dashboards').request.body;
@@ -132,11 +140,11 @@ describe('DisplaysPage', () => {
       const root = await render([{ ...display('1', 'Hallway', ['k', 'g', 'c'], status({})), idleRules: [weekend] }]);
       const select = root.querySelector('.idle__entry select') as HTMLSelectElement;
 
-      expect([...select.options].map((o) => o.textContent?.trim())).toEqual(['Kitchen', 'Garden', 'Cinema', 'Colour']);
+      expect([...select.options].map((o) => o.textContent?.trim())).toEqual(['Kitchen', 'Garden', 'Cinema', 'Colour', 'Turn screen off']);
       select.value = 'dashboard:c';
       select.dispatchEvent(new Event('change'));
 
-      expect(idleRequest().body.rules).toEqual([{ ...weekend, dashboardId: 'c', photoSetId: null, color: null, returnDashboardId: null }]);
+      expect(idleRequest().body.rules).toEqual([{ ...weekend, dashboardId: 'c', photoSetId: null, color: null, screenOff: false, returnDashboardId: null }]);
     });
 
     it('plays a photo set instead, going back to the last used or a dashboard it offers', async () => {
@@ -146,14 +154,14 @@ describe('DisplaysPage', () => {
 
       selects()[0].value = 'photos:s';
       selects()[0].dispatchEvent(new Event('change'));
-      expect(idleRequest().body.rules).toEqual([{ ...weekend, dashboardId: null, photoSetId: 's', color: null, returnDashboardId: null }]);
+      expect(idleRequest().body.rules).toEqual([{ ...weekend, dashboardId: null, photoSetId: 's', color: null, screenOff: false, returnDashboardId: null }]);
       await TestBed.inject(ApplicationRef).whenStable();
 
       const back = selects()[1];
       expect([...back.options].map((o) => o.textContent?.trim())).toEqual(['Back to the last used', 'Back to Kitchen', 'Back to Garden']);
       back.value = 'g';
       back.dispatchEvent(new Event('change'));
-      expect(idleRequest().body.rules).toEqual([{ ...weekend, dashboardId: null, photoSetId: 's', color: null, returnDashboardId: 'g' }]);
+      expect(idleRequest().body.rules).toEqual([{ ...weekend, dashboardId: null, photoSetId: 's', color: null, screenOff: false, returnDashboardId: 'g' }]);
     });
 
     it('fills with a colour instead, starting black, going back to the last used or a dashboard it offers', async () => {
@@ -162,7 +170,7 @@ describe('DisplaysPage', () => {
 
       action.value = 'color';
       action.dispatchEvent(new Event('change'));
-      expect(idleRequest().body.rules).toEqual([{ ...weekend, dashboardId: null, photoSetId: null, color: '#000000', returnDashboardId: null }]);
+      expect(idleRequest().body.rules).toEqual([{ ...weekend, dashboardId: null, photoSetId: null, color: '#000000', screenOff: false, returnDashboardId: null }]);
       await TestBed.inject(ApplicationRef).whenStable();
 
       const color = root.querySelector('.idle__color') as HTMLInputElement;
@@ -175,7 +183,19 @@ describe('DisplaysPage', () => {
       const back = root.querySelectorAll<HTMLSelectElement>('.idle__entry select')[1];
       back.value = 'g';
       back.dispatchEvent(new Event('change'));
-      expect(idleRequest().body.rules[0]).toEqual({ ...weekend, dashboardId: null, photoSetId: null, color: '#203040', returnDashboardId: 'g' });
+      expect(idleRequest().body.rules[0]).toEqual({ ...weekend, dashboardId: null, photoSetId: null, color: '#203040', screenOff: false, returnDashboardId: 'g' });
+    });
+
+    it('turns the screen off instead, going back to the last used', async () => {
+      const root = await render([{ ...display('1', 'Hallway', ['k', 'g'], status({})), idleRules: [weekend] }]);
+      const action = root.querySelector('.idle__entry select') as HTMLSelectElement;
+
+      action.value = 'screen-off';
+      action.dispatchEvent(new Event('change'));
+
+      expect(idleRequest().body.rules).toEqual([
+        { ...weekend, dashboardId: null, photoSetId: null, color: null, screenOff: true, returnDashboardId: null },
+      ]);
     });
 
     it('reorders and removes rules', async () => {

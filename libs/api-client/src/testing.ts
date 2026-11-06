@@ -151,6 +151,12 @@ export class FakeRealtime implements Partial<Realtime> {
     this.touches++;
   }
 
+  kiosks = 0;
+
+  async kiosk() {
+    this.kiosks++;
+  }
+
   async brightness(level: number) {
     this.brightnesses.push(level);
   }

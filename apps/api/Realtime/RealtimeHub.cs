@@ -145,10 +145,21 @@ public sealed class RealtimeHub(
 
     // How much light falls on the screen in lux, from its light sensor or estimated with its camera; screens measure
     // every minute or so.
-    public void Brightness(double lux)
+    public async Task Brightness(double lux)
     {
         if (!Context.Items.TryGetValue(ScreenKey, out var screen) || screen is not Guid screenId) throw new HubException("Join as a screen first.");
-        if (double.IsFinite(lux) && directory.ByScreen(screenId) is { } display) brightness.Measure(display.Id, lux);
+        if (!double.IsFinite(lux)) return;
+        if (directory.ByScreen(screenId) is { } display) brightness.Measure(display.Id, lux);
+        presence.ReportLux(screenId, Math.Round(Math.Clamp(lux, 0, DisplayBrightness.MaxLux)));
+        await notifier.DisplaysChangedAsync(db, CancellationToken.None);
+    }
+
+    // The screen runs in Fully Kiosk Browser; screens that don't never say.
+    public async Task Kiosk()
+    {
+        if (!Context.Items.TryGetValue(ScreenKey, out var screen) || screen is not Guid screenId) throw new HubException("Join as a screen first.");
+        presence.ReportKiosk(screenId);
+        await notifier.DisplaysChangedAsync(db, CancellationToken.None);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)

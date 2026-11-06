@@ -17,6 +17,8 @@ export interface IdleRule {
   photoSetId?: string | null;
   /** The colour it fills the screen with, as `#rrggbb`. */
   color?: string | null;
+  /** Whether it turns the screen off (black where the browser can't) instead. */
+  screenOff?: boolean;
   returnDashboardId?: string | null;
 }
 
@@ -68,6 +70,10 @@ export interface DisplayStatus {
   lastSeenAt: string | null;
   /** One per dashboard it offers, in order. */
   versions: DashboardVersion[];
+  /** Whether its screen runs in Fully Kiosk Browser. */
+  kiosk: boolean;
+  /** The light falling on its screen in lux, as it last measured; null until it has. */
+  lux: number | null;
 }
 
 /** A display as Management lists it. */

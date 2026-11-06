@@ -131,9 +131,9 @@ public static partial class DisplayEndpoints
         var errors = new Dictionary<string, string[]>();
         foreach (var (idle, i) in rules.Select((r, i) => (r, i)))
         {
-            if (new object?[] { idle.DashboardId, idle.PhotoSetId, idle.Color }.Count(a => a is not null) > 1)
-                errors[$"rules[{i}]"] = ["A rule either shows a dashboard, plays a photo set or fills with a colour, just one."];
-            else if (idle.PhotoSetId is not null || idle.Color is not null)
+            if (new object?[] { idle.DashboardId, idle.PhotoSetId, idle.Color, idle.ScreenOff ? true : null }.Count(a => a is not null) > 1)
+                errors[$"rules[{i}]"] = ["A rule either shows a dashboard, plays a photo set, fills with a colour or turns the screen off, just one."];
+            else if (idle.PhotoSetId is not null || idle.Color is not null || idle.ScreenOff)
             {
                 if (idle.PhotoSetId is { } set && !sets.Contains(set))
                     errors[$"rules[{i}].photoSetId"] = [$"Photo set {set} not found."];
@@ -145,7 +145,7 @@ public static partial class DisplayEndpoints
             else if (idle.DashboardId is not { } shown || !display.DashboardIds.Contains(shown))
                 errors[$"rules[{i}].dashboardId"] = ["Only a dashboard the display offers can be shown when it is left alone."];
             else if (idle.ReturnDashboardId is not null)
-                errors[$"rules[{i}].returnDashboardId"] = ["Only a rule that plays a photo set or fills with a colour goes back to a dashboard."];
+                errors[$"rules[{i}].returnDashboardId"] = ["Only a rule that plays a photo set, fills with a colour or turns the screen off goes back to a dashboard."];
             if (RuleSetup.Check(idle.Rule, engine).Error is { } error)
                 errors[$"rules[{i}].rule"] = [error];
         }

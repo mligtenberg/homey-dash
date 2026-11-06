@@ -188,7 +188,8 @@ public sealed class ManagementTools(
         dashboard). An entry either shows a dashboard, { "dashboardId", "rule": <rule> }, which must be one the display
         offers (see list_displays), plays a photo set full screen, { "photoSetId", "rule": <rule>, "returnDashboardId"? },
         or fills the screen with one colour, { "color": "#rrggbb", "rule": <rule>, "returnDashboardId"? } (such as
-        "#000000" to darken it at night), until someone touches the screen, which goes back to returnDashboardId (a
+        "#000000" to darken it at night), or turns the screen off, { "screenOff": true, "rule": <rule>, "returnDashboardId"? }
+        (on a display in Fully Kiosk Browser; elsewhere it goes black), until someone touches the screen, which goes back to returnDashboardId (a
         dashboard the display offers) or, without it, to the dashboard shown last. A photo set's id is what follows
         "photo-set:" in its target (see list_targets). Replaces the display's idle rules as a whole.
         {{RuleSchema}}

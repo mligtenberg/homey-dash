@@ -147,6 +147,24 @@ public sealed class RealtimeHubTests(ApiFactory factory) : IClassFixture<ApiFact
     }
 
     [Fact]
+    public async Task DisplayStatus_ShowsKioskAndLux()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var management = await ConnectAsync();
+        var displays = Listen(management, "Displays");
+        await management.InvokeAsync<JsonElement>("JoinManagement");
+
+        var hub = await ConnectAsync();
+        await hub.InvokeAsync<JsonElement>("JoinScreen", screen);
+        await hub.InvokeAsync("Kiosk");
+        await hub.InvokeAsync("Brightness", 12.4);
+
+        await NextAsync(displays, DisplayWhere(display, s =>
+            s.GetProperty("kiosk").GetBoolean() && s.GetProperty("lux").ValueKind == JsonValueKind.Number && s.GetProperty("lux").GetDouble() == 12));
+    }
+
+    [Fact]
     public async Task DashboardChanges_ReachManagement()
     {
         var management = await ConnectAsync();

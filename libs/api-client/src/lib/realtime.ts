@@ -201,6 +201,11 @@ export class Realtime {
     return this.hub.invoke<void>('Brightness', lux);
   }
 
+  /** Tells HomeyDash this screen runs in Fully Kiosk Browser, which Management shows. */
+  kiosk() {
+    return this.hub.invoke<void>('Kiosk');
+  }
+
   private start(attempt: number) {
     setTimeout(() => {
       this.hub.start().then(

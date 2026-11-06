@@ -17,7 +17,7 @@ The state of a display that nobody has touched for a minute, and that it starts 
 _Avoid_: Idle mode, screensaver, inactive, main dashboard
 
 **Idle rule**:
-A **Rule** and what a display does while it holds: show one of its dashboards, play a **Photo set** full screen, or fill the screen with one colour (such as black at night); a display has an ordered list of them, set in **Management**. Left alone, the display does what the first rule that holds says, else stays where it is. A photo set or colour stays until a touch, which goes back to the dashboard the rule names, or to the one shown before. It only names a dashboard the display offers; one that shows a dashboard no longer offered goes, and one that went back to it goes back to the one shown before instead. A photo set that is gone or has no photos is passed over.
+A **Rule** and what a display does while it holds: show one of its dashboards, play a **Photo set** full screen, fill the screen with one colour (such as black at night), or turn the screen off (in Fully Kiosk Browser, which a motion it sees or a touch turns on again; in any other browser the screen goes black); a display has an ordered list of them, set in **Management**. Left alone, the display does what the first rule that holds says, else stays where it is. A photo set or colour stays until a touch, which goes back to the dashboard the rule names, or to the one shown before. It only names a dashboard the display offers; one that shows a dashboard no longer offered goes, and one that went back to it goes back to the one shown before instead. A photo set that is gone or has no photos is passed over.
 _Avoid_: Schedule, home rule, auto-switch
 
 **Lock screen**:
