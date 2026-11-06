@@ -63,6 +63,7 @@ describe('App', () => {
     await start(null);
     const screen = localStorage.getItem('homeydash.screen');
     TestBed.createComponent(App);
+    await stable();
 
     expect(screen).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(realtime.joined).toEqual([screen, screen]);
