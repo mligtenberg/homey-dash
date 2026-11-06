@@ -113,6 +113,26 @@ public sealed class PlexApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Audio_IsATracksOwnFileOrAShowsTheme_AndNothingElse()
+    {
+        var track = await _client.GetAsync("/api/plex/audio?account=1&item=612");
+        var theme = await _client.GetAsync("/api/plex/audio?item=500&theme=true");
+        var trackAsTheme = await _client.GetAsync("/api/plex/audio?item=612&theme=true");
+        var movie = await _client.GetAsync("/api/plex/audio?item=101");
+        var notANumber = await _client.GetAsync("/api/plex/audio?item=../accounts");
+        var ofNoAccount = await _client.GetAsync("/api/plex/audio?account=2&item=612");
+
+        Assert.Equal(HttpStatusCode.OK, track.StatusCode);
+        Assert.Equal("audio/wav", track.Content.Headers.ContentType?.MediaType);
+        Assert.NotEmpty(await track.Content.ReadAsByteArrayAsync());
+        Assert.Equal(HttpStatusCode.OK, theme.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, trackAsTheme.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, movie.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, notANumber.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, ofNoAccount.StatusCode);
+    }
+
+    [Fact]
     public async Task TheAccount_ShowsWhoAndWhichServer_ButNoToken()
     {
         var text = await _client.GetStringAsync("/api/accounts/plex");

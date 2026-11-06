@@ -115,6 +115,22 @@ export class FakeRealtime implements Partial<Realtime> {
     return this.plexSearchResults;
   }
 
+  /** What a library holds, whatever library is asked: pages are cut from it. */
+  plexLibraryList: PlexItem[] = [];
+
+  async plexLibraryItems(accountId: number, libraryId: string, start: number, size: number) {
+    this.commands.push(['plexLibraryItems', accountId, libraryId, start, size]);
+    return { items: this.plexLibraryList.slice(start, start + size), total: this.plexLibraryList.length };
+  }
+
+  /** What is under any item, whatever is asked. */
+  plexChildrenList: PlexItem[] = [];
+
+  async plexChildren(accountId: number, itemId: string) {
+    this.commands.push(['plexChildren', accountId, itemId]);
+    return this.plexChildrenList;
+  }
+
   plexTrackList: PlexTracks = {
     audio: [
       { id: '1', label: 'English (AC3 5.1)', selected: true },
@@ -146,6 +162,10 @@ export class FakeRealtime implements Partial<Realtime> {
 
   playOnAirPlay(accountId: number, itemId: string, deviceId: string) {
     return this.command('playOnAirPlay', accountId, itemId, deviceId);
+  }
+
+  playAlbumOnAirPlay(accountId: number, albumId: string, trackId: string | null, deviceId: string) {
+    return this.command('playAlbumOnAirPlay', accountId, albumId, trackId, deviceId);
   }
 
   setAirPlayPaused(deviceId: string, paused: boolean) {

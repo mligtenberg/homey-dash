@@ -19,6 +19,19 @@ public sealed class PlexStreamTests
     }
 
     [Fact]
+    public void ATrack_IsOneMp3Stream_NotAPlaylist()
+    {
+        var url = PlexStream.AudioUrl(Local, "7", "s1");
+
+        Assert.StartsWith("http://192.168.1.23:32400/audio/:/transcode/universal/start.mp3?", url);
+        Assert.Contains("path=%2Flibrary%2Fmetadata%2F7", url);
+        Assert.Contains("protocol=http", url);
+        // Plex answers 400 to an audio stream that doesn't say which platform asks.
+        Assert.Contains("X-Plex-Platform=tvOS", url);
+        Assert.Contains("X-Plex-Token=tok", url);
+    }
+
+    [Fact]
     public void ATrackChoice_NamesTheStreamsAndWhereToStart()
     {
         var url = PlexStream.Url(Local, "5", "s1", choice: new PlexStreamChoice("22", null, 95));

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using HomeyDash.Api.Plex;
 using HomeyDash.Api.Realtime;
 using Microsoft.AspNetCore.SignalR;
 
@@ -11,7 +12,20 @@ namespace HomeyDash.Api.AirPlay;
 /// </summary>
 public sealed record AirPlayPlayback(
     string DeviceId, string DeviceName, int AccountId, string ItemId, string Title, bool Paused,
-    string? AudioStreamId, string? SubtitleStreamId, long OffsetMs, DateTimeOffset At);
+    string? AudioStreamId, string? SubtitleStreamId, long OffsetMs, DateTimeOffset At)
+{
+    // What the title is part of, such as the artist, the album and which track of it this is.
+    public string? Detail { get; init; }
+    // How long it runs; 0 when the server doesn't say.
+    public long DurationMs { get; init; }
+}
+
+/// <summary>An album playing track by track: Position is the index in Tracks of the track that plays now.</summary>
+public sealed record AirPlayQueue(PlexItem Album, IReadOnlyList<PlexItem> Tracks, int Position)
+{
+    public string Detail => string.Join(" · ",
+        string.Join(" — ", new[] { Album.Subtitle, Album.Title }.OfType<string>()), $"{Position + 1} of {Tracks.Count}");
+}
 
 /// <summary>
 /// The playback every screen shows controls for: one place that knows what plays where, pushed to every connection as
@@ -19,7 +33,11 @@ public sealed record AirPlayPlayback(
 /// </summary>
 public sealed class AirPlayNow : IDisposable
 {
+    // A track that ends this close to its length ended because it finished, not because someone stopped it on the TV.
+    private static readonly TimeSpan FinishedWithin = TimeSpan.FromSeconds(15);
+
     private readonly ConcurrentDictionary<string, AirPlayPlayback> _playing = new();
+    private readonly ConcurrentDictionary<string, AirPlayQueue> _queues = new();
     private readonly IHubContext<RealtimeHub> _hub;
     private readonly IAirPlay _airPlay;
     private readonly TimeProvider _time;
@@ -39,6 +57,17 @@ public sealed class AirPlayNow : IDisposable
 
     public AirPlayPlayback? Find(string deviceId) => _playing.GetValueOrDefault(deviceId);
 
+    public AirPlayQueue? Queue(string deviceId) => _queues.GetValueOrDefault(deviceId);
+
+    public void SetQueue(string deviceId, AirPlayQueue? queue)
+    {
+        if (queue is null) _queues.TryRemove(deviceId, out _);
+        else _queues[deviceId] = queue;
+    }
+
+    // Goes on with what follows when a receiver finished what it played; says whether it did. Set by whoever can start things.
+    public Func<string, Task<bool>>? Advance { get; set; }
+
     // Where it is now, in whole seconds from the start.
     public int PositionSeconds(AirPlayPlayback playback) =>
         (int)(Math.Max(0, playback.OffsetMs + (playback.Paused ? 0 : (_time.GetUtcNow() - playback.At).TotalMilliseconds)) / 1000);
@@ -54,6 +83,7 @@ public sealed class AirPlayNow : IDisposable
 
     public async Task StoppedAsync(string deviceId)
     {
+        _queues.TryRemove(deviceId, out _);
         if (_playing.TryRemove(deviceId, out _)) await PushAsync();
     }
 
@@ -63,7 +93,17 @@ public sealed class AirPlayNow : IDisposable
         await PushAsync();
     }
 
-    private void OnEnded(string deviceId) => _ = StoppedAsync(deviceId);
+    private void OnEnded(string deviceId) => _ = EndedAsync(deviceId);
+
+    private async Task EndedAsync(string deviceId)
+    {
+        if (_playing.GetValueOrDefault(deviceId) is { } playing && Advance is { } advance && Finished(playing) && await advance(deviceId)) return;
+        await StoppedAsync(deviceId);
+    }
+
+    private bool Finished(AirPlayPlayback playing) =>
+        playing is { DurationMs: > 0, Paused: false }
+        && TimeSpan.FromSeconds(PositionSeconds(playing)) >= TimeSpan.FromMilliseconds(playing.DurationMs) - FinishedWithin;
 
     private async Task PushAsync()
     {

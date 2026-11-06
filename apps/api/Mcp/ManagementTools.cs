@@ -45,6 +45,9 @@ public sealed class ManagementTools(
           settings.target is "plex-player:any" for whatever plays, or a player's target.
         - "plex-recent" (small, wide, full, large, full-large): the posters of what was newly added to Plex; settings.target is
           "plex-library:all" or a library's target.
+        - "plex-library" (small, wide, full, large, full-large): a Plex library; its posters on the tile, and a press opens everything
+          in it, films, series or albums, alphabetically; settings.target is "plex-library:all" (every library, as tabs) or a
+          library's target.
         - "sonos" (small, wide, full, large, full-large, full-tall): Sonos multiroom; settings.targets lists the ids of the speaker
           devices in order and settings.target is null. The tile shows what the first room that plays is playing with play/pause
           (and skip, from wide up) and one volume for its group; a press opens every room with its own volume and a button that

@@ -155,6 +155,39 @@ public static class PlexEndpoints
                 return Results.Problem(e.Message, statusCode: StatusCodes.Status502BadGateway);
             }
         });
+
+        // A track's file, or a show's theme (theme=true), from the account's server, for a screen to play: the screen never has
+        // the server's address or token. A Range request is passed on, so a player can skip.
+        api.MapGet("/plex/audio", async (string? item, bool? theme, int? account, PlexAccounts accounts, IPlex plex, HttpContext http,
+            CancellationToken ct) =>
+        {
+            if (item is null || item.Length is 0 or > 12 || !item.All(char.IsAsciiDigit)) return Results.NotFound();
+            if (accounts.For(account)?.Connection is not { } server) return NotSignedIn();
+            try
+            {
+                var audio = await plex.AudioAsync(server, item, theme == true, http.Request.Headers.Range.ToString() is { Length: > 0 } range ? range : null, ct);
+                if (audio is null) return Results.NotFound();
+                await WriteAudioAsync(http, audio, ct);
+                return Results.Empty;
+            }
+            catch (PlexException e)
+            {
+                return Results.Problem(e.Message, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+    }
+
+    private static async Task WriteAudioAsync(HttpContext http, PlexAudio audio, CancellationToken ct)
+    {
+        using (audio.Content)
+        {
+            http.Response.StatusCode = audio.Status;
+            http.Response.ContentType = audio.ContentType;
+            if (audio.Length is { } length) http.Response.ContentLength = length;
+            if (audio.ContentRange is { } contentRange) http.Response.Headers.ContentRange = contentRange;
+            http.Response.Headers.AcceptRanges = "bytes";
+            await audio.Content.CopyToAsync(http.Response.Body, ct);
+        }
     }
 
     private static IResult Info(PlexOptions options, PlexAccounts accounts, PlexSignIn signIn) =>

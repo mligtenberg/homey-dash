@@ -1,20 +1,23 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
-import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexTracks, Realtime, plexImageUrl } from '@homey-dash/api-client';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
+import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, PlexTracks, Realtime, plexAudioUrl, plexImageUrl } from '@homey-dash/api-client';
 import { TileSize } from '@homey-dash/layout';
 import {
   LucideAirplay,
+  LucideCheck,
   LucideChevronLeft,
   LucideClapperboard,
   LucideDynamicIcon,
+  LucideLibrary,
   LucidePause,
   LucidePlay,
   LucideSquare,
   LucideStar,
+  LucideVolume2,
 } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { AirPlayData } from './airplay-data';
-import { PlexData } from './plex-data';
+import { PlexData, plexTime } from './plex-data';
 import { plexIdle } from './now-playing-tile';
 
 /** How many posters fit a tile: one per cell across, two rows on the large sizes. */
@@ -22,6 +25,18 @@ export const RECENT_POSTERS: Record<TileSize, number> = { small: 1, wide: 2, ful
 
 /** How many items the detail view lists. */
 const DETAIL_COUNT = 24;
+
+/** How many items of a library are asked for at a time, and how close to the end of the list that asks for the next ones (px). */
+const PAGE = 60;
+const NEAR_END = 600;
+
+/** What a library listing has of one library so far: the pages that came, and how many there are in all. */
+interface Pages {
+  items: PlexItem[];
+  total: number;
+  loading: boolean;
+  error?: string;
+}
 
 /** Where choosing a receiver for a cover is: the button, looking for receivers, choosing one, starting. Once it plays, every screen shows it from `AirPlayData`. */
 interface Cast {
@@ -34,6 +49,20 @@ interface Cast {
 }
 
 const IDLE: Cast = { step: 'idle', devices: [] };
+
+/** Music playing on this screen: the tracks to play and which one plays now, and the album they are part of. */
+interface LocalPlay {
+  queue: PlexItem[];
+  index: number;
+  paused: boolean;
+  album: PlexItem | null;
+}
+
+/** What is under a show, season or album: nothing while it loads. */
+interface Under {
+  items?: PlexItem[];
+  error?: string;
+}
 
 /** What the backend says went wrong (a hub error carries its message after the method), else a fallback. */
 function reason(error: unknown, fallback: string): string {
@@ -56,20 +85,8 @@ export function addedOn(iso: string, now = Date.now()): string {
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
-/**
- * The posters of what was newly added to one library of the tile's Plex account, or every library of it
- * (`plex-library:all`), newest first: as
- * many as fit the tile, with their titles. A press opens a full-screen detail view in Plex colours: a grid of the newest 24 posters with when each was added,
- * and tabs per library when the tile covers several. A press on a poster opens its details: backdrop, summary, year,
- * runtime, rating and genres.
- */
-@Component({
-  selector: 'hd-plex-recent-tile',
-  imports: [TileDetails, LucideDynamicIcon],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex-recent', '[class.has-art]': 'shown().length > 0' },
-  template: `
-    @if (shown().length) {
+/** The full-screen view of Plex tiles that browse a library: the newest or everything, shown the same way (see `LibraryTile`). */
+export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
       <div class="hd-plex-recent__grid" [attr.data-count]="shown().length">
         @for (item of shown(); track item.id) {
           <div class="hd-plex-recent__item">
@@ -85,8 +102,8 @@ export function addedOn(iso: string, now = Date.now()): string {
           </div>
         }
       </div>
-      @if (settings().label) {
-        <div class="hd-photo__label">{{ settings().label }}</div>
+      @if (faceLabel(); as label) {
+        <div class="hd-photo__label">{{ label }}</div>
       }
     } @else {
       <svg class="hd-icon" [lucideIcon]="icon" />
@@ -95,28 +112,41 @@ export function addedOn(iso: string, now = Date.now()): string {
         <div class="hd-tile__detail">{{ face().detail }}</div>
       </div>
     }
-    @if (casting().length) {
-      <div
-        class="hd-plex-recent__casting"
-        [class.is-paused]="allPaused()"
-        role="img"
-        [attr.aria-label]="(allPaused() ? 'Paused on ' : 'Playing on ') + casting()[0].deviceName"
-      >
-        <svg [lucideIcon]="allPaused() ? pauseIcon : playIcon" />
+    @if (badge(); as b) {
+      <div class="hd-plex-recent__casting" [class.is-paused]="b.paused" role="img" [attr.aria-label]="b.label">
+        <svg [lucideIcon]="b.paused ? pauseIcon : playIcon" />
       </div>
     }
-    <hd-tile-details [screen]="true" [name]="face().name" [icon]="icon" subtitle="Newly added" (closed)="closeScreen()">
-      @if (!selected() && tabs().length > 2) {
+    <hd-tile-details [screen]="true" [name]="face().name" [icon]="icon" [subtitle]="subtitle()" (closed)="closeScreen()">
+      @if (!selected() && tabs().length > (browse ? 1 : 2)) {
         <div class="hd-segmented" hdDetailsHead role="group" aria-label="Show">
           @for (t of tabs(); track t.id) {
-            <button type="button" [attr.aria-pressed]="tab() === t.id" (click)="selectTab(t.id)">{{ t.label }}</button>
+            <button type="button" [attr.aria-pressed]="activeTab() === t.id" (click)="selectTab(t.id)">{{ t.label }}</button>
           }
+        </div>
+      }
+      @if (local(); as l) {
+        <div class="hd-plex-recent__now" role="group" aria-label="Playing here">
+          <div class="hd-plex-recent__now-text">
+            <strong>{{ l.queue[l.index].title }}</strong>
+            @if (localDetail(l); as detail) {
+              <span>{{ detail }}</span>
+            }
+            <span>{{ l.paused ? 'Paused here' : 'Playing here' }}</span>
+          </div>
+          <button type="button" class="hd-plex-recent__receiver" (click)="toggleLocal()">
+            <svg [lucideIcon]="l.paused ? playIcon : pauseIcon" />{{ l.paused ? 'Resume' : 'Pause' }}
+          </button>
+          <button type="button" class="hd-plex-recent__receiver" (click)="stopLocal()"><svg [lucideIcon]="stopIcon" />Stop</button>
         </div>
       }
       @for (p of casting(); track p.deviceId) {
         <div class="hd-plex-recent__now" role="group" [attr.aria-label]="'Playing on ' + p.deviceName">
           <div class="hd-plex-recent__now-text">
             <strong>{{ p.title }}</strong>
+            @if (p.detail) {
+              <span>{{ p.detail }}</span>
+            }
             <span>{{ busy().includes(p.deviceId) ? 'Starting on' : p.paused ? 'Paused on' : 'Playing on' }} {{ p.deviceName }}</span>
           </div>
           <button type="button" class="hd-plex-recent__receiver" [disabled]="busy().includes(p.deviceId)" (click)="togglePause(p)">
@@ -156,7 +186,7 @@ export function addedOn(iso: string, now = Date.now()): string {
           @if (item.art) {
             <img class="hd-plex-recent__backdrop" [src]="artUrl(item.art)" alt="" draggable="false" />
           }
-          <button type="button" class="hd-round-btn hd-plex-recent__back" aria-label="Back to the covers" (click)="selected.set(null)">
+          <button type="button" class="hd-round-btn hd-plex-recent__back" [attr.aria-label]="trail().length > 1 ? 'Back' : 'Back to the covers'" (click)="back()">
             <svg [lucideIcon]="backIcon" />
           </button>
           <div class="hd-plex-recent__cover hd-plex-recent__cover--large">
@@ -167,12 +197,12 @@ export function addedOn(iso: string, now = Date.now()): string {
             }
           </div>
           <div class="hd-plex-recent__facts">
-            <div class="hd-plex-recent__added">{{ added(item) }}</div>
+            <div class="hd-plex-recent__added">{{ crumbs() || added(item) }}</div>
             <h3 class="hd-plex-recent__headline">{{ item.title }}</h3>
             @if (tagline(item); as tagline) {
               <div class="hd-plex-recent__tagline">{{ tagline }}</div>
             }
-            @if (meta(item).length || item.rating) {
+            @if (meta(item).length || item.rating || item.watched) {
               <div class="hd-plex-recent__meta">
                 @if (item.rating) {
                   <span class="hd-plex-recent__rating"><svg [lucideIcon]="starIcon" />{{ item.rating }}</span>
@@ -182,6 +212,9 @@ export function addedOn(iso: string, now = Date.now()): string {
                 }
                 @if (item.contentRating) {
                   <span class="hd-plex-recent__certificate">{{ item.contentRating }}</span>
+                }
+                @if (item.watched) {
+                  <span class="hd-plex-recent__watched"><svg [lucideIcon]="seenIcon" />Watched</span>
                 }
               </div>
             }
@@ -201,8 +234,13 @@ export function addedOn(iso: string, now = Date.now()): string {
                 @switch (c.step) {
                   @case ('idle') {
                     <button type="button" class="hd-plex-recent__play" (click)="findReceivers(item)">
-                      <svg [lucideIcon]="airPlayIcon" />Play on AirPlay
+                      <svg [lucideIcon]="airPlayIcon" />{{ item.kind === 'album' ? 'Play album on AirPlay' : 'Play on AirPlay' }}
                     </button>
+                    @if (item.kind === 'track' || item.kind === 'album') {
+                      <button type="button" class="hd-plex-recent__receiver" (click)="playHere(item)">
+                        <svg [lucideIcon]="speakerIcon" />{{ item.kind === 'album' ? 'Play album here' : 'Play here' }}
+                      </button>
+                    }
                   }
                   @case ('searching') {
                     <div class="hd-plex-recent__cast-note">Looking for Apple TVs…</div>
@@ -221,9 +259,68 @@ export function addedOn(iso: string, now = Date.now()): string {
                 @if (c.error) {
                   <div class="hd-plex-recent__cast-error" role="alert">{{ c.error }}</div>
                 }
+                @if (localError(); as error) {
+                  <div class="hd-plex-recent__cast-error" role="alert">{{ error }}</div>
+                }
               </div>
             }
           </div>
+          @if (hasChildren(item)) {
+            @let under = childrenOf(item);
+            <div class="hd-plex-recent__children">
+              <h4 class="hd-plex-recent__section">{{ childrenTitle(item) }}</h4>
+              @if (under.error) {
+                <div class="hd-plex-recent__empty" role="alert">{{ under.error }}</div>
+              } @else if (!under.items) {
+                <div class="hd-plex-recent__empty">Loading…</div>
+              } @else if (!under.items.length) {
+                <div class="hd-plex-recent__empty">Nothing here</div>
+              } @else if (item.kind === 'show') {
+                <div class="hd-plex-recent__seasons">
+                  @for (child of under.items; track child.id) {
+                    <button type="button" class="hd-plex-recent__card" (click)="push(child)">
+                      <div class="hd-plex-recent__cover">
+                        @if (child.image) {
+                          <img [src]="posterUrl(child.image)" alt="" loading="lazy" draggable="false" />
+                        } @else {
+                          <svg [lucideIcon]="icon" />
+                        }
+                        @if (child.watched) {
+                          <span class="hd-plex-recent__seen" role="img" aria-label="Watched"><svg [lucideIcon]="seenIcon" /></span>
+                        }
+                      </div>
+                      <div class="hd-plex-recent__card-title">{{ child.title }}</div>
+                      @if (child.subtitle) {
+                        <div class="hd-plex-recent__card-sub">{{ child.subtitle }}</div>
+                      }
+                    </button>
+                  }
+                </div>
+              } @else {
+                <ol class="hd-plex-recent__rows">
+                  @for (child of under.items; track child.id) {
+                    <li>
+                      <button type="button" class="hd-plex-recent__row" (click)="push(child)">
+                        <span class="hd-plex-recent__row-no">{{ child.index }}</span>
+                        <span class="hd-plex-recent__row-title">
+                          {{ child.title }}
+                          @if (child.subtitle) {
+                            <small>{{ child.subtitle }}</small>
+                          }
+                        </span>
+                        <span class="hd-plex-recent__row-time">
+                          @if (child.watched) {
+                            <svg role="img" aria-label="Watched" [lucideIcon]="seenIcon" />
+                          }
+                          {{ length(child) }}
+                        </span>
+                      </button>
+                    </li>
+                  }
+                </ol>
+              }
+            </div>
+          }
         </div>
       } @else {
         <input
@@ -235,14 +332,17 @@ export function addedOn(iso: string, now = Date.now()): string {
           [value]="query()"
           (input)="onSearch($any($event.target).value)"
         />
-        <div class="hd-plex-recent__pane">
+        <div class="hd-plex-recent__pane" (scroll)="onPaneScroll($any($event.target))">
           @for (item of listed(); track item.id) {
-            <button type="button" class="hd-plex-recent__card" (click)="selected.set(item)">
+            <button type="button" class="hd-plex-recent__card" (click)="open(item)">
               <div class="hd-plex-recent__cover">
                 @if (item.image) {
                   <img [src]="posterUrl(item.image)" alt="" loading="lazy" draggable="false" />
                 } @else {
                   <svg [lucideIcon]="icon" />
+                }
+                @if (item.watched) {
+                  <span class="hd-plex-recent__seen" role="img" aria-label="Watched"><svg [lucideIcon]="seenIcon" /></span>
                 }
                 @if (isNew(item)) {
                   <span class="hd-plex-recent__badge">New</span>
@@ -258,26 +358,45 @@ export function addedOn(iso: string, now = Date.now()): string {
             </button>
           } @empty {
             <div class="hd-plex-recent__empty">
-              {{ searching() ? 'Searching…' : searchError() || (results() ? 'Nothing found for “' + query().trim() + '”' : 'Nothing added yet') }}
+              {{ searching() ? 'Searching…' : searchError() || (results() ? 'Nothing found for “' + query().trim() + '”' : emptyText()) }}
             </div>
           }
         </div>
       }
     </hd-tile-details>
-  `,
+`;
+
+/**
+ * The posters of what was newly added to one library of the tile's Plex account, or every library of it
+ * (`plex-library:all`), newest first: as
+ * many as fit the tile, with their titles. A press opens a full-screen detail view in Plex colours: a grid of the newest 24 posters with when each was added,
+ * and tabs per library when the tile covers several. A press on a poster opens its details: backdrop, summary, year,
+ * runtime, rating and genres. A show lists its seasons, a season its episodes and an album its tracks, each one pressed
+ * for its own details; a movie, episode, track or album plays on an Apple TV.
+ */
+@Component({
+  selector: 'hd-plex-recent-tile',
+  imports: [TileDetails, LucideDynamicIcon],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex-recent', '[class.has-art]': 'shown().length > 0' },
+  template: PLEX_BROWSER_TEMPLATE,
 })
 export class RecentlyAddedTile extends TileView {
+  /** Whether this lists everything a library holds, a page at a time (the library tile), instead of the newest. */
+  protected readonly browse: boolean = false;
   private readonly plex = inject(PlexData);
   private readonly realtime = inject(Realtime);
   private readonly airPlay = inject(AirPlayData);
 
-  protected readonly icon = LucideClapperboard;
+  protected readonly icon: typeof LucideClapperboard | typeof LucideLibrary = LucideClapperboard;
   protected readonly backIcon = LucideChevronLeft;
   protected readonly starIcon = LucideStar;
   protected readonly airPlayIcon = LucideAirplay;
   protected readonly stopIcon = LucideSquare;
   protected readonly playIcon = LucidePlay;
   protected readonly pauseIcon = LucidePause;
+  protected readonly speakerIcon = LucideVolume2;
+  protected readonly seenIcon = LucideCheck;
 
   private readonly overview = computed(() => this.plex.overview(this.settings().account));
 
@@ -291,20 +410,37 @@ export class RecentlyAddedTile extends TileView {
     const target = this.settings().target;
     const libraries = this.overview()?.libraries ?? [];
     if (target === ALL_PLEX_LIBRARIES)
-      return libraries.flatMap((l) => l.recent).sort((a, b) => b.addedAt.localeCompare(a.addedAt));
-    return this.library()?.recent ?? [];
+      return libraries.flatMap((l) => this.newestOf(l)).sort((a, b) => b.addedAt.localeCompare(a.addedAt));
+    const library = this.library();
+    return library ? this.newestOf(library) : [];
   });
 
   /** The detail view's tabs: everything, then each library the target holds. Shown when there is more than one library. */
   protected readonly tabs = computed(() => {
     const libraries = this.overview()?.libraries ?? [];
     if (this.settings().target !== ALL_PLEX_LIBRARIES) return [];
-    const withItems = libraries.filter((l) => l.recent.length);
-    return [{ id: 'all', label: 'All' }, ...withItems.map((l) => ({ id: l.id, label: l.title }))];
+    const withItems = libraries.filter((l) => this.newestOf(l).length);
+    const tabs = withItems.map((l) => ({ id: l.id, label: l.title }));
+    // A library listing is of one library at a time; the newest of all of them are one list.
+    return this.browse ? tabs : [{ id: 'all', label: 'All' }, ...tabs];
   });
   protected readonly tab = signal('all');
-  /** The cover opened for its details. */
-  protected readonly selected = signal<PlexItem | null>(null);
+
+  /** What a library shows of itself on the face: what was newly added, or for a library listing its newest films, series or albums. */
+  private newestOf(library: PlexLibrary): PlexItem[] {
+    return this.browse ? (library.titles ?? []) : library.recent;
+  }
+  /** The tab on show: the one chosen, else the first (a library listing has no "all"). */
+  protected readonly activeTab = computed(() => {
+    const tab = this.tab();
+    return this.tabs().some((t) => t.id === tab) ? tab : this.browse ? (this.tabs()[0]?.id ?? 'all') : 'all';
+  });
+  /** The covers opened for their details, the one on show last: a show, then its season, then an episode. */
+  protected readonly trail = signal<PlexItem[]>([]);
+  /** The cover on show. */
+  protected readonly selected = computed(() => this.trail()[this.trail().length - 1] ?? null);
+  /** What is under the shows, seasons and albums opened so far, by id: loading until it arrives. */
+  private readonly under = signal<Record<string, Under>>({});
   private readonly cast = signal<Cast>(IDLE);
 
   /** What plays on AirPlay now for this account, wherever it was started: its controls stay on show. */
@@ -323,15 +459,105 @@ export class RecentlyAddedTile extends TileView {
   protected readonly searchError = signal('');
   private searchTimer?: ReturnType<typeof setTimeout>;
 
+  /** Music playing on this screen, which goes on when the cover is closed. */
+  protected readonly local = signal<LocalPlay | null>(null);
+  protected readonly localError = signal('');
+  private audio?: HTMLAudioElement;
+  private theme?: HTMLAudioElement;
+  private themeOf?: string;
+
+  /** What the tile's face says plays: on an Apple TV, or here. */
+  protected readonly badge = computed(() => {
+    const local = this.local();
+    if (this.casting().length) {
+      const paused = this.allPaused();
+      return { paused, label: (paused ? 'Paused on ' : 'Playing on ') + this.casting()[0].deviceName };
+    }
+    return local ? { paused: local.paused, label: local.paused ? 'Paused here' : 'Playing here' } : null;
+  });
+
+  /** What each library listing has so far, by library id. */
+  private readonly pages = signal<Record<string, Pages>>({});
+
+  /** The library a listing shows: the tab's, or the tile's own. */
+  protected readonly shownLibrary = computed(() =>
+    this.settings().target === ALL_PLEX_LIBRARIES ? this.activeTab() : (this.library()?.id ?? ''));
+
+  private pageOf(id: string): Pages | undefined {
+    return this.pages()[id];
+  }
+
+  /** How many films, series or albums the tile's libraries hold. */
+  private readonly totalCount = computed(() => {
+    const libraries = this.overview()?.libraries ?? [];
+    return this.settings().target === ALL_PLEX_LIBRARIES
+      ? libraries.reduce((sum, l) => sum + (l.count ?? 0), 0)
+      : (this.library()?.count ?? 0);
+  });
+
+  /** The head's second line. */
+  protected readonly subtitle = computed(() => {
+    if (!this.browse) return 'Newly added';
+    const library = this.overview()?.libraries.find((l) => l.id === this.shownLibrary());
+    const noun = library?.type === 'show' ? 'shows' : library?.type === 'artist' ? 'albums' : 'movies';
+    return library?.count ? `${library.count.toLocaleString()} ${noun}` : 'Library';
+  });
+
+  /** What the tile's face says over its posters: its own label; a library listing always names its library and how big it is. */
+  protected readonly faceLabel = computed(() => {
+    const { label } = this.settings();
+    if (!this.browse) return label ?? '';
+    const count = this.totalCount();
+    return count ? `${this.face().name} · ${count.toLocaleString()}` : this.face().name;
+  });
+
+  protected emptyText() {
+    if (!this.browse) return 'Nothing added yet';
+    const page = this.pageOf(this.shownLibrary());
+    return page?.error ?? (!page || page.loading ? 'Loading…' : 'Nothing in this library');
+  }
+
+  private async loadPage(id: string) {
+    const current = this.pageOf(id);
+    if (!id || current?.loading || (current && !current.error && current.items.length >= current.total)) return;
+    const have = current?.items ?? [];
+    this.pages.update((all) => ({ ...all, [id]: { items: have, total: current?.total ?? 0, loading: true } }));
+    try {
+      const page = await this.realtime.plexLibraryItems(this.overview()?.accountId ?? 0, id, have.length, PAGE);
+      this.pages.update((all) => ({ ...all, [id]: { items: [...have, ...page.items], total: page.total, loading: false } }));
+    } catch (error) {
+      this.pages.update((all) => ({ ...all, [id]: { items: have, total: current?.total ?? 0, loading: false, error: reason(error, 'Could not load the library.') } }));
+    }
+  }
+
+  /** The next page comes when the list is scrolled near its end. */
+  protected onPaneScroll(pane: HTMLElement) {
+    if (this.browse && !this.results() && pane.scrollTop + pane.clientHeight >= pane.scrollHeight - NEAR_END) void this.loadPage(this.shownLibrary());
+  }
+
   constructor() {
     super();
+    // A library listing's first page comes when it is opened, and again for each library tab.
+    effect(() => {
+      const id = this.shownLibrary();
+      if (this.browse && this.details()?.isOpen()) untracked(() => (this.pageOf(id) ? undefined : void this.loadPage(id)));
+    });
+    // A show's theme plays from opening the show and goes on through its seasons and episodes; it stops when the show is left.
+    effect(() => {
+      const root = this.trail()[0];
+      untracked(() => this.playTheme(root?.kind === 'show' ? root : null));
+    });
+    inject(DestroyRef).onDestroy(() => {
+      this.stopTheme();
+      this.stopLocal();
+    });
     // Each thing that plays gets its tracks, to choose between.
     effect(() => this.casting().forEach((p) => void this.loadTracks(p)));
   }
 
   /** What the detail view lists: the newest of the chosen tab. */
   protected readonly detailItems = computed<PlexItem[]>(() => {
-    const tab = this.tab();
+    const tab = this.activeTab();
     const libraries = this.overview()?.libraries ?? [];
     const source =
       tab === 'all' || !this.tabs().some((t) => t.id === tab)
@@ -341,16 +567,16 @@ export class RecentlyAddedTile extends TileView {
   });
 
   /** What the grid lists: what the search found, else the newest of the chosen tab. */
-  protected readonly listed = computed<PlexItem[]>(() => this.results() ?? this.detailItems());
+  protected readonly listed = computed<PlexItem[]>(() => this.results() ?? (this.browse ? (this.pageOf(this.shownLibrary())?.items ?? []) : this.detailItems()));
 
   protected readonly shown = computed(() => (this.face().state === 'ok' ? this.items().slice(0, RECENT_POSTERS[this.size()]) : []));
 
   readonly face = computed<TileFace>(() => {
-    const look = { icon: LucideClapperboard, hue: 'neutral' as const };
+    const look = { icon: this.icon, hue: 'neutral' as const };
     const { target, label } = this.settings();
     const overview = this.overview();
     const status = this.plex.status(this.settings().account);
-    const name = label || (target === ALL_PLEX_LIBRARIES ? 'Recently added' : (this.library()?.title ?? 'Plex library'));
+    const name = label || (target === ALL_PLEX_LIBRARIES ? (this.browse ? 'Plex library' : 'Recently added') : (this.library()?.title ?? 'Plex library'));
     if (!target) return { ...look, name, detail: 'Pick a library', state: 'unset' };
     if (!overview?.loaded) {
       return status && status !== 'connected'
@@ -368,7 +594,7 @@ export class RecentlyAddedTile extends TileView {
 
   /** When it was added; nothing when the server didn't say (a search result without a date). */
   protected added(item: PlexItem) {
-    return new Date(item.addedAt).getTime() > 0 ? addedOn(item.addedAt) : '';
+    return !this.browse && new Date(item.addedAt).getTime() > 0 ? addedOn(item.addedAt) : '';
   }
 
   protected artUrl(path: string) {
@@ -382,12 +608,66 @@ export class RecentlyAddedTile extends TileView {
 
   /** Year and how long it runs, when the server says. */
   protected meta(item: PlexItem) {
-    return [item.year ? `${item.year}` : null, item.durationMs ? runtime(item.durationMs) : null].filter((m): m is string => !!m);
+    return [item.year ? `${item.year}` : null, this.length(item) || null].filter((m): m is string => !!m);
   }
 
-  /** Only a movie or an episode plays on a TV. */
+  /** A movie, an episode, a track or an album plays on a TV; a show or a season is opened for what is in it. */
   protected playable(item: PlexItem) {
-    return item.kind === 'movie' || item.kind === 'episode';
+    return item.kind === 'movie' || item.kind === 'episode' || item.kind === 'track' || item.kind === 'album';
+  }
+
+  /** Shows have seasons, seasons episodes, albums tracks. */
+  protected hasChildren(item: PlexItem) {
+    return item.kind === 'show' || item.kind === 'season' || item.kind === 'album';
+  }
+
+  protected childrenTitle(item: PlexItem) {
+    return item.kind === 'show' ? 'Seasons' : item.kind === 'season' ? 'Episodes' : 'Tracks';
+  }
+
+  protected childrenOf(item: PlexItem): Under {
+    return this.under()[item.id] ?? {};
+  }
+
+  /** How long a track or an episode runs: 3:07, 33m. */
+  protected length(item: PlexItem) {
+    if (!item.durationMs) return '';
+    return item.kind === 'track' ? plexTime(item.durationMs) : runtime(item.durationMs);
+  }
+
+  /** The show and season (or the artist) an opened cover is part of. */
+  protected readonly crumbs = computed(() =>
+    this.trail()
+      .slice(0, -1)
+      .map((i) => i.title)
+      .join(' › '));
+
+  /** Opens a cover of the grid for its details. */
+  protected open(item: PlexItem) {
+    this.trail.set([item]);
+    void this.loadChildren(item);
+  }
+
+  /** Opens something under the cover on show: its season, episode or track. */
+  protected push(item: PlexItem) {
+    this.trail.update((t) => [...t, item]);
+    void this.loadChildren(item);
+  }
+
+  /** Back to the cover before, or to the grid from the first. */
+  protected back() {
+    this.trail.update((t) => t.slice(0, -1));
+  }
+
+  private async loadChildren(item: PlexItem) {
+    if (!this.hasChildren(item) || this.under()[item.id]?.items) return;
+    this.under.update((all) => ({ ...all, [item.id]: {} }));
+    try {
+      const items = await this.realtime.plexChildren(this.overview()?.accountId ?? 0, item.id);
+      this.under.update((all) => ({ ...all, [item.id]: { items } }));
+    } catch (error) {
+      this.under.update((all) => ({ ...all, [item.id]: { error: reason(error, 'Could not load what is in it.') } }));
+    }
   }
 
   /** Where playing this cover is; the others start from the button. */
@@ -410,12 +690,90 @@ export class RecentlyAddedTile extends TileView {
   protected async playOn(item: PlexItem, device: AirPlayDevice) {
     this.cast.set({ step: 'starting', itemId: item.id, devices: [], device });
     try {
-      await this.realtime.playOnAirPlay(this.overview()?.accountId ?? 0, item.id, device.id);
+      const account = this.overview()?.accountId ?? 0;
+      // A track chosen from its album goes on with the album's next tracks.
+      const trail = this.trail();
+      const album = item.kind === 'track' ? trail[trail.length - 2] : undefined;
+      if (album?.kind === 'album') await this.realtime.playAlbumOnAirPlay(account, album.id, item.id, device.id);
+      else await this.realtime.playOnAirPlay(account, item.id, device.id);
       // From here the playing shows from AirPlayData, on this screen and every other.
       this.cast.set(IDLE);
     } catch (error) {
       this.cast.set({ ...IDLE, itemId: item.id, error: reason(error, `Could not play on ${device.name}.`) });
     }
+  }
+
+  private playTheme(show: PlexItem | null) {
+    // Still in the same show: it goes on, not from the start.
+    if (show && show.id === this.themeOf) return;
+    this.stopTheme();
+    // Nothing talks over music that already plays.
+    if (!show || this.local() || this.casting().length) return;
+    this.themeOf = show.id;
+    this.theme = new Audio(plexAudioUrl(this.overview()?.accountId ?? 0, show.id, true));
+    this.theme.volume = 0.6;
+    // A show without a theme, or a browser that wants a press first, is silent.
+    this.theme.play()?.catch(() => undefined);
+  }
+
+  private stopTheme() {
+    this.theme?.pause();
+    this.theme = undefined;
+    this.themeOf = undefined;
+  }
+
+  /** Plays a track, or an album track after track, in this screen's own speakers. A track chosen from its album goes on with the rest of it. */
+  protected async playHere(item: PlexItem) {
+    this.localError.set('');
+    const trail = this.trail();
+    const album = item.kind === 'album' ? item : item.kind === 'track' ? trail[trail.length - 2] : undefined;
+    if (album?.kind !== 'album') return this.startLocal({ queue: [item], index: 0, paused: false, album: null });
+    await this.loadChildren(album);
+    const tracks = (this.under()[album.id]?.items ?? []).filter((t) => t.kind === 'track');
+    if (!tracks.length) return this.localError.set('That album has no tracks.');
+    const index = item.kind === 'track' ? Math.max(0, tracks.findIndex((t) => t.id === item.id)) : 0;
+    this.startLocal({ queue: tracks, index, paused: false, album });
+  }
+
+  /** What the track is part of: the artist, the album and its place in it; for a lone track, what the server says of it. */
+  protected localDetail(play: LocalPlay) {
+    const { album, index, queue } = play;
+    return album
+      ? `${album.subtitle ? album.subtitle + ' — ' : ''}${album.title} · ${index + 1} of ${queue.length}`
+      : queue[index].subtitle;
+  }
+
+  private startLocal(play: LocalPlay) {
+    this.stopTheme();
+    this.audio ??= new Audio();
+    const audio = this.audio;
+    const fail = () => {
+      this.localError.set(`Could not play ${play.queue[play.index].title}.`);
+      this.stopLocal();
+    };
+    audio.onended = () => (play.index + 1 >= play.queue.length ? this.stopLocal() : this.startLocal({ ...play, index: play.index + 1 }));
+    audio.onerror = fail;
+    audio.src = plexAudioUrl(this.overview()?.accountId ?? 0, play.queue[play.index].id);
+    this.local.set(play);
+    audio.play()?.catch(fail);
+  }
+
+  protected toggleLocal() {
+    const play = this.local();
+    if (!play || !this.audio) return;
+    if (play.paused) this.audio.play()?.catch(() => this.stopLocal());
+    else this.audio.pause();
+    this.local.set({ ...play, paused: !play.paused });
+  }
+
+  protected stopLocal() {
+    const audio = this.audio;
+    if (audio) {
+      audio.onended = audio.onerror = null;
+      audio.pause();
+      audio.removeAttribute('src');
+    }
+    this.local.set(null);
   }
 
   protected async togglePause(playing: AirPlayPlayback) {
@@ -498,7 +856,7 @@ export class RecentlyAddedTile extends TileView {
   private async runSearch(query: string) {
     // One library when the tile covers one or a tab picked one; else all of them.
     const target = this.settings().target;
-    const tab = this.tab();
+    const tab = this.activeTab();
     const library =
       target === ALL_PLEX_LIBRARIES ? (tab !== 'all' && this.tabs().some((t) => t.id === tab) ? tab : null) : (this.library()?.id ?? null);
     try {
@@ -514,13 +872,16 @@ export class RecentlyAddedTile extends TileView {
   }
 
   protected closeScreen() {
-    this.selected.set(null);
+    this.trail.set([]);
+    // Opened again, a listing is of what the library holds then.
+    this.pages.set({});
     this.onSearch('');
   }
 
 
   /** Added today or yesterday. */
   protected isNew(item: PlexItem) {
+    if (this.browse) return false;
     const label = addedOn(item.addedAt);
     return label === 'Today' || label === 'Yesterday';
   }

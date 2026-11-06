@@ -748,7 +748,12 @@
 }
 .hd-plex-recent__title { font-size: calc(var(--cell) * .1); line-height: 1.15; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-plex-recent__sub { font-size: calc(var(--cell) * .08); opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hd-plex-recent.has-art > .hd-photo__label { z-index: 1; }
+/* The tile's label over its posters: a dark pill in the top-left corner. */
+.hd-plex-recent.has-art > .hd-photo__label {
+  position: absolute; top: calc(var(--cell) * .08); left: calc(var(--cell) * .08); z-index: 1; box-sizing: border-box;
+  max-width: calc(100% - var(--cell) * .16); padding: .25em .75em; border-radius: var(--radius-pill);
+  background: rgb(0 0 0 / .6); color: #fff; font-size: calc(var(--cell) * .1); backdrop-filter: blur(6px);
+}
 /*
  * The recently added screen: Plex's own look, whatever the theme. Charcoal ground, white text, and the Plex gold
  * for the active tab, the "New" badge and when each was added.
@@ -788,6 +793,15 @@
   padding: .2em .55em; border-radius: var(--radius-pill); background: #e5a00d; color: #1f2326;
   font: 800 calc(var(--cell) * .07)/1.2 var(--font-sans); letter-spacing: .04em; text-transform: uppercase;
 }
+/* Played: a gold tick on the cover's corner opposite "New", a pill in the facts, a tick before the length in a list. */
+.hd-plex-recent__seen {
+  position: absolute; top: calc(var(--cell) * .06); right: calc(var(--cell) * .06); z-index: 1; display: grid; place-items: center;
+  width: calc(var(--cell) * .2); height: calc(var(--cell) * .2); border-radius: 50%; background: #e5a00d; color: #1f2326;
+  box-shadow: 0 1px calc(var(--cell) * .04) rgb(0 0 0 / .5);
+}
+.hd-plex-recent__seen svg { width: 62%; height: 62%; stroke: currentColor; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.hd-plex-recent__watched { display: inline-flex; align-items: center; gap: .35em; color: #e5a00d; font-weight: 800; }
+.hd-plex-recent__watched svg, .hd-plex-recent__row-time svg { width: 1.1em; height: 1.1em; stroke: #e5a00d; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
 .hd-plex-recent__card-title { font: 700 calc(var(--cell) * .105)/1.2 var(--font-sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-plex-recent__card-sub { font-size: calc(var(--cell) * .085); color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-plex-recent__card-added { font: 700 calc(var(--cell) * .08)/1.2 var(--font-sans); color: #e5a00d; }
@@ -805,7 +819,8 @@
   mask-image: linear-gradient(#000, transparent 85%); user-select: none; -webkit-user-drag: none;
 }
 .hd-plex-recent__back { position: absolute; top: 0; left: 0; z-index: 1; width: calc(var(--cell) * .34); height: calc(var(--cell) * .34); }
-.hd-plex-recent__cover--large { margin: calc(var(--cell) * .4) 0 0; border-radius: calc(var(--cell) * .08); }
+/* clip, not hidden: a hidden overflow lets the grid row ignore the cover's height, and what is listed below would cover it. */
+.hd-plex-recent__cover--large { margin: calc(var(--cell) * .4) 0 0; border-radius: calc(var(--cell) * .08); overflow: clip; }
 .hd-plex-recent__facts { display: flex; flex-direction: column; align-items: flex-start; gap: calc(var(--cell) * .1); min-width: 0; padding-top: calc(var(--cell) * .4); }
 .hd-plex-recent__added { font: 800 calc(var(--cell) * .08)/1.2 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: #e5a00d; }
 .hd-plex-recent__headline { margin: 0; font: 800 calc(var(--cell) * .26)/1.1 var(--font-sans); overflow-wrap: anywhere; }
@@ -821,6 +836,24 @@
   .hd-plex-recent__detail { grid-template-columns: minmax(0, 1fr); justify-items: center; }
   .hd-plex-recent__cover--large { width: min(60%, calc(var(--cell) * 1.5)); }
 }
+/* What is under a show, season or album, below the facts: its seasons as covers, its episodes or tracks as rows. */
+.hd-plex-recent__children { grid-column: 1 / -1; justify-self: stretch; display: flex; flex-direction: column; gap: calc(var(--cell) * .12); padding-bottom: calc(var(--cell) * .1); }
+.hd-plex-recent__section { margin: 0; font: 800 calc(var(--cell) * .08)/1.2 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: #e5a00d; }
+.hd-plex-recent__seasons { display: grid; gap: calc(var(--cell) * .2) calc(var(--cell) * .14); grid-template-columns: repeat(auto-fill, minmax(calc(var(--cell) * 1.1), 1fr)); }
+.hd-plex-recent__rows { margin: 0; padding: 0; list-style: none; }
+.hd-plex-recent__rows li + li { border-top: 1px solid rgb(255 255 255 / .08); }
+.hd-plex-recent__row {
+  width: 100%; min-height: 52px; display: grid; grid-template-columns: 2.4em minmax(0, 1fr) auto; align-items: center; gap: calc(var(--cell) * .1);
+  padding: calc(var(--cell) * .06) calc(var(--cell) * .08); border: 0; border-radius: calc(var(--cell) * .06); background: none;
+  color: inherit; font: 700 calc(var(--cell) * .11)/1.25 var(--font-sans); text-align: start; cursor: pointer; transition: background-color .1s;
+}
+.hd-plex-recent__row:active { background: rgb(255 255 255 / .12); }
+.hd-plex-recent__row:focus-visible { outline: 3px solid #e5a00d; outline-offset: -3px; }
+.hd-plex-recent__row-no, .hd-plex-recent__row-time { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.hd-plex-recent__row-time { display: inline-flex; align-items: center; gap: .5em; }
+.hd-plex-recent__row-no { text-align: end; }
+.hd-plex-recent__row-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hd-plex-recent__row-title small { display: block; overflow: hidden; text-overflow: ellipsis; font-size: .8em; font-weight: 600; color: var(--ink-muted); }
 .hd-plex-recent__cast { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--cell) * .1); margin-top: calc(var(--cell) * .1); }
 .hd-plex-recent__play, .hd-plex-recent__receiver {
   display: inline-flex; align-items: center; gap: .5em; min-height: 44px; padding: 0 calc(var(--cell) * .2); border: 0;

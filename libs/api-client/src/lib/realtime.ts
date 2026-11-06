@@ -4,7 +4,7 @@ import { AirPlayInfo, AirPlayPlayback } from './airplay';
 import { DashboardSummary } from './dashboards';
 import { DisplayInfo, ScreenDetails, ScreenView } from './displays';
 import { PhotoSet } from './photos';
-import { PlexCommand, PlexItem, PlexOverview, PlexSession, PlexSnapshot, PlexTracks } from './plex';
+import { PlexCommand, PlexItem, PlexOverview, PlexPage, PlexSession, PlexSnapshot, PlexTracks } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
 import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
 
@@ -140,6 +140,16 @@ export class Realtime {
     return this.hub.invoke<PlexItem[]>('SearchPlex', accountId, query, libraryId);
   }
 
+  /** A page of what a Plex library holds, alphabetically: films, series or albums, never what is under them. */
+  plexLibraryItems(accountId: number, libraryId: string, start: number, size: number) {
+    return this.hub.invoke<PlexPage>('PlexLibraryItems', accountId, libraryId, start, size);
+  }
+
+  /** What is under a Plex item, in order: a show's seasons, a season's episodes, an album's tracks. */
+  plexChildren(accountId: number, itemId: string) {
+    return this.hub.invoke<PlexItem[]>('PlexChildren', accountId, itemId);
+  }
+
   /** The audio and subtitle tracks of a movie or episode. */
   plexTracks(accountId: number, itemId: string) {
     return this.hub.invoke<PlexTracks>('PlexTracks', accountId, itemId);
@@ -155,9 +165,14 @@ export class Realtime {
     return this.hub.invoke<void>('ChangeAirPlayTracks', deviceId, audioStreamId, subtitleStreamId);
   }
 
-  /** Plays a movie or episode of a Plex account on an AirPlay receiver; fails with the reason. */
+  /** Plays a movie, episode, track or album (track after track) of a Plex account on an AirPlay receiver; fails with the reason. */
   playOnAirPlay(accountId: number, itemId: string, deviceId: string) {
     return this.hub.invoke<void>('PlayOnAirPlay', accountId, itemId, deviceId);
+  }
+
+  /** Plays an album from one of its tracks (its first when `trackId` is null); the tracks after it follow. */
+  playAlbumOnAirPlay(accountId: number, albumId: string, trackId: string | null, deviceId: string) {
+    return this.hub.invoke<void>('PlayAlbumOnAirPlay', accountId, albumId, trackId, deviceId);
   }
 
   /** Pauses or resumes what plays on an AirPlay receiver; fails with the reason. */

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 
-/** An AirPlay receiver on the network. Only a `tv` plays what Plex streams (ADR-0012). */
+/** An AirPlay receiver on the network. Only a `tv` plays what Plex streams, video or music (ADR-0012). */
 export interface AirPlayDevice {
   id: string;
   name: string;
@@ -24,6 +24,10 @@ export interface AirPlayPlayback {
   subtitleStreamId: string | null;
   offsetMs: number;
   at: string;
+  /** What the title is part of, such as a track's artist, album and place in the album. */
+  detail?: string | null;
+  /** How long it runs; 0 when the server doesn't say. */
+  durationMs?: number;
 }
 
 /** Whether AirPlay is set up, and the receivers found. What a screen asks for. */

@@ -43,8 +43,19 @@ encrypted control and event connections and the video playback commands.
   private address, which routers and DNS filters often refuse), and the playlist, a variant and the first segment are
   fetched as the receiver would before anything is sent to it. A failed check comes back as the reason.
   `GET /api/accounts/airplay/stream-check` shows that check for the newest movie or episode, without the token.
-- Only movies and episodes play; a season or album has nothing single to stream, and a search can find any item of the
-  library, not only the newest (`SearchPlex`; playing looks the item up on the server).
+- Movies, episodes, tracks and albums play; a show or a season is opened for what is in it (`PlexChildren`: seasons,
+  episodes, tracks), and a search can find any item of the library, not only the newest (`SearchPlex`; playing looks the
+  item up on the server). A search returns movies, shows and albums by their title, and episodes and tracks only by their
+  own, never because their show or album has that name.
+- A track streams as one mp3 the server makes (`/audio/:/transcode/universal/start.mp3`, `protocol=http`). It is not HLS:
+  Plex's audio transcoder serves one continuous stream whatever it is asked, and the HLS playlist it gives names segments
+  that never exist (the first segment is a 404), while a request without `X-Plex-Platform` is a 400. The check for a
+  track is that this stream answers. The receiver plays one stream at a time, so an album is a queue HomeyDash keeps
+  (`AirPlayQueue` in `AirPlayNow`): when the receiver ends a track that, by HomeyDash's count, had run to within 15 seconds
+  of its length, the next one starts. A track stopped earlier on the TV ends the album.
+- Music also plays on a screen itself, and a show's theme plays when it is opened. For these HomeyDash serves the file,
+  not Plex's transcoder: `GET /api/plex/audio?item=…` is a track's own file and `&theme=true` a show's theme, passed on
+  from the server with its Range header, so the screen never has the server's address or token.
 - What plays where is one state in the API (`AirPlayNow`), pushed to every screen as `AirPlayNow`: started on one screen,
   the Plex card on another shows its controls (pause, resume, stop) and a playing badge. The Apple TV doesn't report its
   position, so the API counts it itself (not while paused) and the state ends when the receiver ends the session.

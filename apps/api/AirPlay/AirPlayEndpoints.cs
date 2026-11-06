@@ -20,6 +20,7 @@ public static class AirPlayEndpoints
         }
         services.AddSingleton(options);
         services.AddSingleton<AirPlayNow>();
+        services.AddSingleton<PlexPlayback>();
         // The stream check also fetches from Plex, whichever client is in use.
         services.AddHttpClient();
         if (options.Fake)
@@ -53,17 +54,26 @@ public static class AirPlayEndpoints
         });
 
         // For diagnosing a receiver that starts a stream and stops it at once: what the Plex server serves for an item, as a
-        // receiver would fetch it. The oldest Plex account and its newest movie or episode unless told otherwise. Never
+        // receiver would fetch it. The oldest Plex account and its newest movie or episode unless told otherwise (item: a movie,
+        // episode or track). Never
         // shows the token.
         airPlay.MapGet("/stream-check", async (int? account, string? item, PlexAccounts accounts, PlexWatcher watcher,
-            [FromServices] IHttpClientFactory http, CancellationToken ct) =>
+            [FromServices] IHttpClientFactory http, [FromServices] IPlex plexApi, CancellationToken ct) =>
         {
             if (accounts.For(account) is not { Connection: { } server } plex) return Results.Problem("Sign in with Plex first.", statusCode: StatusCodes.Status409Conflict);
             var id = item ?? watcher.Snapshot.Accounts.FirstOrDefault(a => a.AccountId == plex.Id)?.Libraries
                 .SelectMany(l => l.Recent).FirstOrDefault(i => i.Kind is "movie" or "episode")?.Id;
-            return id is null
-                ? Results.Problem("There is no movie or episode to check.", statusCode: StatusCodes.Status404NotFound)
-                : Results.Ok(new { item = id, check = await PlexStreamCheck.RunAsync(http.CreateClient(PlexClient.HttpClientName), server, id, ct) });
+            if (id is null) return Results.Problem("There is no movie or episode to check.", statusCode: StatusCodes.Status404NotFound);
+            try
+            {
+                // A track has the audio transcoder's stream.
+                var audio = item is not null && (await plexApi.ItemAsync(server, id, ct))?.Kind == "track";
+                return Results.Ok(new { item = id, check = await PlexStreamCheck.RunAsync(http.CreateClient(PlexClient.HttpClientName), server, id, ct, audio) });
+            }
+            catch (PlexException e)
+            {
+                return Results.Problem(e.Message, statusCode: StatusCodes.Status502BadGateway);
+            }
         });
 
         // The receiver shows a PIN for finish.

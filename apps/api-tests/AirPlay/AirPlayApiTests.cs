@@ -108,6 +108,105 @@ public sealed class AirPlayApiTests(ApiFactory factory) : IClassFixture<ApiFacto
     }
 
     [Fact]
+    public async Task ASearch_FindsSeriesAndAlbumsByName_AndEpisodesAndTracksOnlyByTheirOwn()
+    {
+        var hub = await ConnectAsync();
+        await WaitForLibrariesAsync(hub);
+
+        async Task<string[]> Ids(string query, string? library = null) =>
+            (await hub.InvokeAsync<JsonElement[]>("SearchPlex", 1, query, library)).Select(i => i.GetProperty("id").GetString()!).Order().ToArray();
+
+        // The show and the episode named after it, not the episodes of the show; seasons are reached through the show.
+        Assert.Equal(["500"], await Ids("bear", "2"));
+        Assert.Equal(["501"], await Ids("system", "2"));
+        // The album, and the track that shares its name, not the other tracks of the album.
+        Assert.Equal(["601", "613"], await Ids("happier", "3"));
+        Assert.Equal(["312"], await Ids("lunch"));
+        Assert.Empty(await Ids("skinny", "1"));
+    }
+
+    [Fact]
+    public async Task ALibrary_ListsOnlyItsFilmsSeriesOrAlbums_AlphabeticallyInPages()
+    {
+        var hub = await ConnectAsync();
+        await WaitForLibrariesAsync(hub);
+
+        async Task<(string[] Titles, int Total)> Page(string library, int start, int size)
+        {
+            var page = await hub.InvokeAsync<JsonElement>("PlexLibraryItems", 1, library, start, size);
+            return (page.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("title").GetString()!).ToArray(), page.GetProperty("total").GetInt32());
+        }
+
+        // Films, series and albums only: no episodes, seasons or tracks.
+        var (films, filmTotal) = await Page("1", 0, 100);
+        Assert.Equal(["Anora", "Arrival", "Blade Runner 2049", "Dune", "Dune: Part Two", "Oppenheimer", "Past Lives", "Perfect Days"], films);
+        Assert.Equal(8, filmTotal);
+        Assert.Equal(["Andor", "Severance", "Slow Horses", "The Bear"], (await Page("2", 0, 100)).Titles);
+        Assert.Equal(["Brat", "Happier Than Ever", "Hit Me Hard and Soft", "Short n' Sweet"], (await Page("3", 0, 100)).Titles);
+        // A page at a time.
+        var second = await Page("1", 2, 3);
+        Assert.Equal(["Blade Runner 2049", "Dune", "Dune: Part Two"], second.Titles);
+        Assert.Equal(8, second.Total);
+        Assert.Empty((await Page("1", 50, 10)).Titles);
+        // The library has a count on the overview.
+        var overview = await hub.InvokeAsync<JsonElement>("Plex");
+        Assert.Equal([8, 4, 4], overview.GetProperty("accounts")[0].GetProperty("libraries").EnumerateArray().Select(l => l.GetProperty("count").GetInt32()));
+        // What a library shows of its newest is films, series or albums, never an episode or a track.
+        var titles = overview.GetProperty("accounts")[0].GetProperty("libraries")[1].GetProperty("titles").EnumerateArray().Select(i => i.GetProperty("kind").GetString());
+        Assert.NotEmpty(titles);
+        Assert.All(titles, kind => Assert.Equal("show", kind));
+        await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync<JsonElement>("PlexLibraryItems", 1, "99", 0, 10));
+        await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync<JsonElement>("PlexLibraryItems", 2, "1", 0, 10));
+    }
+
+    [Fact]
+    public async Task WhatWasPlayed_IsSaidOfFilmsEpisodesAndSeasons()
+    {
+        var hub = await ConnectAsync();
+        await WaitForLibrariesAsync(hub);
+
+        async Task<(string, bool)[]> Watched(string method, params object[] args) =>
+            (await hub.InvokeCoreAsync<JsonElement[]>(method, args)).Select(i => (i.GetProperty("title").GetString()!, i.GetProperty("watched").GetBoolean())).ToArray();
+
+        var films = (await hub.InvokeAsync<JsonElement>("PlexLibraryItems", 1, "1", 0, 100)).GetProperty("items").EnumerateArray()
+            .Where(i => i.GetProperty("watched").GetBoolean()).Select(i => i.GetProperty("title").GetString());
+        Assert.Equal(["Arrival", "Past Lives"], films);
+        Assert.Equal([("Season 1", false), ("Season 2", true)], await Watched("PlexChildren", 1, "500"));
+        Assert.Equal([("System", true), ("Hands", true), ("Brigade", false)], await Watched("PlexChildren", 1, "510"));
+    }
+
+    [Fact]
+    public async Task WhatIsUnderAnItem_IsListedInOrder()
+    {
+        var hub = await ConnectAsync();
+
+        async Task<string[]> Titles(string id) =>
+            (await hub.InvokeAsync<JsonElement[]>("PlexChildren", 1, id)).Select(i => i.GetProperty("title").GetString()!).ToArray();
+
+        Assert.Equal(["Season 1", "Season 2"], await Titles("500"));
+        Assert.Equal(["System", "Hands", "Brigade"], await Titles("510"));
+        Assert.Equal(["Getting Older", "I Didn't Change My Number", "Happier Than Ever"], await Titles("601"));
+        // A recently added season is a season of its show: its episodes are under it.
+        Assert.Equal(["Anjin", "Servants of Two Masters"], await Titles("203"));
+        Assert.Empty(await Titles("101"));
+        await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync<JsonElement[]>("PlexChildren", 2, "500"));
+    }
+
+    [Fact]
+    public async Task ATrack_PlaysByItself_AsAudio()
+    {
+        var hub = await ConnectAsync();
+        await WaitForLibrariesAsync(hub);
+
+        await hub.InvokeAsync("PlayOnAirPlay", 1, "612", FakeAirPlay.LivingRoomTv);
+
+        var url = factory.Services.GetRequiredService<FakeAirPlay>().Playing[FakeAirPlay.LivingRoomTv];
+        Assert.Contains("/audio/:/transcode/universal/start.mp3", url);
+        Assert.Contains("path=%2Flibrary%2Fmetadata%2F612", url);
+        await hub.InvokeAsync("StopAirPlay", FakeAirPlay.LivingRoomTv);
+    }
+
+    [Fact]
     public async Task WhatPlays_CanBePausedAndResumed_ButNothingElse()
     {
         var hub = await ConnectAsync();

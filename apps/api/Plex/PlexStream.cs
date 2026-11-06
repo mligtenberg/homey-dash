@@ -42,6 +42,21 @@ public static partial class PlexStream
         return QueryHelpers.AddQueryString(server.Uri + "/video/:/transcode/universal/start.m3u8", query);
     }
 
+    /// <summary>
+    /// A track as one mp3 stream the server makes of whatever the file holds, which an Apple TV plays; the URL carries the token
+    /// for the same reason as <see cref="Url"/>. It is not HLS: Plex's audio transcoder serves one continuous stream whatever it
+    /// is asked, and the HLS playlist it gives names segments that never exist.
+    /// </summary>
+    public static string AudioUrl(PlexConnection server, string trackId, string? session = null) =>
+        QueryHelpers.AddQueryString(server.Uri + "/audio/:/transcode/universal/start.mp3", new Dictionary<string, string?>
+        {
+            ["path"] = $"/library/metadata/{trackId}",
+            ["mediaIndex"] = "0", ["partIndex"] = "0", ["protocol"] = "http",
+            ["session"] = session ?? Guid.NewGuid().ToString("N"),
+            ["X-Plex-Product"] = "HomeyDash", ["X-Plex-Platform"] = "tvOS",
+            ["X-Plex-Client-Identifier"] = server.ClientId, ["X-Plex-Token"] = server.Token,
+        });
+
     // Plex names a local address 192-168-1-23.<id>.plex.direct and serves it over https. A receiver has to resolve that
     // name through public DNS, which routers and DNS filters often refuse for a private address: the IP over http, which
     // a Plex server allows on the local network unless told to require secure connections, needs neither.

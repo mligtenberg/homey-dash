@@ -26,10 +26,13 @@ export interface PlexSession {
   accountId: number;
 }
 
-/** Something in a library: newly added, or found by a search. `addedAt` is the epoch when the server doesn't say. */
+/**
+ * Something in a library: newly added, found by a search, or listed under a show, season or album. `addedAt` is the epoch when
+ * the server doesn't say.
+ */
 export interface PlexItem {
   id: string;
-  kind: 'movie' | 'show' | 'episode' | 'season' | 'album' | 'other';
+  kind: 'movie' | 'show' | 'episode' | 'season' | 'album' | 'track' | 'other';
   title: string;
   subtitle: string | null;
   image: string | null;
@@ -44,6 +47,10 @@ export interface PlexItem {
   genres?: string[];
   /** The wide artwork behind it. */
   art?: string | null;
+  /** A film or episode that was played, or a season or series whose episodes all were. */
+  watched?: boolean;
+  /** An episode's, season's or track's number in its season, show or album; only on what `plexChildren` lists. */
+  index?: number | null;
 }
 
 /** An audio or subtitle track of a movie or episode: `label` says language, format and channels. */
@@ -65,6 +72,16 @@ export interface PlexLibrary {
   type: 'movie' | 'show' | 'artist';
   /** The newest first. */
   recent: PlexItem[];
+  /** How many films, series or albums it holds. */
+  count?: number;
+  /** The newest films, series or albums, newest first, where `recent` has what the server lists as new: for series, episodes. */
+  titles?: PlexItem[];
+}
+
+/** A page of what a library holds: `total` is how many it holds in all. */
+export interface PlexPage {
+  items: PlexItem[];
+  total: number;
 }
 
 /** A player that played something since HomeyDash started. */
@@ -110,6 +127,11 @@ export function plexLibraryTarget(library: Pick<PlexLibrary, 'id'>) {
 /** A picture from a Plex account's server, scaled by it to fit `width` × `height`. */
 export function plexImageUrl(accountId: number, path: string, width: number, height: number) {
   return `/api/plex/image?account=${accountId}&path=${encodeURIComponent(path)}&w=${Math.round(width)}&h=${Math.round(height)}`;
+}
+
+/** A track's own file, or a show's theme song (`theme`), from a Plex account's server through HomeyDash, for an audio element. */
+export function plexAudioUrl(accountId: number, itemId: string, theme = false) {
+  return `/api/plex/audio?account=${accountId}&item=${encodeURIComponent(itemId)}${theme ? '&theme=true' : ''}`;
 }
 
 /**

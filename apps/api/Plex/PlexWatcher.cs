@@ -264,7 +264,7 @@ public sealed class PlexWatcher(
         public static readonly LibraryComparer Instance = new();
 
         public bool Equals(PlexLibrary? a, PlexLibrary? b) =>
-            a is not null && b is not null && a.Id == b.Id && a.Title == b.Title && a.Type == b.Type && a.Recent.SequenceEqual(b.Recent);
+            a is not null && b is not null && a.Id == b.Id && a.Title == b.Title && a.Type == b.Type && a.Count == b.Count && a.Recent.SequenceEqual(b.Recent) && a.Titles.SequenceEqual(b.Titles);
 
         public int GetHashCode(PlexLibrary library) => library.Id.GetHashCode();
     }

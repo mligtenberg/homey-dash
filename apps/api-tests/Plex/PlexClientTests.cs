@@ -197,6 +197,7 @@ public class PlexClientTests
         {
             new { type = "movie", Metadata = new object[] { new { ratingKey = "7", type = "movie", title = "Arrival", year = 2016, addedAt = 1_600_000_000 } } },
             new { type = "show", Metadata = new object[] { new { ratingKey = "8", type = "show", title = "Arrival Show", year = 2020, addedAt = 1_600_000_000 } } },
+            new { type = "season", Metadata = new object[] { new { ratingKey = "10", type = "season", title = "Season 1", parentTitle = "Arrival Show", addedAt = 1_600_000_000 } } },
             new { type = "actor" },
             new { type = "track", Metadata = new object[] { new { ratingKey = "9", type = "track", title = "Arrival", addedAt = 1_600_000_000 } } },
             new { type = "movie", Metadata = new object[] { new { ratingKey = "7", type = "movie", title = "Arrival", addedAt = 1_600_000_000 } } },
@@ -204,12 +205,98 @@ public class PlexClientTests
 
         var found = await Client(plex).SearchAsync(Server, "arri val", "1", 12, CancellationToken.None);
 
-        Assert.Equal(["7", "8"], found.Select(i => i.Id));
-        Assert.Equal(["movie", "show"], found.Select(i => i.Kind));
+        Assert.Equal(["7", "8", "9"], found.Select(i => i.Id));
+        Assert.Equal(["movie", "show", "track"], found.Select(i => i.Kind));
         var request = plex.Requests.Single().RequestUri!;
         Assert.Equal("/hubs/search", request.AbsolutePath);
         Assert.Contains("query=arri%20val", request.Query);
         Assert.Contains("sectionId=1", request.Query);
+    }
+
+    [Fact]
+    public async Task Search_FindsAnEpisodeOrATrackByItsOwnTitle_NotByItsShowOrAlbum()
+    {
+        var plex = new ScriptedPlex(_ => Json(new { MediaContainer = new { Hub = new object[]
+        {
+            new { type = "episode", Metadata = new object[]
+            {
+                new { ratingKey = "1", type = "episode", title = "Bear Hug", grandparentTitle = "Show", addedAt = 1 },
+                new { ratingKey = "2", type = "episode", title = "System", grandparentTitle = "The Bear", addedAt = 1 },
+            } },
+            new { type = "album", Metadata = new object[] { new { ratingKey = "3", type = "album", title = "Bear Songs", parentTitle = "Band", addedAt = 1 } } },
+            new { type = "track", Metadata = new object[]
+            {
+                new { ratingKey = "4", type = "track", title = "Hungry Bear", parentTitle = "Album", addedAt = 1 },
+                new { ratingKey = "5", type = "track", title = "Lunch", parentTitle = "Bear Songs", grandparentTitle = "Band", addedAt = 1 },
+            } },
+        } } }));
+
+        var found = await Client(plex).SearchAsync(Server, "Bear", null, 12, CancellationToken.None);
+
+        Assert.Equal(["1", "3", "4"], found.Select(i => i.Id));
+    }
+
+    [Fact]
+    public async Task Children_AreTheSeasonsOfAShow_TheEpisodesOfASeason_AndTheTracksOfAnAlbum()
+    {
+        var plex = new ScriptedPlex(request => request.RequestUri!.AbsolutePath.Contains("/10/") ? Json(new { MediaContainer = new { Metadata = new object[]
+        {
+            new { ratingKey = "11", type = "season", title = "Season 1", parentTitle = "Show", index = 1, leafCount = 8, thumb = "/library/metadata/11/thumb/1", parentThumb = "/library/metadata/10/thumb/1" },
+            new { ratingKey = "12", type = "season", title = "Specials", parentTitle = "Show", index = 0, leafCount = 1 },
+        } } }) : Json(new { MediaContainer = new { Metadata = new object[]
+        {
+            new { ratingKey = "21", type = "track", title = "First", index = 1, duration = 180_000, originalTitle = "Guest", parentThumb = "/library/metadata/20/thumb/1" },
+            new { ratingKey = "22", type = "track", title = "Second", index = 2, duration = 200_000 },
+        } } }));
+
+        var seasons = await Client(plex).ChildrenAsync(Server, "10", CancellationToken.None);
+        var tracks = await Client(plex).ChildrenAsync(Server, "20", CancellationToken.None);
+
+        Assert.Equal([("Season 1", "8 episodes", 1, "/library/metadata/11/thumb/1"), ("Specials", "1 episode", null, null)],
+            seasons.Select(s => (s.Title, s.Subtitle, s.Index, s.Image)));
+        Assert.Equal([("First", "Guest", 1, 180_000L), ("Second", null, 2, 200_000L)], tracks.Select(t => (t.Title, t.Subtitle, t.Index, t.DurationMs)));
+        Assert.Equal("/library/metadata/20/thumb/1", tracks[0].Image);
+        Assert.Equal("/library/metadata/10/children", plex.Requests[0].RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task ALibraryPage_IsTheTopOfTheLibrary_SortedByTitle_AndAnArtistLibraryListsItsAlbums()
+    {
+        var plex = new ScriptedPlex(_ => Json(new { MediaContainer = new { totalSize = 120, Metadata = new object[]
+            { new { ratingKey = "1", type = "album", title = "Brat", parentTitle = "Charli xcx", addedAt = 1 } } } }));
+
+        var page = await Client(plex).LibraryItemsAsync(Server, "3", "artist", 60, 30, CancellationToken.None);
+        await Client(plex).LibraryItemsAsync(Server, "1", "movie", 0, 30, CancellationToken.None);
+
+        Assert.Equal(120, page.Total);
+        Assert.Equal(["Brat"], page.Items.Select(i => i.Title));
+        var artist = plex.Requests[0].RequestUri!;
+        Assert.Equal("/library/sections/3/all", artist.AbsolutePath);
+        Assert.Contains("type=9", artist.Query);
+        Assert.Contains("sort=titleSort", artist.Query);
+        Assert.Contains("X-Plex-Container-Start=60", artist.Query);
+        Assert.Contains("X-Plex-Container-Size=30", artist.Query);
+        Assert.DoesNotContain("type=9", plex.Requests[1].RequestUri!.Query);
+    }
+
+    [Fact]
+    public async Task Libraries_SayHowManyTheyHold_AndWhichFilmsSeriesOrAlbumsAreNewest()
+    {
+        var plex = new ScriptedPlex(request => request.RequestUri!.AbsolutePath == "/library/sections"
+            ? Json(new { MediaContainer = new { Directory = new object[] { new { key = "2", title = "TV Shows", type = "show" } } } })
+            : request.RequestUri.AbsolutePath.EndsWith("/recentlyAdded")
+                ? Json(new { MediaContainer = new { Metadata = new object[] { new { ratingKey = "9", type = "episode", title = "An episode", addedAt = 1 } } } })
+                : Json(new { MediaContainer = new { totalSize = 1234, Metadata = new object[] { new { ratingKey = "5", type = "show", title = "A series", addedAt = 1 } } } }));
+
+        var library = Assert.Single(await Client(plex).LibrariesAsync(Server, 24, CancellationToken.None));
+
+        Assert.Equal(1234, library.Count);
+        // What the server lists as new is episodes; the newest series are asked for apart.
+        Assert.Equal(["An episode"], library.Recent.Select(i => i.Title));
+        Assert.Equal(["A series"], library.Titles.Select(i => i.Title));
+        var asked = plex.Requests.Single(r => r.RequestUri!.AbsolutePath == "/library/sections/2/all").RequestUri!;
+        Assert.Contains("sort=addedAt%3Adesc", asked.Query);
+        Assert.Contains("X-Plex-Container-Size=24", asked.Query);
     }
 
     [Fact]
@@ -219,6 +306,37 @@ public class PlexClientTests
 
         Assert.Empty(await Client(plex).SearchAsync(Server, "zzz", null, 12, CancellationToken.None));
         Assert.DoesNotContain("sectionId", plex.Requests.Single().RequestUri!.Query);
+    }
+
+    [Fact]
+    public async Task Audio_IsTheTracksFirstPart_OrTheShowsTheme_AskedForTheRangeWanted()
+    {
+        var plex = new ScriptedPlex(request => request.RequestUri!.AbsolutePath switch
+        {
+            "/library/metadata/7" => Json(new { MediaContainer = new { Metadata = new object[]
+                { new { ratingKey = "7", type = "track", Media = new object[] { new { Part = new object[] { new { key = "/library/parts/70/1/file.mp3" } } } } } } } }),
+            "/library/metadata/8" => Json(new { MediaContainer = new { Metadata = new object[]
+                { new { ratingKey = "8", type = "show", theme = "/library/metadata/8/theme/1" } } } }),
+            "/library/metadata/9" => Json(new { MediaContainer = new { Metadata = new object[] { new { ratingKey = "9", type = "show" } } } }),
+            "/library/parts/70/1/file.mp3" => new HttpResponseMessage(HttpStatusCode.PartialContent) { Content = new ByteArrayContent([1, 2, 3]) },
+            "/library/metadata/8/theme/1" => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([4, 5]) },
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+        });
+        var client = Client(plex);
+
+        var track = await client.AudioAsync(Server, "7", false, "bytes=0-", CancellationToken.None);
+        var theme = await client.AudioAsync(Server, "8", true, null, CancellationToken.None);
+
+        Assert.Equal(206, track!.Status);
+        using var bytes = new MemoryStream();
+        await track.Content.CopyToAsync(bytes);
+        Assert.Equal(new byte[] { 1, 2, 3 }, bytes.ToArray());
+        Assert.Equal(200, theme!.Status);
+        Assert.Equal("bytes=0-", plex.Requests.Single(r => r.RequestUri!.AbsolutePath.EndsWith("file.mp3")).Headers.GetValues("Range").Single());
+        // A show without a theme, a theme asked of a track, a track asked as a theme, and something the server doesn't have: nothing.
+        Assert.Null(await client.AudioAsync(Server, "9", true, null, CancellationToken.None));
+        Assert.Null(await client.AudioAsync(Server, "7", true, null, CancellationToken.None));
+        Assert.Null(await client.AudioAsync(Server, "8", false, null, CancellationToken.None));
     }
 
     [Fact]

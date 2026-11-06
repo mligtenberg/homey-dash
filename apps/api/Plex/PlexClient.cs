@@ -114,10 +114,30 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
             var key = Str(section, "key")!;
             var items = await ServerAsync(server, HttpMethod.Get,
                 $"/library/sections/{Uri.EscapeDataString(key)}/recentlyAdded?X-Plex-Container-Start=0&X-Plex-Container-Size={recent}", ct);
-            libraries.Add(new PlexLibrary(key, Str(section, "title") ?? key, Str(section, "type")!, Metadata(items).Select(ToItem).ToList()));
+            // The newest films, series or albums, and with them how many there are.
+            var titles = await ServerAsync(server, HttpMethod.Get, LibraryPath(key, Str(section, "type")!, 0, recent, "addedAt:desc"), ct);
+            libraries.Add(new PlexLibrary(key, Str(section, "title") ?? key, Str(section, "type")!, Metadata(items).Select(ToItem).ToList())
+            {
+                Count = (int)TotalSize(titles),
+                Titles = Metadata(titles).Select(ToItem).ToList(),
+            });
         }
         return libraries;
     }
+
+    // What a library holds at the top: films, series, and for music its albums (type 9), by sort title.
+    private static string LibraryPath(string libraryId, string libraryType, int start, int size, string sort = "titleSort") =>
+        $"/library/sections/{Uri.EscapeDataString(libraryId)}/all?{(libraryType == "artist" ? "type=9&" : "")}sort={Uri.EscapeDataString(sort)}"
+        + $"&X-Plex-Container-Start={start}&X-Plex-Container-Size={size}";
+
+    public async Task<PlexPage> LibraryItemsAsync(PlexConnection server, string libraryId, string libraryType, int start, int size, CancellationToken ct)
+    {
+        var json = await ServerAsync(server, HttpMethod.Get, LibraryPath(libraryId, libraryType, start, size), ct);
+        return new PlexPage(Metadata(json).Select(ToItem).ToList(), (int)TotalSize(json));
+    }
+
+    private static long TotalSize(JsonElement json) =>
+        json.ValueKind == JsonValueKind.Object && json.TryGetProperty("MediaContainer", out var container) ? Long(container, "totalSize") : 0;
 
     public async Task<IReadOnlyList<PlexItem>> SearchAsync(PlexConnection server, string query, string? libraryId, int limit, CancellationToken ct)
     {
@@ -125,15 +145,24 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
             + (libraryId is null ? "" : $"&sectionId={Uri.EscapeDataString(libraryId)}");
         var json = await ServerAsync(server, HttpMethod.Get, path, ct);
         if (!json.GetProperty("MediaContainer").TryGetProperty("Hub", out var hubs) || hubs.ValueKind != JsonValueKind.Array) return [];
-        // One list per kind (movies, shows, episodes...); keep the ones a card can show, in the server's order.
+        // One list per kind (movies, shows, episodes...); keep the ones a card can show, in the server's order. Seasons are
+        // reached through their show. Plex also lists an episode under its show's name and a track under its album's: only
+        // the ones named by their own title stay.
         return hubs.EnumerateArray()
             .Where(hub => hub.TryGetProperty("Metadata", out _))
             .SelectMany(hub => hub.GetProperty("Metadata").EnumerateArray())
-            .Where(m => Str(m, "type") is "movie" or "show" or "season" or "episode" or "album")
+            .Where(m => Str(m, "type") is "movie" or "show" or "album"
+                || (Str(m, "type") is "episode" or "track" && PlexSearch.Matches(Str(m, "title") ?? "", query)))
             .Select(ToItem)
             .DistinctBy(i => i.Id)
-            .Take(limit * 3)
+            .Take(limit * 5)
             .ToList();
+    }
+
+    public async Task<IReadOnlyList<PlexItem>> ChildrenAsync(PlexConnection server, string itemId, CancellationToken ct)
+    {
+        var json = await ServerAsync(server, HttpMethod.Get, $"/library/metadata/{Uri.EscapeDataString(itemId)}/children", ct);
+        return Metadata(json).Where(m => Str(m, "type") is "season" or "episode" or "track").Select(ToChild).ToList();
     }
 
     public async Task<PlexItem?> ItemAsync(PlexConnection server, string itemId, CancellationToken ct)
@@ -158,12 +187,39 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
         return new PlexTracks(Of(2), Of(3));
     }
 
+    // Under its show, season, or album, an item is told by its own name and number.
+    private static PlexItem ToChild(JsonElement m)
+    {
+        var type = Str(m, "type");
+        return ToItem(m) with
+        {
+            Title = Str(m, "title") ?? "",
+            Subtitle = type switch
+            {
+                "season" => Long(m, "leafCount") is > 0 and var n ? n == 1 ? "1 episode" : $"{n} episodes" : null,
+                // The artist, when the album's tracks have different ones.
+                "track" => Str(m, "originalTitle"),
+                _ => null,
+            },
+            Image = type == "season" ? Str(m, "thumb") ?? Str(m, "parentThumb") : ToItem(m).Image,
+            Index = Long(m, "index") is > 0 and var index ? (int)index : null,
+        };
+    }
+
+    // An album's cover is its own picture; its parent's is the artist's.
+    private static string? Thumb(JsonElement m) => Str(m, "type") switch
+    {
+        "album" => Str(m, "thumb") ?? Str(m, "parentThumb"),
+        "track" => Str(m, "parentThumb") ?? Str(m, "thumb") ?? Str(m, "grandparentThumb"),
+        _ => Str(m, "grandparentThumb") ?? Str(m, "parentThumb") ?? Str(m, "thumb"),
+    };
+
     private static PlexItem ToItem(JsonElement m) => new(
         Str(m, "ratingKey") ?? "",
         Kind(Str(m, "type")),
         Str(m, "type") == "season" ? Str(m, "parentTitle") ?? "" : Str(m, "title") ?? "",
         Str(m, "type") == "season" ? Str(m, "title") : Subtitle(m),
-        Str(m, "grandparentThumb") ?? Str(m, "parentThumb") ?? Str(m, "thumb"),
+        Thumb(m),
         DateTimeOffset.FromUnixTimeSeconds(Long(m, "addedAt")))
     {
         Summary = Summary(Str(m, "summary")),
@@ -175,7 +231,52 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
             ? genres.EnumerateArray().Select(g => Str(g, "tag")).OfType<string>().Take(3).ToList()
             : [],
         Art = Str(m, "grandparentArt") ?? Str(m, "art"),
+        Watched = Str(m, "type") switch
+        {
+            "movie" or "episode" => Long(m, "viewCount") > 0,
+            // A season or series is watched when every one of its episodes is.
+            "season" or "show" => Long(m, "leafCount") is > 0 and var leaves && Long(m, "viewedLeafCount") >= leaves,
+            _ => false,
+        },
     };
+
+    public async Task<PlexAudio?> AudioAsync(PlexConnection server, string itemId, bool theme, string? range, CancellationToken ct)
+    {
+        var json = await ServerAsync(server, HttpMethod.Get, $"/library/metadata/{Uri.EscapeDataString(itemId)}", ct);
+        if (Metadata(json).FirstOrDefault() is not { ValueKind: JsonValueKind.Object } m) return null;
+        string? path;
+        if (theme) path = Str(m, "theme");
+        else
+            path = Str(m, "type") == "track" && m.TryGetProperty("Media", out var media) && media.ValueKind == JsonValueKind.Array && media.GetArrayLength() > 0
+                && media[0].TryGetProperty("Part", out var parts) && parts.ValueKind == JsonValueKind.Array && parts.GetArrayLength() > 0
+                    ? Str(parts[0], "key")
+                    : null;
+        // Only the library's own files, like the pictures.
+        if (path is null || !(path.StartsWith("/library/parts/", StringComparison.Ordinal) || path.StartsWith("/library/metadata/", StringComparison.Ordinal))
+            || path.Contains("..") || path.Contains('?')) return null;
+        var request = Request(HttpMethod.Get, server.Uri + path, server.ClientId, server.Token);
+        request.Headers.Accept.Clear();
+        request.Headers.Accept.ParseAdd("*/*");
+        if (range is not null) request.Headers.TryAddWithoutValidation("Range", range);
+        HttpResponseMessage response;
+        try
+        {
+            response = await Http().SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+        catch (HttpRequestException e)
+        {
+            throw Unreachable(e);
+        }
+        if (response.StatusCode is not (HttpStatusCode.OK or HttpStatusCode.PartialContent))
+        {
+            response.Dispose();
+            return null;
+        }
+        // Plex calls an mp3 audio/mpeg3 at times, which is not a type a browser knows.
+        var type = response.Content.Headers.ContentType?.MediaType is { } named && !named.Contains("mpeg3") ? named : "audio/mpeg";
+        return new PlexAudio(await response.Content.ReadAsStreamAsync(ct), type,
+            (int)response.StatusCode, response.Content.Headers.ContentLength, response.Content.Headers.ContentRange?.ToString());
+    }
 
     public async Task<(Stream Content, string ContentType)?> ImageAsync(PlexConnection server, string path, int width, int height, CancellationToken ct)
     {

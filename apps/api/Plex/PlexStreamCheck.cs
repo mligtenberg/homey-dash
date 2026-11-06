@@ -17,11 +17,12 @@ public sealed record StreamCheck(string Host, string Scheme, bool Ok, string Sum
 public static class PlexStreamCheck
 {
     /// <summary>The stream as it will be sent: the receiver's address, what the item is made of, and what is done with it.</summary>
-    public static async Task<StreamCheck> RunAsync(HttpClient http, PlexConnection server, string itemId, CancellationToken ct)
+    public static async Task<StreamCheck> RunAsync(HttpClient http, PlexConnection server, string itemId, CancellationToken ct, bool audio = false)
     {
         var (receiver, source, copy) = await PlexStream.PrepareAsync(http, server, itemId, ct);
         var session = Guid.NewGuid().ToString("N");
-        return await RunAsync(http, receiver, PlexStream.Url(receiver, itemId, session, copy), session, source, copy, ct);
+        var url = audio ? PlexStream.AudioUrl(receiver, itemId, session) : PlexStream.Url(receiver, itemId, session, copy);
+        return await RunAsync(http, receiver, url, session, source, copy, ct);
     }
 
     public static async Task<StreamCheck> RunAsync(
@@ -31,6 +32,14 @@ public static class PlexStreamCheck
         List<StreamRequest> requests = [];
         try
         {
+            // A track is one stream, not a playlist of segments: it answers, or it doesn't.
+            if (master.AbsolutePath.StartsWith("/audio/", StringComparison.Ordinal))
+            {
+                var (status, _) = await FetchAsync(http, "audio stream", master, ct, requests, readBody: false);
+                return status is 200 or 206
+                    ? Result(master, true, "Plex serves the stream.", source, copy, requests)
+                    : Result(master, false, $"Plex did not give the stream ({Describe(status)}).", source, copy, requests);
+            }
             var (first, body) = await FetchAsync(http, "playlist", master, ct, requests);
             if (body is null) return Result(master, false, $"Plex did not give the stream ({Describe(first)}).", source, copy, requests);
 
@@ -52,7 +61,7 @@ public static class PlexStreamCheck
         }
         finally
         {
-            await StopAsync(http, server, session);
+            await StopAsync(http, server, session, new Uri(url).AbsolutePath.StartsWith("/audio/", StringComparison.Ordinal));
         }
     }
 
@@ -98,11 +107,11 @@ public static class PlexStreamCheck
         }
     }
 
-    private static async Task StopAsync(HttpClient http, PlexConnection server, string session)
+    private static async Task StopAsync(HttpClient http, PlexConnection server, string session, bool audio)
     {
         try
         {
-            var stop = QueryHelpers.AddQueryString(server.Uri + "/video/:/transcode/universal/stop",
+            var stop = QueryHelpers.AddQueryString(server.Uri + (audio ? "/audio" : "/video") + "/:/transcode/universal/stop",
                 new Dictionary<string, string?> { ["session"] = session, ["X-Plex-Token"] = server.Token });
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             using var _ = await http.GetAsync(stop, timeout.Token);

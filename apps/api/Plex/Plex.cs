@@ -77,7 +77,7 @@ public sealed record PlexSession(
 // A player that played something since HomeyDash started, for a now-playing tile to follow.
 public sealed record PlexPlayer(string Id, string Name);
 
-// Something in a library: a movie, show, episode, season or album. AddedAt is when it was added (the epoch when unknown).
+// Something in a library: a movie, show, season, episode, album or track. AddedAt is when it was added (the epoch when unknown).
 public sealed record PlexItem(string Id, string Kind, string Title, string? Subtitle, string? Image, DateTimeOffset AddedAt)
 {
     // What the detail view of a cover shows, when the server has it.
@@ -90,15 +90,35 @@ public sealed record PlexItem(string Id, string Kind, string Title, string? Subt
     public IReadOnlyList<string> Genres { get; init; } = [];
     // The wide artwork behind it.
     public string? Art { get; init; }
+    // A film or episode that was played, or a season or series whose episodes all were, for this Plex account.
+    public bool Watched { get; init; }
+    // An episode's, a season's or a track's number within its season or album; only on what ChildrenAsync lists.
+    public int? Index { get; init; }
 }
 
 // An audio or subtitle track of an item. Label says language, format and channels (English (AC3 5.1)); Selected is the one
 // Plex plays when asked for none in particular.
 public sealed record PlexTrack(string Id, string Label, bool Selected);
 
+/// <summary>
+/// A track's file or a show's theme as the server serves it, for a screen to play: Status is 200 or, for a range that was asked
+/// for, 206 with ContentRange.
+/// </summary>
+public sealed record PlexAudio(Stream Content, string ContentType, int Status, long? Length, string? ContentRange);
+
 public sealed record PlexTracks(IReadOnlyList<PlexTrack> Audio, IReadOnlyList<PlexTrack> Subtitles);
 
-public sealed record PlexLibrary(string Id, string Title, string Type, IReadOnlyList<PlexItem> Recent);
+public sealed record PlexLibrary(string Id, string Title, string Type, IReadOnlyList<PlexItem> Recent)
+{
+    // How many films, series or albums the library holds.
+    public int Count { get; init; }
+    // The newest of them, newest first: films, series or albums, where Recent has what the server lists as newly added, which for
+    // a library of series is its episodes.
+    public IReadOnlyList<PlexItem> Titles { get; init; } = [];
+}
+
+// A page of a library: Total is how many it holds in all.
+public sealed record PlexPage(IReadOnlyList<PlexItem> Items, int Total);
 
 // What a Plex player can be told to do.
 public enum PlexCommand { Play, Pause, SkipNext, SkipPrevious }
@@ -122,8 +142,16 @@ public interface IPlex
     // The libraries of movies, shows and music, each with its newest items.
     Task<IReadOnlyList<PlexLibrary>> LibrariesAsync(PlexConnection server, int recent, CancellationToken ct);
 
-    // Movies, shows, seasons, episodes and albums whose title matches, across one library or all of them, not only the newest.
+    // One page of what a library holds, alphabetically: films, series, or albums (an artist library lists its albums), never the
+    // episodes, seasons or tracks under them. libraryType is the library's type (movie, show or artist).
+    Task<PlexPage> LibraryItemsAsync(PlexConnection server, string libraryId, string libraryType, int start, int size, CancellationToken ct);
+
+    // Movies, shows, albums, and episodes and tracks whose own title matches (never because their show or album does), across
+    // one library or all of them, not only the newest.
     Task<IReadOnlyList<PlexItem>> SearchAsync(PlexConnection server, string query, string? libraryId, int limit, CancellationToken ct);
+
+    // What is under an item, in order: a show's seasons, a season's episodes, an album's tracks. Nothing for anything else.
+    Task<IReadOnlyList<PlexItem>> ChildrenAsync(PlexConnection server, string itemId, CancellationToken ct);
 
     // The audio and subtitle tracks of an item's first media.
     Task<PlexTracks> TracksAsync(PlexConnection server, string itemId, CancellationToken ct);
@@ -131,11 +159,33 @@ public interface IPlex
     // One item by its id, or null when the server no longer has it.
     Task<PlexItem?> ItemAsync(PlexConnection server, string itemId, CancellationToken ct);
 
+    // A track's own file, or a show's theme song, from the server; range is the Range header of the request that wants it. Null when
+    // there is none (a show without a theme, an item that is no track).
+    Task<PlexAudio?> AudioAsync(PlexConnection server, string itemId, bool theme, string? range, CancellationToken ct);
+
     // A picture from the server, scaled to fit width × height.
     Task<(Stream Content, string ContentType)?> ImageAsync(PlexConnection server, string path, int width, int height, CancellationToken ct);
 
     // Through the server to the player, which must allow remote control.
     Task ControlAsync(PlexConnection server, string playerId, PlexCommand command, string kind, CancellationToken ct);
+}
+
+public static class PlexSearch
+{
+    /// <summary>
+    /// Whether a title answers a search: every word of the query is in it, whatever the case or accents. Plex also finds an
+    /// episode by its show and a track by its album; a title does not say that, so those are left out.
+    /// </summary>
+    public static bool Matches(string title, string query)
+    {
+        var plain = Fold(title);
+        return Fold(query).Split(' ', StringSplitOptions.RemoveEmptyEntries).All(plain.Contains);
+    }
+
+    private static string Fold(string text) =>
+        new string(text.Normalize(System.Text.NormalizationForm.FormD)
+            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .ToArray()).ToLowerInvariant();
 }
 
 // plex.tv or the server could not be reached, or refused. The message says what to do about it.

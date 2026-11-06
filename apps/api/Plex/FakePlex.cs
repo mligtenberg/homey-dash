@@ -19,6 +19,9 @@ public sealed class FakePlex(TimeProvider time) : IPlex
         Id = 1, Name = "Fake Plex", ServerId = ServerId, ServerName = "Fake Plex", ServerUri = "http://fake-plex:32400", ServerToken = "fake-token",
     };
 
+    // What this account played: two films, three episodes, and so the second season of The Bear, whose one episode it is.
+    private static readonly HashSet<string> Seen = ["102", "401", "501", "520", "522", "511"];
+
     private readonly Lock _lock = new();
     private readonly Dictionary<string, (string State, long OffsetMs, DateTimeOffset At)> _players = new()
     {
@@ -55,7 +58,20 @@ public sealed class FakePlex(TimeProvider time) : IPlex
         }
     }
 
-    public Task<IReadOnlyList<PlexLibrary>> LibrariesAsync(PlexConnection server, int recent, CancellationToken ct)
+    public async Task<IReadOnlyList<PlexLibrary>> LibrariesAsync(PlexConnection server, int recent, CancellationToken ct)
+    {
+        var catalog = await CatalogAsync(ct);
+        return Newest().Select(l =>
+        {
+            var titles = catalog.Where(c => c.Library == l.Id && IsTopLevel(c.Item)).Select(c => c.Item).ToList();
+            return l with { Count = titles.Count, Titles = titles.OrderByDescending(i => i.AddedAt).Take(recent).ToList() };
+        }).ToList();
+    }
+
+    // What a library lists at the top: films, series and albums, not what is under them.
+    private static bool IsTopLevel(PlexItem item) => item.Kind is "movie" or "show" or "album";
+
+    private IReadOnlyList<PlexLibrary> Newest()
     {
         var now = time.GetUtcNow();
         PlexItem Item(int n, string kind, string title, string? subtitle, string? summary = null, int? year = null,
@@ -63,9 +79,9 @@ public sealed class FakePlex(TimeProvider time) : IPlex
             new($"{n}", kind, title, subtitle, $"/library/metadata/{n}/thumb", now.AddDays(-n % 100))
             {
                 Summary = summary, Year = year, DurationMs = minutes * 60_000, Rating = rating, ContentRating = contentRating,
-                Genres = genres, Art = $"/library/metadata/{n}/art",
+                Genres = genres, Art = $"/library/metadata/{n}/art", Watched = Seen.Contains($"{n}"),
             };
-        return Task.FromResult<IReadOnlyList<PlexLibrary>>(
+        return
         [
             new PlexLibrary("1", "Movies", "movie",
                 [
@@ -82,37 +98,95 @@ public sealed class FakePlex(TimeProvider time) : IPlex
                     Item(203, "season", "Shōgun", "Season 1", "In 1600 Japan, a mysterious European ship is found marooned in a nearby fishing village.", 2024, null, 9.1, "TV-MA", "Drama", "History"),
                 ]),
             new PlexLibrary("3", "Music", "artist", [Item(301, "album", "Hit Me Hard and Soft", "Billie Eilish", year: 2024, genres: ["Pop"])]),
-        ]);
+        ];
     }
 
-    // Everything the fake library holds: the newest above, and older things that only a search finds.
-    private async Task<List<(string Library, PlexItem Item)>> CatalogAsync(CancellationToken ct)
+    // Everything the fake library holds: the newest above, older things that only a search finds, and what is under a show,
+    // season or album, which is reached through it.
+    private Task<List<(string Library, PlexItem Item)>> CatalogAsync(CancellationToken ct)
     {
         var now = time.GetUtcNow();
-        PlexItem Older(int n, string kind, string title, string? subtitle, int year, long? minutes) =>
+        PlexItem Older(int n, string kind, string title, string? subtitle, int year, long? minutes, int? index = null) =>
             new($"{n}", kind, title, subtitle, $"/library/metadata/{n}/thumb", now.AddDays(-400 - n))
             {
                 Summary = $"{title}, from {year}.", Year = year, DurationMs = minutes * 60_000, Rating = 7.5, ContentRating = "PG-13", Genres = ["Drama"],
-                Art = $"/library/metadata/{n}/art",
+                Art = $"/library/metadata/{n}/art", Index = index, Watched = Seen.Contains($"{n}"),
             };
-        var catalog = (await LibrariesAsync(new PlexConnection("", "", ""), 24, ct)).SelectMany(l => l.Recent.Select(i => (l.Id, i))).ToList();
+        var catalog = Newest().SelectMany(l => l.Recent.Select(i => (l.Id, i))).ToList();
         catalog.AddRange(
         [
             ("1", Older(401, "movie", "Arrival", "2016", 2016, 116)),
             ("1", Older(402, "movie", "Blade Runner 2049", "2017", 2017, 164)),
             ("1", Older(403, "movie", "Dune", "1984", 1984, 137)),
             ("2", Older(500, "show", "The Bear", "2022", 2022, null)),
-            ("2", Older(501, "episode", "System", "The Bear · S1 E1", 2022, 28)),
+            ("2", Older(501, "episode", "System", "The Bear · S1 E1", 2022, 28, 1)),
+            ("2", Older(520, "episode", "Hands", "The Bear · S1 E2", 2022, 21, 2)),
+            ("2", Older(521, "episode", "Brigade", "The Bear · S1 E3", 2022, 27, 3)),
+            ("2", Older(510, "season", "Season 1", "3 episodes", 2022, null, 1)),
+            ("2", Older(511, "season", "Season 2", "1 episode", 2023, null, 2)),
+            ("2", Older(522, "episode", "Beef", "The Bear · S2 E1", 2023, 31, 1)),
+            ("2", Older(530, "episode", "Anjin", "Shōgun · S1 E1", 2024, 59, 1)),
+            ("2", Older(531, "episode", "Servants of Two Masters", "Shōgun · S1 E2", 2024, 58, 2)),
             ("3", Older(601, "album", "Happier Than Ever", "Billie Eilish", 2021, null)),
+            ("3", Older(311, "track", "SKINNY", "Billie Eilish — Hit Me Hard and Soft", 2024, 3, 1)),
+            ("3", Older(312, "track", "LUNCH", "Billie Eilish — Hit Me Hard and Soft", 2024, 3, 2)),
+            ("3", Older(313, "track", "CHIHIRO", "Billie Eilish — Hit Me Hard and Soft", 2024, 5, 3)),
+            ("3", Older(611, "track", "Getting Older", "Billie Eilish — Happier Than Ever", 2021, 4, 1)),
+            ("3", Older(612, "track", "I Didn't Change My Number", "Billie Eilish — Happier Than Ever", 2021, 3, 2)),
+            ("3", Older(613, "track", "Happier Than Ever", "Billie Eilish — Happier Than Ever", 2021, 5, 3)),
+            ("1", Older(404, "movie", "Anora", "2024", 2024, 139)),
+            ("1", Older(405, "movie", "Oppenheimer", "2023", 2023, 181)),
+            ("2", Older(502, "show", "Severance", "2022", 2022, null)),
+            ("2", Older(503, "show", "Slow Horses", "2022", 2022, null)),
+            ("2", Older(504, "show", "Andor", "2022", 2022, null)),
+            ("3", Older(602, "album", "Brat", "Charli xcx", 2024, null)),
+            ("3", Older(603, "album", "Short n' Sweet", "Sabrina Carpenter", 2024, null)),
         ]);
-        return catalog;
+        return Task.FromResult(catalog);
+    }
+
+    // Under a show, season or album; the numbers there are the ones a track or episode has in it.
+    private static readonly Dictionary<string, string[]> Under = new()
+    {
+        ["500"] = ["510", "511"],
+        ["510"] = ["501", "520", "521"],
+        ["511"] = ["522"],
+        ["203"] = ["530", "531"],
+        ["301"] = ["311", "312", "313"],
+        ["601"] = ["611", "612", "613"],
+    };
+
+    public async Task<PlexPage> LibraryItemsAsync(PlexConnection server, string libraryId, string libraryType, int start, int size, CancellationToken ct)
+    {
+        var all = (await CatalogAsync(ct)).Where(c => c.Library == libraryId && IsTopLevel(c.Item)).Select(c => c.Item)
+            .OrderBy(i => i.Title, StringComparer.OrdinalIgnoreCase).ToList();
+        return new PlexPage(all.Skip(start).Take(size).ToList(), all.Count);
     }
 
     public async Task<IReadOnlyList<PlexItem>> SearchAsync(PlexConnection server, string query, string? libraryId, int limit, CancellationToken ct) =>
         (await CatalogAsync(ct))
         .Where(c => libraryId is null || c.Library == libraryId)
-        .Where(c => c.Item.Title.Contains(query, StringComparison.OrdinalIgnoreCase) || c.Item.Subtitle?.Contains(query, StringComparison.OrdinalIgnoreCase) == true)
-        .Select(c => c.Item).Take(limit * 3).ToList();
+        .Where(c => c.Item.Kind switch
+        {
+            // Reached through their show, not searched for.
+            "season" => false,
+            // An episode or a track is found by its own name, not its show's or its album's.
+            "episode" or "track" => PlexSearch.Matches(c.Item.Title, query),
+            _ => c.Item.Title.Contains(query, StringComparison.OrdinalIgnoreCase) || c.Item.Subtitle?.Contains(query, StringComparison.OrdinalIgnoreCase) == true,
+        })
+        .Select(c => c.Item).Take(limit * 5).ToList();
+
+    public async Task<IReadOnlyList<PlexItem>> ChildrenAsync(PlexConnection server, string itemId, CancellationToken ct)
+    {
+        if (!Under.TryGetValue(itemId, out var ids)) return [];
+        var catalog = (await CatalogAsync(ct)).Select(c => c.Item).ToList();
+        return ids.Select(id => catalog.First(i => i.Id == id)).Select(i => i.Kind switch
+        {
+            // As the real server lists them: a season by its name, an episode or track by its own.
+            "season" => i,
+            _ => i with { Subtitle = null },
+        }).ToList();
+    }
 
     public Task<PlexTracks> TracksAsync(PlexConnection server, string itemId, CancellationToken ct) =>
         Task.FromResult(new PlexTracks(
@@ -121,6 +195,24 @@ public sealed class FakePlex(TimeProvider time) : IPlex
 
     public async Task<PlexItem?> ItemAsync(PlexConnection server, string itemId, CancellationToken ct) =>
         (await CatalogAsync(ct)).Select(c => c.Item).FirstOrDefault(i => i.Id == itemId);
+
+    // A tone a few seconds long, higher for each item, so a screen has something to play: for a track, and for the theme of a show.
+    public async Task<PlexAudio?> AudioAsync(PlexConnection server, string itemId, bool theme, string? range, CancellationToken ct)
+    {
+        var kind = theme ? "show" : "track";
+        if ((await CatalogAsync(ct)).Select(c => c.Item).FirstOrDefault(i => i.Id == itemId) is not { } item || item.Kind != kind) return null;
+        const int rate = 8000, seconds = 3;
+        var frequency = 220 + int.Parse(item.Id) % 12 * 40;
+        var samples = Enumerable.Range(0, rate * seconds)
+            .Select(n => (byte)(128 + 60 * Math.Sin(2 * Math.PI * frequency * n / rate) * Math.Min(1, Math.Min(n, rate * seconds - n) / 400.0))).ToArray();
+        using var wav = new MemoryStream();
+        using (var w = new BinaryWriter(wav, Encoding.ASCII, leaveOpen: true))
+        {
+            w.Write("RIFF"u8); w.Write(36 + samples.Length); w.Write("WAVEfmt "u8); w.Write(16); w.Write((short)1); w.Write((short)1);
+            w.Write(rate); w.Write(rate); w.Write((short)1); w.Write((short)8); w.Write("data"u8); w.Write(samples.Length); w.Write(samples);
+        }
+        return new PlexAudio(new MemoryStream(wav.ToArray()), "audio/wav", 200, wav.Length, null);
+    }
 
     public Task<(Stream Content, string ContentType)?> ImageAsync(PlexConnection server, string path, int width, int height, CancellationToken ct)
     {

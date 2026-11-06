@@ -1,8 +1,10 @@
 import { ALL_PLEX_LIBRARIES, ANY_PLEX_PLAYER } from '@homey-dash/api-client';
 import { TileModule } from '../tile-kind';
 import { NowPlayingTile } from './now-playing-tile';
+import { LibraryTile } from './library-tile';
 import { RecentlyAddedTile } from './recently-added-tile';
 
+export * from './library-tile';
 export * from './now-playing-tile';
 export * from './plex-data';
 export * from './recently-added-tile';
@@ -28,6 +30,14 @@ export const PLEX_TILES: TileModule = {
       sizes: ['small', 'wide', 'full', 'large', 'full-large'],
       defaultSettings: { target: ALL_PLEX_LIBRARIES },
       component: RecentlyAddedTile,
+    },
+    {
+      id: 'plex-library',
+      label: 'Plex library tile',
+      target: 'plexLibrary',
+      sizes: ['small', 'wide', 'full', 'large', 'full-large'],
+      defaultSettings: { target: ALL_PLEX_LIBRARIES },
+      component: LibraryTile,
     },
   ],
 };
