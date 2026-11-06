@@ -16,12 +16,13 @@ ARG TARGETARCH
 SHELL ["/bin/bash", "-c"]
 WORKDIR /src
 COPY apps/api/HomeyDash.Api.csproj apps/api/
-RUN --mount=type=cache,target=/root/.nuget/packages \
-    dotnet restore apps/api/HomeyDash.Api.csproj -a ${TARGETARCH/amd64/x64}
+# The packages stay in this layer rather than a cache mount: publish runs with --no-restore, and a cache mount can be
+# pruned or differ between the two steps, which fails publish with NETSDK1064 (package not found). Only the build stage
+# carries them; the final image doesn't.
+RUN dotnet restore apps/api/HomeyDash.Api.csproj -a ${TARGETARCH/amd64/x64}
 COPY apps/api apps/api
 COPY libs/design-system/backgrounds libs/design-system/backgrounds
-RUN --mount=type=cache,target=/root/.nuget/packages \
-    dotnet publish apps/api/HomeyDash.Api.csproj -c Release -a ${TARGETARCH/amd64/x64} \
+RUN dotnet publish apps/api/HomeyDash.Api.csproj -c Release -a ${TARGETARCH/amd64/x64} \
     --no-restore -p:UseAppHost=false -o /rootfs/app
 # The chiseled image has no shell, so prepare the data directory here.
 RUN mkdir /rootfs/data && chown $APP_UID:$APP_UID /rootfs/data
