@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, input, linkedSignal, output, signal, untracked } from '@angular/core';
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, input, linkedSignal, output, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { canRotate, Focus, Photo, PhotoSetsApi, photoUrl, Realtime } from '@homey-dash/api-client';
+import { canRotate, Photo, PhotoSetsApi, photoUrl, Realtime } from '@homey-dash/api-client';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   LucideChevronLeft,
@@ -42,25 +42,6 @@ export function shuffled<T>(items: readonly T[], random = Math.random): T[] {
   return result;
 }
 
-/**
- * Where to crop a photo that covers a box, as its object-position: with its faces in the middle of the box, as far as
- * the photo's edges allow, given the width-to-height ratios of the photo and the box. The middle, as an image crops by
- * default, until its faces are read. Before the photo has loaded, the focus lines up with the same fraction of the box,
- * which keeps it in view however the photo is cropped.
- */
-export function cropPosition(focus: Focus | null | undefined, photoRatio?: number, boxRatio?: number): string {
-  if (!focus) return '50% 50%';
-  let { x, y } = focus;
-  if (photoRatio && boxRatio) {
-    // How many times the box the covering photo is, along the side it overflows.
-    const over = photoRatio / boxRatio;
-    const middle = (f: number, k: number) => Math.min(1, Math.max(0, (f * k - 0.5) / (k - 1)));
-    if (over > 1) x = middle(x, over);
-    else if (over < 1) y = middle(y, 1 / over);
-  }
-  return `${Math.round(x * 1000) / 10}% ${Math.round(y * 1000) / 10}%`;
-}
-
 /** When a photo was taken, as people say it: 12 August 2026. */
 export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
   return photo.takenAt ? new Date(photo.takenAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
@@ -68,7 +49,7 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
 
 /**
  * The photos of one photo set, one at a time in shuffled order, fading to the next at the tile's interval. Each photo
- * fills the tile, cropped around the faces in it, with when and where it was taken along the bottom. A press opens
+ * fills the tile, cropped around the faces in it by HomeyDash, which sends it at the tile's size, with when and where it was taken along the bottom. A press opens
  * the detail view with the photo whole, when and where it was taken and who is on it, where a swipe, the arrows or the
  * arrow keys move through the set, a photo can be rotated in Immich (a partner's only with a key of theirs), and a
  * photo can be excluded from the set for good; the tile then moves on to the next. While the connection to HomeyDash
@@ -87,9 +68,10 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
   },
   template: `
     @if (face().state === 'ok' && layers().length) {
-      @for (layer of layers(); track layer.key) {
-        <img class="hd-photo__img" [src]="urlOf(layer)" [style.object-position]="cropAt(layer)" alt="" draggable="false"
-          (load)="measured(layer.key, $any($event.target))" />
+      @if (sized()) {
+        @for (layer of layers(); track layer.key) {
+          <img class="hd-photo__img" [src]="urlOf(layer, true)" alt="" draggable="false" />
+        }
       }
       @if (settings().label || caption() || shownPeople()) {
         <div class="hd-photo__caption">
@@ -168,6 +150,14 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
 export class PhotoTile extends TileView<PhotoTileSettings> {
   private readonly realtime = inject(Realtime);
   private readonly photoSetsApi = inject(PhotoSetsApi);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  /**
+   * The tile's size in CSS pixels, which HomeyDash crops each photo to. Null until it is measured; where a browser
+   * can't observe sizes (as in tests), photos come whole.
+   */
+  private readonly box = signal<{ width: number; height: number } | null>(null);
+  protected readonly sized = computed(() => this.box() !== null || typeof ResizeObserver === 'undefined');
 
   protected readonly icon = LucideImage;
   protected readonly previousIcon = LucideChevronLeft;
@@ -294,6 +284,19 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
       timer = setInterval(() => this.advance(), seconds * 1000);
     });
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
+
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      if (typeof ResizeObserver === 'undefined') return;
+      const element = this.host.nativeElement;
+      const observer = new ResizeObserver(() => {
+        const [width, height] = [element.clientWidth, element.clientHeight];
+        const box = this.box();
+        if (width > 0 && height > 0 && (box?.width !== width || box?.height !== height)) this.box.set({ width, height });
+      });
+      observer.observe(element);
+      destroyRef.onDestroy(() => observer.disconnect());
+    });
   }
 
   private advance() {
@@ -306,7 +309,7 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
   // Fades in the photo at the position.
   private async show(order: ShownPhoto[]) {
     const { photo } = order[this.position];
-    const url = this.urlOf({ id: photo.id, url: order[this.position].url });
+    const url = this.urlOf({ id: photo.id, url: order[this.position].url }, true);
     // Only once it has loaded, so the fade never shows half a photo.
     const image = new Image();
     image.src = url;
@@ -323,21 +326,10 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
    * The photo's URL as the set has it now, so one rotated since it was put in order shows turned; the URL it had, once
    * it has left the set.
    */
-  protected urlOf(shown: { id: string; url: string }) {
+  protected urlOf(shown: { id: string; url: string }, fit = false) {
     const set = this.set();
     const photo = this.photosById().get(shown.id);
-    return set && photo ? photoUrl(set, photo) : shown.url;
-  }
-
-  protected cropAt(layer: PhotoLayer) {
-    return cropPosition(this.photosById().get(layer.id)?.faces?.focus, layer.photoRatio, layer.boxRatio);
-  }
-
-  // The tile is the image's box, since the image fills it.
-  protected measured(key: number, image: HTMLImageElement) {
-    if (!image.naturalHeight || !image.clientHeight) return;
-    const ratios = { photoRatio: image.naturalWidth / image.naturalHeight, boxRatio: image.clientWidth / image.clientHeight };
-    this.layers.update((layers) => layers.map((l) => (l.key === key ? { ...l, ...ratios } : l)));
+    return set && photo ? photoUrl(set, photo, fit ? (this.box() ?? undefined) : undefined) : shown.url;
   }
 
   protected override openDetails() {
@@ -410,8 +402,6 @@ interface PhotoLayer {
   key: number;
   id: string;
   url: string;
-  photoRatio?: number;
-  boxRatio?: number;
 }
 
 /** Management's choice of how long a photo tile shows each photo. */

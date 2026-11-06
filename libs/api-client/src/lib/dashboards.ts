@@ -35,9 +35,9 @@ export type DashboardBackground =
   | { kind: 'image'; imageId: string }
   | { kind: 'preset'; preset: string; color?: string | null; angle?: number | null };
 
-/** Where HomeyDash serves an uploaded background image. */
-export function backgroundImageUrl(imageId: string) {
-  return `/api/backgrounds/${imageId}`;
+/** Where HomeyDash serves an uploaded background image; with a size in pixels, cropped to cover it. */
+export function backgroundImageUrl(imageId: string, size?: { width: number; height: number }) {
+  return size ? `/api/backgrounds/${imageId}?width=${size.width}&height=${size.height}` : `/api/backgrounds/${imageId}`;
 }
 
 /** Where the apps serve a built-in background, such as `geometric/living-room`, by day or by night. */

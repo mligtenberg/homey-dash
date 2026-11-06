@@ -111,10 +111,34 @@ export interface ImmichAlbum {
   assetCount: number;
 }
 
-/** With the photo's version, so a photo edited in Immich is fetched again rather than taken from the cache. */
-export function photoUrl(set: Pick<PhotoSet, 'id'>, photo: Pick<Photo, 'id' | 'version'>) {
+/**
+ * A side of an image HomeyDash resizes for a screen: css pixels at the screen's pixel density, rounded up so slightly
+ * different sizes share an image, within what HomeyDash accepts.
+ */
+export function imageSide(css: number, density = globalThis.devicePixelRatio || 1) {
+  return Math.min(4096, Math.max(16, Math.ceil((css * density) / 16) * 16));
+}
+
+/**
+ * With the photo's version, so a photo edited in Immich is fetched again rather than taken from the cache. With a size
+ * in css pixels, HomeyDash crops it to cover that box around the faces in it and sends no more pixels than the screen
+ * has; its faces are read after it is synced, so they are part of the URL too.
+ */
+export function photoUrl(
+  set: Pick<PhotoSet, 'id'>,
+  photo: Pick<Photo, 'id'> & Partial<Pick<Photo, 'version' | 'faces'>>,
+  size?: { width: number; height: number },
+  density?: number,
+) {
+  const query = new URLSearchParams();
+  if (photo.version) query.set('v', photo.version);
+  if (size) {
+    query.set('width', `${imageSide(size.width, density)}`);
+    query.set('height', `${imageSide(size.height, density)}`);
+    if (photo.faces) query.set('faces', '1');
+  }
   const url = `/api/photos/${set.id}/${photo.id}`;
-  return photo.version ? `${url}?v=${encodeURIComponent(photo.version)}` : url;
+  return query.size ? `${url}?${query}` : url;
 }
 
 @Injectable({ providedIn: 'root' })

@@ -1,4 +1,5 @@
 using HomeyDash.Api.Data;
+using HomeyDash.Api.Photos;
 using Microsoft.EntityFrameworkCore;
 
 namespace HomeyDash.Api.Dashboards;
@@ -47,10 +48,19 @@ public static class BackgroundImageEndpoints
             return Results.Created(Url(image.Id), new UploadedBackground(image.Id, Url(image.Id)));
         }).DisableAntiforgery();
 
-        backgrounds.MapGet("/{id:guid}", async (Guid id, HomeyDashDbContext db, HttpContext http, CancellationToken ct) =>
+        // With a width and a height, a WebP of that size covering it, cropped around its middle; without, the upload.
+        backgrounds.MapGet("/{id:guid}", async (Guid id, int? width, int? height, HomeyDashDbContext db, HttpContext http, CancellationToken ct) =>
         {
+            if (ImageFit.Check(width, height) is { Count: > 0 } errors) return Results.ValidationProblem(errors);
             if (await db.BackgroundImages.FindAsync([id], ct) is not { } image) return Results.NotFound();
             http.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            if (width is not null && height is not null)
+            {
+                using var content = new MemoryStream(image.Content);
+                return ImageFit.Cover(content, width.Value, height.Value, Focus.Middle) is { } fitted
+                    ? Results.Bytes(fitted, "image/webp")
+                    : Results.Problem("The image can't be read.", statusCode: StatusCodes.Status500InternalServerError);
+            }
             return Results.Bytes(image.Content, image.ContentType);
         });
     }

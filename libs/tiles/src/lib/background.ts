@@ -1,4 +1,4 @@
-import { backgroundImageUrl, backgroundPresetUrl, DashboardBackground, renderedPresetUrl } from '@homey-dash/api-client';
+import { backgroundImageUrl, backgroundPresetUrl, DashboardBackground, imageSide, renderedPresetUrl } from '@homey-dash/api-client';
 
 /** A built-in image's day and night pictures, when not the SVGs the apps ship (such as rendered ones). */
 export interface PresetUrls {
@@ -11,14 +11,18 @@ export interface PresetUrls {
  * image (`hd-has-image`, see `hasImage`), so they stay readable on it. A built-in image is its day one in the light
  * theme and its night one in the dark theme, switching along with it; `urls` stand in for its files.
  */
-export function backgroundStyle(background: DashboardBackground | null | undefined, urls?: PresetUrls): string | null {
+export function backgroundStyle(
+  background: DashboardBackground | null | undefined,
+  urls?: PresetUrls,
+  size?: { width: number; height: number },
+): string | null {
   switch (background?.kind) {
     case 'color':
       return background.color;
     case 'gradient':
       return `linear-gradient(${background.angle}deg, ${background.color}, ${background.to})`;
     case 'image':
-      return `center / cover no-repeat url(${backgroundImageUrl(background.imageId)})`;
+      return `center / cover no-repeat url(${backgroundImageUrl(background.imageId, size)})`;
     case 'preset': {
       const { day, night } = urls ?? {
         day: backgroundPresetUrl(background.preset, 'day'),
@@ -37,8 +41,9 @@ export function hasImage(background: DashboardBackground | null | undefined): bo
 }
 
 /**
- * `backgroundStyle` with a built-in image rendered by HomeyDash for width × height CSS pixels at the screen's pixel
- * density (rounded up, so slightly different sizes share an image), in its colour scheme.
+ * `backgroundStyle` with an image, built in or uploaded, rendered or cropped by HomeyDash for width × height CSS pixels
+ * at the screen's pixel density (rounded up, so slightly different sizes share an image); a built-in one in its colour
+ * scheme.
  */
 export function renderedBackgroundStyle(
   background: DashboardBackground | null | undefined,
@@ -46,9 +51,9 @@ export function renderedBackgroundStyle(
   height: number,
   density = globalThis.devicePixelRatio || 1,
 ): string | null {
+  const [w, h] = [imageSide(width, density), imageSide(height, density)];
+  if (background?.kind === 'image') return backgroundStyle(background, undefined, { width: w, height: h });
   if (background?.kind !== 'preset') return backgroundStyle(background);
-  const side = (css: number) => Math.min(4096, Math.max(16, Math.ceil((css * density) / 16) * 16));
-  const [w, h] = [side(width), side(height)];
   return backgroundStyle(background, {
     day: renderedPresetUrl(background, 'day', w, h),
     night: renderedPresetUrl(background, 'night', w, h),

@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationRef, Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { HomeyCapability, HomeyDevice, PhotoSet, Realtime } from '@homey-dash/api-client';
+import { HomeyCapability, HomeyDevice, PhotoSet, photoUrl, Realtime } from '@homey-dash/api-client';
 import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { TileSize } from '@homey-dash/layout';
 import { RealtimeTileData } from '../realtime-tile-data';
@@ -12,7 +12,7 @@ import { DeviceTile } from './device-tile';
 import { CORE_TILES } from './core-tiles';
 import { MoodListTile } from './mood-list-tile';
 import { moodTint } from './mood-tint';
-import { cropPosition, PhotoTile, shuffled } from './photo-tile';
+import { PhotoTile, shuffled } from './photo-tile';
 import { drawChart, logOwner, nearestPoint, StatisticTile } from './statistic-tile';
 import { DETAILS_IDLE_MS } from './tile-details';
 import { FLASH_MS } from './tile-view';
@@ -691,25 +691,14 @@ describe('core tiles', () => {
 
       expect(tile.classList).toContain('has-photo');
       expect(tile.querySelector('img')?.getAttribute('src')).toMatch(/^\/api\/photos\/s1\/p[012]$/);
-      // Around its middle, until its faces are read.
-      expect(tile.querySelector('img')?.style.objectPosition).toBe('50% 50%');
     });
 
-    it('crops a photo with its faces in the middle, as far as its edges allow', () => {
-      const face = { x: 0.2, y: 0.15 };
-      // A 3:4 photo in a 3:1 box: four times the box's height, so its faces at 15% sit in the middle at about 3%.
-      expect(cropPosition(face, 3 / 4, 3)).toBe('20% 3.3%');
-      // A 2:1 photo in a 1:1 box, faces near the left edge: the photo's left edge.
-      expect(cropPosition(face, 2, 1)).toBe('0% 15%');
-      // Before it has loaded, and without faces read.
-      expect(cropPosition(face)).toBe('20% 15%');
-      expect(cropPosition(null, 2, 1)).toBe('50% 50%');
-    });
-
-    it('crops the photo around its faces', async () => {
-      const set = photoSet(1);
-      realtime.photoSetList = [{ ...set, photos: [{ ...set.photos[0], faces: { focus: { x: 0.2, y: 0.15 }, people: [] } }] }];
-      expect((await render(PhotoTile, 'photo-set:s1', 'large')).querySelector('img')?.style.objectPosition).toBe('20% 15%');
+    it('asks for a photo at the size of the tile, cropped by HomeyDash around its faces', () => {
+      const photo = { id: 'p0', version: 'h/1', faces: { focus: { x: 0.2, y: 0.15 }, people: [] } };
+      expect(photoUrl({ id: 's1' }, photo, { width: 400, height: 250 }, 2)).toBe('/api/photos/s1/p0?v=h%2F1&width=800&height=512&faces=1');
+      // Whole, as the detail view shows it; and before its faces are read.
+      expect(photoUrl({ id: 's1' }, photo)).toBe('/api/photos/s1/p0?v=h%2F1');
+      expect(photoUrl({ id: 's1' }, { id: 'p0' }, { width: 400, height: 250 }, 1)).toBe('/api/photos/s1/p0?width=400&height=256');
     });
 
     it('shows the label over the photo only when one is set', async () => {

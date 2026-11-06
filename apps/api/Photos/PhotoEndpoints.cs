@@ -348,10 +348,12 @@ public static class PhotoEndpoints
         });
 
         // Fetched from Immich as a display asks for it; only photos of the set, so this can't reach the rest of Immich. Its
-        // excluded photos too, which Management shows.
-        api.MapGet("/photos/{setId:guid}/{photoId}", async (Guid setId, string photoId, HomeyDashDbContext db,
+        // excluded photos too, which Management shows. With a width and a height, a WebP of that size covering it, cropped
+        // around the faces in the photo; without, the photo whole.
+        api.MapGet("/photos/{setId:guid}/{photoId}", async (Guid setId, string photoId, int? width, int? height, HomeyDashDbContext db,
             ImmichAccounts accounts, IImmich photos, HttpContext http, CancellationToken ct) =>
         {
+            if (ImageFit.Check(width, height) is { Count: > 0 } errors) return Results.ValidationProblem(errors);
             var set = await db.PhotoSets.AsNoTracking().FirstOrDefaultAsync(s => s.Id == setId, ct);
             if (set is null || !set.Photos.Any(p => p.Id == photoId) && !set.Excluded.Contains(photoId)) return Results.NotFound();
             if (accounts.Find(set.AccountId) is not { } account) return NotSetUp();
@@ -367,6 +369,17 @@ public static class PhotoEndpoints
             if (photo is null) return Results.NotFound();
             // Kept a day: tiles cycle through the same photos, and keep showing them while Immich can't be reached.
             http.Response.Headers.CacheControl = "public, max-age=86400";
+            if (width is not null && height is not null)
+            {
+                await using var content = photo.Content;
+                var focus = set.Photos.FirstOrDefault(p => p.Id == photoId)?.Faces?.Focus ?? Focus.Middle;
+                using var buffer = new MemoryStream();
+                await content.CopyToAsync(buffer, ct);
+                buffer.Position = 0;
+                return ImageFit.Cover(buffer, width.Value, height.Value, focus) is { } fitted
+                    ? Results.Bytes(fitted, "image/webp")
+                    : Results.Problem("Immich did not send an image.", statusCode: StatusCodes.Status502BadGateway);
+            }
             return Results.Stream(photo.Content, photo.ContentType);
         });
     }
