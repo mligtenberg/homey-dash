@@ -29,12 +29,48 @@ export interface StatisticTileSettings extends TileSettings {
 
 const HOUR = 3_600_000;
 
-export const STATISTIC_WINDOWS: Record<InsightResolution, { label: string; ago: string; ms: number }> = {
-  lastHour: { label: 'Last hour', ago: '1h ago', ms: HOUR },
-  last24Hours: { label: 'Last 24 hours', ago: '24h ago', ms: 24 * HOUR },
-  last7Days: { label: 'Last 7 days', ago: '7d ago', ms: 7 * 24 * HOUR },
-  last31Days: { label: 'Last 31 days', ago: '31d ago', ms: 31 * 24 * HOUR },
+export const STATISTIC_WINDOWS: Record<InsightResolution, { label: string; tab: string; ago: string; ms: number }> = {
+  lastHour: { label: 'Last hour', tab: 'Hour', ago: '1h ago', ms: HOUR },
+  last24Hours: { label: 'Last 24 hours', tab: 'Day', ago: '24h ago', ms: 24 * HOUR },
+  last7Days: { label: 'Last 7 days', tab: 'Week', ago: '7d ago', ms: 7 * 24 * HOUR },
+  last31Days: { label: 'Last 31 days', tab: 'Month', ago: '31d ago', ms: 31 * 24 * HOUR },
 };
+
+/**
+ * What a log measures, for the colour of its full-screen view: power and energy are amber like a lit lamp,
+ * temperature warm, humidity cool. Anything else keeps the tile's own hue.
+ */
+export type StatisticTone = 'power' | 'temperature' | 'humidity' | 'other';
+
+export function statisticTone(log: Pick<HomeyInsightLog, 'id' | 'units'> | undefined): StatisticTone {
+  const units = log?.units ?? '';
+  const id = log?.id ?? '';
+  if (/power|meter|energy/.test(id) || /^(k?Wh?|A|V)$/.test(units)) return 'power';
+  if (/temperature/.test(id) || /^°/.test(units)) return 'temperature';
+  if (/humidity/.test(id) || units === '%') return 'humidity';
+  return 'other';
+}
+
+export interface StatisticSummary {
+  lowest: HomeyInsightEntry;
+  highest: HomeyInsightEntry;
+  average: number;
+  /** The first and last values of the window. */
+  from: number;
+  to: number;
+}
+
+/** The lowest, highest and average value of the `windowMs` up to the last entry, or null when it has none. */
+export function summarize(entries: readonly HomeyInsightEntry[], windowMs: number): StatisticSummary | null {
+  const values = entries.filter((e): e is HomeyInsightEntry & { v: number } => e.v !== null);
+  if (values.length === 0) return null;
+  const start = Date.parse(values[values.length - 1].t) - windowMs;
+  const inWindow = values.filter((e) => Date.parse(e.t) >= start);
+  const lowest = inWindow.reduce((a, b) => (b.v < a.v ? b : a));
+  const highest = inWindow.reduce((a, b) => (b.v > a.v ? b : a));
+  const average = inWindow.reduce((sum, e) => sum + e.v, 0) / inWindow.length;
+  return { lowest, highest, average, from: inWindow[0].v, to: inWindow[inWindow.length - 1].v };
+}
 
 /**
  * The device and capability a log records, from its id such as `homey:device:<id>:measure_power`. Homey's own
@@ -258,14 +294,34 @@ export class StatisticChart {
         <div class="hd-tile__detail">{{ face().detail }}</div>
       </div>
     }
-    <hd-tile-details [name]="face().name" [icon]="face().icon" [subtitle]="face().detail">
-      @if (readout(); as readout) {
-        <div class="hd-stat__readout">
-          <div class="hd-value hd-value--xl">{{ readout.value }}<span class="hd-unit">{{ readout.units }}</span></div>
-          <div class="hd-details__label">{{ pickedAt() ?? 'Now' }}</div>
-        </div>
-      }
-      <hd-statistic-chart [entries]="entries()" [window]="window()" [scrub]="true" (picked)="picked.set($event)" />
+    <hd-tile-details [screen]="true" [name]="face().name" [icon]="face().icon" [subtitle]="face().detail">
+      <div class="hd-segmented" hdDetailsHead role="group" aria-label="Time window">
+        @for (w of windows; track w.id) {
+          <button type="button" [attr.aria-pressed]="shownWindow() === w.id" (click)="viewWindow.set(w.id)">{{ w.tab }}</button>
+        }
+      </div>
+      <div class="hd-stat__pane" [attr.data-tone]="tone()">
+        @if (readout(); as readout) {
+          <div class="hd-stat__readout">
+            <div class="hd-value hd-value--xl">{{ readout.value }}<span class="hd-unit">{{ readout.units }}</span></div>
+            <div class="hd-details__label">{{ pickedAt() ?? 'Now' }}</div>
+          </div>
+        }
+        <hd-statistic-chart [entries]="shownEntries()" [window]="shownWindowInfo()" [scrub]="true" (picked)="picked.set($event)" />
+        @if (figures(); as figures) {
+          <dl class="hd-stat__figures">
+            @for (f of figures; track f.label) {
+              <div class="hd-stat__figure">
+                <dt class="hd-details__label">{{ f.label }}</dt>
+                <dd class="hd-stat__figure-value">{{ f.value }}</dd>
+                @if (f.note) {
+                  <dd class="hd-stat__figure-note">{{ f.note }}</dd>
+                }
+              </div>
+            }
+          </dl>
+        }
+      </div>
     </hd-tile-details>
   `,
 })
@@ -278,12 +334,28 @@ export class StatisticTile extends TileView<StatisticTileSettings> {
     const owner = logOwner(this.settings().target ?? '');
     return owner ? { device: this.homey()?.devices.get(owner.deviceId), capability: owner.capability } : null;
   });
-  protected readonly window = computed(() => STATISTIC_WINDOWS[this.settings().window ?? 'last24Hours']);
+  private readonly windowId = computed<InsightResolution>(() => this.settings().window ?? 'last24Hours');
+  protected readonly window = computed(() => STATISTIC_WINDOWS[this.windowId()]);
 
   private readonly history = rxResource({
     params: () => {
       const log = this.log();
-      return log ? { log: log.id, window: this.settings().window ?? 'last24Hours', account: this.settings().account } : undefined;
+      return log ? { log: log.id, window: this.windowId(), account: this.settings().account } : undefined;
+    },
+    stream: ({ params }) => this.homeyApi.insightEntries(params.log, params.window, params.account),
+  });
+
+  /** The window the detail view shows: the tile's own until another tab is pressed, and again once it is closed. */
+  protected readonly viewWindow = signal<InsightResolution | null>(null);
+  protected readonly windows = Object.entries(STATISTIC_WINDOWS).map(([id, { tab }]) => ({ id: id as InsightResolution, tab }));
+  protected readonly shownWindow = computed(() => this.viewWindow() ?? this.windowId());
+  protected readonly shownWindowInfo = computed(() => STATISTIC_WINDOWS[this.shownWindow()]);
+  /** The history of another tab's window, fetched only while the detail view is open on it. */
+  private readonly otherHistory = rxResource({
+    params: () => {
+      const log = this.log();
+      const window = this.viewWindow();
+      return log && window && window !== this.windowId() ? { log: log.id, window, account: this.settings().account } : undefined;
     },
     stream: ({ params }) => this.homeyApi.insightEntries(params.log, params.window, params.account),
   });
@@ -302,20 +374,51 @@ export class StatisticTile extends TileView<StatisticTileSettings> {
   /** The entry picked along the chart in the detail view. */
   protected readonly picked = signal<HomeyInsightEntry | null>(null);
 
+  /** The entries of the window the detail view shows. */
+  protected readonly shownEntries = computed(() =>
+    this.shownWindow() === this.windowId() ? this.entries() : this.otherHistory.hasValue() ? this.otherHistory.value() : [],
+  );
+
   private readonly latest = computed(() => [...this.entries()].reverse().find((e) => e.v !== null));
   protected readonly current = computed(() => this.reading(this.latest()));
-  protected readonly readout = computed(() => this.reading(this.picked() ?? this.latest()));
+  protected readonly readout = computed(() => {
+    const shown = this.shownEntries();
+    return this.reading(this.picked() ?? [...shown].reverse().find((e) => e.v !== null));
+  });
+  protected readonly tone = computed(() => statisticTone(this.log()));
 
   protected readonly pickedAt = computed(() => {
     const picked = this.picked();
-    if (!picked) return null;
-    const days = this.window().ms > 24 * HOUR;
-    return new Date(picked.t).toLocaleString([], {
+    return picked ? this.stamp(picked.t) : null;
+  });
+
+  /** The lowest, highest, average and change of the shown window. */
+  protected readonly figures = computed(() => {
+    const summary = summarize(this.shownEntries(), this.shownWindowInfo().ms);
+    if (!summary) return null;
+    const units = this.log()?.units ?? null;
+    const show = (v: number) => {
+      const { value, units: u } = formatReading(v, units);
+      return `${value}${u}`;
+    };
+    const change = summary.to - summary.from;
+    const sign = change > 0 ? '+' : change < 0 ? '−' : '';
+    return [
+      { label: 'Lowest', value: show(summary.lowest.v as number), note: this.stamp(summary.lowest.t) },
+      { label: 'Highest', value: show(summary.highest.v as number), note: this.stamp(summary.highest.t) },
+      { label: 'Average', value: show(summary.average), note: '' },
+      { label: 'Change', value: `${sign}${show(Math.abs(change))}`, note: `over the ${this.shownWindowInfo().label.toLowerCase()}` },
+    ];
+  });
+
+  private stamp(iso: string) {
+    const days = this.shownWindowInfo().ms > 24 * HOUR;
+    return new Date(iso).toLocaleString([], {
       ...(days ? { weekday: 'short', day: 'numeric', month: 'short' } : {}),
       hour: '2-digit',
       minute: '2-digit',
     });
-  });
+  }
 
   private reading(entry: HomeyInsightEntry | undefined) {
     return entry ? formatReading(entry.v as number, this.log()?.units ?? null) : null;
@@ -323,6 +426,11 @@ export class StatisticTile extends TileView<StatisticTileSettings> {
 
   constructor() {
     super();
+    // The detail view opens on the tile's own window every time.
+    effect(() => {
+      if (!this.details()?.isOpen()) untracked(() => this.viewWindow.set(null));
+    });
+
     // Values missed while the connection was down are only in Homey's history.
     let wasConnected = untracked(this.realtime.connected);
     effect(() => {

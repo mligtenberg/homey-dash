@@ -13,7 +13,7 @@ import { CORE_TILES } from './core-tiles';
 import { MoodListTile } from './mood-list-tile';
 import { moodTint } from './mood-tint';
 import { PhotoTile, shuffled } from './photo-tile';
-import { drawChart, logOwner, nearestPoint, StatisticTile } from './statistic-tile';
+import { drawChart, logOwner, nearestPoint, StatisticTile, statisticTone, summarize } from './statistic-tile';
 import { DETAILS_IDLE_MS } from './tile-details';
 import { FLASH_MS } from './tile-view';
 
@@ -643,6 +643,44 @@ describe('core tiles', () => {
       expect(dialog.querySelector('.hd-chart__line')?.getAttribute('d')?.split('L')).toHaveLength(3);
     });
 
+    it('opens full screen with the figures of the window, and another window on its tab', async () => {
+      const tile = await render(StatisticTile, logId, 'large');
+      const http = TestBed.inject(HttpTestingController);
+      http.expectOne('/api/homey/insights?account=1').flush([
+        { id: logId, ownerUri: 'homey:device:d1', ownerName: 'Washer', title: 'Power', type: 'number', units: 'W' },
+      ]);
+      TestBed.tick();
+      const entries = (resolution: string) => (r: { url: string; params: { get(k: string): string | null } }) =>
+        r.url === '/api/homey/insights/entries' && r.params.get('resolution') === resolution;
+      http.expectOne(entries('last24Hours')).flush([
+        { t: '2026-10-25T10:00:00Z', v: 100 },
+        { t: '2026-10-25T11:00:00Z', v: 300 },
+      ]);
+      await settle();
+
+      tile.click();
+      await settle();
+      const dialog = details(tile);
+      expect(dialog.classList).toContain('hd-details--screen');
+      expect(dialog.querySelector('.hd-stat__pane')?.getAttribute('data-tone')).toBe('power');
+      const figures = () => [...dialog.querySelectorAll('.hd-stat__figure')].map((f) => f.querySelector('.hd-stat__figure-value')?.textContent);
+      expect(figures()).toEqual(['100W', '300W', '200W', '+200W']);
+
+      const tabs = [...dialog.querySelectorAll<HTMLButtonElement>('.hd-segmented button')];
+      expect(tabs.map((t) => t.textContent?.trim())).toEqual(['Hour', 'Day', 'Week', 'Month']);
+      expect(tabs[1].getAttribute('aria-pressed')).toBe('true');
+      tabs[2].click();
+      TestBed.tick();
+      http.expectOne(entries('last7Days')).flush([
+        { t: '2026-10-19T11:00:00Z', v: 50 },
+        { t: '2026-10-25T11:00:00Z', v: 300 },
+      ]);
+      await settle();
+
+      expect(tabs[2].getAttribute('aria-pressed')).toBe('true');
+      expect(figures()).toEqual(['50W', '300W', '175W', '+250W']);
+    });
+
     it('loads the history again after a reconnect', async () => {
       await render(StatisticTile, logId, 'large');
       const http = TestBed.inject(HttpTestingController);
@@ -660,6 +698,34 @@ describe('core tiles', () => {
       TestBed.tick();
 
       http.expectOne(entries);
+    });
+  });
+
+  describe('statistic summary', () => {
+    const entry = (t: string, v: number | null) => ({ t, v });
+
+    it('finds the lowest, highest and average of the window up to the last entry, leaving gaps out', () => {
+      const entries = [
+        entry('2026-10-25T08:00:00Z', 900), // Before the window.
+        entry('2026-10-25T10:00:00Z', 100),
+        entry('2026-10-25T10:30:00Z', null),
+        entry('2026-10-25T11:00:00Z', 300),
+      ];
+
+      const summary = summarize(entries, 2 * 3_600_000);
+
+      expect(summary).toMatchObject({ average: 200, from: 100, to: 300 });
+      expect(summary?.lowest.t).toBe('2026-10-25T10:00:00Z');
+      expect(summary?.highest.t).toBe('2026-10-25T11:00:00Z');
+      expect(summarize([entry('2026-10-25T10:00:00Z', null)], 3_600_000)).toBeNull();
+    });
+
+    it('tones a log by what it measures', () => {
+      expect(statisticTone({ id: 'homey:device:d:measure_power', units: 'W' })).toBe('power');
+      expect(statisticTone({ id: 'homey:device:d:measure_temperature', units: '°C' })).toBe('temperature');
+      expect(statisticTone({ id: 'homey:device:d:measure_humidity', units: '%' })).toBe('humidity');
+      expect(statisticTone({ id: 'homey:device:d:measure_co2', units: 'ppm' })).toBe('other');
+      expect(statisticTone(undefined)).toBe('other');
     });
   });
 

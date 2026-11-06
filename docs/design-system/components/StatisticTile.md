@@ -9,4 +9,10 @@ The history of one recorded value over a time window, with its current value, up
 
 On a `large` tile the current value is `.hd-value--m`, so the name keeps room beside it; `full-large` uses `.hd-value--l`.
 
-A tap opens the [TileDetails](TileDetails.md) with the current value and a bigger chart. There, `.hd-chart--scrub` lets a press or drag along the chart pick a moment: an `.hd-chart__cursor` line and the dot mark it, and the `.hd-stat__readout` above shows its value and time instead of `Now`.
+A tap opens the [TileDetails](TileDetails.md) over the whole screen (`.hd-details--screen`, like Sonos), in the theme's colours with the ground tinted by the hue. It holds:
+
+- In the head, between the title and the close button, a `.hd-segmented` tab per window (`Hour`, `Day`, `Week`, `Month`). It opens on the tile's own window and goes back to it when closed; another tab loads that window's history.
+- `.hd-stat__pane`: the current value (`.hd-value--xl`) and, under it, a chart that takes all the room left. `.hd-chart--scrub` lets a press or drag along the chart pick a moment: an `.hd-chart__cursor` line and the dot mark it, and the `.hd-stat__readout` above shows its value and time instead of `Now`.
+- Under the chart, `.hd-stat__figures`: four `.hd-stat__figure` cards, `Lowest` and `Highest` with when they happened, `Average`, and `Change` over the window (`+250W`, no good or bad colour, since a rise is neither).
+
+The hue of the full screen follows what is measured (`data-tone` on the pane), not the tile's kind: amber for power and energy (the `light` tokens), warm for temperature (`heat`), cool for humidity (`cover`); anything else keeps the tile's hue.
