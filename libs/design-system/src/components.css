@@ -358,7 +358,7 @@
 .hd-details__head .hd-segmented { flex: none; --segment-height: .26; }
 .hd-details__head .hd-segmented button { flex: none; padding-inline: calc(var(--cell) * .2); }
 /* This view's own surface: the hue mixed into the theme's ground, so it is lighter in the light theme and darker in the dark one. */
-.hd-details--screen:has(.hd-sonos__pane) {
+.hd-details--screen:has(:is(.hd-sonos__pane, .hd-stat__pane)) {
   background:
     radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, var(--k-ink) 26%, transparent), transparent 70%),
     color-mix(in oklab, var(--k-ink) 10%, var(--ground));
@@ -386,6 +386,28 @@
 .hd-details__readings { display: grid; grid-template-columns: 1fr auto; gap: calc(var(--cell) * .06) calc(var(--cell) * .12); margin: 0; }
 .hd-details__readings dd { margin: 0; font-size: calc(var(--cell) * .12); font-weight: 700; font-variant-numeric: tabular-nums; text-align: end; }
 .hd-details .hd-chart { flex: none; height: calc(var(--cell) * 1.8); }
+/*
+ * A statistic's full screen: the value, a chart that takes the room left, and four figures under it. The hue says what
+ * is measured, not the kind of the tile: amber for power and energy, warm for temperature, cool for humidity.
+ */
+.hd-details--screen:has(.hd-stat__pane[data-tone="power"]) { --k-ink: var(--kind-light-ink); --k-fill: var(--kind-light-fill); }
+.hd-details--screen:has(.hd-stat__pane[data-tone="temperature"]) { --k-ink: var(--kind-heat-ink); --k-fill: var(--kind-heat-fill); }
+.hd-details--screen:has(.hd-stat__pane[data-tone="humidity"]) { --k-ink: var(--kind-cover-ink); --k-fill: var(--kind-cover-fill); }
+.hd-details--screen .hd-details__panel > .hd-stat__pane { flex: 1; min-height: 0; }
+.hd-stat__pane { display: flex; flex-direction: column; gap: calc(var(--cell) * .16); }
+.hd-stat__pane .hd-chart { flex: 1; height: auto; min-height: 0; }
+.hd-stat__pane .hd-chart__area { opacity: .22; }
+.hd-stat__pane .hd-chart__dot { stroke: var(--ground); }
+.hd-stat__figures { flex: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(calc(var(--cell) * 1.3), 1fr)); gap: calc(var(--cell) * .1); margin: 0; }
+.hd-stat__figure {
+  display: flex; flex-direction: column; gap: calc(var(--cell) * .03); min-width: 0;
+  padding: calc(var(--cell) * .12) calc(var(--cell) * .14);
+  border-radius: calc(var(--cell) * var(--tile-radius) * .75);
+  background: color-mix(in oklab, var(--k-ink) 12%, var(--tile-surface));
+}
+.hd-stat__figure dd { margin: 0; }
+.hd-stat__figure-value { font: 700 calc(var(--cell) * .2)/1.1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--k-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-stat__figure-note { font-size: calc(var(--cell) * .085); color: var(--ink-muted); }
 .hd-details :is(.hd-round-btn, .hd-segmented button, .hd-slider):focus-visible { outline: 3px solid var(--k-ink); outline-offset: 3px; }
 
 /* Tile states */
