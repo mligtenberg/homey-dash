@@ -4,8 +4,9 @@
 FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend
 WORKDIR /src
 COPY package.json package-lock.json ./
-RUN npm ci
-COPY . .
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
+# Leave the .NET projects out, so API changes don't rebuild the frontends.
+COPY --exclude=apps/api --exclude=apps/api-tests . .
 RUN NX_DAEMON=false npx nx run-many -t build -p display management
 
 # --- API ---------------------------------------------------------------------
@@ -15,10 +16,12 @@ ARG TARGETARCH
 SHELL ["/bin/bash", "-c"]
 WORKDIR /src
 COPY apps/api/HomeyDash.Api.csproj apps/api/
-RUN dotnet restore apps/api/HomeyDash.Api.csproj -a ${TARGETARCH/amd64/x64}
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet restore apps/api/HomeyDash.Api.csproj -a ${TARGETARCH/amd64/x64}
 COPY apps/api apps/api
 COPY libs/design-system/backgrounds libs/design-system/backgrounds
-RUN dotnet publish apps/api/HomeyDash.Api.csproj -c Release -a ${TARGETARCH/amd64/x64} \
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet publish apps/api/HomeyDash.Api.csproj -c Release -a ${TARGETARCH/amd64/x64} \
     --no-restore -p:UseAppHost=false -o /rootfs/app
 # The chiseled image has no shell, so prepare the data directory here.
 RUN mkdir /rootfs/data && chown $APP_UID:$APP_UID /rootfs/data
@@ -27,6 +30,10 @@ RUN mkdir /rootfs/data && chown $APP_UID:$APP_UID /rootfs/data
 FROM api AS rootfs
 COPY --from=frontend /src/dist/apps/display/browser /rootfs/app/frontends/display
 COPY --from=frontend /src/dist/apps/management/browser /rootfs/app/frontends/admin
+# The built-in backgrounds ship with the API and both frontends. Keep only the API's copy: the apps
+# fetch them from the root (/backgrounds/...), which the display app serves.
+RUN rm -r /rootfs/app/frontends/admin/backgrounds /rootfs/app/frontends/display/backgrounds \
+    && ln -s /app/backgrounds /rootfs/app/frontends/display/backgrounds
 
 # --- Runtime: chiseled (distroless, non-root) --------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled AS final
