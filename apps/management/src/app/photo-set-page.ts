@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, injec
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { ImmichAccount, ImmichAccountApi, ImmichAlbum, PhotoSelection, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
-import { RealtimeTileData } from '@homey-dash/tiles';
+import { PhotoViewer, RealtimeTileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
 import { timeAgo } from './displays/displays-store';
 import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue, problem } from './immich-albums';
@@ -16,7 +16,7 @@ import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-
  */
 @Component({
   selector: 'hd-photo-set-page',
-  imports: [RouterLink, PhotoSelectionForm],
+  imports: [RouterLink, PhotoSelectionForm, PhotoViewer],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="header">
@@ -147,9 +147,14 @@ import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-
             <h2>Photos</h2>
             <ul class="photos">
               @for (photo of set.photos; track photo.id) {
-                <li><img [src]="url(set, photo)" alt="" loading="lazy" /></li>
+                <li>
+                  <button type="button" class="photo" [attr.aria-label]="'Open photo ' + ($index + 1)" (click)="viewer.open($index)">
+                    <img [src]="url(set, photo)" alt="" loading="lazy" />
+                  </button>
+                </li>
               }
             </ul>
+            <hd-photo-viewer #viewer [set]="set" [photos]="set.photos" />
           </section>
         }
 
@@ -212,6 +217,7 @@ import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-
     .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
     .photos { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
     .photos img { display: block; width: 96px; height: 96px; object-fit: cover; border-radius: 6px; background: var(--tile-surface); }
+    .photo { display: block; padding: 0; border: 0; background: none; border-radius: 6px; cursor: zoom-in; }
     .excluded { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .excluded .hd-btn { padding: 4px 8px; font-size: 12px; }
   `,

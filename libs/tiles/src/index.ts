@@ -22,4 +22,5 @@ export {
 export { BACKGROUND_STYLES, BACKGROUND_SUBJECTS } from './lib/background-presets';
 export * from './lib/realtime-tile-data';
 export { PhotoTile } from './lib/core/photo-tile';
+export { PhotoViewer } from './lib/core/photo-viewer';
 export { TileDetails } from './lib/core/tile-details';

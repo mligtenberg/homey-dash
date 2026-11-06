@@ -1,20 +1,8 @@
-import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, input, linkedSignal, output, signal, untracked } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
-import { canRotate, Photo, PhotoSetsApi, photoUrl, Realtime } from '@homey-dash/api-client';
-import { HttpErrorResponse } from '@angular/common/http';
-import {
-  LucideChevronLeft,
-  LucideChevronRight,
-  LucideDynamicIcon,
-  LucideImage,
-  LucideImageOff,
-  LucideMapPin,
-  LucideRotateCcw,
-  LucideRotateCw,
-  LucideUsers,
-} from '@lucide/angular';
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, input, linkedSignal, output, signal, untracked, viewChild } from '@angular/core';
+import { Photo, photoUrl, Realtime } from '@homey-dash/api-client';
+import { LucideDynamicIcon, LucideImage } from '@lucide/angular';
 import { TileSettings } from '../tile-data';
-import { TileDetails } from './tile-details';
+import { PhotoViewer, takenOn } from './photo-viewer';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
 
 export interface PhotoTileSettings extends TileSettings {
@@ -42,10 +30,7 @@ export function shuffled<T>(items: readonly T[], random = Math.random): T[] {
   return result;
 }
 
-/** When a photo was taken, as people say it: 12 August 2026. */
-export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
-  return photo.takenAt ? new Date(photo.takenAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
-}
+export { takenOn };
 
 /**
  * The photos of one photo set, one at a time in shuffled order, fading to the next at the tile's interval. Each photo
@@ -57,14 +42,12 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
  */
 @Component({
   selector: 'hd-photo-tile',
-  imports: [TileDetails, LucideDynamicIcon],
+  imports: [PhotoViewer, LucideDynamicIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     ...TILE_FACE_HOST,
     class: 'hd-tile hd-photo',
     '[class.has-photo]': "face().state === 'ok' && layers().length > 0",
-    '(keydown.arrowleft)': 'onArrow($event, -1)',
-    '(keydown.arrowright)': 'onArrow($event, 1)',
   },
   template: `
     @if (face().state === 'ok' && layers().length) {
@@ -95,62 +78,13 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
         <div class="hd-tile__detail">{{ face().detail }}</div>
       </div>
     }
-    <hd-tile-details [name]="face().name" [icon]="icon" [subtitle]="detailSubtitle()" [fill]="true">
-      <!-- Only while open: projected content exists even when the dialog doesn't show it, and its <img> would fetch the whole photo. -->
-      @if (details()?.isOpen() && detailPhoto(); as photo) {
-        <!-- The photo takes the whole screen; the head, the arrows and the bar float over its edges. -->
-        <div
-          class="hd-photo-details"
-          (pointerdown)="swipeStart = $event.clientX"
-          (pointerup)="swipeEnd($event.clientX)"
-        >
-          <img class="hd-photo-details__img" [src]="photo.url" alt="" draggable="false" />
-        </div>
-        <button type="button" class="hd-round-btn hd-photo-details__step hd-photo-details__step--previous" aria-label="Previous photo" (click)="step(-1)">
-          <svg [lucideIcon]="previousIcon" />
-        </button>
-        <button type="button" class="hd-round-btn hd-photo-details__step hd-photo-details__step--next" aria-label="Next photo" (click)="step(1)">
-          <svg [lucideIcon]="nextIcon" />
-        </button>
-        <div class="hd-photo-details__bar">
-          @if (photo.photo.place || photo.photo.faces?.people?.length) {
-            <div class="hd-photo-details__meta">
-              @if (photo.photo.place; as place) {
-                <span><svg [lucideIcon]="placeIcon" aria-label="Where" />{{ place }}</span>
-              }
-              @if (photo.photo.faces?.people?.length) {
-                <span><svg [lucideIcon]="peopleIcon" aria-label="Who" />{{ photo.photo.faces!.people.join(', ') }}</span>
-              }
-            </div>
-          }
-          <div class="hd-photo-details__middle">
-            @if (failure(); as failure) {
-              <span class="hd-details__label" role="alert">{{ failure }}</span>
-            } @else if (busy() === 'rotating') {
-              <span class="hd-details__label" role="status">Rotating…</span>
-            } @else {
-              <span class="hd-details__label">{{ detailIndex() + 1 }} of {{ order().length }}</span>
-            }
-            <button type="button" class="hd-btn" aria-label="Rotate left" [disabled]="busy() || !photo.rotatable" [attr.title]="photo.rotatable ? null : lockedHint"
-              (click)="rotate(false)">
-              <svg [lucideIcon]="rotateLeftIcon" />
-            </button>
-            <button type="button" class="hd-btn" aria-label="Rotate right" [disabled]="busy() || !photo.rotatable" [attr.title]="photo.rotatable ? null : lockedHint"
-              (click)="rotate(true)">
-              <svg [lucideIcon]="rotateRightIcon" />
-            </button>
-            <button type="button" class="hd-btn hd-btn--danger" [disabled]="busy()" (click)="exclude()">
-              <svg [lucideIcon]="excludeIcon" />Exclude photo
-            </button>
-          </div>
-        </div>
-      }
-    </hd-tile-details>
+    @if (set(); as set) {
+      <hd-photo-viewer #viewer [set]="set" [photos]="orderedPhotos()" [name]="face().name" />
+    }
   `,
 })
 export class PhotoTile extends TileView<PhotoTileSettings> {
   private readonly realtime = inject(Realtime);
-  private readonly photoSetsApi = inject(PhotoSetsApi);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /**
@@ -161,13 +95,6 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
   protected readonly sized = computed(() => this.box() !== null || typeof ResizeObserver === 'undefined');
 
   protected readonly icon = LucideImage;
-  protected readonly previousIcon = LucideChevronLeft;
-  protected readonly nextIcon = LucideChevronRight;
-  protected readonly placeIcon = LucideMapPin;
-  protected readonly peopleIcon = LucideUsers;
-  protected readonly excludeIcon = LucideImageOff;
-  protected readonly rotateLeftIcon = LucideRotateCcw;
-  protected readonly rotateRightIcon = LucideRotateCw;
 
   protected readonly set = computed(() => {
     const target = this.settings().target;
@@ -234,25 +161,9 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
     return { ...look, name, detail: '', details: true, state: 'ok' };
   });
 
-  protected readonly detailIndex = signal(0);
-  protected readonly detailPhoto = computed(() => {
-    const shown = this.order()[this.detailIndex()];
-    if (!shown) return undefined;
-    const photo = this.photosById().get(shown.photo.id) ?? shown.photo;
-    const set = this.set();
-    return { photo, url: this.urlOf({ id: photo.id, url: shown.url }), rotatable: !set || canRotate(set, photo) };
-  });
-  protected readonly detailSubtitle = computed(() => {
-    const photo = this.detailPhoto()?.photo;
-    return photo ? takenOn(photo) : '';
-  });
-  protected swipeStart: number | null = null;
-  /** Why a partner's photo can't be rotated. */
-  protected readonly lockedHint = "A partner's photo: add an API key of theirs under Accounts to rotate it";
-  /** What the detail view is waiting on HomeyDash for. */
-  protected readonly busy = signal<'rotating' | 'excluding' | null>(null);
-  /** Why the last rotation or exclusion failed. */
-  protected readonly failure = signal<string | null>(null);
+  /** The photos in this tile's order, for the viewer to step through. */
+  protected readonly orderedPhotos = computed(() => this.order().map((p) => p.photo));
+  private readonly viewer = viewChild<PhotoViewer>('viewer');
 
   constructor() {
     super();
@@ -287,17 +198,7 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
       if (!sized || order.length < 2 || shown === undefined) return;
       untracked(() => {
         const at = order.findIndex((p) => p.photo.id === shown);
-        if (at >= 0) this.preload(order[(at + 1) % order.length], true);
-      });
-    });
-
-    // In the detail view, which steps both ways, the photos on either side of the one shown.
-    effect(() => {
-      const order = this.order();
-      const at = this.detailIndex();
-      if (order.length < 2 || !this.details()?.isOpen()) return;
-      untracked(() => {
-        for (const by of [1, -1]) this.preload(order[(at + by + order.length) % order.length], false);
+        if (at >= 0) this.preload(order[(at + 1) % order.length]);
       });
     });
 
@@ -325,10 +226,10 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
     });
   }
 
-  // Into the browser's cache, which keeps a photo a day; at the size the tile asks for, or whole as the detail view does.
-  private preload(shown: ShownPhoto, fit: boolean) {
+  // Into the browser's cache, which keeps a photo a day, at the size the tile asks for.
+  private preload(shown: ShownPhoto) {
     const image = new Image();
-    image.src = this.urlOf({ id: shown.photo.id, url: shown.url }, fit);
+    image.src = this.urlOf({ id: shown.photo.id, url: shown.url }, true);
   }
 
   private advance() {
@@ -366,63 +267,7 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
   }
 
   protected override openDetails() {
-    this.detailIndex.set(this.position);
-    super.openDetails();
-  }
-
-  // Closes the detail view once HomeyDash has it; its push then takes the photo out of every tile showing the set.
-  protected async exclude() {
-    const set = this.set();
-    const shown = this.detailPhoto();
-    if (!set || !shown) return;
-    this.busy.set('excluding');
-    this.failure.set(null);
-    try {
-      await firstValueFrom(this.photoSetsApi.exclude(set, shown.photo));
-      this.closeDetails();
-    } catch {
-      this.failure.set('Could not exclude the photo. Try again.');
-    } finally {
-      this.busy.set(null);
-    }
-  }
-
-  // HomeyDash answers once Immich has turned the photo; its push then shows it turned on every tile with it. Immich's
-  // reason when it can't, such as for a live photo or a key that may not edit, or HomeyDash's for a partner's photo.
-  protected async rotate(clockwise: boolean) {
-    const set = this.set();
-    const shown = this.detailPhoto();
-    if (!set || !shown) return;
-    this.busy.set('rotating');
-    this.failure.set(null);
-    try {
-      await firstValueFrom(this.photoSetsApi.rotate(set, shown.photo, clockwise));
-    } catch (e) {
-      const detail = e instanceof HttpErrorResponse && (e.status === 502 || e.status === 409) ? e.error?.detail : null;
-      this.failure.set(typeof detail === 'string' ? detail : 'Could not rotate the photo. Try again.');
-    } finally {
-      this.busy.set(null);
-    }
-  }
-
-  protected step(by: number) {
-    this.failure.set(null);
-    const count = this.order().length;
-    if (count) this.detailIndex.update((i) => (i + by + count) % count);
-  }
-
-  // Only from inside the detail view, which is in the tile; the tile itself has focus while it is closed.
-  protected onArrow(event: Event, by: number) {
-    if (event.target === event.currentTarget || !this.detailPhoto()) return;
-    event.preventDefault();
-    this.step(by);
-  }
-
-  protected swipeEnd(x: number) {
-    if (this.swipeStart === null) return;
-    const dx = x - this.swipeStart;
-    this.swipeStart = null;
-    if (Math.abs(dx) > 40) this.step(dx < 0 ? 1 : -1);
+    this.viewer()?.open(this.position);
   }
 }
 

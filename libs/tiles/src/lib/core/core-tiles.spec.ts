@@ -868,7 +868,7 @@ describe('core tiles', () => {
       const idOf = (img: Element | null | undefined) => img?.getAttribute('src')?.split('/').pop() ?? '';
       const shownId = (tile: HTMLElement) => idOf([...tile.querySelectorAll('.hd-photo__img')].pop());
 
-      it('excludes the photo in the detail view, closes it and moves the tile on to the next photo', async () => {
+      it('excludes the photo in the detail view, which moves on to the next photo, and moves the tile on too', async () => {
         realtime.photoSetList = [photoSet(3)];
         const tile = await render(PhotoTile, 'photo-set:s1', 'large');
         const excluded = shownId(tile);
@@ -885,7 +885,8 @@ describe('core tiles', () => {
         await settle();
         await settle();
 
-        expect(details(tile).open).toBe(false);
+        expect(details(tile).open).toBe(true);
+        expect(details(tile).querySelector('.hd-photo-details__img')?.getAttribute('src')).not.toContain(excluded);
         expect(shownId(tile)).not.toBe(excluded);
         expect(left.map((p) => p.id)).toContain(shownId(tile));
       });

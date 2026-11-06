@@ -27,6 +27,17 @@ const photoSet = (change: Partial<PhotoSet> = {}): PhotoSet => ({
   ...change,
 });
 
+// jsdom has no modal dialogs.
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+    this.open = true;
+  };
+  HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+    this.open = false;
+    this.dispatchEvent(new Event('close'));
+  };
+});
+
 describe('PhotoSetPage', () => {
   async function render(sets: PhotoSet[], id = 's1') {
     const realtime = new FakeRealtime();
@@ -53,6 +64,22 @@ describe('PhotoSetPage', () => {
     expect((page.querySelector('[aria-label="Name of Summer"]') as HTMLInputElement).value).toBe('Summer');
     expect(page.textContent?.replace(/\s+/g, ' ')).toContain('1 photo from Summer');
     expect(page.querySelector('[aria-label="Photos"] img')?.getAttribute('src')).toBe('/api/photos/s1/p1');
+  });
+
+  it('opens the photo viewer on the photo clicked, and steps through the set', async () => {
+    const photos = [1, 2, 3].map((n) => ({ id: `p${n}`, takenAt: null, place: null, faces: null }));
+    const page = await render([photoSet({ photos })]);
+    const shown = () => page.querySelector('.hd-photo-details__img')?.getAttribute('src');
+    // Closed, the viewer fetches nothing.
+    expect(shown()).toBeUndefined();
+
+    (page.querySelector('[aria-label="Open photo 2"]') as HTMLButtonElement).click();
+    TestBed.tick();
+
+    expect(shown()).toBe('/api/photos/s1/p2');
+    (page.querySelector('[aria-label="Next photo"]') as HTMLButtonElement).click();
+    TestBed.tick();
+    expect(shown()).toBe('/api/photos/s1/p3');
   });
 
   it('lists the photos excluded from the set, with their thumbnails', async () => {
