@@ -96,7 +96,8 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
       </div>
     }
     <hd-tile-details [name]="face().name" [icon]="icon" [subtitle]="detailSubtitle()" [fill]="true">
-      @if (detailPhoto(); as photo) {
+      <!-- Only while open: projected content exists even when the dialog doesn't show it, and its <img> would fetch the whole photo. -->
+      @if (details()?.isOpen() && detailPhoto(); as photo) {
         <!-- The photo takes the whole screen; the head, the arrows and the bar float over its edges. -->
         <div
           class="hd-photo-details"
@@ -280,9 +281,10 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
       const order = this.order();
       const layers = this.layers();
       const shown = layers[layers.length - 1]?.id;
-      this.sized();
+      // Not before the tile is measured: without a size the URL is the whole photo, which nothing would ask for.
+      const sized = this.sized();
       this.box();
-      if (order.length < 2 || shown === undefined) return;
+      if (!sized || order.length < 2 || shown === undefined) return;
       untracked(() => {
         const at = order.findIndex((p) => p.photo.id === shown);
         if (at >= 0) this.preload(order[(at + 1) % order.length], true);
@@ -331,7 +333,8 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
 
   private advance() {
     const order = this.order();
-    if (order.length < 2) return;
+    // Not before the tile is measured: its photo is then fetched whole, not at the size it shows.
+    if (order.length < 2 || !this.sized()) return;
     this.position = (this.position + 1) % order.length;
     void this.show(order);
   }
