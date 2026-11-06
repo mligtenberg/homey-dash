@@ -42,7 +42,7 @@ public static class ImageFit
     /// </summary>
     public static byte[]? Cover(Stream content, int width, int height, Focus focus)
     {
-        using var bitmap = Decode(content);
+        using var bitmap = Decode(content, width, height, focus);
         if (bitmap is null) return null;
         var crop = Crop(bitmap.Width, bitmap.Height, width, height, focus);
         var scale = Math.Min(1.0, Math.Max((double)width / crop.Width, (double)height / crop.Height));
@@ -76,16 +76,18 @@ public static class ImageFit
         }
     }
 
-    // Upright, as a browser shows it: turned as the file's EXIF orientation says.
-    private static SKBitmap? Decode(Stream content)
+    // Upright, as a browser shows it: turned as the file's EXIF orientation says. Decoded no larger than the box needs
+    // (JPEG and WebP decode at 1/2, 1/4, 1/8 size directly), so a 12 MP photo for a tablet never fills memory in full.
+    private static SKBitmap? Decode(Stream content, int width, int height, Focus focus)
     {
-        using var buffer = new MemoryStream();
-        content.CopyTo(buffer);
-        var bytes = buffer.ToArray();
-        using var codec = SKCodec.Create(new MemoryStream(bytes));
-        if (codec is null) return DrawSvg(new MemoryStream(bytes));
-        using var decoded = SKBitmap.Decode(codec);
-        if (decoded is null) return null;
+        using var data = SKData.Create(content);
+        using var codec = data is null ? null : SKCodec.Create(data);
+        if (codec is null)
+        {
+            if (data is null) return null;
+            using var raw = data.AsStream();
+            return DrawSvg(raw);
+        }
         var (turn, flip) = codec.EncodedOrigin switch
         {
             SKEncodedOrigin.RightTop => (90f, false),
@@ -97,15 +99,21 @@ public static class ImageFit
             SKEncodedOrigin.RightBottom => (270f, true),
             _ => (0f, false),
         };
-        if (turn == 0 && !flip) return decoded.Copy();
         var sideways = turn is 90 or 270;
+        var (uprightWidth, uprightHeight) = sideways ? (codec.Info.Height, codec.Info.Width) : (codec.Info.Width, codec.Info.Height);
+        var crop = Crop(uprightWidth, uprightHeight, width, height, focus);
+        var wanted = (float)Math.Min(1.0, Math.Max((double)width / crop.Width, (double)height / crop.Height));
+        using var decoded = SKBitmap.Decode(codec, codec.Info.WithSize(codec.GetScaledDimensions(wanted)));
+        if (decoded is null) return null;
+        if (turn == 0 && !flip) return decoded.Copy();
         var upright = new SKBitmap(sideways ? decoded.Height : decoded.Width, sideways ? decoded.Width : decoded.Height);
         using var canvas = new SKCanvas(upright);
         canvas.Translate(upright.Width / 2f, upright.Height / 2f);
         canvas.RotateDegrees(turn);
         if (flip) canvas.Scale(-1, 1);
         canvas.Translate(-decoded.Width / 2f, -decoded.Height / 2f);
-        canvas.DrawImage(SKImage.FromBitmap(decoded), 0, 0, new SKSamplingOptions());
+        using var image = SKImage.FromBitmap(decoded);
+        canvas.DrawImage(image, 0, 0, new SKSamplingOptions());
         return upright;
     }
 }

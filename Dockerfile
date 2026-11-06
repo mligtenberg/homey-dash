@@ -42,6 +42,7 @@ COPY --from=rootfs /rootfs /
 WORKDIR /app
 
 ENV ASPNETCORE_HTTP_PORTS=8080 \
+    DOTNET_GCConserveMemory=5 \
     ConnectionStrings__HomeyDash="Data Source=/data/homey-dash.db"
 VOLUME /data
 EXPOSE 8080 8443

@@ -373,16 +373,20 @@ public static class PhotoEndpoints
             {
                 await using var content = photo.Content;
                 var focus = set.Photos.FirstOrDefault(p => p.Id == photoId)?.Faces?.Focus ?? Focus.Middle;
-                using var buffer = new MemoryStream();
-                await content.CopyToAsync(buffer, ct);
-                buffer.Position = 0;
-                return ImageFit.Cover(buffer, width.Value, height.Value, focus) is { } fitted
+                // One resize at a time: each holds a decoded image, and several at once is what makes memory spike.
+                await ResizeGate.WaitAsync(ct);
+                byte[]? fitted;
+                try { fitted = ImageFit.Cover(content, width.Value, height.Value, focus); }
+                finally { ResizeGate.Release(); }
+                return fitted is not null
                     ? Results.Bytes(fitted, "image/webp")
                     : Results.Problem("Immich did not send an image.", statusCode: StatusCodes.Status502BadGateway);
             }
             return Results.Stream(photo.Content, photo.ContentType);
         });
     }
+
+    private static readonly SemaphoreSlim ResizeGate = new(2);
 
     public sealed record Services(
         HomeyDashDbContext Db, PhotoSetIndex Index, PhotoSync Sync, ImmichAccounts Accounts, RealtimeNotifier Notifier, TimeProvider Time)
