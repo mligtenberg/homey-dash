@@ -1,12 +1,16 @@
 import { signal } from '@angular/core';
 import {
+  AirPlayInfo,
+  AirPlayPlayback,
   ScreenDetails,
   CapabilityValue,
   DisplayInfo,
   HomeySnapshot,
   PhotoSet,
   PlexCommand,
+  PlexItem,
   PlexSnapshot,
+  PlexTracks,
   Realtime,
   RealtimeMessages,
   Rule,
@@ -101,6 +105,55 @@ export class FakeRealtime implements Partial<Realtime> {
 
   controlPlex(accountId: number, playerId: string, command: PlexCommand) {
     return this.command('controlPlex', accountId, playerId, command);
+  }
+
+  /** What a search finds, whatever is asked. */
+  plexSearchResults: PlexItem[] = [];
+
+  async searchPlex(accountId: number, query: string, libraryId: string | null) {
+    this.commands.push(['searchPlex', accountId, query, libraryId]);
+    return this.plexSearchResults;
+  }
+
+  plexTrackList: PlexTracks = {
+    audio: [
+      { id: '1', label: 'English (AC3 5.1)', selected: true },
+      { id: '2', label: 'Nederlands (AAC Stereo)', selected: false },
+    ],
+    subtitles: [{ id: '11', label: 'English (SRT)', selected: false }],
+  };
+
+  async plexTracks() {
+    return this.plexTrackList;
+  }
+
+  /** What plays on AirPlay now, as a screen first loads it. */
+  airPlayNow: AirPlayPlayback[] = [];
+
+  async airPlayNowPlaying() {
+    return this.airPlayNow;
+  }
+
+  changeAirPlayTracks(deviceId: string, audioStreamId: string | null, subtitleStreamId: string | null) {
+    return this.command('changeAirPlayTracks', deviceId, audioStreamId, subtitleStreamId);
+  }
+
+  airPlay: AirPlayInfo = { available: true, devices: [{ id: 'tv', name: 'Living room TV', kind: 'tv', paired: true }] };
+
+  async airPlayDevices() {
+    return this.airPlay;
+  }
+
+  playOnAirPlay(accountId: number, itemId: string, deviceId: string) {
+    return this.command('playOnAirPlay', accountId, itemId, deviceId);
+  }
+
+  setAirPlayPaused(deviceId: string, paused: boolean) {
+    return this.command('setAirPlayPaused', deviceId, paused);
+  }
+
+  stopAirPlay(deviceId: string) {
+    return this.command('stopAirPlay', deviceId);
   }
 
   async joinScreen(screenId: string) {

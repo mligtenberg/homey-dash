@@ -1,4 +1,6 @@
+using HomeyDash.AirPlay;
 using System.Text.Json;
+using HomeyDash.Api.AirPlay;
 using HomeyDash.Api.Data;
 using HomeyDash.Api.Displays;
 using HomeyDash.Api.Homey;
@@ -30,6 +32,11 @@ public sealed class RealtimeHub(
     PlexWatcher plexWatcher,
     IPlex plex,
     PlexAccounts plexAccounts,
+    IAirPlay airPlay,
+    AirPlayNow nowPlaying,
+    IHttpClientFactory httpClients,
+    PlexOptions plexOptions,
+    AirPlayOptions airPlayOptions,
     RuleEngine rules,
     RuleSubscriptions subscriptions,
     DisplayDirectory directory,
@@ -49,6 +56,22 @@ public sealed class RealtimeHub(
     // Every Plex account's libraries, and what plays now. Changes that follow arrive as Plex and PlexSessions.
     public PlexSnapshot Plex() => plexWatcher.Snapshot;
 
+    // Items of the account's Plex libraries (one, or every one when libraryId is null) whose title matches, not only the newest.
+    public async Task<IReadOnlyList<PlexItem>> SearchPlex(int accountId, string query, string? libraryId)
+    {
+        if (plexAccounts.Find(accountId)?.Connection is not { } server) throw new HubException("Sign in with Plex under Accounts first.");
+        query = query.Trim();
+        if (query.Length < 2) return [];
+        try
+        {
+            return await plex.SearchAsync(server, query, libraryId, 12, Context.ConnectionAborted);
+        }
+        catch (PlexException e)
+        {
+            throw new HubException(e.Message);
+        }
+    }
+
     // Plays or pauses what plays on one of the account's players, or skips; the player must allow remote control.
     public async Task ControlPlex(int accountId, string playerId, PlexCommand command)
     {
@@ -64,6 +87,119 @@ public sealed class RealtimeHub(
             throw new HubException(e.Message);
         }
         plexWatcher.Wake(accountId);
+    }
+
+    // The paired AirPlay receivers, or that AirPlay isn't set up (ADR-0012).
+    public async Task<AirPlayInfo> AirPlayDevices()
+    {
+        if (!airPlayOptions.Enabled) return new AirPlayInfo(false, []);
+        try
+        {
+            return new AirPlayInfo(true, await airPlay.PairedAsync(Context.ConnectionAborted));
+        }
+        catch (AirPlayException e)
+        {
+            throw new HubException(e.Message);
+        }
+    }
+
+    // Plays a movie or episode of a Plex account on an AirPlay receiver, which fetches the stream from the Plex server itself.
+    public Task PlayOnAirPlay(int accountId, string itemId, string deviceId) => StartAirPlay(accountId, itemId, deviceId, null);
+
+    // What plays on AirPlay now, on every receiver. Changes that follow arrive as AirPlayNow.
+    public IReadOnlyList<AirPlayPlayback> AirPlayNowPlaying() => nowPlaying.All;
+
+    // Changes the audio or subtitle track of what plays on a receiver (no subtitleStreamId: none). The stream is one the server
+    // makes, so it starts over from where it is by HomeyDash's count.
+    public Task ChangeAirPlayTracks(string deviceId, string? audioStreamId, string? subtitleStreamId)
+    {
+        var playing = nowPlaying.Find(deviceId) ?? throw new HubException("Nothing is playing on that Apple TV.");
+        return StartAirPlay(playing.AccountId, playing.ItemId, deviceId,
+            new PlexStreamChoice(audioStreamId, subtitleStreamId, nowPlaying.PositionSeconds(playing)));
+    }
+
+    // The audio and subtitle tracks of a movie or episode, to choose between.
+    public async Task<PlexTracks> PlexTracks(int accountId, string itemId)
+    {
+        if (plexAccounts.Find(accountId)?.Connection is not { } server) throw new HubException("Sign in with Plex under Accounts first.");
+        try
+        {
+            return await plex.TracksAsync(server, itemId, Context.ConnectionAborted);
+        }
+        catch (PlexException e)
+        {
+            throw new HubException(e.Message);
+        }
+    }
+
+    private async Task StartAirPlay(int accountId, string itemId, string deviceId, PlexStreamChoice? choice)
+    {
+        if (!airPlayOptions.Enabled) throw new HubException("AirPlay isn't set up.");
+        if (plexAccounts.Find(accountId)?.Connection is not { } server) throw new HubException("Sign in with Plex under Accounts first.");
+        // Anything the server has: what the library lists as new, or what a search found.
+        var item = plexWatcher.Snapshot.Accounts.FirstOrDefault(a => a.AccountId == accountId)?.Libraries
+            .SelectMany(l => l.Recent).FirstOrDefault(i => i.Id == itemId);
+        try
+        {
+            item ??= await plex.ItemAsync(server, itemId, Context.ConnectionAborted);
+        }
+        catch (PlexException e)
+        {
+            throw new HubException(e.Message);
+        }
+        if (item is null) throw new HubException("Plex no longer has that.");
+        if (item.Kind is not ("movie" or "episode")) throw new HubException("Only a movie or an episode plays on AirPlay.");
+        try
+        {
+            var url = PlexStream.Url(server, itemId, choice: choice);
+            if (!plexOptions.Fake)
+            {
+                // A receiver that cannot play what it is given starts and stops at once, saying nothing; the server's
+                // answer says why, so find out first.
+                var http = httpClients.CreateClient(PlexClient.HttpClientName);
+                var (receiver, source, copyVideo) = await PlexStream.PrepareAsync(http, server, itemId, Context.ConnectionAborted);
+                var session = Guid.NewGuid().ToString("N");
+                var check = await PlexStreamCheck.RunAsync(http, receiver, PlexStream.Url(receiver, itemId, session, copyVideo, choice), session, source,
+                    copyVideo && choice?.SubtitleStreamId is null, Context.ConnectionAborted);
+                if (!check.Ok) throw new HubException(check.Summary);
+                url = PlexStream.Url(receiver, itemId, copyVideo: copyVideo, choice: choice);
+            }
+            await airPlay.PlayAsync(deviceId, url, Context.ConnectionAborted);
+            var name = (await airPlay.PairedAsync(Context.ConnectionAborted)).FirstOrDefault(d => d.Id == deviceId)?.Name ?? deviceId;
+            await nowPlaying.StartedAsync(new AirPlayPlayback(deviceId, name, accountId, itemId, item.Title, false,
+                choice?.AudioStreamId, choice?.SubtitleStreamId, (choice?.OffsetSeconds ?? 0) * 1000L, default));
+        }
+        catch (AirPlayException e)
+        {
+            throw new HubException(e.Message);
+        }
+    }
+
+    // Pauses or resumes what plays on an AirPlay receiver.
+    public async Task SetAirPlayPaused(string deviceId, bool paused)
+    {
+        try
+        {
+            await airPlay.SetPausedAsync(deviceId, paused, Context.ConnectionAborted);
+            await nowPlaying.PausedAsync(deviceId, paused);
+        }
+        catch (AirPlayException e)
+        {
+            throw new HubException(e.Message);
+        }
+    }
+
+    public async Task StopAirPlay(string deviceId)
+    {
+        try
+        {
+            await airPlay.StopAsync(deviceId, Context.ConnectionAborted);
+            await nowPlaying.StoppedAsync(deviceId);
+        }
+        catch (AirPlayException e)
+        {
+            throw new HubException(e.Message);
+        }
     }
 
     // Identifies the running build; it changes when an update is installed, so a screen that sees it change reloads.

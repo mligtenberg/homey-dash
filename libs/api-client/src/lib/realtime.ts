@@ -1,9 +1,10 @@
 import { Injectable, signal } from '@angular/core';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import { AirPlayInfo, AirPlayPlayback } from './airplay';
 import { DashboardSummary } from './dashboards';
 import { DisplayInfo, ScreenDetails, ScreenView } from './displays';
 import { PhotoSet } from './photos';
-import { PlexCommand, PlexOverview, PlexSession, PlexSnapshot } from './plex';
+import { PlexCommand, PlexItem, PlexOverview, PlexSession, PlexSnapshot, PlexTracks } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
 import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
 
@@ -57,6 +58,8 @@ export interface RealtimeMessages {
   Plex: PlexOverview[];
   /** What plays on Plex, whenever more than its progress changed. */
   PlexSessions: PlexSession[];
+  /** What plays on AirPlay receivers, whenever it changes: started, paused, changed or ended. */
+  AirPlayNow: AirPlayPlayback[];
   /** The answers to this connection's rule subscriptions that one change altered. */
   RuleAnswers: RuleAnswers;
 }
@@ -125,6 +128,45 @@ export class Realtime {
   /** Plays, pauses or skips on a player of a Plex account; fails when the player takes no remote control. */
   controlPlex(accountId: number, playerId: string, command: PlexCommand) {
     return this.hub.invoke<void>('ControlPlex', accountId, playerId, command);
+  }
+
+  /** The AirPlay receivers on the network (it takes a few seconds), or that AirPlay isn't set up. */
+  airPlayDevices() {
+    return this.hub.invoke<AirPlayInfo>('AirPlayDevices');
+  }
+
+  /** Items of a Plex account's libraries (one, or all when `libraryId` is null) whose title matches, not only the newest. */
+  searchPlex(accountId: number, query: string, libraryId: string | null) {
+    return this.hub.invoke<PlexItem[]>('SearchPlex', accountId, query, libraryId);
+  }
+
+  /** The audio and subtitle tracks of a movie or episode. */
+  plexTracks(accountId: number, itemId: string) {
+    return this.hub.invoke<PlexTracks>('PlexTracks', accountId, itemId);
+  }
+
+  /** What plays on AirPlay now; changes that follow arrive as `AirPlayNow`. */
+  airPlayNowPlaying() {
+    return this.hub.invoke<AirPlayPlayback[]>('AirPlayNowPlaying');
+  }
+
+  /** Changes the audio or subtitle track of what plays on a receiver (no subtitle id: none); the stream starts over from where it is. */
+  changeAirPlayTracks(deviceId: string, audioStreamId: string | null, subtitleStreamId: string | null) {
+    return this.hub.invoke<void>('ChangeAirPlayTracks', deviceId, audioStreamId, subtitleStreamId);
+  }
+
+  /** Plays a movie or episode of a Plex account on an AirPlay receiver; fails with the reason. */
+  playOnAirPlay(accountId: number, itemId: string, deviceId: string) {
+    return this.hub.invoke<void>('PlayOnAirPlay', accountId, itemId, deviceId);
+  }
+
+  /** Pauses or resumes what plays on an AirPlay receiver; fails with the reason. */
+  setAirPlayPaused(deviceId: string, paused: boolean) {
+    return this.hub.invoke<void>('SetAirPlayPaused', deviceId, paused);
+  }
+
+  stopAirPlay(deviceId: string) {
+    return this.hub.invoke<void>('StopAirPlay', deviceId);
   }
 
   /** Identifies the running build of the backend; it differs after an update was installed. */

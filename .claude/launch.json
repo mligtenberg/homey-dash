@@ -41,6 +41,7 @@
         "--Homey:Fake=true",
         "--Immich:Fake=true",
         "--Plex:Fake=true",
+        "--AirPlay:Fake=true",
         "--ReverseProxy:Clusters:display:Destinations:display:Address=http://localhost:4300",
         "--ReverseProxy:Clusters:management:Destinations:management:Address=http://localhost:4301"
       ],
@@ -99,6 +100,7 @@
         "--Homey:Fake=true",
         "--Immich:Fake=true",
         "--Plex:Fake=true",
+        "--AirPlay:Fake=true",
         "--ReverseProxy:Clusters:display:Destinations:display:Address=http://localhost:4302",
         "--ReverseProxy:Clusters:management:Destinations:management:Address=http://localhost:4303"
       ],

@@ -6,4 +6,11 @@
   <Folder Name="/apps/api/">
     <Project Path="apps/api/HomeyDash.Api.csproj" />
   </Folder>
+  <Folder Name="/libs/" />
+  <Folder Name="/libs/airplay/">
+    <Project Path="libs/airplay/HomeyDash.AirPlay.csproj" />
+  </Folder>
+  <Folder Name="/libs/airplay-tests/">
+    <Project Path="libs/airplay-tests/HomeyDash.AirPlay.Tests.csproj" />
+  </Folder>
 </Solution>

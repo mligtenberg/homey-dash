@@ -58,17 +58,69 @@ public sealed class FakePlex(TimeProvider time) : IPlex
     public Task<IReadOnlyList<PlexLibrary>> LibrariesAsync(PlexConnection server, int recent, CancellationToken ct)
     {
         var now = time.GetUtcNow();
-        PlexItem Item(int n, string kind, string title, string? subtitle) =>
-            new($"{n}", kind, title, subtitle, $"/library/metadata/{n}/thumb", now.AddDays(-n % 100));
+        PlexItem Item(int n, string kind, string title, string? subtitle, string? summary = null, int? year = null,
+            long? minutes = null, double? rating = null, string? contentRating = null, params string[] genres) =>
+            new($"{n}", kind, title, subtitle, $"/library/metadata/{n}/thumb", now.AddDays(-n % 100))
+            {
+                Summary = summary, Year = year, DurationMs = minutes * 60_000, Rating = rating, ContentRating = contentRating,
+                Genres = genres, Art = $"/library/metadata/{n}/art",
+            };
         return Task.FromResult<IReadOnlyList<PlexLibrary>>(
         [
             new PlexLibrary("1", "Movies", "movie",
-                [Item(101, "movie", "Dune: Part Two", "2024"), Item(102, "movie", "Past Lives", "2023"), Item(103, "movie", "Perfect Days", "2023")]),
+                [
+                    Item(101, "movie", "Dune: Part Two", "2024", "Paul Atreides unites with Chani and the Fremen while seeking revenge against the conspirators who destroyed his family. Facing a choice between the love of his life and the fate of the known universe, he endeavors to prevent a terrible future only he can foresee.",
+                        2024, 166, 8.4, "PG-13", "Science Fiction", "Adventure", "Drama"),
+                    Item(102, "movie", "Past Lives", "2023", "Nora and Hae Sung, two childhood friends, are reunited in New York for one fateful week as they confront notions of love and destiny.",
+                        2023, 106, 8.0, "PG-13", "Drama", "Romance"),
+                    Item(103, "movie", "Perfect Days", "2023", "Hirayama seems content with his simple life as a toilet cleaner in Tokyo.",
+                        2023, 124, 7.9, "PG", "Drama"),
+                ]),
             new PlexLibrary("2", "TV Shows", "show",
-                [Item(202, "episode", "Next", "The Bear · S3 E2"), Item(203, "season", "Shōgun", "Season 1")]),
-            new PlexLibrary("3", "Music", "artist", [Item(301, "album", "Hit Me Hard and Soft", "Billie Eilish")]),
+                [
+                    Item(202, "episode", "Next", "The Bear · S3 E2", "Carmy and Sydney race to get the restaurant ready as tensions rise in the kitchen.", 2024, 33, 8.6, "TV-MA", "Comedy", "Drama"),
+                    Item(203, "season", "Shōgun", "Season 1", "In 1600 Japan, a mysterious European ship is found marooned in a nearby fishing village.", 2024, null, 9.1, "TV-MA", "Drama", "History"),
+                ]),
+            new PlexLibrary("3", "Music", "artist", [Item(301, "album", "Hit Me Hard and Soft", "Billie Eilish", year: 2024, genres: ["Pop"])]),
         ]);
     }
+
+    // Everything the fake library holds: the newest above, and older things that only a search finds.
+    private async Task<List<(string Library, PlexItem Item)>> CatalogAsync(CancellationToken ct)
+    {
+        var now = time.GetUtcNow();
+        PlexItem Older(int n, string kind, string title, string? subtitle, int year, long? minutes) =>
+            new($"{n}", kind, title, subtitle, $"/library/metadata/{n}/thumb", now.AddDays(-400 - n))
+            {
+                Summary = $"{title}, from {year}.", Year = year, DurationMs = minutes * 60_000, Rating = 7.5, ContentRating = "PG-13", Genres = ["Drama"],
+                Art = $"/library/metadata/{n}/art",
+            };
+        var catalog = (await LibrariesAsync(new PlexConnection("", "", ""), 24, ct)).SelectMany(l => l.Recent.Select(i => (l.Id, i))).ToList();
+        catalog.AddRange(
+        [
+            ("1", Older(401, "movie", "Arrival", "2016", 2016, 116)),
+            ("1", Older(402, "movie", "Blade Runner 2049", "2017", 2017, 164)),
+            ("1", Older(403, "movie", "Dune", "1984", 1984, 137)),
+            ("2", Older(500, "show", "The Bear", "2022", 2022, null)),
+            ("2", Older(501, "episode", "System", "The Bear · S1 E1", 2022, 28)),
+            ("3", Older(601, "album", "Happier Than Ever", "Billie Eilish", 2021, null)),
+        ]);
+        return catalog;
+    }
+
+    public async Task<IReadOnlyList<PlexItem>> SearchAsync(PlexConnection server, string query, string? libraryId, int limit, CancellationToken ct) =>
+        (await CatalogAsync(ct))
+        .Where(c => libraryId is null || c.Library == libraryId)
+        .Where(c => c.Item.Title.Contains(query, StringComparison.OrdinalIgnoreCase) || c.Item.Subtitle?.Contains(query, StringComparison.OrdinalIgnoreCase) == true)
+        .Select(c => c.Item).Take(limit * 3).ToList();
+
+    public Task<PlexTracks> TracksAsync(PlexConnection server, string itemId, CancellationToken ct) =>
+        Task.FromResult(new PlexTracks(
+            [new PlexTrack("1", "English (AC3 5.1)", true), new PlexTrack("2", "Nederlands (AAC Stereo)", false), new PlexTrack("3", "Japanese (DTS-HD MA 7.1)", false)],
+            [new PlexTrack("11", "English (SRT)", false), new PlexTrack("12", "Nederlands (SRT)", false), new PlexTrack("13", "English (PGS)", false)]));
+
+    public async Task<PlexItem?> ItemAsync(PlexConnection server, string itemId, CancellationToken ct) =>
+        (await CatalogAsync(ct)).Select(c => c.Item).FirstOrDefault(i => i.Id == itemId);
 
     public Task<(Stream Content, string ContentType)?> ImageAsync(PlexConnection server, string path, int width, int height, CancellationToken ct)
     {

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, input, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { LucideDynamicIcon, LucideIconInput, LucideX } from '@lucide/angular';
 
 /** How long the detail view stays open untouched; nobody may be there to close it on a wall tablet. */
@@ -58,6 +58,9 @@ export class TileDetails {
   /** Whether a tap on the backdrop closes it. */
   readonly closeOnBackdrop = input(true);
 
+  /** Emits when it closed, however: its button, Escape, the backdrop or going idle. */
+  readonly closed = output<void>();
+
   readonly isOpen = signal(false);
   protected readonly closeIcon = LucideX;
 
@@ -85,6 +88,7 @@ export class TileDetails {
   protected onClose() {
     this.isOpen.set(false);
     clearTimeout(this.idleTimer);
+    this.closed.emit();
   }
 
   protected keepOpen() {

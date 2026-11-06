@@ -55,6 +55,17 @@ servers, choose one there. The buttons only work on players that take remote con
 `Plex:Fake=true` runs against a fake Plex with a movie playing and an episode paused (`npx nx serve api -c simulator`
 sets it).
 
+### Play on Apple TV (AirPlay)
+
+A movie or episode opened in the recently-added screen can play on an Apple TV with **Play on AirPlay** (see
+[ADR-0012](docs/adr/0012-airplay-in-dotnet.md)). HomeyDash speaks AirPlay itself, with the `libs/airplay` library, so
+there is nothing else to run. It finds Apple TVs with multicast DNS, which reaches your network from a container only with
+host networking (Linux): give the container `network_mode: host`. Management → Accounts → AirPlay lists the Apple TVs it
+found and pairs one that asks for a PIN; pairings are kept in `airplay-credentials.json` next to the database
+(`AirPlay:CredentialsPath` moves it), and `AirPlay:Enabled=false` switches AirPlay off.
+
+`AirPlay:Fake=true` runs against two made-up Apple TVs.
+
 ## Brightness
 
 Displays measure how much light falls on them, in lux, once a minute, for rules on the **Brightness** signal (see

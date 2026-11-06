@@ -6,7 +6,7 @@ WORKDIR /src
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 # Leave the .NET projects out, so API changes don't rebuild the frontends.
-COPY --exclude=apps/api --exclude=apps/api-tests . .
+COPY --exclude=apps/api --exclude=apps/api-tests --exclude=libs/airplay --exclude=libs/airplay-tests . .
 RUN NX_DAEMON=false npx nx run-many -t build -p display management
 
 # --- API ---------------------------------------------------------------------
@@ -16,11 +16,13 @@ ARG TARGETARCH
 SHELL ["/bin/bash", "-c"]
 WORKDIR /src
 COPY apps/api/HomeyDash.Api.csproj apps/api/
+COPY libs/airplay/HomeyDash.AirPlay.csproj libs/airplay/
 # The packages stay in this layer rather than a cache mount: publish runs with --no-restore, and a cache mount can be
 # pruned or differ between the two steps, which fails publish with NETSDK1064 (package not found). Only the build stage
 # carries them; the final image doesn't.
 RUN dotnet restore apps/api/HomeyDash.Api.csproj -a ${TARGETARCH/amd64/x64}
 COPY apps/api apps/api
+COPY libs/airplay libs/airplay
 COPY libs/design-system/backgrounds libs/design-system/backgrounds
 RUN dotnet publish apps/api/HomeyDash.Api.csproj -c Release -a ${TARGETARCH/amd64/x64} \
     --no-restore -p:UseAppHost=false -o /rootfs/app

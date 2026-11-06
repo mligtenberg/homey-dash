@@ -21,6 +21,8 @@ services:
       # ASPNETCORE_HTTPS_PORTS: "8443"
       # SelfSignedCertificatePath: /data/https/homey-dash.pfx
       # SelfSignedCertificateHosts: "192.168.1.23,nas.local"
+      # Playing Plex covers on Apple TVs through AirPlay finds them with multicast DNS, which reaches your network from a
+      # container only with host networking (Linux): add `network_mode: host` and drop `ports` (ADR-0012).
       # Defaults, only change if you move things:
       # ConnectionStrings__HomeyDash: "Data Source=/data/homey-dash.db"
       # ASPNETCORE_HTTP_PORTS: "8080"

@@ -114,16 +114,68 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
             var key = Str(section, "key")!;
             var items = await ServerAsync(server, HttpMethod.Get,
                 $"/library/sections/{Uri.EscapeDataString(key)}/recentlyAdded?X-Plex-Container-Start=0&X-Plex-Container-Size={recent}", ct);
-            libraries.Add(new PlexLibrary(key, Str(section, "title") ?? key, Str(section, "type")!, Metadata(items).Select(m => new PlexItem(
-                Str(m, "ratingKey") ?? "",
-                Kind(Str(m, "type")),
-                Str(m, "type") == "season" ? Str(m, "parentTitle") ?? "" : Str(m, "title") ?? "",
-                Str(m, "type") == "season" ? Str(m, "title") : Subtitle(m),
-                Str(m, "grandparentThumb") ?? Str(m, "parentThumb") ?? Str(m, "thumb"),
-                DateTimeOffset.FromUnixTimeSeconds(Long(m, "addedAt")))).ToList()));
+            libraries.Add(new PlexLibrary(key, Str(section, "title") ?? key, Str(section, "type")!, Metadata(items).Select(ToItem).ToList()));
         }
         return libraries;
     }
+
+    public async Task<IReadOnlyList<PlexItem>> SearchAsync(PlexConnection server, string query, string? libraryId, int limit, CancellationToken ct)
+    {
+        var path = $"/hubs/search?query={Uri.EscapeDataString(query)}&limit={limit}"
+            + (libraryId is null ? "" : $"&sectionId={Uri.EscapeDataString(libraryId)}");
+        var json = await ServerAsync(server, HttpMethod.Get, path, ct);
+        if (!json.GetProperty("MediaContainer").TryGetProperty("Hub", out var hubs) || hubs.ValueKind != JsonValueKind.Array) return [];
+        // One list per kind (movies, shows, episodes...); keep the ones a card can show, in the server's order.
+        return hubs.EnumerateArray()
+            .Where(hub => hub.TryGetProperty("Metadata", out _))
+            .SelectMany(hub => hub.GetProperty("Metadata").EnumerateArray())
+            .Where(m => Str(m, "type") is "movie" or "show" or "season" or "episode" or "album")
+            .Select(ToItem)
+            .DistinctBy(i => i.Id)
+            .Take(limit * 3)
+            .ToList();
+    }
+
+    public async Task<PlexItem?> ItemAsync(PlexConnection server, string itemId, CancellationToken ct)
+    {
+        var json = await ServerAsync(server, HttpMethod.Get, $"/library/metadata/{Uri.EscapeDataString(itemId)}", ct);
+        return Metadata(json).Select(ToItem).FirstOrDefault();
+    }
+
+    public async Task<PlexTracks> TracksAsync(PlexConnection server, string itemId, CancellationToken ct)
+    {
+        var json = await ServerAsync(server, HttpMethod.Get, $"/library/metadata/{Uri.EscapeDataString(itemId)}", ct);
+        var streams = Metadata(json).FirstOrDefault() is { ValueKind: JsonValueKind.Object } m
+            && m.TryGetProperty("Media", out var media) && media.ValueKind == JsonValueKind.Array && media.GetArrayLength() > 0
+            && media[0].TryGetProperty("Part", out var parts) && parts.ValueKind == JsonValueKind.Array && parts.GetArrayLength() > 0
+            && parts[0].TryGetProperty("Stream", out var s) && s.ValueKind == JsonValueKind.Array
+                ? s.EnumerateArray().ToList()
+                : [];
+        List<PlexTrack> Of(long type) => streams.Where(x => Long(x, "streamType") == type).Select(x => new PlexTrack(
+            Long(x, "id").ToString(),
+            Str(x, "extendedDisplayTitle") ?? Str(x, "displayTitle") ?? Str(x, "language") ?? "Unknown",
+            x.TryGetProperty("selected", out var selected) && selected.ValueKind == JsonValueKind.True)).ToList();
+        return new PlexTracks(Of(2), Of(3));
+    }
+
+    private static PlexItem ToItem(JsonElement m) => new(
+        Str(m, "ratingKey") ?? "",
+        Kind(Str(m, "type")),
+        Str(m, "type") == "season" ? Str(m, "parentTitle") ?? "" : Str(m, "title") ?? "",
+        Str(m, "type") == "season" ? Str(m, "title") : Subtitle(m),
+        Str(m, "grandparentThumb") ?? Str(m, "parentThumb") ?? Str(m, "thumb"),
+        DateTimeOffset.FromUnixTimeSeconds(Long(m, "addedAt")))
+    {
+        Summary = Summary(Str(m, "summary")),
+        Year = Long(m, "year") is > 0 and var year ? (int)year : null,
+        DurationMs = Long(m, "duration") is > 0 and var duration ? duration : null,
+        Rating = Number(m, "audienceRating") ?? Number(m, "rating"),
+        ContentRating = Str(m, "contentRating"),
+        Genres = m.TryGetProperty("Genre", out var genres) && genres.ValueKind == JsonValueKind.Array
+            ? genres.EnumerateArray().Select(g => Str(g, "tag")).OfType<string>().Take(3).ToList()
+            : [],
+        Art = Str(m, "grandparentArt") ?? Str(m, "art"),
+    };
 
     public async Task<(Stream Content, string ContentType)?> ImageAsync(PlexConnection server, string path, int width, int height, CancellationToken ct)
     {
@@ -232,7 +284,7 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
 
     private static string Kind(string? type) => type switch
     {
-        "movie" or "episode" or "track" or "season" or "album" => type,
+        "movie" or "episode" or "track" or "season" or "album" or "show" => type,
         _ => "other",
     };
 
@@ -246,9 +298,18 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
         }.OfType<string>()),
         "track" => string.Join(" — ", new[] { Str(m, "grandparentTitle"), Str(m, "parentTitle") }.OfType<string>()),
         "album" => Str(m, "parentTitle"),
-        "movie" => m.TryGetProperty("year", out _) ? Long(m, "year").ToString() : null,
+        "movie" or "show" => m.TryGetProperty("year", out _) ? Long(m, "year").ToString() : null,
         _ => null,
     };
+
+    // A summary is a paragraph or two; the detail view shows a few lines of it.
+    private static string? Summary(string? text) =>
+        string.IsNullOrWhiteSpace(text) ? null : text.Length <= 600 ? text.Trim() : text[..600].TrimEnd() + "…";
+
+    private static double? Number(JsonElement json, string name) =>
+        json.ValueKind == JsonValueKind.Object && json.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number
+            ? Math.Round(value.GetDouble(), 1)
+            : null;
 
     private static long Long(JsonElement json, string name) =>
         json.ValueKind == JsonValueKind.Object && json.TryGetProperty(name, out var value)

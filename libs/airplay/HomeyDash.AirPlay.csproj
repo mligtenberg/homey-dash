@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>HomeyDash.AirPlay</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Ed25519 and X25519, which .NET doesn't have; pure managed, so nothing native ships with the image. -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="HomeyDash.AirPlay.Tests" />
+  </ItemGroup>
+
+</Project>

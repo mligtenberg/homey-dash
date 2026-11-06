@@ -17,12 +17,17 @@ public class ApiFactory : WebApplicationFactory<Program>
 
     protected virtual bool FakePlex => true;
 
+    protected virtual bool FakeAirPlay => true;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("ConnectionStrings:HomeyDash", $"Data Source={_dbPath};Pooling=False");
         builder.UseSetting("Homey:Fake", FakeHomey ? "true" : "false");
         builder.UseSetting("Immich:Fake", FakeImmich ? "true" : "false");
         builder.UseSetting("Plex:Fake", FakePlex ? "true" : "false");
+        builder.UseSetting("AirPlay:Fake", FakeAirPlay ? "true" : "false");
+        // Without the fake, AirPlay is off: tests don't look for receivers on the network.
+        builder.UseSetting("AirPlay:Enabled", FakeAirPlay ? "true" : "false");
     }
 
     public override async ValueTask DisposeAsync()
@@ -62,4 +67,10 @@ public sealed class ClockApiFactory : ApiFactory
         base.ConfigureWebHost(builder);
         builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(Clock));
     }
+}
+
+// The API with AirPlay switched off.
+public sealed class NoAirPlayApiFactory : ApiFactory
+{
+    protected override bool FakeAirPlay => false;
 }

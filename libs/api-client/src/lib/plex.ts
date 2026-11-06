@@ -26,14 +26,37 @@ export interface PlexSession {
   accountId: number;
 }
 
-/** Something newly added to a library. */
+/** Something in a library: newly added, or found by a search. `addedAt` is the epoch when the server doesn't say. */
 export interface PlexItem {
   id: string;
-  kind: 'movie' | 'episode' | 'season' | 'album' | 'other';
+  kind: 'movie' | 'show' | 'episode' | 'season' | 'album' | 'other';
   title: string;
   subtitle: string | null;
   image: string | null;
   addedAt: string;
+  /** What the detail view of a cover shows, when the server has it. */
+  summary?: string | null;
+  year?: number | null;
+  durationMs?: number | null;
+  /** Out of ten. */
+  rating?: number | null;
+  contentRating?: string | null;
+  genres?: string[];
+  /** The wide artwork behind it. */
+  art?: string | null;
+}
+
+/** An audio or subtitle track of a movie or episode: `label` says language, format and channels. */
+export interface PlexTrack {
+  id: string;
+  label: string;
+  /** The one Plex plays when asked for none in particular. */
+  selected: boolean;
+}
+
+export interface PlexTracks {
+  audio: PlexTrack[];
+  subtitles: PlexTrack[];
 }
 
 export interface PlexLibrary {

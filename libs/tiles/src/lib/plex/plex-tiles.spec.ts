@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationRef, Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { PlexItem, PlexOverview, PlexSession, Realtime } from '@homey-dash/api-client';
+import { AirPlayPlayback, PlexItem, PlexOverview, PlexSession, Realtime } from '@homey-dash/api-client';
 import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { TileSize } from '@homey-dash/layout';
 import { RealtimeTileData } from '../realtime-tile-data';
@@ -10,7 +10,7 @@ import { TileData } from '../tile-data';
 import { NowPlayingTile } from './now-playing-tile';
 import { PLEX_TILES } from './plex-tiles';
 import { LivePlexSession, PlexData, plexPosition, plexTime } from './plex-data';
-import { addedOn, RecentlyAddedTile } from './recently-added-tile';
+import { addedOn, RecentlyAddedTile, runtime } from './recently-added-tile';
 
 const session = (change: Partial<PlexSession> = {}): PlexSession => ({
   id: '1',
@@ -37,6 +37,13 @@ const item = (n: number, addedAt: string): PlexItem => ({
   subtitle: null,
   image: `/library/metadata/${n}/thumb`,
   addedAt,
+  summary: n === 3 ? 'A long summary.' : null,
+  year: n === 3 ? 2024 : null,
+  durationMs: n === 3 ? 9_960_000 : null,
+  rating: n === 3 ? 8.4 : null,
+  contentRating: n === 3 ? 'PG-13' : null,
+  genres: n === 3 ? ['Drama', 'Adventure'] : [],
+  art: `/library/metadata/${n}/art`,
 });
 
 const overview = (change: Partial<PlexOverview> = {}): PlexOverview => ({
@@ -194,6 +201,227 @@ describe('Plex tiles', () => {
 
       expect([...tileCard()].map((t) => t.textContent?.trim())).toEqual(['Movie 3']);
     });
+
+    it('opens the details of a cover, and goes back to the covers', async () => {
+      HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+        this.open = true;
+      };
+      realtime.plexSnapshot = { accounts: [overview()], sessions: [] };
+      const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
+
+      tile.click();
+      await settle();
+      (tile.querySelector('.hd-plex-recent__card') as HTMLElement).click();
+      await settle();
+
+      const text = (selector: string) => tile.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim();
+      expect(text('.hd-plex-recent__headline')).toBe('Movie 3');
+      expect([...tile.querySelectorAll('.hd-plex-recent__meta > span')].map((m) => m.textContent?.trim())).toEqual(['8.4', '2024', '2h 46m', 'PG-13']);
+      expect([...tile.querySelectorAll('.hd-plex-recent__genres span')].map((g) => g.textContent?.trim())).toEqual(['Drama', 'Adventure']);
+      expect(text('.hd-plex-recent__summary')).toBe('A long summary.');
+      expect(tile.querySelector('.hd-plex-recent__pane')).toBeNull();
+      (button(tile, 'Back to the covers')).click();
+      await settle();
+
+      expect(tile.querySelector('.hd-plex-recent__pane')).not.toBeNull();
+    });
+
+    const playback = (change: Partial<AirPlayPlayback> = {}): AirPlayPlayback => ({
+      deviceId: 'tv',
+      deviceName: 'Living room TV',
+      accountId: 1,
+      itemId: '3',
+      title: 'Movie 3',
+      paused: false,
+      audioStreamId: null,
+      subtitleStreamId: null,
+      offsetMs: 0,
+      at: '2026-11-01T10:00:00Z',
+      ...change,
+    });
+
+    const prepare = () => {
+      HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+        this.open = true;
+      };
+      realtime.plexSnapshot = { accounts: [overview()], sessions: [] };
+      realtime.airPlay = {
+        available: true,
+        devices: [
+          { id: 'tv', name: 'Living room TV', kind: 'tv', paired: true },
+          { id: 'kitchen', name: 'Kitchen speaker', kind: 'speaker', paired: true },
+        ],
+      };
+    };
+
+    const presser = (tile: HTMLElement) => async (selector: string, text?: string) => {
+      ([...tile.querySelectorAll(selector)].find((b) => !text || b.textContent?.includes(text)) as HTMLElement).click();
+      await settle();
+    };
+
+    it('plays a cover on an Apple TV through AirPlay, and shows it from what the server says plays', async () => {
+      prepare();
+      const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
+      const press = presser(tile);
+
+      tile.click();
+      await settle();
+      await press('.hd-plex-recent__card');
+      await press('.hd-plex-recent__play');
+
+      expect([...tile.querySelectorAll('.hd-plex-recent__receiver')].map((b) => b.textContent?.trim())).toEqual(['Living room TV']);
+      await press('.hd-plex-recent__receiver');
+      expect(realtime.commands).toContainEqual(['playOnAirPlay', 1, '3', 'tv']);
+
+      // The server tells every screen, this one included; until then nothing claims to play.
+      expect(tile.querySelector('.hd-plex-recent__now')).toBeNull();
+      realtime.push('AirPlayNow', [playback()]);
+      await settle();
+      expect(tile.querySelector('.hd-plex-recent__now')?.textContent).toContain('Playing on Living room TV');
+      // The tile itself shows that something plays, and when it is paused.
+      expect(tile.querySelector('.hd-plex-recent__casting')?.getAttribute('aria-label')).toBe('Playing on Living room TV');
+      // The controls stay on show back in the grid, not only on the cover that was played.
+      await press('.hd-plex-recent__back');
+      expect(tile.querySelector('.hd-plex-recent__now')).not.toBeNull();
+
+      await press('.hd-plex-recent__now button', 'Pause');
+      expect(realtime.commands).toContainEqual(['setAirPlayPaused', 'tv', true]);
+      realtime.push('AirPlayNow', [playback({ paused: true })]);
+      await settle();
+      expect(tile.querySelector('.hd-plex-recent__now')?.textContent).toContain('Paused on Living room TV');
+      expect(tile.querySelector('.hd-plex-recent__casting')?.getAttribute('aria-label')).toBe('Paused on Living room TV');
+
+      await press('.hd-plex-recent__now button', 'Resume');
+      expect(realtime.commands).toContainEqual(['setAirPlayPaused', 'tv', false]);
+      await press('.hd-plex-recent__now button', 'Stop');
+      expect(realtime.commands).toContainEqual(['stopAirPlay', 'tv']);
+      realtime.push('AirPlayNow', []);
+      await settle();
+      expect(tile.querySelector('.hd-plex-recent__now')).toBeNull();
+      expect(tile.querySelector('.hd-plex-recent__casting')).toBeNull();
+    });
+
+    it('shows what another screen started, and its controls work from here', async () => {
+      prepare();
+      realtime.airPlayNow = [playback()];
+      const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
+      const press = presser(tile);
+
+      expect(tile.querySelector('.hd-plex-recent__casting')?.getAttribute('aria-label')).toBe('Playing on Living room TV');
+      tile.click();
+      await settle();
+      expect(tile.querySelector('.hd-plex-recent__now strong')?.textContent).toBe('Movie 3');
+      await press('.hd-plex-recent__now button', 'Stop');
+      expect(realtime.commands).toContainEqual(['stopAirPlay', 'tv']);
+    });
+
+    it('ignores what plays for another Plex account', async () => {
+      prepare();
+      realtime.airPlayNow = [playback({ accountId: 2 })];
+      const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
+
+      expect(tile.querySelector('.hd-plex-recent__casting')).toBeNull();
+    });
+
+    it('chooses the audio and subtitle track of what plays', async () => {
+      prepare();
+      realtime.airPlayNow = [playback()];
+      const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
+      tile.click();
+      await settle();
+
+      const [audio, subtitles] = [...tile.querySelectorAll('.hd-plex-recent__track select')] as HTMLSelectElement[];
+      expect([...audio.options].map((o) => o.textContent)).toEqual(['English (AC3 5.1)', 'Nederlands (AAC Stereo)']);
+      // The default track is the one Plex plays unless told otherwise.
+      expect(audio.value).toBe('1');
+      expect([...subtitles.options].map((o) => o.textContent)).toEqual(['Off', 'English (SRT)']);
+      expect(subtitles.value).toBe('');
+
+      audio.value = '2';
+      audio.dispatchEvent(new Event('change'));
+      await settle();
+      expect(realtime.commands).toContainEqual(['changeAirPlayTracks', 'tv', '2', null]);
+
+      realtime.push('AirPlayNow', [playback({ audioStreamId: '2' })]);
+      await settle();
+      subtitles.value = '11';
+      subtitles.dispatchEvent(new Event('change'));
+      await settle();
+      expect(realtime.commands).toContainEqual(['changeAirPlayTracks', 'tv', '2', '11']);
+    });
+
+    it('searches the whole library, and what it finds opens like a cover', async () => {
+      prepare();
+      realtime.plexSearchResults = [{ ...item(9, '1970-01-01T00:00:00Z'), title: 'Older movie', year: 2001 }];
+      const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
+      const press = presser(tile);
+      tile.click();
+      await settle();
+
+      const search = tile.querySelector('.hd-plex-recent__search') as HTMLInputElement;
+      search.value = 'ol';
+      search.dispatchEvent(new Event('input'));
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      await settle();
+
+      expect(realtime.commands).toContainEqual(['searchPlex', 1, 'ol', null]);
+      const cards = [...tile.querySelectorAll('.hd-plex-recent__card')];
+      expect(cards.map((c) => c.querySelector('.hd-plex-recent__card-title')?.textContent)).toEqual(['Older movie']);
+      // A search result with no date says nothing about when it was added.
+      expect(cards[0].querySelector('.hd-plex-recent__card-added')).toBeNull();
+      await press('.hd-plex-recent__card');
+      expect(tile.querySelector('.hd-plex-recent__play')).not.toBeNull();
+
+      // Clearing the search brings the newest back.
+      await press('.hd-plex-recent__back');
+      const again = tile.querySelector('.hd-plex-recent__search') as HTMLInputElement;
+      again.value = '';
+      again.dispatchEvent(new Event('input'));
+      await settle();
+      expect(tile.querySelectorAll('.hd-plex-recent__card').length).toBe(3);
+    });
+
+    it('says so when a search finds nothing, and does not search for one letter', async () => {
+      prepare();
+      realtime.plexSearchResults = [];
+      const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
+      tile.click();
+      await settle();
+      const search = tile.querySelector('.hd-plex-recent__search') as HTMLInputElement;
+
+      search.value = 'z';
+      search.dispatchEvent(new Event('input'));
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(realtime.commands.some((c) => c[0] === 'searchPlex')).toBe(false);
+
+      search.value = 'zzz';
+      search.dispatchEvent(new Event('input'));
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      await settle();
+      expect(tile.querySelector('.hd-plex-recent__empty')?.textContent).toContain('Nothing found for “zzz”');
+    });
+
+    it('says so when AirPlay is not set up', async () => {
+      HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+        this.open = true;
+      };
+      realtime.plexSnapshot = { accounts: [overview()], sessions: [] };
+      realtime.airPlay = { available: false, devices: [] };
+      const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
+
+      tile.click();
+      await settle();
+      (tile.querySelector('.hd-plex-recent__card') as HTMLElement).click();
+      await settle();
+      (tile.querySelector('.hd-plex-recent__play') as HTMLElement).click();
+      await settle();
+
+      expect(tile.querySelector('.hd-plex-recent__cast-error')?.textContent).toContain('not set up');
+    });
+  });
+
+  it('says how long something runs', () => {
+    expect([runtime(9_960_000), runtime(1_980_000), runtime(7_200_000)]).toEqual(['2h 46m', '33m', '2h']);
   });
 
   it('moves progress on while playing, never past the end', () => {

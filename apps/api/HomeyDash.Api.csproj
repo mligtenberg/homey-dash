@@ -25,6 +25,14 @@
     <PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="HomeyDash.Api.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../libs/airplay/HomeyDash.AirPlay.csproj" />
+  </ItemGroup>
+
   <!-- The built-in backgrounds, rendered for displays (see PresetBackgrounds). -->
   <ItemGroup>
     <Content Include="../../libs/design-system/backgrounds/*/*.svg" LinkBase="backgrounds" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

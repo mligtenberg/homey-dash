@@ -1,0 +1,24 @@
+{
+  "name": "airplay",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/airplay",
+  "tags": [],
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/**/*",
+        "{workspaceRoot}/libs/airplay-tests/**/*",
+        "!{projectRoot}/bin/**/*",
+        "!{projectRoot}/obj/**/*",
+        "!{workspaceRoot}/libs/airplay-tests/bin/**/*",
+        "!{workspaceRoot}/libs/airplay-tests/obj/**/*"
+      ],
+      "options": {
+        "command": "dotnet test libs/airplay-tests/HomeyDash.AirPlay.Tests.csproj"
+      }
+    }
+  }
+}

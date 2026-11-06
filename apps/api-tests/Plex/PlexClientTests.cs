@@ -163,4 +163,89 @@ public class PlexClientTests
         var item = Assert.Single(library.Recent);
         Assert.Equal(("Shōgun", "Season 1", "/library/metadata/299/thumb/1"), (item.Title, item.Subtitle, item.Image));
     }
+
+    [Fact]
+    public async Task RecentlyAdded_CarriesWhatTheDetailViewShows()
+    {
+        var plex = new ScriptedPlex(request => request.RequestUri!.AbsolutePath == "/library/sections"
+            ? Json(new { MediaContainer = new { Directory = new object[] { new { key = "1", title = "Movies", type = "movie" } } } })
+            : Json(new { MediaContainer = new { Metadata = new object[]
+                {
+                    new
+                    {
+                        ratingKey = "100", type = "movie", title = "Dune: Part Two", year = 2024, duration = 9_960_000, summary = "  Paul unites with the Fremen.  ",
+                        audienceRating = 8.44, rating = 9.0, contentRating = "PG-13", art = "/library/metadata/100/art/1", addedAt = 1_790_000_000,
+                        Genre = new object[] { new { tag = "Science Fiction" }, new { tag = "Adventure" }, new { tag = "Drama" }, new { tag = "Action" } },
+                    },
+                    new { ratingKey = "101", type = "movie", title = "Bare", addedAt = 1_790_000_000 },
+                } } }));
+
+        var library = Assert.Single(await Client(plex).LibrariesAsync(Server, 24, CancellationToken.None));
+
+        var dune = library.Recent[0];
+        Assert.Equal(("Paul unites with the Fremen.", 2024, 9_960_000L, 8.4, "PG-13", "/library/metadata/100/art/1"),
+            (dune.Summary, dune.Year, dune.DurationMs, dune.Rating, dune.ContentRating, dune.Art));
+        Assert.Equal(["Science Fiction", "Adventure", "Drama"], dune.Genres);
+        var bare = library.Recent[1];
+        Assert.Equal((null, null, null, null, 0), (bare.Summary, bare.Year, bare.Rating, bare.ContentRating, bare.Genres.Count));
+    }
+
+    [Fact]
+    public async Task Search_AsksTheServerForTheWholeLibrary_AndKeepsWhatACardCanShow()
+    {
+        var plex = new ScriptedPlex(_ => Json(new { MediaContainer = new { Hub = new object[]
+        {
+            new { type = "movie", Metadata = new object[] { new { ratingKey = "7", type = "movie", title = "Arrival", year = 2016, addedAt = 1_600_000_000 } } },
+            new { type = "show", Metadata = new object[] { new { ratingKey = "8", type = "show", title = "Arrival Show", year = 2020, addedAt = 1_600_000_000 } } },
+            new { type = "actor" },
+            new { type = "track", Metadata = new object[] { new { ratingKey = "9", type = "track", title = "Arrival", addedAt = 1_600_000_000 } } },
+            new { type = "movie", Metadata = new object[] { new { ratingKey = "7", type = "movie", title = "Arrival", addedAt = 1_600_000_000 } } },
+        } } }));
+
+        var found = await Client(plex).SearchAsync(Server, "arri val", "1", 12, CancellationToken.None);
+
+        Assert.Equal(["7", "8"], found.Select(i => i.Id));
+        Assert.Equal(["movie", "show"], found.Select(i => i.Kind));
+        var request = plex.Requests.Single().RequestUri!;
+        Assert.Equal("/hubs/search", request.AbsolutePath);
+        Assert.Contains("query=arri%20val", request.Query);
+        Assert.Contains("sectionId=1", request.Query);
+    }
+
+    [Fact]
+    public async Task Search_WithNothingFound_IsEmpty()
+    {
+        var plex = new ScriptedPlex(_ => Json(new { MediaContainer = new { size = 0 } }));
+
+        Assert.Empty(await Client(plex).SearchAsync(Server, "zzz", null, 12, CancellationToken.None));
+        Assert.DoesNotContain("sectionId", plex.Requests.Single().RequestUri!.Query);
+    }
+
+    [Fact]
+    public async Task Tracks_ListTheAudioAndSubtitlesOfTheFirstMedia()
+    {
+        var plex = new ScriptedPlex(_ => Json(new { MediaContainer = new { Metadata = new object[] { new { Media = new object[] { new { Part = new object[] { new { Stream = new object[]
+        {
+            new { id = 1, streamType = 1, displayTitle = "1080p (H.264)" },
+            new { id = 2, streamType = 2, displayTitle = "English (AC3 5.1)", extendedDisplayTitle = "English (AC3 5.1) (Default)", selected = true },
+            new { id = 3, streamType = 2, displayTitle = "Nederlands (AAC Stereo)" },
+            new { id = 4, streamType = 3, displayTitle = "English (SRT)" },
+        } } } } } } } } }));
+
+        var tracks = await Client(plex).TracksAsync(Server, "100", CancellationToken.None);
+
+        Assert.Equal([("2", "English (AC3 5.1) (Default)", true), ("3", "Nederlands (AAC Stereo)", false)], tracks.Audio.Select(t => (t.Id, t.Label, t.Selected)));
+        Assert.Equal([("4", "English (SRT)", false)], tracks.Subtitles.Select(t => (t.Id, t.Label, t.Selected)));
+    }
+
+    [Fact]
+    public async Task Tracks_OfAnItemWithoutMedia_AreEmpty()
+    {
+        var plex = new ScriptedPlex(_ => Json(new { MediaContainer = new { Metadata = new object[] { new { ratingKey = "1" } } } }));
+
+        var tracks = await Client(plex).TracksAsync(Server, "1", CancellationToken.None);
+
+        Assert.Empty(tracks.Audio);
+        Assert.Empty(tracks.Subtitles);
+    }
 }

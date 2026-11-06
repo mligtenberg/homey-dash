@@ -77,8 +77,26 @@ public sealed record PlexSession(
 // A player that played something since HomeyDash started, for a now-playing tile to follow.
 public sealed record PlexPlayer(string Id, string Name);
 
-// Something newly added to a library: a movie, episode, season or album. AddedAt is when it was added.
-public sealed record PlexItem(string Id, string Kind, string Title, string? Subtitle, string? Image, DateTimeOffset AddedAt);
+// Something in a library: a movie, show, episode, season or album. AddedAt is when it was added (the epoch when unknown).
+public sealed record PlexItem(string Id, string Kind, string Title, string? Subtitle, string? Image, DateTimeOffset AddedAt)
+{
+    // What the detail view of a cover shows, when the server has it.
+    public string? Summary { get; init; }
+    public int? Year { get; init; }
+    public long? DurationMs { get; init; }
+    // Out of ten: the audience's, else the critics'.
+    public double? Rating { get; init; }
+    public string? ContentRating { get; init; }
+    public IReadOnlyList<string> Genres { get; init; } = [];
+    // The wide artwork behind it.
+    public string? Art { get; init; }
+}
+
+// An audio or subtitle track of an item. Label says language, format and channels (English (AC3 5.1)); Selected is the one
+// Plex plays when asked for none in particular.
+public sealed record PlexTrack(string Id, string Label, bool Selected);
+
+public sealed record PlexTracks(IReadOnlyList<PlexTrack> Audio, IReadOnlyList<PlexTrack> Subtitles);
 
 public sealed record PlexLibrary(string Id, string Title, string Type, IReadOnlyList<PlexItem> Recent);
 
@@ -103,6 +121,15 @@ public interface IPlex
 
     // The libraries of movies, shows and music, each with its newest items.
     Task<IReadOnlyList<PlexLibrary>> LibrariesAsync(PlexConnection server, int recent, CancellationToken ct);
+
+    // Movies, shows, seasons, episodes and albums whose title matches, across one library or all of them, not only the newest.
+    Task<IReadOnlyList<PlexItem>> SearchAsync(PlexConnection server, string query, string? libraryId, int limit, CancellationToken ct);
+
+    // The audio and subtitle tracks of an item's first media.
+    Task<PlexTracks> TracksAsync(PlexConnection server, string itemId, CancellationToken ct);
+
+    // One item by its id, or null when the server no longer has it.
+    Task<PlexItem?> ItemAsync(PlexConnection server, string itemId, CancellationToken ct);
 
     // A picture from the server, scaled to fit width × height.
     Task<(Stream Content, string ContentType)?> ImageAsync(PlexConnection server, string path, int width, int height, CancellationToken ct);
