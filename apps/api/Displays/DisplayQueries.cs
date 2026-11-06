@@ -54,6 +54,7 @@ public static class DisplayQueries
             display.LastSeenAt,
             display.DashboardIds.Select(id => new DashboardVersion(id, shown[id], latest.GetValueOrDefault(id))).ToList(),
             presence.IsKiosk(display.ScreenId),
-            presence.Lux(display.ScreenId)));
+            presence.Lux(display.ScreenId),
+            presence.Details(display.ScreenId)));
     }
 }

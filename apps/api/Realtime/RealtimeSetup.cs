@@ -12,6 +12,7 @@ public static class RealtimeSetup
             options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
         services.AddSingleton<DisplayPresence>();
         services.AddSingleton<RealtimeNotifier>();
+        services.AddSingleton<ScreenshotBroker>();
         services.AddHostedService<HomeyBroadcaster>();
         return services;
     }

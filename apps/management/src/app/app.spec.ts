@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { DashboardSummary, Realtime } from '@homey-dash/api-client';
 import { FakeRealtime } from '@homey-dash/api-client/testing';
+import { TileData, RealtimeTileData } from '@homey-dash/tiles';
 import { Shell } from './shell';
 
 const dashboard = (id: string, name: string, change: Partial<DashboardSummary> = {}): DashboardSummary => ({
@@ -24,7 +25,7 @@ describe('Shell', () => {
     realtime = new FakeRealtime();
     TestBed.configureTestingModule({
       imports: [Shell],
-      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(), { provide: Realtime, useValue: realtime }],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(), { provide: Realtime, useValue: realtime }, { provide: TileData, useExisting: RealtimeTileData }],
     });
     const fixture = TestBed.createComponent(Shell);
     await fixture.whenStable();

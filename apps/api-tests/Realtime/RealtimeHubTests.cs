@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -162,6 +163,61 @@ public sealed class RealtimeHubTests(ApiFactory factory) : IClassFixture<ApiFact
 
         await NextAsync(displays, DisplayWhere(display, s =>
             s.GetProperty("kiosk").GetBoolean() && s.GetProperty("lux").ValueKind == JsonValueKind.Number && s.GetProperty("lux").GetDouble() == 12));
+    }
+
+    [Fact]
+    public async Task DisplayStatus_ShowsWhatTheScreenSaidAboutItself()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var management = await ConnectAsync();
+        var displays = Listen(management, "Displays");
+        await management.InvokeAsync<JsonElement>("JoinManagement");
+
+        var hub = await ConnectAsync();
+        await hub.InvokeAsync<JsonElement>("JoinScreen", screen);
+        await hub.InvokeAsync("Details", new
+        {
+            screenWidth = 1280,
+            screenHeight = 800,
+            viewportWidth = 1280,
+            viewportHeight = 752,
+            pixelRatio = 1.5,
+            userAgent = "Mozilla/5.0 (Linux; Android 13) Chrome/120.0",
+            secureContext = false,
+            fully = new { version = "1.57", api = new[] { "turnScreenOff", "bind" } },
+            light = new { available = true, source = "camera" },
+        });
+
+        var shown = await NextAsync(displays, DisplayWhere(display, s => s.TryGetProperty("details", out var d) && d.ValueKind == JsonValueKind.Object));
+        var details = shown.EnumerateArray().First(d => d.GetProperty("id").GetString() == display).GetProperty("status");
+        Assert.True(details.GetProperty("kiosk").GetBoolean());
+        var reported = details.GetProperty("details");
+        Assert.Equal(1280, reported.GetProperty("screenWidth").GetInt32());
+        Assert.Equal("1.57", reported.GetProperty("fully").GetProperty("version").GetString());
+        Assert.Equal("camera", reported.GetProperty("light").GetProperty("source").GetString());
+    }
+
+    [Fact]
+    public async Task Screenshot_IsTakenByTheScreenAndPostedBack()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+
+        // Nothing is connected yet.
+        Assert.Equal(HttpStatusCode.Conflict, (await _client.PostAsync($"/api/displays/{display}/screenshot", null)).StatusCode);
+
+        var hub = await ConnectAsync();
+        await hub.InvokeAsync<JsonElement>("JoinScreen", screen);
+        var picture = new byte[] { 0xFF, 0xD8, 0xFF, 1, 2, 3 };
+        hub.On<Guid>("Screenshot", async id => await _client.PostAsync($"/api/screenshots/{id}", new ByteArrayContent(picture)));
+
+        var response = await _client.PostAsync($"/api/displays/{display}/screenshot", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("image/jpeg", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(picture, await response.Content.ReadAsByteArrayAsync());
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.PostAsync($"/api/screenshots/{Guid.NewGuid()}", new ByteArrayContent(picture))).StatusCode);
     }
 
     [Fact]

@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { DashboardSummary } from './dashboards';
-import { DisplayInfo, ScreenView } from './displays';
+import { DisplayInfo, ScreenDetails, ScreenView } from './displays';
 import { PhotoSet } from './photos';
 import { PlexCommand, PlexOverview, PlexSession, PlexSnapshot } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
@@ -45,6 +45,8 @@ export interface RealtimeMessages {
   Weather: { accountId: number; weather: HomeyWeather };
   /** What a joined screen now is and shows; null sends it to setup. */
   Screen: ScreenView | null;
+  /** Asks a joined screen to take a screenshot and post it under this request id. */
+  Screenshot: string;
   /** Every display with its status, for Management. */
   Displays: DisplayInfo[];
   /** Every dashboard, for Management's sidebar. */
@@ -201,9 +203,9 @@ export class Realtime {
     return this.hub.invoke<void>('Brightness', lux);
   }
 
-  /** Tells HomeyDash this screen runs in Fully Kiosk Browser, which Management shows. */
-  kiosk() {
-    return this.hub.invoke<void>('Kiosk');
+  /** Tells HomeyDash what this screen and its browser are, which Management shows. */
+  details(details: ScreenDetails) {
+    return this.hub.invoke<void>('Details', details);
   }
 
   private start(attempt: number) {

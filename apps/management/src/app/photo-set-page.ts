@@ -4,7 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ImmichAccount, ImmichAccountApi, ImmichAlbum, PhotoSelection, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
 import { RealtimeTileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
-import { timeAgo } from './displays-page';
+import { timeAgo } from './displays/displays-store';
 import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue, problem } from './immich-albums';
 import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-selection-form';
 

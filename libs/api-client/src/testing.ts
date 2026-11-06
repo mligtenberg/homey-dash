@@ -1,5 +1,6 @@
 import { signal } from '@angular/core';
 import {
+  ScreenDetails,
   CapabilityValue,
   DisplayInfo,
   HomeySnapshot,
@@ -151,10 +152,11 @@ export class FakeRealtime implements Partial<Realtime> {
     this.touches++;
   }
 
-  kiosks = 0;
+  /** Each report of what the screen is, in order. */
+  detailsReported: ScreenDetails[] = [];
 
-  async kiosk() {
-    this.kiosks++;
+  async details(details: ScreenDetails) {
+    this.detailsReported.push(details);
   }
 
   async brightness(level: number) {

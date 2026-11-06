@@ -62,6 +62,31 @@ export interface DashboardVersion {
   latestVersion: number;
 }
 
+/** What a screen says about itself and its browser; every part is optional because browsers differ in what they tell. */
+export interface ScreenDetails {
+  /** The screen's size in CSS pixels, and the part of it the page fills. */
+  screenWidth: number | null;
+  screenHeight: number | null;
+  viewportWidth: number | null;
+  viewportHeight: number | null;
+  pixelRatio: number | null;
+  orientation: string | null;
+  userAgent: string | null;
+  language: string | null;
+  timeZone: string | null;
+  touchPoints: number | null;
+  /** Whether the page runs in a secure context, which the camera and light sensor need. */
+  secureContext: boolean;
+  /** The kind of connection, such as `4g` (only where the browser says). */
+  connection: string | null;
+  /** When the display page was loaded on the screen, which a restart of the page or browser resets. */
+  loadedAt: string | null;
+  /** Fully Kiosk Browser's JavaScript interface; null where the page doesn't run in Fully or can't reach it. */
+  fully: { version: string | null; api: string[] } | null;
+  light: { available: boolean; source: 'sensor' | 'camera' | null } | null;
+  battery: { level: number | null; charging: boolean | null } | null;
+}
+
 /** What Management knows about a display beyond its configuration. */
 export interface DisplayStatus {
   connected: boolean;
@@ -74,6 +99,8 @@ export interface DisplayStatus {
   kiosk: boolean;
   /** The light falling on its screen in lux, as it last measured; null until it has. */
   lux: number | null;
+  /** What it last said about itself; null until it has. */
+  details: ScreenDetails | null;
 }
 
 /** A display as Management lists it. */
@@ -113,6 +140,16 @@ export class DisplaysApi {
 
   takeOver(id: string, screenId: string) {
     return this.http.post<DisplayInfo>(`/api/displays/${id}/takeover`, { screenId });
+  }
+
+  /** Asks its screen for a picture of what it shows now; fails with 409 while nothing is connected. */
+  screenshot(id: string) {
+    return this.http.post(`/api/displays/${id}/screenshot`, null, { responseType: 'blob' });
+  }
+
+  /** A screen's answer to the request it was sent: its screenshot, as JPEG. */
+  sendScreenshot(requestId: string, picture: Blob) {
+    return this.http.post<void>(`/api/screenshots/${requestId}`, picture);
   }
 
   rename(id: string, name: string) {

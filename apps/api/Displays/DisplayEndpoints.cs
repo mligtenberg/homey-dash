@@ -23,6 +23,8 @@ public static partial class DisplayEndpoints
     // In order; widgets in the same spot stack in this order.
     public sealed record LockScreen(List<LockWidget>? Widgets);
 
+    private const int MaxScreenshotBytes = 8 * 1024 * 1024;
+
     public static void MapDisplays(this RouteGroupBuilder api)
     {
         var displays = api.MapGroup("/displays");
@@ -82,6 +84,26 @@ public static partial class DisplayEndpoints
                 SetLockScreen(display, body.Widgets ?? [], engine) is { } errors
                     ? Results.ValidationProblem(errors, "These widgets can't be shown.")
                     : null)));
+
+        // Asks the display's screen for a picture of what it shows now. 409: nothing is connected; 504: it didn't answer.
+        displays.MapPost("/{id:guid}/screenshot", async (Guid id, HomeyDashDbContext db, DisplayPresence presence, ScreenshotBroker screenshots, CancellationToken ct) =>
+        {
+            if (await db.Displays.FindAsync([id], ct) is not { } display) return NotFound(id);
+            if (display.ScreenId is not { } screenId || !presence.IsConnected(screenId))
+                return Results.Problem("This display is not connected.", statusCode: StatusCodes.Status409Conflict);
+            return await screenshots.RequestAsync(screenId, ct) is { } picture
+                ? Results.File(picture, "image/jpeg")
+                : Results.Problem("The display did not answer. Reload its page and try again.", statusCode: StatusCodes.Status504GatewayTimeout);
+        });
+
+        // A screen's answer to a screenshot it was asked for: the JPEG itself.
+        api.MapPost("/screenshots/{requestId:guid}", async (Guid requestId, HttpRequest request, ScreenshotBroker screenshots, CancellationToken ct) =>
+        {
+            if (request.ContentLength is null or 0 or > MaxScreenshotBytes) return Results.Problem("Send the picture, at most 8 MB.", statusCode: StatusCodes.Status413PayloadTooLarge);
+            using var picture = new MemoryStream();
+            await request.Body.CopyToAsync(picture, ct);
+            return screenshots.Complete(requestId, picture.ToArray()) ? Results.NoContent() : Results.NotFound();
+        });
 
         displays.MapDelete("/{id:guid}", async (Guid id, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct) =>
         {

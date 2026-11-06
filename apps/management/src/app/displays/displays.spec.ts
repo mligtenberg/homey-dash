@@ -2,11 +2,14 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { DashboardSummary, DashboardVersion, DisplayInfo, DisplayStatus, IdleRule, LockWidget, PhotoSet, Realtime } from '@homey-dash/api-client';
+import { provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { ScreenDetails, DashboardSummary, DashboardVersion, DisplayInfo, DisplayStatus, IdleRule, LockWidget, PhotoSet, Realtime } from '@homey-dash/api-client';
 import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { alwaysRule, RealtimeTileData, TileData } from '@homey-dash/tiles';
-import { DashboardsStore } from './dashboards-store';
-import { DisplaysPage, timeAgo } from './displays-page';
+import { DashboardsStore } from '../dashboards-store';
+import { appRoutes } from '../app.routes';
+import { timeAgo } from './displays-store';
 
 const status = (change: Partial<DisplayStatus>): DisplayStatus => ({
   connected: false,
@@ -15,6 +18,7 @@ const status = (change: Partial<DisplayStatus>): DisplayStatus => ({
   versions: [],
   kiosk: false,
   lux: null,
+  details: null,
   ...change,
 });
 
@@ -40,16 +44,17 @@ const display = (id: string, name: string, dashboardIds: string[], status: Displ
   status,
 });
 
-describe('DisplaysPage', () => {
+describe('Displays', () => {
   let realtime: FakeRealtime;
 
-  async function render(list: DisplayInfo[], photoSets: PhotoSet[] = []) {
+  // Opens a page of the first display, or the overview when no tab is given.
+  async function render(list: DisplayInfo[], photoSets: PhotoSet[] = [], url = '/displays/1/dashboards') {
     realtime = new FakeRealtime();
     realtime.displays = list;
     realtime.photoSetList = photoSets;
     TestBed.configureTestingModule({
-      imports: [DisplaysPage],
       providers: [
+        provideRouter(appRoutes),
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: Realtime, useValue: realtime },
@@ -57,9 +62,10 @@ describe('DisplaysPage', () => {
       ],
     });
     TestBed.inject(DashboardsStore).list.set([summary('c', 'Cinema'), summary('g', 'Garden'), summary('k', 'Kitchen'), summary('d', 'Draft', 0)]);
-    const fixture = TestBed.createComponent(DisplaysPage);
-    await fixture.whenStable();
-    return fixture.nativeElement as HTMLElement;
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl(url);
+    await TestBed.inject(ApplicationRef).whenStable();
+    return harness.routeNativeElement as HTMLElement;
   }
 
   const pills = (root: HTMLElement) => [...root.querySelectorAll('.status .hd-pill')].map((p) => p.textContent?.trim());
@@ -70,7 +76,7 @@ describe('DisplaysPage', () => {
       display('2', 'Kitchen', ['k'], status({ versions: [version('k', 2, 3)] })),
       display('3', 'Attic', [], status({ held: false })),
       display('4', 'Den', ['k', 'g'], status({ versions: [version('k', 3, 3), version('g', null, 1)] })),
-    ]);
+    ], [], '/displays');
 
     expect(pills(root)).toEqual([
       'Connected',
@@ -84,7 +90,7 @@ describe('DisplaysPage', () => {
   });
 
   it('shows a connected display running in Fully Kiosk with its light', async () => {
-    const root = await render([display('1', 'Hallway', ['k'], status({ connected: true, kiosk: true, lux: 1234, versions: [version('k', 3, 3)] }))]);
+    const root = await render([display('1', 'Hallway', ['k'], status({ connected: true, kiosk: true, lux: 1234, versions: [version('k', 3, 3)] }))], [], '/displays');
 
     expect(pills(root)).toEqual(['Connected', 'Fully Kiosk', '1,234 lx']);
   });
@@ -127,20 +133,20 @@ describe('DisplaysPage', () => {
     const idleRequest = () => TestBed.inject(HttpTestingController).expectOne('/api/displays/1/idle-rules').request;
 
     it('adds a rule that always holds on its first dashboard, and opens it', async () => {
-      const root = await render([display('1', 'Hallway', ['k', 'g'], status({}))]);
+      const root = await render([display('1', 'Hallway', ['k', 'g'], status({}))], [], '/displays/1/idle');
 
-      (root.querySelector('.idle__add') as HTMLButtonElement).click();
+      (root.querySelector('.idle-add') as HTMLButtonElement).click();
       await TestBed.inject(ApplicationRef).whenStable();
 
       expect(idleRequest().body.rules).toEqual([{ dashboardId: 'k', rule: alwaysRule() }]);
-      expect(root.querySelector('.idle hd-rule-editor')).not.toBeNull();
+      expect(root.querySelector('hd-rule-editor')).not.toBeNull();
     });
 
     it('picks its dashboard from those the display offers, in order', async () => {
-      const root = await render([{ ...display('1', 'Hallway', ['k', 'g', 'c'], status({})), idleRules: [weekend] }]);
-      const select = root.querySelector('.idle__entry select') as HTMLSelectElement;
+      const root = await render([{ ...display('1', 'Hallway', ['k', 'g', 'c'], status({})), idleRules: [weekend] }], [], '/displays/1/idle');
+      const select = root.querySelector('.entry select') as HTMLSelectElement;
 
-      expect([...select.options].map((o) => o.textContent?.trim())).toEqual(['Kitchen', 'Garden', 'Cinema', 'Colour', 'Turn screen off']);
+      expect([...select.options].map((o) => o.textContent?.trim())).toEqual(['Kitchen', 'Garden', 'Cinema', 'Colour', 'Turn screen off (Fully Kiosk Browser only)']);
       select.value = 'dashboard:c';
       select.dispatchEvent(new Event('change'));
 
@@ -149,8 +155,8 @@ describe('DisplaysPage', () => {
 
     it('plays a photo set instead, going back to the last used or a dashboard it offers', async () => {
       const summer = { id: 's', name: 'Summer', target: 'photo-set:s', photos: [] } as unknown as PhotoSet;
-      const root = await render([{ ...display('1', 'Hallway', ['k', 'g'], status({})), idleRules: [weekend] }], [summer]);
-      const selects = () => [...root.querySelectorAll<HTMLSelectElement>('.idle__entry select')];
+      const root = await render([{ ...display('1', 'Hallway', ['k', 'g'], status({})), idleRules: [weekend] }], [summer], '/displays/1/idle');
+      const selects = () => [...root.querySelectorAll<HTMLSelectElement>('.entry select')];
 
       selects()[0].value = 'photos:s';
       selects()[0].dispatchEvent(new Event('change'));
@@ -165,30 +171,39 @@ describe('DisplaysPage', () => {
     });
 
     it('fills with a colour instead, starting black, going back to the last used or a dashboard it offers', async () => {
-      const root = await render([{ ...display('1', 'Hallway', ['k', 'g'], status({})), idleRules: [weekend] }]);
-      const action = root.querySelector('.idle__entry select') as HTMLSelectElement;
+      const root = await render([{ ...display('1', 'Hallway', ['k', 'g'], status({})), idleRules: [weekend] }], [], '/displays/1/idle');
+      const action = root.querySelector('.entry select') as HTMLSelectElement;
 
       action.value = 'color';
       action.dispatchEvent(new Event('change'));
       expect(idleRequest().body.rules).toEqual([{ ...weekend, dashboardId: null, photoSetId: null, color: '#000000', screenOff: false, returnDashboardId: null }]);
       await TestBed.inject(ApplicationRef).whenStable();
 
-      const color = root.querySelector('.idle__color') as HTMLInputElement;
+      const color = root.querySelector('.color') as HTMLInputElement;
       expect(color.value).toBe('#000000');
       color.value = '#203040';
       color.dispatchEvent(new Event('change'));
       expect(idleRequest().body.rules[0].color).toBe('#203040');
       await TestBed.inject(ApplicationRef).whenStable();
 
-      const back = root.querySelectorAll<HTMLSelectElement>('.idle__entry select')[1];
+      const back = root.querySelectorAll<HTMLSelectElement>('.entry select')[1];
       back.value = 'g';
       back.dispatchEvent(new Event('change'));
       expect(idleRequest().body.rules[0]).toEqual({ ...weekend, dashboardId: null, photoSetId: null, color: '#203040', screenOff: false, returnDashboardId: 'g' });
     });
 
+    it('only offers turning the screen off on a screen in Fully Kiosk Browser', async () => {
+      const off = (kiosk: boolean) => render([{ ...display('1', 'Hallway', ['k'], status({ kiosk })), idleRules: [weekend] }], [], '/displays/1/idle')
+        .then((root) => [...root.querySelectorAll<HTMLOptionElement>('.entry select option')].find((o) => o.value === 'screen-off')!);
+
+      expect((await off(false)).disabled).toBe(true);
+      TestBed.resetTestingModule();
+      expect((await off(true)).disabled).toBe(false);
+    });
+
     it('turns the screen off instead, going back to the last used', async () => {
-      const root = await render([{ ...display('1', 'Hallway', ['k', 'g'], status({})), idleRules: [weekend] }]);
-      const action = root.querySelector('.idle__entry select') as HTMLSelectElement;
+      const root = await render([{ ...display('1', 'Hallway', ['k', 'g'], status({ kiosk: true })), idleRules: [weekend] }], [], '/displays/1/idle');
+      const action = root.querySelector('.entry select') as HTMLSelectElement;
 
       action.value = 'screen-off';
       action.dispatchEvent(new Event('change'));
@@ -200,7 +215,7 @@ describe('DisplaysPage', () => {
 
     it('reorders and removes rules', async () => {
       const cinema = { ...weekend, dashboardId: 'c' };
-      const root = await render([{ ...display('1', 'Hallway', ['k', 'g', 'c'], status({})), idleRules: [weekend, cinema] }]);
+      const root = await render([{ ...display('1', 'Hallway', ['k', 'g', 'c'], status({})), idleRules: [weekend, cinema] }], [], '/displays/1/idle');
 
       (root.querySelector('[aria-label="Move rule 2 up"]') as HTMLButtonElement).click();
       expect(idleRequest().body.rules).toEqual([cinema, weekend]);
@@ -216,7 +231,7 @@ describe('DisplaysPage', () => {
     const stable = () => TestBed.inject(ApplicationRef).whenStable();
 
     it('adds a clock in the middle first, then the weather', async () => {
-      const root = await render([display('1', 'Hallway', ['k'], status({}))]);
+      const root = await render([display('1', 'Hallway', ['k'], status({}))], [], '/displays/1/lock');
 
       (root.querySelector('.lock__add') as HTMLButtonElement).click();
       expect(lockRequest().body.widgets).toEqual([{ kind: 'clock', spot: 'center' }]);
@@ -228,7 +243,7 @@ describe('DisplaysPage', () => {
 
     it('moves a widget to another place, and removes it', async () => {
       const lockWidgets: LockWidget[] = [{ kind: 'clock', spot: 'center' }, { kind: 'weather', spot: 'top-right' }];
-      const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets }]);
+      const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets }], [], '/displays/1/lock');
       const where = root.querySelector('[aria-label="Where widget 2 sits"]') as HTMLSelectElement;
 
       expect([...where.options].map((o) => o.textContent?.trim())).toEqual(['Top left', 'Top right', 'Middle', 'Bottom left', 'Bottom right']);
@@ -242,7 +257,7 @@ describe('DisplaysPage', () => {
     });
 
     it('shows a device value, starting on a temperature, picked from capability signals', async () => {
-      const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'bottom-right' }] }]);
+      const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'bottom-right' }] }], [], '/displays/1/lock');
       const signal = (id: string, name: string) => ({ id, source: 'homey', type: 'number', name, group: 'Thermostat', account: 1 });
       TestBed.inject(HttpTestingController)
         .match('/api/rules/signals')
@@ -259,8 +274,108 @@ describe('DisplaysPage', () => {
     });
   });
 
+  it('opens the details page first, with a tab for each part of the setup', async () => {
+    const root = await render([display('1', 'Hallway', ['k'], status({}))], [], '/displays/1');
+
+    expect(root.querySelector('h1')?.textContent).toBe('Hallway');
+    expect([...root.querySelectorAll('.tab')].map((t) => t.textContent?.trim())).toEqual(['Details', 'Dashboards', 'When idle', 'Lock screen']);
+    expect(root.querySelector('.tab[aria-current="page"]')?.textContent).toBe('Details');
+  });
+
+  describe('details', () => {
+    const tablet: ScreenDetails = {
+      screenWidth: 1280,
+      screenHeight: 800,
+      viewportWidth: 1280,
+      viewportHeight: 752,
+      pixelRatio: 1.5,
+      orientation: 'landscape-primary',
+      userAgent: 'Mozilla/5.0 (Linux; Android 11; Lenovo TB; wv) AppleWebKit/537.36 Version/4.0 Chrome/119.0.0.0 Safari/537.36',
+      language: 'nl-NL',
+      timeZone: 'Europe/Amsterdam',
+      touchPoints: 5,
+      secureContext: false,
+      connection: '4g',
+      loadedAt: null,
+      fully: { version: '1.57', api: ['turnScreenOff', 'turnScreenOn'] },
+      light: { available: true, source: 'camera' },
+      battery: { level: 0.8, charging: true },
+    };
+    const rows = (root: HTMLElement) => Object.fromEntries([...root.querySelectorAll('dt')].map((t) => [t.textContent, t.nextElementSibling?.textContent?.replace(/\s+/g, ' ').trim()]));
+
+    it('shows the resolution, browser, Fully Kiosk support, light and battery', async () => {
+      const root = await render([display('1', 'Hallway', ['k'], status({ connected: true, kiosk: true, lux: 1234, details: tablet }))], [], '/displays/1/details');
+      const r = rows(root);
+
+      expect(r['Resolution']).toBe('1280 × 800 (1920 × 1200 pixels)');
+      expect(r['Browser']).toBe('Android WebView 119');
+      expect(r['System']).toBe('Android 11');
+      expect(r['JavaScript interface']).toBe('Supported');
+      expect(r['Current']).toBe('1,234 lx');
+      expect(r['Measured with']).toBe('Camera (an estimate)');
+      expect(r['Battery']).toBe('80%, charging');
+      expect(r['Secure context']).toContain('No');
+    });
+
+    it('says when it is not Fully Kiosk Browser', async () => {
+      const root = await render([display('1', 'Hallway', ['k'], status({ connected: true, details: { ...tablet, fully: null } }))], [], '/displays/1/details');
+
+      expect(root.textContent).toContain('Not supported here');
+    });
+
+    it('asks for a reload while the screen has not reported', async () => {
+      const root = await render([display('1', 'Hallway', ['k'], status({}))], [], '/displays/1/details');
+
+      expect(root.textContent).toContain('No details yet');
+    });
+  });
+
+  describe('screenshot', () => {
+    const button = (root: HTMLElement) => root.querySelector('hd-display-screenshot button') as HTMLButtonElement;
+
+    it('asks the screen for a picture and shows it', async () => {
+      URL.createObjectURL = () => 'blob:shot';
+      const root = await render([display('1', 'Hallway', ['k'], status({ connected: true }))], [], '/displays/1/details');
+
+      button(root).click();
+      TestBed.inject(HttpTestingController).expectOne('/api/displays/1/screenshot').flush(new Blob(['jpeg'], { type: 'image/jpeg' }));
+      await TestBed.inject(ApplicationRef).whenStable();
+
+      expect(root.querySelector('hd-display-screenshot img')?.getAttribute('src')).toBe('blob:shot');
+      expect(button(root).textContent?.trim()).toBe('Take another');
+    });
+
+    it('cannot be taken while the display is not connected', async () => {
+      const root = await render([display('1', 'Hallway', ['k'], status({}))], [], '/displays/1/details');
+
+      expect(button(root).disabled).toBe(true);
+    });
+
+    it('says when the screen does not answer', async () => {
+      const root = await render([display('1', 'Hallway', ['k'], status({ connected: true }))], [], '/displays/1/details');
+
+      button(root).click();
+      TestBed.inject(HttpTestingController).expectOne('/api/displays/1/screenshot').flush(new Blob([]), { status: 504, statusText: 'Gateway Timeout' });
+      await TestBed.inject(ApplicationRef).whenStable();
+
+      expect(root.querySelector('hd-display-screenshot [role="alert"]')?.textContent).toContain('did not answer');
+    });
+  });
+
+  describe('name', () => {
+    it('renames the display', async () => {
+      const root = await render([display('1', 'Hallway', ['k'], status({}))], [], '/displays/1/details');
+      const name = root.querySelector('#display-name') as HTMLInputElement;
+
+      name.value = 'Entrance';
+      name.dispatchEvent(new Event('change'));
+
+      expect(TestBed.inject(HttpTestingController).expectOne('/api/displays/1').request.body).toEqual({ name: 'Entrance' });
+    });
+  });
+
   it('follows status pushed over the realtime connection', async () => {
-    const root = await render([display('1', 'Hallway', [], status({}))]);
+    const root = await render([display('1', 'Hallway', [], status({}))], [], '/displays');
 
     realtime.push('Displays', [display('1', 'Hallway', [], status({ connected: true }))]);
     await TestBed.inject(ApplicationRef).whenStable();

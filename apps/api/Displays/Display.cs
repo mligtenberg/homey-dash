@@ -125,7 +125,7 @@ public sealed record DashboardVersion(Guid DashboardId, int? ShownVersion, int L
 /// What Management knows about a display beyond its configuration. <see cref="Versions"/> has one entry per
 /// dashboard it offers, in order.
 /// </summary>
-public sealed record DisplayStatus(bool Connected, bool Held, DateTimeOffset? LastSeenAt, List<DashboardVersion> Versions, bool Kiosk = false, double? Lux = null);
+public sealed record DisplayStatus(bool Connected, bool Held, DateTimeOffset? LastSeenAt, List<DashboardVersion> Versions, bool Kiosk = false, double? Lux = null, ScreenDetails? Details = null);
 
 /// <summary>A display as Management lists it.</summary>
 public sealed record DisplayInfo(

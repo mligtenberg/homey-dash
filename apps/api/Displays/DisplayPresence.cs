@@ -19,6 +19,13 @@ public sealed class DisplayPresence
     private readonly ConcurrentDictionary<Guid, bool> _kiosks = new();
     private readonly ConcurrentDictionary<Guid, double> _lux = new();
 
+    private readonly ConcurrentDictionary<Guid, ScreenDetails> _details = new();
+
+    public void ReportDetails(Guid screenId, ScreenDetails details) => _details[screenId] = details.Cleaned();
+
+    /// <summary>What the screen last said about itself, or null before it has.</summary>
+    public ScreenDetails? Details(Guid? screenId) => screenId is { } id && _details.TryGetValue(id, out var d) ? d : null;
+
     public void ReportKiosk(Guid screenId) => _kiosks[screenId] = true;
 
     public void ReportLux(Guid screenId, double lux) => _lux[screenId] = lux;

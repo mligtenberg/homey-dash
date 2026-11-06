@@ -20,6 +20,8 @@ import { BRIGHTNESS_MS, LightMeter } from './light-meter';
 import { KioskScreen } from './kiosk-screen';
 import { LockScreen } from './lock-screen';
 import { ScreenSettings } from './screen-settings';
+import { ScreenCapture } from './screen-capture';
+import { screenDetails } from './screen-details';
 import { Setup } from './setup';
 
 type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; view: ScreenView };
@@ -216,6 +218,9 @@ export class App {
   private metering = false;
   private measuring = false;
   private cornerTaps: number[] = [];
+  private readonly loadedAt = new Date();
+  private resized?: ReturnType<typeof setTimeout>;
+  private lightSource: string | null = null;
   private readonly settings = viewChild.required(ScreenSettings);
 
   private readonly storage = safeStorage();
@@ -252,10 +257,15 @@ export class App {
       });
     });
     // Joining again on every reconnect picks up a version published while the connection was lost.
-    const stops = [this.realtime.on('Screen', (view) => this.show(view)), this.realtime.whenConnected(() => this.join())];
+    const stops = [
+      this.realtime.on('Screen', (view) => this.show(view)),
+      inject(ScreenCapture).answer(),
+      this.realtime.whenConnected(() => this.join()),
+    ];
     inject(DestroyRef).onDestroy(() => {
       clearTimeout(this.idle);
       clearTimeout(this.light);
+      clearTimeout(this.resized);
       stops.forEach((stop) => stop());
     });
   }
@@ -316,6 +326,12 @@ export class App {
         const lux = await this.lightMeter.measure();
         if (lux === null) return;
         await this.realtime.brightness(lux);
+        // The first reading says whether a sensor or the camera measured it.
+        const source = this.lightMeter.reading()?.source ?? null;
+        if (source !== this.lightSource) {
+          this.lightSource = source;
+          this.reportDetails();
+        }
       } catch {
         // The camera was busy or the connection dropped; measured again next time.
       } finally {
@@ -345,7 +361,7 @@ export class App {
   protected async join() {
     try {
       this.show(await this.realtime.joinScreen(this.screenId));
-      if (this.kiosk.available) this.realtime.kiosk().catch(() => undefined);
+      this.reportDetails();
     } catch {
       // The connection dropped again; joining happens again on reconnect.
     }
@@ -366,8 +382,18 @@ export class App {
     );
   }
 
+  // Tells HomeyDash what this screen is; again when its size changes or the light source is known.
+  private reportDetails() {
+    if (!this.realtime.connected()) return;
+    screenDetails(this.kiosk, this.lightMeter, this.loadedAt)
+      .then((details) => this.realtime.details(details))
+      .catch(() => undefined);
+  }
+
   protected onResize() {
     this.height.set(window.innerHeight);
     this.width.set(window.innerWidth);
+    clearTimeout(this.resized);
+    this.resized = setTimeout(() => this.reportDetails(), 2_000);
   }
 }

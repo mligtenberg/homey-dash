@@ -107,6 +107,19 @@ describe('App', () => {
     expect(realtime.shown).toEqual([{ k1: 1 }, { k1: 1 }]);
   });
 
+  it('tells HomeyDash what the screen is when it connects, and again after a reconnect', async () => {
+    await start(published(1));
+
+    expect(realtime.detailsReported.length).toBe(1);
+    expect(realtime.detailsReported[0]).toMatchObject({ viewportWidth: window.innerWidth, fully: null });
+
+    realtime.connected.set(false);
+    realtime.reconnect();
+    await stable();
+
+    expect(realtime.detailsReported.length).toBe(2);
+  });
+
   it('shows one dashboard without a tape', async () => {
     const root = await start(published(1));
 

@@ -6,6 +6,7 @@ import { RealtimeTileData } from '@homey-dash/tiles';
 import { filter, map } from 'rxjs';
 import { LucideDynamicIcon, LucideImages, LucideKeyRound, LucideMonitor, LucidePlus } from '@lucide/angular';
 import { DashboardsStore } from './dashboards-store';
+import { DisplaysStore } from './displays/displays-store';
 
 /** Management's frame: the sidebar with dashboards, and the current page. */
 @Component({
@@ -61,10 +62,21 @@ import { DashboardsStore } from './dashboards-store';
           </button>
         }
         <div class="hd-nav__group">Displays</div>
-        <a class="hd-nav__item" routerLink="/displays" routerLinkActive ariaCurrentWhenActive="page">
+        <a class="hd-nav__item" routerLink="/displays" [routerLinkActiveOptions]="{ exact: true }" routerLinkActive ariaCurrentWhenActive="page">
           <span>All displays</span>
           <svg class="icon" [lucideIcon]="monitor" />
         </a>
+        @for (display of displays.list(); track display.id) {
+          <a class="hd-nav__item" [routerLink]="['/displays', display.id]" routerLinkActive ariaCurrentWhenActive="page">
+            <span>{{ display.name }}</span>
+            <span
+              class="status-dot"
+              role="img"
+              [class.status-dot--on]="display.status.held && display.status.connected"
+              [attr.aria-label]="display.status.held && display.status.connected ? 'Connected' : 'Not connected'"
+            ></span>
+          </a>
+        }
         <div class="hd-nav__group">Photos</div>
         <a class="hd-nav__item" routerLink="/photo-sets" routerLinkActive ariaCurrentWhenActive="page">
           <span>Photo sets</span>
@@ -101,6 +113,8 @@ import { DashboardsStore } from './dashboards-store';
     .marks { display: flex; align-items: center; gap: 8px; }
     .marks:empty { display: none; }
     .icon { width: 18px; height: 18px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+    .status-dot--on { background: var(--ok); }
     .muted { color: var(--ink-muted); margin: 0; padding: 4px 10px; }
     .new { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) 4px; }
     .row { display: flex; gap: var(--space-2); }
@@ -119,6 +133,7 @@ import { DashboardsStore } from './dashboards-store';
 })
 export class Shell {
   protected readonly store = inject(DashboardsStore);
+  protected readonly displays = inject(DisplaysStore);
   private readonly api = inject(DashboardsApi);
   private readonly router = inject(Router);
 

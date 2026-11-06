@@ -1,5 +1,6 @@
 import { Route } from '@angular/router';
-import { DisplaysPage } from './displays-page';
+import { DisplayPage } from './displays/display-page';
+import { DisplaysPage } from './displays/displays-page';
 import { EditorPage } from './editor/editor-page';
 import { HomePage } from './home-page';
 import { PreviewPage } from './preview-page';
@@ -15,6 +16,18 @@ export const appRoutes: Route[] = [
       { path: '', component: HomePage, title: 'HomeyDash' },
       { path: 'dashboards/:id', component: EditorPage, title: 'Dashboard · HomeyDash' },
       { path: 'displays', component: DisplaysPage, title: 'Displays · HomeyDash' },
+      {
+        path: 'displays/:id',
+        component: DisplayPage,
+        title: 'Display · HomeyDash',
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'details' },
+          { path: 'details', loadComponent: () => import('./displays/display-details-tab').then((m) => m.DisplayDetailsTab) },
+          { path: 'dashboards', loadComponent: () => import('./displays/display-dashboards-tab').then((m) => m.DisplayDashboardsTab) },
+          { path: 'idle', loadComponent: () => import('./displays/display-idle-tab').then((m) => m.DisplayIdleTab) },
+          { path: 'lock', loadComponent: () => import('./displays/display-lock-tab').then((m) => m.DisplayLockTab) },
+        ],
+      },
       // Visited rarely, so they load on first visit and keep the editor's bundle small.
       {
         path: 'photo-sets',

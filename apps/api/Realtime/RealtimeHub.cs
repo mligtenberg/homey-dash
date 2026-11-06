@@ -162,6 +162,16 @@ public sealed class RealtimeHub(
         await notifier.DisplaysChangedAsync(db, CancellationToken.None);
     }
 
+    // What the screen and its browser are, such as its size and whether Fully Kiosk Browser's interface is there;
+    // screens say when they connect and when something changes.
+    public async Task Details(ScreenDetails details)
+    {
+        if (!Context.Items.TryGetValue(ScreenKey, out var screen) || screen is not Guid screenId) throw new HubException("Join as a screen first.");
+        presence.ReportDetails(screenId, details);
+        if (details.Fully is not null) presence.ReportKiosk(screenId);
+        await notifier.DisplaysChangedAsync(db, CancellationToken.None);
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         subscriptions.Drop(Context.ConnectionId);
