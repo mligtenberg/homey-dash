@@ -275,6 +275,30 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
       });
     });
 
+    // The photo after the one shown is fetched ahead, so the fade to it starts at once.
+    effect(() => {
+      const order = this.order();
+      const layers = this.layers();
+      const shown = layers[layers.length - 1]?.id;
+      this.sized();
+      this.box();
+      if (order.length < 2 || shown === undefined) return;
+      untracked(() => {
+        const at = order.findIndex((p) => p.photo.id === shown);
+        if (at >= 0) this.preload(order[(at + 1) % order.length], true);
+      });
+    });
+
+    // In the detail view, which steps both ways, the photos on either side of the one shown.
+    effect(() => {
+      const order = this.order();
+      const at = this.detailIndex();
+      if (order.length < 2 || !this.details()?.isOpen()) return;
+      untracked(() => {
+        for (const by of [1, -1]) this.preload(order[(at + by + order.length) % order.length], false);
+      });
+    });
+
     // Rotates while HomeyDash can be reached; when it cannot, the photo shown stays.
     let timer: ReturnType<typeof setInterval> | undefined;
     effect(() => {
@@ -297,6 +321,12 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
       observer.observe(element);
       destroyRef.onDestroy(() => observer.disconnect());
     });
+  }
+
+  // Into the browser's cache, which keeps a photo a day; at the size the tile asks for, or whole as the detail view does.
+  private preload(shown: ShownPhoto, fit: boolean) {
+    const image = new Image();
+    image.src = this.urlOf({ id: shown.photo.id, url: shown.url }, fit);
   }
 
   private advance() {

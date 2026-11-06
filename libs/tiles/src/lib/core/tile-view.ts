@@ -62,7 +62,7 @@ export abstract class TileView<TSettings extends TileSettings = TileSettings> {
   protected readonly opensDetails = computed(() => this.detailView() && !!this.face().details);
 
   /** The component's `hd-tile-details`, if it has one. */
-  private readonly details = viewChild(TileDetails);
+  protected readonly details = viewChild(TileDetails);
 
   constructor() {
     inject(DestroyRef).onDestroy(() => clearTimeout(this.flashTimer));

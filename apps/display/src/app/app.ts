@@ -115,7 +115,7 @@ const TAPE_KEY = 'homeydash.tape';
               <div class="fill" role="button" tabindex="0" aria-label="Back to the dashboard" [style.background]="color" (click)="wake()" animate.leave="is-leaving"></div>
             }
             @if (playing() && !playing()?.screenOff && view.display.lockWidgets.length) {
-              <hd-lock-screen [widgets]="view.display.lockWidgets" animate.leave="is-leaving" />
+              <hd-lock-screen [widgets]="view.display.lockWidgets" [class.over-photo]="!!slideshow()" animate.leave="is-leaving" />
             }
           } @else {
             <div class="waiting">

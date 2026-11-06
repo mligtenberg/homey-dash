@@ -86,6 +86,8 @@ export function capabilitySignal(signal: string): { account: number; device: str
       padding: clamp(16px, 4vh, 48px); color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / .5), 0 0 24px rgb(0 0 0 / .35);
       --u: 1vh;
     }
+    /* Over a photo, the bottom spots stay above the caption along its bottom (see .hd-photo__caption): when and where it was taken, and who. */
+    :host(.over-photo) { padding-bottom: calc(clamp(16px, 4vh, 48px) + 100dvh / 3 * .45); }
     .spot { display: flex; flex-direction: column; gap: calc(2 * var(--u)); }
     .spot--top-left { grid-area: tl; align-items: flex-start; }
     .spot--top-right { grid-area: tr; align-items: flex-end; text-align: right; }
