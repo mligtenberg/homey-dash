@@ -172,6 +172,28 @@ describe('Plex tiles', () => {
       expect(movies.querySelectorAll('.hd-plex-recent__item').length).toBe(2);
       expect(gone.classList).toContain('is-missing');
     });
+
+    it('opens a full-screen grid with a tab per library, filtering by tab', async () => {
+      HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+        this.open = true;
+      };
+      realtime.plexSnapshot = { accounts: [overview()], sessions: [] };
+      const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
+      const tileCard = () => tile.querySelectorAll('.hd-plex-recent__card-title');
+      const dialog = tile.querySelector('dialog') as HTMLDialogElement;
+
+      tile.click();
+      await settle();
+
+      expect(dialog.classList).toContain('hd-details--screen');
+      expect([...tileCard()].map((t) => t.textContent?.trim())).toEqual(['Movie 3', 'Movie 1', 'Movie 2']);
+      const tabs = [...tile.querySelectorAll('.hd-details .hd-segmented button')];
+      expect(tabs.map((b) => b.textContent?.trim())).toEqual(['All', 'Movies', 'TV Shows']);
+      (tabs[2] as HTMLElement).click();
+      await settle();
+
+      expect([...tileCard()].map((t) => t.textContent?.trim())).toEqual(['Movie 3']);
+    });
   });
 
   it('moves progress on while playing, never past the end', () => {

@@ -727,7 +727,44 @@
 .hd-plex-recent__title { font-size: calc(var(--cell) * .1); line-height: 1.15; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-plex-recent__sub { font-size: calc(var(--cell) * .08); opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-plex-recent.has-art > .hd-photo__label { z-index: 1; }
-.hd-plex-details__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--cell) * .1); max-height: min(60dvh, calc(var(--cell) * 3)); overflow-y: auto; }
+/*
+ * The recently added screen: Plex's own look, whatever the theme. Charcoal ground, white text, and the Plex gold
+ * for the active tab, the "New" badge and when each was added.
+ */
+.hd-details--screen:has(.hd-plex-recent__pane) {
+  --ink: #fff; --ink-muted: rgb(255 255 255 / .62); --k-ink: #e5a00d; --on-kind: #1f2326; --danger: #ff8a98;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgb(229 160 13 / .16), transparent 70%),
+    linear-gradient(#282a2d, #1f2326 40%, #14171a);
+  color: #fff;
+}
+.hd-details--screen:has(.hd-plex-recent__pane) .hd-round-btn { background: rgb(255 255 255 / .12); color: #fff; }
+.hd-details--screen:has(.hd-plex-recent__pane) .hd-segmented button { background-color: rgb(255 255 255 / .1); color: #fff; }
+.hd-details--screen:has(.hd-plex-recent__pane) .hd-segmented button[aria-pressed="true"] { background-color: #e5a00d; color: #1f2326; }
+.hd-details--screen .hd-details__panel > .hd-plex-recent__pane { flex: 1; min-height: 0; }
+.hd-plex-recent__pane {
+  display: grid; align-content: start; gap: calc(var(--cell) * .2) calc(var(--cell) * .14);
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--cell) * 1.1), 1fr));
+  overflow-y: auto; scrollbar-width: none; padding-bottom: calc(var(--cell) * .1);
+}
+.hd-plex-recent__pane::-webkit-scrollbar { display: none; }
+.hd-plex-recent__card { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hd-plex-recent__cover {
+  position: relative; aspect-ratio: 2 / 3; display: grid; place-items: center; overflow: hidden;
+  margin-bottom: calc(var(--cell) * .05); border-radius: calc(var(--cell) * .06); background: #2f3236;
+  box-shadow: 0 calc(var(--cell) * .04) calc(var(--cell) * .12) rgb(0 0 0 / .45);
+}
+.hd-plex-recent__cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; }
+.hd-plex-recent__cover > svg { width: 35%; height: 35%; stroke: rgb(255 255 255 / .35); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.hd-plex-recent__badge {
+  position: absolute; top: calc(var(--cell) * .06); left: calc(var(--cell) * .06);
+  padding: .2em .55em; border-radius: var(--radius-pill); background: #e5a00d; color: #1f2326;
+  font: 800 calc(var(--cell) * .07)/1.2 var(--font-sans); letter-spacing: .04em; text-transform: uppercase;
+}
+.hd-plex-recent__card-title { font: 700 calc(var(--cell) * .105)/1.2 var(--font-sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-plex-recent__card-sub { font-size: calc(var(--cell) * .085); color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-plex-recent__card-added { font: 700 calc(var(--cell) * .08)/1.2 var(--font-sans); color: #e5a00d; }
+.hd-plex-recent__empty { grid-column: 1 / -1; font-size: calc(var(--cell) * .12); color: var(--ink-muted); }
 .hd-plex-details__row { display: flex; align-items: center; gap: calc(var(--cell) * .1); }
 .hd-plex-details__poster { width: calc(var(--cell) * .45); aspect-ratio: 2 / 3; object-fit: cover; border-radius: calc(var(--cell) * .04); flex: none; }
 .hd-plex-details__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }

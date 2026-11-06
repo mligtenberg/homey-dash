@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ALL_PLEX_LIBRARIES, PlexItem, plexImageUrl } from '@homey-dash/api-client';
 import { TileSize } from '@homey-dash/layout';
 import { LucideClapperboard, LucideDynamicIcon } from '@lucide/angular';
@@ -25,7 +25,8 @@ export function addedOn(iso: string, now = Date.now()): string {
 /**
  * The posters of what was newly added to one library of the tile's Plex account, or every library of it
  * (`plex-library:all`), newest first: as
- * many as fit the tile, with their titles. A press opens the detail view with the newest 24 and when each was added.
+ * many as fit the tile, with their titles. A press opens a full-screen detail view in Plex colours: a grid of the newest 24 posters with when each was added,
+ * and tabs per library when the tile covers several.
  */
 @Component({
   selector: 'hd-plex-recent-tile',
@@ -59,23 +60,37 @@ export function addedOn(iso: string, now = Date.now()): string {
         <div class="hd-tile__detail">{{ face().detail }}</div>
       </div>
     }
-    <hd-tile-details [name]="face().name" [icon]="icon" subtitle="Newly added">
-      <ul class="hd-plex-details__list">
-        @for (item of items().slice(0, detailCount); track item.id) {
-          <li class="hd-plex-details__row">
-            @if (item.image) {
-              <img class="hd-plex-details__poster" [src]="posterUrl(item.image)" alt="" draggable="false" />
-            }
-            <div class="hd-plex-details__info">
-              <div class="hd-details__label">{{ item.title }}</div>
-              @if (item.subtitle) {
-                <div class="hd-plex__sub">{{ item.subtitle }}</div>
+    <hd-tile-details [screen]="true" [name]="face().name" [icon]="icon" subtitle="Newly added">
+      @if (tabs().length > 2) {
+        <div class="hd-segmented" hdDetailsHead role="group" aria-label="Show">
+          @for (t of tabs(); track t.id) {
+            <button type="button" [attr.aria-pressed]="tab() === t.id" (click)="tab.set(t.id)">{{ t.label }}</button>
+          }
+        </div>
+      }
+      <div class="hd-plex-recent__pane">
+        @for (item of detailItems(); track item.id) {
+          <div class="hd-plex-recent__card">
+            <div class="hd-plex-recent__cover">
+              @if (item.image) {
+                <img [src]="posterUrl(item.image)" alt="" loading="lazy" draggable="false" />
+              } @else {
+                <svg [lucideIcon]="icon" />
               }
-              <div class="hd-plex__sub">{{ added(item) }}</div>
+              @if (isNew(item)) {
+                <span class="hd-plex-recent__badge">New</span>
+              }
             </div>
-          </li>
+            <div class="hd-plex-recent__card-title">{{ item.title }}</div>
+            @if (item.subtitle) {
+              <div class="hd-plex-recent__card-sub">{{ item.subtitle }}</div>
+            }
+            <div class="hd-plex-recent__card-added">{{ added(item) }}</div>
+          </div>
+        } @empty {
+          <div class="hd-plex-recent__empty">Nothing added yet</div>
         }
-      </ul>
+      </div>
     </hd-tile-details>
   `,
 })
@@ -83,7 +98,6 @@ export class RecentlyAddedTile extends TileView {
   private readonly plex = inject(PlexData);
 
   protected readonly icon = LucideClapperboard;
-  protected readonly detailCount = DETAIL_COUNT;
 
   private readonly overview = computed(() => this.plex.overview(this.settings().account));
 
@@ -99,6 +113,26 @@ export class RecentlyAddedTile extends TileView {
     if (target === ALL_PLEX_LIBRARIES)
       return libraries.flatMap((l) => l.recent).sort((a, b) => b.addedAt.localeCompare(a.addedAt));
     return this.library()?.recent ?? [];
+  });
+
+  /** The detail view's tabs: everything, then each library the target holds. Shown when there is more than one library. */
+  protected readonly tabs = computed(() => {
+    const libraries = this.overview()?.libraries ?? [];
+    if (this.settings().target !== ALL_PLEX_LIBRARIES) return [];
+    const withItems = libraries.filter((l) => l.recent.length);
+    return [{ id: 'all', label: 'All' }, ...withItems.map((l) => ({ id: l.id, label: l.title }))];
+  });
+  protected readonly tab = signal('all');
+
+  /** What the detail view lists: the newest of the chosen tab. */
+  protected readonly detailItems = computed<PlexItem[]>(() => {
+    const tab = this.tab();
+    const libraries = this.overview()?.libraries ?? [];
+    const source =
+      tab === 'all' || !this.tabs().some((t) => t.id === tab)
+        ? this.items()
+        : (libraries.find((l) => l.id === tab)?.recent ?? []);
+    return source.slice(0, DETAIL_COUNT);
   });
 
   protected readonly shown = computed(() => (this.face().state === 'ok' ? this.items().slice(0, RECENT_POSTERS[this.size()]) : []));
@@ -126,5 +160,11 @@ export class RecentlyAddedTile extends TileView {
 
   protected added(item: PlexItem) {
     return addedOn(item.addedAt);
+  }
+
+  /** Added today or yesterday. */
+  protected isNew(item: PlexItem) {
+    const label = addedOn(item.addedAt);
+    return label === 'Today' || label === 'Yesterday';
   }
 }

@@ -19,7 +19,10 @@ The detail view lists every session the tile follows: poster, title, subtitle, w
 
 An `.hd-tile.hd-plex-recent`. With items it gets `.has-art` and a `.hd-plex-recent__grid` of the newest posters, edge to edge: 1 on small, 2 on wide, 3 on full, 2 × 2 on large, 3 × 2 on full-large. Each has its title and subtitle on a dark gradient at the bottom. A label of the tile's own sits over the whole as `.hd-photo__label`.
 
-The detail view lists the newest 24 with poster, title, subtitle and when each was added (`Today`, `Yesterday`, `3 days ago`, `12 Aug`).
+The detail view takes the whole screen (`.hd-details--screen`, like Sonos) in Plex's own colours whatever the theme: a charcoal ground with a faint gold glow at the top, white text, and Plex gold (`#e5a00d`) as the accent. It holds:
+
+- In the head, between the title and the close button, a `.hd-segmented` tab per library (`All`, `Movies`, `TV Shows`, …) when the tile covers every library; the active tab is gold with dark text.
+- `.hd-plex-recent__pane`: a scrolling grid of the newest 24 posters (2:3, shadowed), each with title, subtitle and, in gold, when it was added (`Today`, `Yesterday`, `3 days ago`, `12 Aug`). Posters added today or yesterday carry a gold `New` badge.
 
 ## Behavior
 
