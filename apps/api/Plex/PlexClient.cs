@@ -205,14 +205,16 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
         }
         using (response)
         {
-            var text = await response.Content.ReadAsStringAsync(ct);
             if (response.StatusCode == HttpStatusCode.Unauthorized)
                 throw new PlexException("Plex no longer accepts HomeyDash's sign-in. Sign in with Plex again under Accounts.");
             if (!response.IsSuccessStatusCode)
                 throw new PlexException($"Plex answered {(int)response.StatusCode} to {new Uri(url).AbsolutePath}.");
             try
             {
-                return text.Length == 0 ? default : JsonSerializer.Deserialize<JsonElement>(text);
+                // Parsed from the stream: no string copy of the whole answer, and Plex is asked every few seconds.
+                if (response.Content.Headers.ContentLength == 0) return default;
+                await using var body = await response.Content.ReadAsStreamAsync(ct);
+                return await JsonSerializer.DeserializeAsync<JsonElement?>(body, cancellationToken: ct) ?? default;
             }
             catch (JsonException e)
             {

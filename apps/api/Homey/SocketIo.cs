@@ -34,7 +34,13 @@ public readonly record struct SocketIoPacket(SocketIoPacketType Type, string Nam
         while (i < text.Length && char.IsAsciiDigit(text[i])) i++;
         int? ackId = i > idStart ? int.Parse(text.AsSpan(idStart, i - idStart)) : null;
 
-        JsonElement? data = i < text.Length ? JsonDocument.Parse(text.AsMemory(i)).RootElement.Clone() : null;
+        // Disposed once cloned: an undisposed document keeps its pooled buffer, and Homey sends events all day.
+        JsonElement? data = null;
+        if (i < text.Length)
+        {
+            using var document = JsonDocument.Parse(text.AsMemory(i));
+            data = document.RootElement.Clone();
+        }
         return new SocketIoPacket(type, ns, ackId, data);
     }
 }
@@ -142,11 +148,14 @@ public sealed class SocketIoClient : IAsyncDisposable
         switch (text[0])
         {
             case '0':
-                var open = JsonDocument.Parse(text.AsMemory(1)).RootElement;
+            {
+                using var document = JsonDocument.Parse(text.AsMemory(1));
+                var open = document.RootElement;
                 _opened.TrySetResult((
                     TimeSpan.FromMilliseconds(open.GetProperty("pingInterval").GetInt32()),
                     TimeSpan.FromMilliseconds(open.GetProperty("pingTimeout").GetInt32())));
                 break;
+            }
             case '1':
                 throw new WebSocketException("Homey closed the realtime connection");
             case '4':
