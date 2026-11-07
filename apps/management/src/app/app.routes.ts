@@ -1,20 +1,18 @@
 import { Route } from '@angular/router';
 import { DisplayPage } from './displays/display-page';
 import { DisplaysPage } from './displays/displays-page';
-import { EditorPage } from './editor/editor-page';
 import { HomePage } from './home-page';
-import { PreviewPage } from './preview-page';
 import { Shell } from './shell';
 
 export const appRoutes: Route[] = [
   // Preview fills the whole window, so it sits outside the shell with its sidebar.
-  { path: 'dashboards/:id/preview', component: PreviewPage, title: 'Preview · HomeyDash' },
+  { path: 'dashboards/:id/preview', loadComponent: () => import('./preview-page').then((m) => m.PreviewPage), title: 'Preview · HomeyDash' },
   {
     path: '',
     component: Shell,
     children: [
       { path: '', component: HomePage, title: 'HomeyDash' },
-      { path: 'dashboards/:id', component: EditorPage, title: 'Dashboard · HomeyDash' },
+      { path: 'dashboards/:id', loadComponent: () => import('./editor/editor-page').then((m) => m.EditorPage), title: 'Dashboard · HomeyDash' },
       { path: 'displays', component: DisplaysPage, title: 'Displays · HomeyDash' },
       {
         path: 'displays/:id',

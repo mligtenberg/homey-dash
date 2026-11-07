@@ -190,7 +190,7 @@ export class SignalPicker {
       : this.catalogue.groups();
     return buildPlaces(groups, this.data.homeys() ?? []);
   });
-  protected readonly place = computed(() => findPlace(this.places(), this.selected()) ?? this.places()[0]);
+  protected readonly place = computed<SignalPlace | undefined>(() => findPlace(this.places(), this.selected()) ?? this.places()[0]);
   protected readonly groups = computed(() => {
     const place = this.place();
     return place ? placeGroups(place) : [];
