@@ -20,11 +20,11 @@ public sealed record AirPlayPlayback(
     public long DurationMs { get; init; }
 }
 
-/// <summary>An album playing track by track: Position is the index in Tracks of the track that plays now.</summary>
+/// <summary>An album playing track by track, or a season episode by episode: Position is the index in Tracks of the one that plays now.</summary>
 public sealed record AirPlayQueue(PlexItem Album, IReadOnlyList<PlexItem> Tracks, int Position)
 {
     public string Detail => string.Join(" · ",
-        string.Join(" — ", new[] { Album.Subtitle, Album.Title }.OfType<string>()), $"{Position + 1} of {Tracks.Count}");
+        string.Join(" — ", new[] { Album.Kind == "album" ? Album.Subtitle : null, Album.Title }.OfType<string>()), $"{Position + 1} of {Tracks.Count}");
 }
 
 /// <summary>

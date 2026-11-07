@@ -68,6 +68,30 @@ public sealed class AirPlayAlbumTests(ClockApiFactory factory) : IClassFixture<C
     }
 
     [Fact]
+    public async Task ASeason_PlaysEpisodeAfterEpisode_FromTheOneChosen_AndEndsAfterTheLast()
+    {
+        var hub = await ConnectAsync();
+        await WaitForLibrariesAsync(hub);
+        var fake = factory.Services.GetRequiredService<FakeAirPlay>();
+        var now = factory.Services.GetRequiredService<AirPlayNow>();
+
+        await hub.InvokeAsync("PlayAlbumOnAirPlay", 1, "510", "520", FakeAirPlay.LivingRoomTv);
+
+        Assert.Contains("path=%2Flibrary%2Fmetadata%2F520", fake.Playing[FakeAirPlay.LivingRoomTv]);
+        Assert.Equal("Season 1 · 2 of 3", now.Find(FakeAirPlay.LivingRoomTv)!.Detail);
+        // Played to its end: the next episode starts by itself.
+        factory.Clock.Advance(TimeSpan.FromMinutes(21));
+        fake.EndOnReceiver(FakeAirPlay.LivingRoomTv);
+        await Eventually(() => fake.Playing.TryGetValue(FakeAirPlay.LivingRoomTv, out var url) && url.Contains("%2Flibrary%2Fmetadata%2F521"));
+        Assert.Equal("Brigade", now.Find(FakeAirPlay.LivingRoomTv)!.Title);
+        // The last episode ends the season.
+        factory.Clock.Advance(TimeSpan.FromMinutes(27));
+        fake.EndOnReceiver(FakeAirPlay.LivingRoomTv);
+        await Eventually(() => now.Find(FakeAirPlay.LivingRoomTv) is null);
+        Assert.False(fake.Playing.ContainsKey(FakeAirPlay.LivingRoomTv));
+    }
+
+    [Fact]
     public async Task AnAlbum_StoppedOnTheTvPartWay_DoesNotGoOn()
     {
         var hub = await ConnectAsync();

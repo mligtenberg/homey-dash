@@ -6,8 +6,8 @@ namespace HomeyDash.Api.AirPlay;
 
 /// <summary>
 /// Plays what a Plex account holds on an AirPlay receiver (ADR-0012): a movie, an episode, a track, or an album, which is
-/// its tracks one after the other. The receiver plays one stream at a time, so the rest of an album waits in
-/// <see cref="AirPlayNow"/> and the next track starts when the receiver finishes the one before. Failures are
+/// its tracks one after the other, as is a season of episodes. The receiver plays one stream at a time, so the rest of an album or season waits in
+/// <see cref="AirPlayNow"/> and the next track or episode starts when the receiver finishes the one before. Failures are
 /// <see cref="HubException"/>s, whose message is what a screen shows.
 /// </summary>
 public sealed class PlexPlayback : IDisposable
@@ -59,17 +59,19 @@ public sealed class PlexPlayback : IDisposable
                     // Starting this over with another track (choice) goes on with the album it is part of.
                     if (choice is null) _nowPlaying.SetQueue(deviceId, null);
                     break;
-                case "album":
-                    var tracks = (await _plex.ChildrenAsync(server, item.Id, ct)).Where(t => t.Kind == "track").ToList();
-                    if (tracks.Count == 0) throw new HubException("That album has no tracks.");
+                case "album" or "season":
+                    // A season is a queue like an album: its episodes one after the other.
+                    var childKind = item.Kind == "album" ? "track" : "episode";
+                    var tracks = (await _plex.ChildrenAsync(server, item.Id, ct)).Where(t => t.Kind == childKind).ToList();
+                    if (tracks.Count == 0) throw new HubException(item.Kind == "album" ? "That album has no tracks." : "That season has no episodes.");
                     var first = startTrackId is null ? 0 : tracks.FindIndex(t => t.Id == startTrackId);
-                    if (first < 0) throw new HubException("That track isn't on the album.");
+                    if (first < 0) throw new HubException(item.Kind == "album" ? "That track isn't on the album." : "That episode isn't in the season.");
                     var queue = new AirPlayQueue(item, tracks, first);
                     await StartAsync(accountId, server, tracks[first], deviceId, null, queue.Detail, ct);
                     _nowPlaying.SetQueue(deviceId, queue);
                     break;
                 default:
-                    throw new HubException("Only a movie, an episode, an album or a track plays on AirPlay.");
+                    throw new HubException("Only a movie, an episode, a season, an album or a track plays on AirPlay.");
             }
         }
         catch (PlexException e)
@@ -111,7 +113,7 @@ public sealed class PlexPlayback : IDisposable
         });
     }
 
-    // The receiver finished a track: the next one of the album starts, or nothing does and the album is over.
+    // The receiver finished a track or episode: the next one of the album or season starts, or nothing does and it is over.
     private async Task<bool> AdvanceAsync(string deviceId)
     {
         if (_nowPlaying.Find(deviceId) is not { } playing || _nowPlaying.Queue(deviceId) is not { } queue || queue.Position + 1 >= queue.Tracks.Count)
@@ -126,7 +128,7 @@ public sealed class PlexPlayback : IDisposable
         }
         catch (Exception e) when (e is HubException or PlexException or AirPlayException)
         {
-            _log.LogWarning(e, "Could not go on to the next track of {Album} on {Device}", queue.Album.Title, deviceId);
+            _log.LogWarning(e, "Could not go on to the next item of {Album} on {Device}", queue.Album.Title, deviceId);
             return false;
         }
     }

@@ -223,12 +223,12 @@ public sealed class AirPlayApiTests(ApiFactory factory) : IClassFixture<ApiFacto
     }
 
     [Fact]
-    public async Task ASeasonOrAnUnknownItemOrReceiver_IsRefused()
+    public async Task AShowOrAnUnknownItemOrReceiver_IsRefused()
     {
         var hub = await ConnectAsync();
         await WaitForLibrariesAsync(hub);
 
-        await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("PlayOnAirPlay", 1, "203", FakeAirPlay.LivingRoomTv));
+        await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("PlayOnAirPlay", 1, "500", FakeAirPlay.LivingRoomTv));
         await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("PlayOnAirPlay", 1, "9999", FakeAirPlay.LivingRoomTv));
         await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("PlayOnAirPlay", 1, "101", "no-such-receiver"));
         await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("PlayOnAirPlay", 2, "101", FakeAirPlay.LivingRoomTv));

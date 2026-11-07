@@ -456,7 +456,8 @@ describe('Plex tiles', () => {
         expect(text(tile, '.hd-plex-recent__added')).toBe('The Bear › Season 1');
         await press('.hd-plex-recent__play');
         await press('.hd-plex-recent__receiver');
-        expect(realtime.commands).toContainEqual(['playOnAirPlay', 1, '912', 'tv']);
+        // An episode chosen from its season goes on with the season's next episodes.
+        expect(realtime.commands).toContainEqual(['playAlbumOnAirPlay', 1, '91', '912', 'tv']);
 
         // Back goes up one step at a time, then to the grid.
         await press('.hd-plex-recent__back');
@@ -540,6 +541,27 @@ describe('Plex tiles', () => {
         expect(paused).not.toHaveBeenCalled();
         await press('.hd-plex-recent__back');
         expect(paused).toHaveBeenCalledTimes(1);
+      });
+
+      it("stops a show's theme once an episode actually plays, and does not start it over in the same show", async () => {
+        const { played, paused } = speakers();
+        realtime.plexChildrenList = [child('91', 'season', 'Season 1', 1)];
+        const { press } = await openFound({ ...item(9, '1970-01-01T00:00:00Z'), kind: 'show', title: 'The Bear' });
+        await press('.hd-plex-recent__card');
+        expect(played()).toEqual(['?account=1&item=9&theme=true']);
+        expect(paused).not.toHaveBeenCalled();
+
+        realtime.push('AirPlayNow', [{
+          deviceId: 'tv', deviceName: 'Living room TV', accountId: 1, itemId: '911', title: 'System', paused: false,
+          audioStreamId: null, subtitleStreamId: null, offsetMs: 0, at: '2026-11-01T10:00:00Z', detail: null,
+        }]);
+        await settle();
+        expect(paused).toHaveBeenCalledTimes(1);
+
+        // Playback ends, but the theme stays quiet while the show stays open.
+        realtime.push('AirPlayNow', []);
+        await settle();
+        expect(played().length).toBe(1);
       });
 
       it('plays an album in the speakers of this screen, track after track', async () => {
@@ -681,6 +703,27 @@ describe('Plex tiles', () => {
           expect(reports.slice(-2)).toEqual([[1, '7', 'playing'], [1, '7', 'stopped']]);
           tile.remove();
         }
+      });
+
+      it('goes on with the next episode of the season when an episode played here ends', async () => {
+        realtime.plexChildrenList = [child('91', 'season', 'Season 1', 1)];
+        const { tile, press } = await openFound({ ...item(9, '1970-01-01T00:00:00Z'), kind: 'show', title: 'The Bear' });
+        await press('.hd-plex-recent__card');
+        realtime.plexChildrenList = [child('911', 'episode', 'System', 1), child('912', 'episode', 'Hands', 2)];
+        await press('.hd-plex-recent__seasons .hd-plex-recent__card');
+        await press('.hd-plex-recent__row', 'System');
+        await press('.hd-plex-recent__receiver', 'Play here');
+        const video = () => tile.querySelector('video.hd-plex-recent__video') as HTMLVideoElement;
+        expect(video().getAttribute('src')).toBe('/api/plex/video?account=1&item=911');
+
+        video().dispatchEvent(new Event('ended'));
+        await settle();
+        expect(video().getAttribute('src')).toBe('/api/plex/video?account=1&item=912');
+        // The first counts as watched, and the last one ends the season.
+        expect(realtime.commands.filter((c) => c[0] === 'plexProgress').map((c) => c.slice(1, 4))).toContainEqual([1, '911', 'stopped']);
+        video().dispatchEvent(new Event('ended'));
+        await settle();
+        expect(tile.querySelector('.hd-plex-recent__player')).toBeNull();
       });
 
       it('shows what was played: a film, an episode, a season', async () => {

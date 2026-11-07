@@ -138,7 +138,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
             (play)="onVideo(v, 'playing', $any($event.target).currentTime)"
             (pause)="onVideo(v, 'paused', $any($event.target).currentTime)"
             (timeupdate)="onVideoTime(v, $any($event.target).currentTime)"
-            (ended)="stopVideo(true)"
+            (ended)="videoEnded(v)"
             (error)="videoFailed(v)"
           ></video>
           <div class="hd-plex-recent__player-bar">
@@ -632,6 +632,10 @@ export class RecentlyAddedTile extends TileView {
       const root = this.trail()[0];
       untracked(() => this.playTheme(root?.kind === 'show' ? root : null));
     });
+    // Once something actually plays on an Apple TV the theme gives way; it does not come back for the same show.
+    effect(() => {
+      if (this.casting().length) untracked(() => this.silenceTheme());
+    });
     inject(DestroyRef).onDestroy(() => {
       this.stopTheme();
       this.stopLocal();
@@ -855,10 +859,11 @@ export class RecentlyAddedTile extends TileView {
     this.cast.set({ step: 'starting', itemId: item.id, devices: [], device });
     try {
       const account = this.overview()?.accountId ?? 0;
-      // A track chosen from its album goes on with the album's next tracks.
+      // A track chosen from its album goes on with the album's next tracks, an episode with the season's next episodes.
       const trail = this.trail();
-      const album = item.kind === 'track' ? trail[trail.length - 2] : undefined;
-      if (album?.kind === 'album') await this.realtime.playAlbumOnAirPlay(account, album.id, item.id, device.id);
+      const parent = item.kind === 'track' || item.kind === 'episode' ? trail[trail.length - 2] : undefined;
+      if ((item.kind === 'track' && parent?.kind === 'album') || (item.kind === 'episode' && parent?.kind === 'season'))
+        await this.realtime.playAlbumOnAirPlay(account, parent.id, item.id, device.id);
       else await this.realtime.playOnAirPlay(account, item.id, device.id);
       // From here the playing shows from AirPlayData, on this screen and every other.
       this.cast.set(IDLE);
@@ -880,6 +885,12 @@ export class RecentlyAddedTile extends TileView {
     this.theme.play()?.catch(() => undefined);
   }
 
+  /** Stops the theme but remembers its show, so staying in the show does not start it over. */
+  private silenceTheme() {
+    this.theme?.pause();
+    this.theme = undefined;
+  }
+
   private stopTheme() {
     this.theme?.pause();
     this.theme = undefined;
@@ -891,13 +902,24 @@ export class RecentlyAddedTile extends TileView {
   }
 
   /** Plays a film or episode in this screen's own picture, over the dialog. */
-  private playVideo(item: PlexItem) {
+  private playVideo(item: PlexItem, next: PlexItem[] = []) {
     this.stopTheme();
     this.stopLocal();
     this.stopVideo();
+    this.videoNext = next;
     this.videoAt = 0;
     this.videoReportedAt = 0;
     this.video.set(item);
+  }
+
+  /** The episodes after the one that plays, in this screen's picture, which follow when it ends. */
+  private videoNext: PlexItem[] = [];
+
+  /** An episode that played to its end goes on with the next of its season. */
+  protected videoEnded(item: PlexItem) {
+    const next = this.videoNext.shift();
+    this.stopVideo(true);
+    if (next) this.playVideo(next, this.videoNext);
   }
 
   /** Where the video was last seen to be (ms), and when Plex was last told. */
@@ -942,8 +964,14 @@ export class RecentlyAddedTile extends TileView {
   /** Plays a film or episode in this screen's own picture; a track, or an album track after track, in its own speakers. A track chosen from its album goes on with the rest of it. */
   protected async playHere(item: PlexItem) {
     this.localError.set('');
-    if (item.kind === 'movie' || item.kind === 'episode') return this.playVideo(item);
     const trail = this.trail();
+    if (item.kind === 'movie') return this.playVideo(item);
+    if (item.kind === 'episode') {
+      const season = trail[trail.length - 2];
+      const episodes = season?.kind === 'season' ? (this.under()[season.id]?.items ?? []).filter((e) => e.kind === 'episode') : [];
+      const at = episodes.findIndex((e) => e.id === item.id);
+      return this.playVideo(item, at < 0 ? [] : episodes.slice(at + 1));
+    }
     const album = item.kind === 'album' ? item : item.kind === 'track' ? trail[trail.length - 2] : undefined;
     if (album?.kind !== 'album') return this.startLocal({ queue: [item], index: 0, paused: false, album: null });
     await this.loadChildren(album);

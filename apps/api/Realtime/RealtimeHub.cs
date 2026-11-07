@@ -143,7 +143,7 @@ public sealed class RealtimeHub(
     public Task PlayOnAirPlay(int accountId, string itemId, string deviceId) =>
         playback.PlayAsync(accountId, itemId, deviceId, null, null, Context.ConnectionAborted);
 
-    // Plays an album from one of its tracks (the first when trackId is null); the tracks after it follow.
+    // Plays an album from one of its tracks, or a season from one of its episodes (the first when trackId is null); the ones after it follow.
     public Task PlayAlbumOnAirPlay(int accountId, string albumId, string? trackId, string deviceId) =>
         playback.PlayAsync(accountId, albumId, deviceId, trackId, null, Context.ConnectionAborted);
 
