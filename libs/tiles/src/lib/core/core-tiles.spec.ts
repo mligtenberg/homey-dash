@@ -150,6 +150,21 @@ describe('core tiles', () => {
       expect(button(tile, 'Play')).toBeTruthy();
     });
 
+    it('lets a speaker\'s volume be set on its tile, unless the tile is small', async () => {
+      const speaker = device([capability('speaker_playing', true), capability('volume_set', 0.3)], { class: 'speaker' });
+      const small = await render(DeviceTile, 'd1', 'small');
+      await push(speaker);
+      expect(small.querySelector('.hd-tile__volume')).toBeNull();
+
+      const tile = await render(DeviceTile, 'd1', 'wide');
+      await push(speaker);
+      const slider = tile.querySelector<HTMLElement>('.hd-tile__volume [role="slider"]');
+      expect(slider?.getAttribute('aria-valuenow')).toBe('30');
+      slider?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+      await settle();
+      expect(realtime.commands).toEqual([['setCapability', undefined, 'd1', 'volume_set', 0.4]]);
+    });
+
     it('opens its details on Enter and Space like a tap', async () => {
       const tile = await render(DeviceTile, 'd1');
       await push(device([capability('onoff', true), capability('dim', 0.5)]));
@@ -623,6 +638,7 @@ describe('core tiles', () => {
             { id: 'homey:device:d1:measure_power', ownerUri: 'homey:device:d1', ownerName: 'Plug', title: 'Power', type: 'number', units: 'W' },
             { id: 'homey:device:d1:measure_empty', ownerUri: 'homey:device:d1', ownerName: 'Plug', title: 'Empty', type: 'number', units: 'W' },
             { id: 'homey:device:d1:alarm_contact', ownerUri: 'homey:device:d1', ownerName: 'Plug', title: 'Contact', type: 'boolean', units: null },
+            { id: 'homey:device:d1:speaker_position', ownerUri: 'homey:device:d1', ownerName: 'Plug', title: 'Position', type: 'number', units: 's' },
             { id: 'homey:device:other:measure_power', ownerUri: 'homey:device:other', ownerName: 'Other', title: 'Power', type: 'number', units: 'W' },
           ]);
           await push(device([capability('onoff', true)], { class: 'socket' }));

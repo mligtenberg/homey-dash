@@ -5,10 +5,13 @@ export function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+/** Readings of what plays that are not worth a chart: the playbar already shows them. */
+const UNCHARTED = new Set(['speaker_duration', 'speaker_position']);
+
 /** The insight logs of a device's readings that can be charted: numbers, not on/off or text. */
 export function deviceLogs(insights: ReadonlyMap<string, HomeyInsightLog> | undefined, deviceId: string): HomeyInsightLog[] {
   const prefix = `homey:device:${deviceId}:`;
-  return [...(insights?.values() ?? [])].filter((l) => l.type === 'number' && l.id.startsWith(prefix));
+  return [...(insights?.values() ?? [])].filter((l) => l.type === 'number' && l.id.startsWith(prefix) && !UNCHARTED.has(l.id.slice(prefix.length)));
 }
 
 /** Whether two lists of logs hold the same ones; a device's values change all the time, its logs do not. */

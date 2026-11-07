@@ -38,6 +38,8 @@ interface DeviceFace extends TileFace {
   reading?: { value: string; units: string };
   /** The `dim` capability when the tile shows a brightness slider. */
   slider?: HomeyCapability;
+  /** The `volume_set` capability when a speaker's tile shows a volume slider. */
+  volume?: HomeyCapability;
   thermostat?: HomeyCapability;
   cover?: HomeyCapability;
 }
@@ -78,6 +80,12 @@ interface DeviceFace extends TileFace {
     </div>
     @if (face().slider; as dim) {
       <hd-device-slider [capability]="dim" [label]="face().name + ' brightness'" [disabled]="face().state !== 'ok'" [driver]="drive" />
+    }
+    @if (face().volume; as volume) {
+      <div class="hd-tile__volume">
+        <span class="hd-tile__volume-label">Volume</span>
+        <hd-device-slider [capability]="volume" [label]="face().name + ' volume'" [disabled]="face().state !== 'ok'" [driver]="drive" />
+      </div>
     }
     @if (face().cover; as cover) {
       <hd-device-segments [capability]="cover" [options]="coverStates" [disabled]="face().state !== 'ok'" [driver]="drive" />
@@ -137,6 +145,7 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
       case 'speaker_playing':
         face.action = primary.value ? 'Pause' : 'Play';
         face.actionIcon = primary.value ? LucidePause : LucidePlay;
+        if (roomy && caps['volume_set']?.setable) face.volume = caps['volume_set'];
         break;
       default:
         if (typeof primary?.value === 'number') {
@@ -176,7 +185,7 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
       this.logs().length > 0 ||
       !!c.position ||
       !!c.lock ||
-      !!c.volume ||
+      (!!c.volume && !face.volume) ||
       !!c.progress ||
       !!c.remote ||
       !!c.volumeKeys ||
