@@ -4,6 +4,7 @@ import {
   AirPlayPlayback,
   ScreenDetails,
   CapabilityValue,
+  DeviceApp,
   DisplayInfo,
   HomeySnapshot,
   PhotoSet,
@@ -297,6 +298,17 @@ export class FakeRealtime implements Partial<Realtime> {
 
   playSpeakerMusic(account: number | undefined, deviceId: string, kind: SpeakerMusicKind, music: SpeakerMusic) {
     return this.command('playSpeakerMusic', account, deviceId, kind, music.name);
+  }
+
+  /** What `deviceApps` answers, whatever device is asked. */
+  apps: DeviceApp[] = [];
+
+  async deviceApps() {
+    return this.apps;
+  }
+
+  openDeviceApp(account: number | undefined, deviceId: string, app: DeviceApp) {
+    return this.command('openDeviceApp', account, deviceId, app.name);
   }
 
   private async command(...command: unknown[]) {

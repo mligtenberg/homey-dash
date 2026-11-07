@@ -113,6 +113,17 @@ export interface SpeakerMusic {
   item: unknown;
 }
 
+/** An app a device can open, such as one on an Apple TV; `item` is handed back to open it. */
+export interface DeviceApp {
+  name: string;
+  image: string | null;
+  /** What kind of app it is, such as Entertainment; null when that is not known. */
+  category: string | null;
+  /** Whether it is for watching or listening, which come first. */
+  media: boolean;
+  item: unknown;
+}
+
 export type SpeakerMusicKind = 'favorite' | 'playlist';
 
 export interface HomeyInsightLog {

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using HomeyDash.Api.Accounts;
 
 namespace HomeyDash.Api.Homey;
@@ -369,6 +370,64 @@ public sealed class LocalHomey(
     {
         var (card, arg) = MusicCard(kind);
         return RunSpeakerActionAsync(deviceId, card, new Dictionary<string, JsonElement> { [arg] = item }, ct);
+    }
+
+    // A device's flow card that opens an app is called `appletv_launch_app`, `launch_app` or `send-launch-app` by the app
+    // that owns the device, with one autocomplete argument whose name differs too, so both are read from the card.
+    private static readonly Regex LaunchAppCard = new(@"^[^:]*(launch|open)[-_]app$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // The cards are many and change only when an app is installed, so they are read now and then: by device, its card and argument.
+    private static readonly TimeSpan AppCardsLifetime = TimeSpan.FromMinutes(10);
+    private readonly SemaphoreSlim _appCardsLoading = new(1, 1);
+    private Dictionary<string, (string Card, string Arg)> _appCards = [];
+    private long? _appCardsRead;
+
+    private async Task<(string Card, string Arg)?> AppCardAsync(string deviceId, CancellationToken ct)
+    {
+        if (state.FindDevice(deviceId) is null) throw new HomeyNotFoundException($"Device {deviceId} not found in Homey");
+        await _appCardsLoading.WaitAsync(ct);
+        try
+        {
+            if (_appCardsRead is not { } read || Environment.TickCount64 - read > AppCardsLifetime.TotalMilliseconds)
+            {
+                var cards = new Dictionary<string, (string, string)>();
+                const string prefix = "homey:device:";
+                foreach (var card in HomeyMapper.Values(await GetJsonAsync("api/manager/flow/flowcardaction", ct)))
+                {
+                    if (HomeyMapper.String(card, "id") is not { } id || !id.StartsWith(prefix)) continue;
+                    var split = id.IndexOf(':', prefix.Length);
+                    if (split < 0 || !LaunchAppCard.IsMatch(id[(split + 1)..])) continue;
+                    var arg = card.TryGetProperty("args", out var args) && args.ValueKind == JsonValueKind.Array
+                        ? args.EnumerateArray().FirstOrDefault(a => HomeyMapper.String(a, "type") == "autocomplete")
+                        : default;
+                    if (arg.ValueKind == JsonValueKind.Object && HomeyMapper.String(arg, "name") is { } name) cards[id[prefix.Length..split]] = (id[(split + 1)..], name);
+                }
+                _appCards = cards;
+                _appCardsRead = Environment.TickCount64;
+            }
+            return _appCards.TryGetValue(deviceId, out var found) ? found : null;
+        }
+        finally
+        {
+            _appCardsLoading.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<DeviceApp>> ListDeviceAppsAsync(string deviceId, CancellationToken ct)
+    {
+        if (await AppCardAsync(deviceId, ct) is not { } found) return [];
+        var (card, arg) = found;
+        var apps = await SendJsonAsync(HttpMethod.Get,
+            $"{FlowCardAction(DeviceUri(deviceId), card, "autocomplete")}?name={Uri.EscapeDataString(arg)}&query=", null, ct);
+        return apps.ValueKind != JsonValueKind.Array ? []
+            : apps.EnumerateArray().Select(i => new DeviceApp(HomeyMapper.String(i, "name") ?? "?", HomeyMapper.String(i, "image"), i.Clone())).ToList();
+    }
+
+    public async Task OpenDeviceAppAsync(string deviceId, JsonElement item, CancellationToken ct)
+    {
+        if (await AppCardAsync(deviceId, ct) is not { } found) throw new HomeyNotFoundException($"Device {deviceId} cannot open apps");
+        var (card, arg) = found;
+        await RunSpeakerActionAsync(deviceId, card, new Dictionary<string, JsonElement> { [arg] = item }, ct);
     }
 
     private Task RunSpeakerActionAsync(string deviceId, string card, object args, CancellationToken ct)

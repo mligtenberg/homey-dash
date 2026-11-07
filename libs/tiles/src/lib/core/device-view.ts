@@ -15,6 +15,17 @@ export function deviceLogs(insights: ReadonlyMap<string, HomeyInsightLog> | unde
 export const sameLogs = (a: readonly HomeyInsightLog[], b: readonly HomeyInsightLog[]) =>
   a.length === b.length && a.every((l, i) => l.id === b[i].id);
 
+/** The capabilities that press a remote's buttons, by what each does; a device has the ones it has. */
+export type RemoteKeys = Partial<
+  Record<'up' | 'down' | 'left' | 'right' | 'select' | 'back' | 'home' | 'playpause' | 'x' | 'y' | 'menu' | 'view', HomeyCapability>
+>;
+
+/** The channel buttons of a television. */
+export type ChannelKeys = Partial<Record<'up' | 'down', HomeyCapability>>;
+
+/** The volume buttons of a device with no volume slider. */
+export type VolumeKeys = Partial<Record<'down' | 'mute' | 'up', HomeyCapability>>;
+
 /**
  * Everything the detail view of a device shows: every control it has, whatever the tile size, laid out for its mode.
  * `failed` says its last command was not answered.
@@ -29,6 +40,14 @@ export function describeDevice(device: HomeyDevice, accountId: number | undefine
     const [min, max] = [c.min ?? fallback[0], c.max ?? fallback[1]];
     return clamp((c.value - min) / ((max - min) || 1), 0, 1);
   };
+  // Each key is pressed by the first of the capabilities named for it that the device has.
+  const keys = <K extends string>(ids: Record<K, string | string[]>): Partial<Record<K, HomeyCapability>> | null => {
+    const found = Object.entries<string | string[]>(ids).flatMap(([key, id]) => {
+      const button = [id].flat().map(control).find(Boolean);
+      return button ? [[key, button]] : [];
+    });
+    return found.length ? (Object.fromEntries(found) as Partial<Record<K, HomeyCapability>>) : null;
+  };
   const mode = deviceMode(device);
   const thermostat = control('target_temperature');
   const on = caps['onoff']?.value === true || caps['speaker_playing']?.value === true || (mode === 'lock' && caps['locked']?.value === true);
@@ -39,6 +58,8 @@ export function describeDevice(device: HomeyDevice, accountId: number | undefine
     'locked',
     'windowcoverings_set',
     'volume_set',
+    'speaker_duration',
+    'speaker_position',
   ]);
   const text = (id: string) => (typeof caps[id]?.value === 'string' ? (caps[id].value as string) : '');
   const closed = coverClosed(device);
@@ -68,6 +89,28 @@ export function describeDevice(device: HomeyDevice, accountId: number | undefine
     previous: control('speaker_prev'),
     next: control('speaker_next'),
     volume: control('volume_set'),
+    // An Apple TV has no volume to slide, only buttons to press.
+    volumeKeys: control('volume_set') ? null : keys({ down: 'volume_down', mute: 'volume_mute', up: 'volume_up' }),
+    // An Apple TV's remote, or an Xbox's controller: A selects and B goes back.
+    remote: keys({
+      up: ['remote_up', 'controller_Up'],
+      down: ['remote_down', 'controller_Down'],
+      left: ['remote_left', 'controller_Left'],
+      right: ['remote_right', 'controller_Right'],
+      select: ['remote_select', 'controller_A'],
+      back: ['remote_back', 'controller_B'],
+      home: ['remote_home', 'controller_nexus'],
+      playpause: 'remote_playpause',
+      x: 'controller_X',
+      y: 'controller_Y',
+      menu: 'controller_Menu',
+      view: 'controller_View',
+    }),
+    channel: keys({ up: 'channel_up', down: 'channel_down' }),
+    // Beside a volume slider, mute is a button of its own.
+    mute: control('volume_set') ? control('volume_mute') : undefined,
+    app: text('now_playing_app'),
+    progress: playbackProgress(caps['speaker_position'], caps['speaker_duration'], on),
     track: text('speaker_track'),
     artist: text('speaker_artist'),
     art: device.albumArt && accountId !== undefined ? homeyImageUrl(accountId, device.albumArt) : null,
@@ -81,6 +124,20 @@ export function describeDevice(device: HomeyDevice, accountId: number | undefine
 }
 
 export type DeviceView = ReturnType<typeof describeDevice>;
+
+/** How far what plays has come, in seconds, when the device says both where it is and how long it lasts. */
+function playbackProgress(position: HomeyCapability | undefined, duration: HomeyCapability | undefined, playing: boolean) {
+  if (typeof position?.value !== 'number' || typeof duration?.value !== 'number' || duration.value <= 0 || position.value < 0) return null;
+  const updated = position.lastUpdated ? Date.parse(position.lastUpdated) : NaN;
+  return { position: position.value, duration: duration.value, playing, updated: Number.isNaN(updated) ? null : updated };
+}
+
+/** A time in seconds as `4:07` or `1:31:57`. */
+export function clockTime(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const [h, m, s] = [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60];
+  return `${h ? `${h}:${`${m}`.padStart(2, '0')}` : m}:${`${s}`.padStart(2, '0')}`;
+}
 
 /** How far a cover is shut, 0 to 1: by its position when it has one, else by its state. */
 function coverClosed(device: HomeyDevice): number {

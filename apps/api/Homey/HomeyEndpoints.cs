@@ -12,6 +12,8 @@ public static class HomeyEndpoints
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<Homeys>();
         services.AddSingleton<HomeyAccounts>();
+        services.AddSingleton<AppCatalog>();
+        services.AddHttpClient(AppCatalog.HttpClientName);
 
         if (options.Fake)
         {

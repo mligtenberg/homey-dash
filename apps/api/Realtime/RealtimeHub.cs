@@ -43,6 +43,7 @@ public sealed class RealtimeHub(
     DisplayDirectory directory,
     DisplayTouches touches,
     DisplayBrightness brightness,
+    AppCatalog appCatalog,
     TimeProvider time) : Hub
 {
     public const string Path = "/api/realtime";
@@ -294,6 +295,16 @@ public sealed class RealtimeHub(
 
     public Task PlaySpeakerMusic(int? accountId, string deviceId, string kind, JsonElement item) =>
         Perform(ct => homeys.Require(accountId).PlaySpeakerMusicAsync(deviceId, kind, item, ct));
+
+    public async Task<IReadOnlyList<DeviceApp>> DeviceApps(int? accountId, string deviceId)
+    {
+        IReadOnlyList<DeviceApp> apps = [];
+        await Perform(async ct => apps = await appCatalog.DescribeAsync(await homeys.Require(accountId).ListDeviceAppsAsync(deviceId, ct), ct));
+        return apps;
+    }
+
+    public Task OpenDeviceApp(int? accountId, string deviceId, JsonElement item) =>
+        Perform(ct => homeys.Require(accountId).OpenDeviceAppAsync(deviceId, item, ct));
 
     /// <summary>
     /// Subscribes to a rule under an id the connection chooses, answering whether it holds now. A screen's rules are

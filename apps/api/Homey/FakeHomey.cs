@@ -18,6 +18,7 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
 
     private static readonly JsonElement True = JsonSerializer.SerializeToElement(true);
     private static readonly JsonElement False = JsonSerializer.SerializeToElement(false);
+    private static readonly JsonElement Null = JsonSerializer.SerializeToElement<object?>(null);
 
     private static readonly HomeyZone[] Zones =
     [
@@ -50,7 +51,15 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         Device("living-tv-bars", "TV light bars", "living", "light", OnOff(false), Dim(0.4)),
         Device("thermostat", "Thermostat", "living", "thermostat", Target(20.5), Temperature(20.1)),
         Device("living-blinds", "Blinds", "living", "blinds", Cover("idle")),
-        Device("living-tv", "TV", "living", "tv", OnOff(false)),
+        Device("living-tv", "TV", "living", "tv", OnOff(false),
+            Number("volume_set", "Volume", 0.3, null, true, 0, 1, 0.01),
+            Capability("volume_mute", "Mute", "boolean", False, true),
+            Button("channel_up", "Channel up"), Button("channel_down", "Channel down")),
+        Device("living-xbox", "Xbox", "living", "gameconsole",
+            OnOff(false),
+            Button("controller_Up", "Up"), Button("controller_Down", "Down"), Button("controller_Left", "Left"), Button("controller_Right", "Right"),
+            Button("controller_A", "A"), Button("controller_B", "B"), Button("controller_X", "X"), Button("controller_Y", "Y"),
+            Button("controller_Menu", "Menu"), Button("controller_View", "View"), Button("controller_nexus", "Xbox")),
         Device("living-speaker", "Speaker", "living", "speaker",
             Capability("speaker_playing", "Playing", "boolean", True, true),
             Capability("speaker_track", "Track", "string", JsonSerializer.SerializeToElement("Birds of a Feather"), false),
@@ -58,6 +67,16 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
             Capability("speaker_album", "Album", "string", JsonSerializer.SerializeToElement("Hit Me Hard and Soft"), false),
             Number("volume_set", "Volume", 0.25, null, true, 0, 1, 0.01),
             Group("Living room")) with { AlbumArt = new("fake-album-art", "1") },
+        Device("living-apple-tv", "Apple TV", "living", "settopbox",
+            OnOff(true),
+            Capability("speaker_playing", "Playing", "boolean", True, true),
+            Capability("speaker_track", "Track", "string", JsonSerializer.SerializeToElement("Got Talent"), false),
+            Capability("speaker_artist", "Artist", "string", JsonSerializer.SerializeToElement("Videoland"), false),
+            Capability("now_playing_app", "App", "string", JsonSerializer.SerializeToElement("Videoland"), false),
+            Number("speaker_duration", "Length", 5516.92, null, false), Number("speaker_position", "Position", 1125.2, null, false),
+            Button("remote_up", "Up"), Button("remote_down", "Down"), Button("remote_left", "Left"), Button("remote_right", "Right"),
+            Button("remote_select", "Select"), Button("remote_back", "Back"), Button("remote_home", "Home"),
+            Button("volume_down", "Volume down"), Button("volume_mute", "Mute"), Button("volume_up", "Volume up")),
         Device("living-vacuum", "Robot vacuum", "living", "vacuumcleaner", OnOff(false), Number("measure_battery", "Battery", 87, "%", false)),
         Device("living-climate", "Climate sensor", "living", "sensor", Temperature(20.3), Humidity(48)),
         Device("living-motion", "Motion sensor", "living", "sensor", Alarm("alarm_motion", "Motion", false), Number("measure_luminance", "Light level", 140, "lx", false)),
@@ -303,6 +322,30 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         return Task.CompletedTask;
     }
 
+    private static readonly (string Name, string Category)[] Apps =
+    [
+        ("Netflix", "Entertainment"), ("Disney+", "Entertainment"), ("YouTube", "Photo & Video"), ("Videoland", "Entertainment"),
+        ("NPO", "Entertainment"), ("Plex", "Photo & Video"), ("Spotify", "Music"), ("Prime Video", "Entertainment"), ("Settings", "Apple"),
+    ];
+    private static readonly string[] AppNames = [.. Apps.Select(a => a.Name)];
+
+    public Task<IReadOnlyList<DeviceApp>> ListDeviceAppsAsync(string deviceId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<DeviceApp>>(HasApps(deviceId)
+            ? Apps.Select(a => new DeviceApp(a.Name, null, JsonSerializer.SerializeToElement(new { name = a.Name, id = a.Name == "Settings" ? "com.apple.TVSettings" : (string?)null })) { Category = a.Category, Media = a.Category != "Apple" }).ToList()
+            : []);
+
+    public Task OpenDeviceAppAsync(string deviceId, JsonElement item, CancellationToken ct)
+    {
+        var name = item.TryGetProperty("name", out var n) ? n.GetString() : null;
+        if (!HasApps(deviceId) || name is null || !AppNames.Contains(name)) throw new HomeyNotFoundException($"{name ?? "That app"} cannot be opened");
+        _state.UpdateCapability(deviceId, "now_playing_app", JsonSerializer.SerializeToElement(name), null);
+        _state.UpdateCapability(deviceId, "speaker_track", JsonSerializer.SerializeToElement(name), null);
+        return Task.CompletedTask;
+    }
+
+    private bool HasApps(string deviceId) =>
+        _state.FindDevice(deviceId) is { } device ? device.Capabilities.ContainsKey("now_playing_app") : throw new HomeyNotFoundException($"Device {deviceId} not found in Homey");
+
     private string GroupOf(string deviceId) =>
         _state.FindDevice(deviceId)?.Capabilities.GetValueOrDefault("sonos_group")?.Value.GetString()
         ?? throw new HomeyNotFoundException($"Device {deviceId} is not a Sonos speaker");
@@ -393,6 +436,9 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         };
 
     private static HomeyCapability Group(string name) => Capability("sonos_group", "Group", "string", JsonSerializer.SerializeToElement(name), false);
+
+    // A button: something to press, which has no value.
+    private static HomeyCapability Button(string id, string title) => Capability(id, title, "boolean", Null, true);
 
     private static HomeyCapability Alarm(string id, string title, bool on) => Capability(id, title, "boolean", on ? True : False, false);
 

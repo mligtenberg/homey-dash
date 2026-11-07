@@ -422,6 +422,176 @@ describe('core tiles', () => {
           ]);
         });
 
+        describe('remote control', () => {
+          const appleTv = (change: Partial<HomeyDevice> = {}) =>
+            open(
+              [
+                capability('onoff', true),
+                capability('speaker_playing', true),
+                capability('speaker_track', 'Got Talent', { type: 'string', setable: false }),
+                capability('now_playing_app', 'Videoland', { type: 'string', setable: false }),
+                ...['up', 'down', 'left', 'right', 'select', 'back', 'home'].map((key) => capability(`remote_${key}`, null, { type: 'boolean' })),
+                ...['down', 'mute', 'up'].map((key) => capability(`volume_${key}`, null, { type: 'boolean' })),
+              ],
+              { class: 'settopbox', ...change },
+            );
+
+          it('has arrows, select, back and home to press', async () => {
+            const { dialog } = await appleTv();
+            for (const label of ['Up', 'Left', 'Select', 'Right', 'Down', 'Back', 'Home']) button(dialog, label).click();
+            await settle();
+            expect(realtime.commands).toEqual(
+              ['up', 'left', 'select', 'right', 'down', 'back', 'home'].map((key) => ['setCapability', undefined, 'd1', `remote_${key}`, true]),
+            );
+          });
+
+          it('has an Xbox controller for a remote: A selects, B goes back, and X, Y, Menu and View are labelled', async () => {
+            const { dialog } = await open(
+              [
+                capability('onoff', true),
+                ...['Up', 'Down', 'Left', 'Right', 'A', 'B', 'X', 'Y', 'Menu', 'View', 'nexus'].map((key) => capability(`controller_${key}`, null, { type: 'boolean' })),
+              ],
+              { class: 'gameconsole' },
+            );
+            for (const label of ['Up', 'Select', 'Back', 'Home', 'X', 'Menu']) button(dialog, label).click();
+            await settle();
+            expect(realtime.commands).toEqual(
+              ['Up', 'A', 'B', 'nexus', 'X', 'Menu'].map((key) => ['setCapability', undefined, 'd1', `controller_${key}`, true]),
+            );
+          });
+
+          it('has channel buttons and a mute toggle next to the volume slider of a television', async () => {
+            const { dialog } = await open(
+              [
+                capability('onoff', true),
+                capability('volume_set', 0.3),
+                capability('volume_mute', false),
+                capability('channel_up', null, { type: 'boolean' }),
+                capability('channel_down', null, { type: 'boolean' }),
+              ],
+              { class: 'tv' },
+            );
+            button(dialog, 'Channel up').click();
+            button(dialog, 'Channel down').click();
+            button(dialog, 'Mute').click();
+            await settle();
+            expect(realtime.commands).toEqual([
+              ['setCapability', undefined, 'd1', 'channel_up', true],
+              ['setCapability', undefined, 'd1', 'channel_down', true],
+              ['setCapability', undefined, 'd1', 'volume_mute', true],
+            ]);
+          });
+
+          it('has volume buttons where there is no slider, and a hold repeats them', async () => {
+            vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+            try {
+              const { dialog } = await appleTv();
+              expect(dialog.querySelector('[role="slider"]')).toBeNull();
+              button(dialog, 'Mute').click();
+              const up = button(dialog, 'Volume up');
+              up.dispatchEvent(new Event('pointerdown'));
+              vi.advanceTimersByTime(400 + 150 * 2);
+              up.dispatchEvent(new Event('pointerup'));
+              up.click(); // The click that ends a hold does not press once more.
+              vi.advanceTimersByTime(1000);
+              expect(realtime.commands).toEqual([
+                ['setCapability', undefined, 'd1', 'volume_mute', true],
+                ['setCapability', undefined, 'd1', 'volume_up', true],
+                ['setCapability', undefined, 'd1', 'volume_up', true],
+                ['setCapability', undefined, 'd1', 'volume_up', true],
+              ]);
+            } finally {
+              vi.useRealTimers();
+            }
+          });
+
+          it('shows a slider instead of volume buttons where the device has one', async () => {
+            const { dialog } = await open([capability('onoff', true), capability('volume_set', 0.3), capability('volume_up', null, { type: 'boolean' })], { class: 'tv' });
+            expect(dialog.querySelectorAll('[role="slider"]').length).toBe(1);
+            expect(button(dialog, 'Volume up')).toBeUndefined();
+          });
+
+          it('opens the apps the device offers, and marks the one that is open', async () => {
+            realtime.apps = [
+              { name: 'Netflix', image: null, category: null, media: false, item: { name: 'Netflix' } },
+              { name: 'Videoland', image: null, category: null, media: false, item: { name: 'Videoland' } },
+            ];
+            const { dialog } = await appleTv();
+            await settle();
+            button(dialog, 'Apps').click();
+            await settle();
+            expect(button(dialog, 'Videoland').getAttribute('aria-pressed')).toBe('true');
+            expect(button(dialog, 'Netflix').getAttribute('aria-pressed')).toBe('false');
+
+            button(dialog, 'Netflix').click();
+            await settle();
+            expect(realtime.commands).toEqual([['openDeviceApp', undefined, 'd1', 'Netflix']]);
+          });
+
+          it('groups the apps by category, media first and those with no category last', async () => {
+            realtime.apps = [
+              { name: 'Settings', image: null, category: null, media: false, item: {} },
+              { name: 'Fitness', image: null, category: 'Health', media: false, item: {} },
+              { name: 'Spotify', image: null, category: 'Music', media: true, item: {} },
+              { name: 'Netflix', image: 'https://cdn/netflix.jpg', category: 'Entertainment', media: true, item: {} },
+            ];
+            const { dialog } = await appleTv();
+            await settle();
+            button(dialog, 'Apps').click();
+            await settle();
+            const groups = [...dialog.querySelectorAll('.hd-apps__group')].map((g) => [g.querySelector('h3')?.textContent, ...[...g.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))]);
+            expect(groups).toEqual([['Entertainment', 'Netflix'], ['Music', 'Spotify'], ['Health', 'Fitness'], ['Other', 'Settings']]);
+            expect(dialog.querySelector('.hd-apps__app img')?.getAttribute('src')).toBe('https://cdn/netflix.jpg');
+          });
+
+          it('keeps an icon for the apps that come with the device, and the first letter for the rest', async () => {
+            realtime.apps = [
+              { name: 'Instellingen', image: null, category: 'Apple', media: false, item: { id: 'com.apple.TVSettings' } },
+              { name: 'Netflix', image: null, category: 'Apple', media: false, item: { id: 'com.netflix.app' } },
+            ];
+            const { dialog } = await appleTv();
+            await settle();
+            button(dialog, 'Apps').click();
+            await settle();
+            expect(button(dialog, 'Instellingen').querySelector('.hd-apps__icon svg')).not.toBeNull();
+            expect(button(dialog, 'Netflix').querySelector('.hd-apps__icon svg')).toBeNull();
+            expect(button(dialog, 'Netflix').querySelector('.hd-apps__icon')?.textContent?.trim()).toBe('N');
+          });
+
+          it('says when an app could not be opened', async () => {
+            realtime.apps = [{ name: 'Netflix', image: null, category: null, media: false, item: { name: 'Netflix' } }];
+            const { dialog } = await appleTv();
+            await settle();
+            button(dialog, 'Apps').click();
+            await settle();
+            realtime.failCommands = true;
+            button(dialog, 'Netflix').click();
+            await settle();
+            expect(dialog.querySelector('[role="alert"]')?.textContent).toBe('Could not open Netflix');
+          });
+
+          it('has no apps page for a device that opens none', async () => {
+            const { dialog } = await appleTv();
+            await settle();
+            expect(button(dialog, 'Apps')).toBeUndefined();
+            expect(dialog.querySelector('.hd-apps')).toBeNull();
+          });
+        });
+
+        it('shows how far what plays has come as a bar, not as numbers', async () => {
+          const { dialog, pane } = await open(
+            [
+              capability('speaker_playing', false),
+              capability('speaker_duration', 5516.9),
+              capability('speaker_position', 1125.2),
+            ],
+            { class: 'speaker' },
+          );
+          expect(pane.querySelector('.hd-dev__progress-times')?.textContent).toBe('18:45' + '1:31:56');
+          expect(pane.querySelector('.hd-dev__progress-bar > div')?.getAttribute('style')).toContain('20.39');
+          expect(dialog.querySelector('.hd-details__readings')).toBeNull();
+        });
+
         it('locks and unlocks a lock', async () => {
           const { dialog, pane } = await open([capability('locked', true)], { class: 'lock' });
           expect(pane.dataset['mode']).toBe('lock');

@@ -258,6 +258,22 @@ public sealed class RealtimeHubTests(ApiFactory factory) : IClassFixture<ApiFact
     }
 
     [Fact]
+    public async Task ADeviceThatOpensApps_ListsThemAndOpensOne()
+    {
+        var hub = await ConnectAsync();
+        var changes = Listen(hub, "DeviceChanged");
+
+        var apps = await hub.InvokeAsync<JsonElement>("DeviceApps", null, "living-apple-tv");
+        var netflix = apps.EnumerateArray().First(a => a.GetProperty("name").GetString() == "Netflix");
+        await hub.InvokeAsync("OpenDeviceApp", null, "living-apple-tv", netflix.GetProperty("item"));
+
+        await NextAsync(changes, c => c.GetProperty("device") is var d && d.GetProperty("id").GetString() == "living-apple-tv"
+            && d.GetProperty("capabilities").TryGetProperty("now_playing_app", out var app) && app.GetProperty("value").GetString() == "Netflix");
+        Assert.Empty((await hub.InvokeAsync<JsonElement>("DeviceApps", null, "living-lamp")).EnumerateArray());
+        await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("OpenDeviceApp", null, "living-lamp", netflix.GetProperty("item")));
+    }
+
+    [Fact]
     public async Task AFailedAction_SaysWhy()
     {
         var hub = await ConnectAsync();

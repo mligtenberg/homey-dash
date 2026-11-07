@@ -74,6 +74,17 @@ public sealed record HomeyWeather(double? Temperature, string? State, double? Hu
 // Something a Sonos speaker can play, as its flow card offers it. Item is the card's own answer, handed back to play it.
 public sealed record SpeakerMusic(string Name, string? Description, string? Image, JsonElement Item);
 
+// An app a device can open (an Apple TV's Netflix, an Xbox game), as its flow card offers it. Item is the card's own answer,
+// handed back to open it.
+public sealed record DeviceApp(string Name, string? Image, JsonElement Item)
+{
+    // What kind of app it is, such as Entertainment; null when it is not known.
+    public string? Category { get; init; }
+
+    // Whether it is for watching or listening (video, music, sports), which the apps list shows first.
+    public bool Media { get; init; }
+}
+
 public static class SpeakerMusicKinds
 {
     public const string Favorite = "favorite";

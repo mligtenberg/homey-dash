@@ -27,6 +27,9 @@ export function primaryCapability(device: HomeyDevice, picked: string | undefine
   return control ?? Object.values(caps).find((c) => typeof c.value === 'number' && c.id.startsWith('measure_')) ?? null;
 }
 
+/** Device classes that usually open apps (an Apple TV, a smart TV, a game console). */
+const APP_CLASSES = new Set(['tv', 'settopbox', 'gameconsole']);
+
 interface DeviceFace extends TileFace {
   /** The icon on the quick action's button; a power button unless said otherwise. */
   actionIcon?: LucideIconInput;
@@ -173,7 +176,14 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
       this.logs().length > 0 ||
       !!c.position ||
       !!c.lock ||
-      (c.mode === 'speaker' && (!!c.volume || !!c.next || !!c.previous || !!c.art)) ||
+      !!c.volume ||
+      !!c.progress ||
+      !!c.remote ||
+      !!c.volumeKeys ||
+      !!c.channel ||
+      // These may open apps, which only the backend knows.
+      APP_CLASSES.has(device.class) ||
+      (c.mode === 'speaker' && (!!c.next || !!c.previous || !!c.art)) ||
       c.readings.some((r) => r.id !== shown)
     );
   }

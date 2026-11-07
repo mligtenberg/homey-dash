@@ -506,10 +506,87 @@
 .hd-dev__art img { width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; }
 .hd-dev__titles { display: flex; flex-direction: column; gap: calc(var(--cell) * .06); }
 .hd-dev__titles .hd-dev__big { font-size: calc(var(--cell) * .3); line-height: 1.1; }
+.hd-dev__progress { display: flex; flex-direction: column; gap: calc(var(--cell) * .06); width: min(100%, calc(var(--cell) * 3.2)); margin-top: calc(var(--cell) * .1); align-self: center; }
+.hd-dev__progress-bar { height: calc(var(--cell) * .07); border-radius: var(--radius-pill); background: color-mix(in oklab, var(--k-ink) 18%, transparent); overflow: hidden; }
+.hd-dev__progress-bar > div { height: 100%; border-radius: inherit; background: var(--k-ink); }
+.hd-dev__progress-times { display: flex; justify-content: space-between; font: 700 calc(var(--cell) * .11)/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink-muted); }
 .hd-dev__artist { font-size: calc(var(--cell) * .16); font-weight: 600; color: var(--ink-muted); }
 .hd-dev__transport { display: flex; align-items: center; justify-content: center; gap: calc(var(--cell) * .3); }
 .hd-dev__transport .hd-round-btn { width: calc(var(--cell) * .6); height: calc(var(--cell) * .6); }
 .hd-dev__transport .hd-dev__play { width: calc(var(--cell) * .84); height: calc(var(--cell) * .84); background: var(--k-ink); color: var(--on-kind); }
+
+/*
+ * A remote control: arrows in a ring around a select button, with back, home and volume beside it. Holding an arrow or
+ * a volume button repeats it, so they must not select text or pop up a menu.
+ */
+.hd-remote { display: flex; align-items: center; justify-content: center; gap: calc(var(--cell) * .3); }
+.hd-remote :is(button) { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.hd-remote__pad {
+  --size: min(calc(var(--cell) * 1.7), 36vmin);
+  display: grid; grid-template: ". up ." 1fr "left select right" 1fr ". down ." 1fr / 1fr 1fr 1fr;
+  width: var(--size); aspect-ratio: 1; border-radius: 50%;
+  background: color-mix(in oklab, var(--k-ink) 12%, transparent);
+}
+.hd-remote__key {
+  position: relative; display: grid; place-items: center; border: 0; border-radius: 50%; padding: 0;
+  background: transparent; color: var(--k-ink); cursor: pointer; transition: transform .1s, background-color .1s;
+}
+.hd-remote__key[data-key="up"] { grid-area: up; }
+.hd-remote__key[data-key="down"] { grid-area: down; }
+.hd-remote__key[data-key="left"] { grid-area: left; }
+.hd-remote__key[data-key="right"] { grid-area: right; }
+.hd-remote__key[data-key="select"] { grid-area: select; margin: 6%; background: var(--k-ink); }
+.hd-remote__key[data-key="select"]::before { content: ""; width: 30%; aspect-ratio: 1; border-radius: 50%; background: var(--on-kind); }
+.hd-remote__key > svg { width: 55%; height: 55%; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.hd-remote__key:active { transform: scale(.92); background-color: color-mix(in oklab, var(--k-ink) 22%, transparent); }
+.hd-remote__key[data-key="select"]:active { background-color: var(--k-ink); }
+.hd-remote__key:disabled { opacity: .5; cursor: default; }
+/* Back and home down the left of the arrows, volume as a capsule down the right; alone, volume lies down. */
+.hd-remote__keys { display: flex; flex-direction: column; gap: calc(var(--cell) * .1); }
+.hd-remote__keys .hd-round-btn { width: calc(var(--cell) * .5); height: calc(var(--cell) * .5); }
+.hd-remote__volume { display: flex; flex-direction: column; padding: 3px; border-radius: var(--radius-pill); background: color-mix(in oklab, var(--k-ink) 12%, transparent); }
+.hd-remote:not(:has(.hd-remote__pad)) .hd-remote__volume:not(.hd-remote__channel) { flex-direction: row-reverse; }
+.hd-remote__volume .hd-round-btn { width: calc(var(--cell) * .5); height: calc(var(--cell) * .5); background: transparent; }
+
+/* A game controller's other buttons, as a row of labels under the arrows. */
+.hd-remote__extras { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(var(--cell) * .1); }
+.hd-remote__extra {
+  min-width: calc(var(--cell) * .5); height: calc(var(--cell) * .42); padding: 0 calc(var(--cell) * .16); border: 0; border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--k-ink) 12%, transparent); color: var(--k-ink); font: 800 calc(var(--cell) * .13)/1 var(--font-sans);
+  cursor: pointer; user-select: none; touch-action: manipulation; transition: transform .1s;
+}
+.hd-remote__extra:active { transform: scale(.94); }
+.hd-remote__extra:disabled { opacity: .5; cursor: default; }
+.hd-dev__level .hd-dev__mute { flex: none; width: calc(var(--cell) * .42); height: calc(var(--cell) * .42); }
+.hd-dev__mute[aria-pressed="true"] { background: var(--k-ink); color: var(--on-kind); }
+
+/* The apps a device can open, on a page of their own: a wrapping grid of buttons, the open app solid. */
+.hd-details--screen .hd-details__panel > .hd-apps { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; gap: calc(var(--cell) * .2); }
+.hd-apps { display: flex; flex-direction: column; min-width: 0; }
+.hd-apps__group { display: flex; flex-direction: column; gap: calc(var(--cell) * .1); }
+.hd-apps__group > h3 { margin: 0; }
+.hd-apps::-webkit-scrollbar { display: none; }
+.hd-apps__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--cell) * 1.5), 1fr)); gap: calc(var(--cell) * .12); }
+.hd-apps__app {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--cell) * .12);
+  min-width: 0; min-height: calc(var(--cell) * 1.1); padding: calc(var(--cell) * .14) calc(var(--cell) * .1); border: 0;
+  border-radius: calc(var(--cell) * var(--tile-radius) * .75);
+  background: color-mix(in oklab, var(--k-ink) 10%, transparent); color: var(--ink);
+  font: 700 calc(var(--cell) * .13)/1.1 var(--font-sans); text-align: center; cursor: pointer; transition: transform .1s;
+}
+.hd-apps__app:active { transform: scale(.96); }
+.hd-apps__app:disabled { opacity: .5; cursor: default; }
+.hd-apps__app[aria-pressed="true"] { background: var(--k-ink); color: var(--on-kind); }
+.hd-apps__app.is-busy { opacity: .6; }
+.hd-apps__icon {
+  flex: none; display: grid; place-items: center; overflow: hidden; width: calc(var(--cell) * .5); height: calc(var(--cell) * .5);
+  border-radius: calc(var(--cell) * var(--tile-radius) * .5); background: color-mix(in oklab, var(--k-ink) 22%, transparent);
+  font-size: calc(var(--cell) * .26); font-weight: 800;
+}
+.hd-apps__app[aria-pressed="true"] .hd-apps__icon { background: color-mix(in oklab, var(--on-kind) 25%, transparent); }
+.hd-apps__icon > svg { width: 56%; height: 56%; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.hd-apps__icon img { width: 100%; height: 100%; object-fit: cover; }
+.hd-apps__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .hd-dev .hd-segmented { --segment-height: .52; }
 .hd-dev .hd-segmented button { font-size: calc(var(--cell) * .14); }

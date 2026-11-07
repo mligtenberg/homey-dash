@@ -120,6 +120,32 @@ public sealed class LocalHomeyTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ADeviceWithAnOpenAppCard_ListsItsAppsAndOpensOne()
+    {
+        await Eventually(() => _state.Status.Connection == HomeyConnection.Connected);
+
+        var apps = await _homey.ListDeviceAppsAsync("lamp", CancellationToken.None);
+        await _homey.OpenDeviceAppAsync("lamp", apps[0].Item, CancellationToken.None);
+
+        Assert.Equal(["Netflix", "YouTube"], apps.Select(a => a.Name));
+        Assert.Equal("http://tv/nflx.png", apps[0].Image);
+        Assert.Contains(_server.Requests, r => r is ("GET",
+            "/api/manager/flow/flowcardaction/homey:device:lamp/homey:device:lamp:appletv_launch_app/autocomplete?name=app&query=", _));
+        Assert.Contains(_server.Requests, r => r is ("POST",
+            "/api/manager/flow/flowcardaction/homey:device:lamp/homey:device:lamp:appletv_launch_app/run", """{"args":{"app":{"id":"nflx","name":"Netflix","image":"http://tv/nflx.png"}}}"""));
+    }
+
+    [Fact]
+    public async Task ADeviceWithNoOpenAppCard_OpensNoApps()
+    {
+        await Eventually(() => _state.Status.Connection == HomeyConnection.Connected);
+        var other = _state.Devices.First(d => d.Id != "lamp").Id;
+
+        Assert.Empty(await _homey.ListDeviceAppsAsync(other, CancellationToken.None));
+        await Assert.ThrowsAsync<HomeyNotFoundException>(() => _homey.OpenDeviceAppAsync(other, JsonSerializer.SerializeToElement(new { }), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task InsightEntries_AskHomeyForTheLogOfItsOwner()
     {
         var entries = await _homey.GetInsightEntriesAsync("homey:device:abc:measure_power", "last24Hours", CancellationToken.None);

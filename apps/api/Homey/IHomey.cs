@@ -22,6 +22,11 @@ public interface IHomey
     Task<IReadOnlyList<SpeakerMusic>> ListSpeakerMusicAsync(string deviceId, string kind, CancellationToken ct);
     Task PlaySpeakerMusicAsync(string deviceId, string kind, JsonElement item, CancellationToken ct);
 
+    // The apps a device can open through its own "open an app" flow card (Apple TV, LG, Xbox); none when it has no such
+    // card. Open takes an Item from the list.
+    Task<IReadOnlyList<DeviceApp>> ListDeviceAppsAsync(string deviceId, CancellationToken ct);
+    Task OpenDeviceAppAsync(string deviceId, JsonElement item, CancellationToken ct);
+
     Task<IReadOnlyList<HomeyInsightLog>> GetInsightLogsAsync(CancellationToken ct);
 
     // A picture Homey keeps, such as a device's album art; null when Homey has no such picture.

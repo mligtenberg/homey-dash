@@ -1,11 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, signal, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, resource, signal, viewChild } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { CapabilityValue, HomeyApi, InsightResolution, Realtime } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucideIconInput, LucideLock, LucideLockOpen, LucidePause, LucidePlay, LucideSkipBack, LucideSkipForward, LucideSpeaker, LucideVolume2 } from '@lucide/angular';
+import { CapabilityValue, DeviceApp, HomeyApi, InsightResolution, Realtime } from '@homey-dash/api-client';
+import { LucideDynamicIcon, LucideIconInput, LucideLock, LucideLockOpen, LucidePause, LucidePlay, LucideSkipBack, LucideSkipForward, LucideSpeaker, LucideVolume2, LucideVolumeX } from '@lucide/angular';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import { TileData } from '../tile-data';
-import { CapabilityDriver, DeviceSegments, DeviceSlider, DeviceStepper } from './device-controls';
-import { describeDevice, deviceLogs, sameLogs } from './device-view';
+import { DeviceApps } from './device-apps';
+import { CapabilityDriver, DeviceRemote, DeviceSegments, DeviceSlider, DeviceStepper } from './device-controls';
+import { clamp, clockTime, describeDevice, deviceLogs, sameLogs } from './device-view';
 import { StatisticHistory } from './statistic-history';
 import { TileDetails } from './tile-details';
 import { FLASH_MS } from './tile-view';
@@ -33,15 +35,15 @@ const LOCK_STATES = [
  */
 @Component({
   selector: 'hd-device-details',
-  imports: [LucideDynamicIcon, DeviceSegments, DeviceSlider, DeviceStepper, StatisticHistory, TileDetails],
+  imports: [LucideDynamicIcon, NgTemplateOutlet, DeviceApps, DeviceRemote, DeviceSegments, DeviceSlider, DeviceStepper, StatisticHistory, TileDetails],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // Not a box of its own, so it does not take part in the tile's layout.
   host: { style: 'display: contents' },
   template: `
     <hd-tile-details #dialog [screen]="true" [name]="name()" [icon]="icon()" [subtitle]="view()?.room ?? ''" (closed)="page.set('device')">
-      @if (graphable().length) {
+      @if (pages().length > 1) {
         <div class="hd-segmented" hdDetailsHead role="group" aria-label="Show">
-          @for (p of pages; track p.id) {
+          @for (p of pages(); track p.id) {
             <button type="button" [attr.aria-pressed]="page() === p.id" (click)="page.set(p.id)">{{ p.label }}</button>
           }
         </div>
@@ -50,6 +52,8 @@ const LOCK_STATES = [
         <div class="hd-details__label">Loading…</div>
       } @else if (page() === 'history' && graphable().length) {
         <hd-statistic-history [logs]="graphable()" [account]="account()" [initial]="log()" [initialWindow]="window()" />
+      } @else if (page() === 'apps' && appList().length) {
+        <hd-device-apps [account]="account()" [deviceId]="deviceId()" [apps]="appList()" [current]="view()?.app ?? ''" [disabled]="!ok()" />
       } @else if (view(); as c) {
         <div class="hd-dev" [attr.data-mode]="c.mode" [class.is-on]="c.on" [style.--level]="c.level" [style.--fraction]="c.fraction" [style.--closed]="c.closed">
           <section class="hd-dev__hero">
@@ -88,6 +92,9 @@ const LOCK_STATES = [
                     <svg class="hd-dev__glyph" [lucideIcon]="speakerIcon" />
                   }
                 </div>
+                @if (c.remote) {
+                  <ng-container [ngTemplateOutlet]="titles" [ngTemplateOutletContext]="{ $implicit: c, progress: progress() }" />
+                }
               }
               @case ('lock') {
                 <div class="hd-dev__disc"><svg class="hd-dev__glyph" [lucideIcon]="c.locked ? lockIcon : unlockIcon" /></div>
@@ -103,45 +110,56 @@ const LOCK_STATES = [
           </section>
           <section class="hd-dev__controls">
             @if (c.mode === 'speaker') {
-              <div class="hd-dev__titles">
-                <div class="hd-dev__big">{{ c.track || c.state }}</div>
-                @if (c.artist) {
-                  <div class="hd-dev__artist">{{ c.artist }}</div>
-                }
-                @if (c.track && c.state) {
-                  <div class="hd-details__state">{{ c.playing ? 'Playing' : 'Not playing' }}</div>
-                }
-              </div>
+              @if (!c.remote) {
+                <ng-container [ngTemplateOutlet]="titles" [ngTemplateOutletContext]="{ $implicit: c, progress: progress() }" />
+              }
               @if (c.playback; as playing) {
-                <div class="hd-dev__transport">
-                  @if (c.previous; as previous) {
-                    <button type="button" class="hd-round-btn" aria-label="Previous" [disabled]="!ok()" (click)="drive.set(previous.id, true)">
-                      <svg [lucideIcon]="previousIcon" />
+                @if (!c.remote || c.previous || c.next) {
+                  <div class="hd-dev__transport">
+                    @if (c.previous; as previous) {
+                      <button type="button" class="hd-round-btn" aria-label="Previous" [disabled]="!ok()" (click)="drive.set(previous.id, true)">
+                        <svg [lucideIcon]="previousIcon" />
+                      </button>
+                    }
+                    <button
+                      type="button"
+                      class="hd-round-btn hd-dev__play"
+                      [attr.aria-label]="playing.value ? 'Pause' : 'Play'"
+                      [disabled]="!ok()"
+                      (click)="drive.set(playing.id, !playing.value)"
+                    >
+                      <svg [lucideIcon]="playing.value ? pauseIcon : playIcon" />
                     </button>
-                  }
+                    @if (c.next; as next) {
+                      <button type="button" class="hd-round-btn" aria-label="Next" [disabled]="!ok()" (click)="drive.set(next.id, true)">
+                        <svg [lucideIcon]="nextIcon" />
+                      </button>
+                    }
+                  </div>
+                }
+              }
+            }
+            @if (c.volume; as volume) {
+              <div class="hd-dev__level">
+                <svg class="hd-dev__level-icon" [lucideIcon]="volumeIcon" />
+                <hd-device-slider [capability]="volume" label="Volume" [disabled]="!ok()" [driver]="drive" />
+                @if (c.mute; as mute) {
                   <button
                     type="button"
-                    class="hd-round-btn hd-dev__play"
-                    [attr.aria-label]="playing.value ? 'Pause' : 'Play'"
+                    class="hd-round-btn hd-dev__mute"
+                    aria-label="Mute"
+                    [attr.aria-pressed]="mute.value === true"
                     [disabled]="!ok()"
-                    (click)="drive.set(playing.id, !playing.value)"
+                    (click)="drive.press(mute)"
                   >
-                    <svg [lucideIcon]="playing.value ? pauseIcon : playIcon" />
+                    <svg [lucideIcon]="muteIcon" />
                   </button>
-                  @if (c.next; as next) {
-                    <button type="button" class="hd-round-btn" aria-label="Next" [disabled]="!ok()" (click)="drive.set(next.id, true)">
-                      <svg [lucideIcon]="nextIcon" />
-                    </button>
-                  }
-                </div>
-              }
-              @if (c.volume; as volume) {
-                <div class="hd-dev__level">
-                  <svg class="hd-dev__level-icon" [lucideIcon]="volumeIcon" />
-                  <hd-device-slider [capability]="volume" label="Volume" [disabled]="!ok()" [driver]="drive" />
-                  <span class="hd-details__label">{{ drive.percent(volume) }}%</span>
-                </div>
-              }
+                }
+                <span class="hd-details__label">{{ drive.percent(volume) }}%</span>
+              </div>
+            }
+            @if (c.remote || c.volumeKeys || c.channel) {
+              <hd-device-remote [remote]="c.remote" [volume]="c.volumeKeys" [channel]="c.channel" [playsElsewhere]="!!c.playback" [playback]="c.remote && !c.previous && !c.next ? c.playback ?? null : null" [disabled]="!ok()" [driver]="drive" />
             }
             @if (c.lock; as lock) {
               <hd-device-segments [capability]="lock" [options]="lockStates" [disabled]="!ok()" [driver]="drive" />
@@ -196,6 +214,23 @@ const LOCK_STATES = [
           </section>
         </div>
       }
+      <ng-template #titles let-c let-progress="progress">
+        <div class="hd-dev__titles">
+          <div class="hd-dev__big">{{ c.track || c.state }}</div>
+          @if (c.artist) {
+            <div class="hd-dev__artist">{{ c.artist }}</div>
+          }
+          @if (c.track && c.state) {
+            <div class="hd-details__state">{{ c.playing ? 'Playing' : 'Not playing' }}</div>
+          }
+          @if (progress) {
+            <div class="hd-dev__progress" role="progressbar" aria-label="Playback" aria-valuemin="0" [attr.aria-valuemax]="progress.duration" [attr.aria-valuenow]="progress.position">
+              <div class="hd-dev__progress-bar"><div [style.width.%]="progress.fraction * 100"></div></div>
+              <div class="hd-dev__progress-times"><span>{{ progress.elapsed }}</span><span>{{ progress.total }}</span></div>
+            </div>
+          }
+        </div>
+      </ng-template>
     </hd-tile-details>
   `,
 })
@@ -219,17 +254,20 @@ export class DeviceDetails {
   protected readonly coverStates = COVER_STATES;
   protected readonly onOffStates = ON_OFF_STATES;
   protected readonly lockStates = LOCK_STATES;
-  protected readonly pages = [
-    { id: 'device', label: 'Device' },
-    { id: 'history', label: 'History' },
-  ] as const;
-  /** Which page shows: the device's state and controls, or the history of its readings. */
-  protected readonly page = signal<'device' | 'history'>('device');
+  /** The pages there are to show: always the device, and its apps and the history of its readings when it has them. */
+  protected readonly pages = computed(() => [
+    { id: 'device' as const, label: 'Device' },
+    ...(this.appList().length ? [{ id: 'apps' as const, label: 'Apps' }] : []),
+    ...(this.graphable().length ? [{ id: 'history' as const, label: 'History' }] : []),
+  ]);
+  /** Which page shows: the device's state and controls, its apps, or the history of its readings. */
+  protected readonly page = signal<'device' | 'apps' | 'history'>('device');
   protected readonly playIcon = LucidePlay;
   protected readonly pauseIcon = LucidePause;
   protected readonly previousIcon = LucideSkipBack;
   protected readonly nextIcon = LucideSkipForward;
   protected readonly volumeIcon = LucideVolume2;
+  protected readonly muteIcon = LucideVolumeX;
   protected readonly speakerIcon = LucideSpeaker;
   protected readonly lockIcon = LucideLock;
   protected readonly unlockIcon = LucideLockOpen;
@@ -246,6 +284,17 @@ export class DeviceDetails {
   protected readonly view = computed(() => {
     const device = this.device();
     return device ? describeDevice(device, this.homey()?.accountId, this.failed()) : null;
+  });
+
+  /** The time now, ticking while the view is open, so that what plays moves on between the device's reports. */
+  private readonly clock = signal(Date.now());
+
+  /** How far what plays has come, moved on by the time since the device last said. */
+  protected readonly progress = computed(() => {
+    const p = this.view()?.progress;
+    if (!p) return null;
+    const position = clamp(p.position + (p.playing && p.updated ? (this.clock() - p.updated) / 1000 : 0), 0, p.duration);
+    return { position, duration: p.duration, fraction: position / p.duration, elapsed: clockTime(position), total: clockTime(p.duration) };
   });
 
   protected readonly drive = new CapabilityDriver((capability, value) => this.set(capability, value));
@@ -267,13 +316,25 @@ export class DeviceDetails {
       ).pipe(map((has) => params.logs.filter((_, i) => has[i]))),
   });
 
+  /** The apps the device can open, asked for once its view is open; none when it opens none. */
+  private readonly apps = resource({
+    params: () => (this.isOpen() ? { account: this.account(), deviceId: this.deviceId() } : undefined),
+    loader: ({ params }) => this.realtime.deviceApps(params.account, params.deviceId).catch((): DeviceApp[] => []),
+  });
+  protected readonly appList = computed(() => (this.apps.hasValue() ? this.apps.value() : []));
+
   /** The logs the history offers; none until they are known, so the tab shows only when there is a graph. */
   protected readonly graphable = computed(() => (this.drawn.hasValue() ? this.drawn.value() : []));
   /** Whether the history was asked for but it is not known yet which logs it has. */
   protected readonly probing = computed(() => this.page() === 'history' && this.logs().length > 0 && !this.drawn.hasValue());
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => clearTimeout(this.failedTimer));
+    const tick = setInterval(() => this.isOpen() && this.clock.set(Date.now()), 1000);
+    inject(DestroyRef).onDestroy(() => {
+      clearInterval(tick);
+      clearTimeout(this.failedTimer);
+      this.drive.holdEnd();
+    });
   }
 
   open(page: 'device' | 'history' = 'device') {
@@ -282,6 +343,7 @@ export class DeviceDetails {
   }
 
   close() {
+    this.drive.holdEnd();
     this.dialog().close();
   }
 

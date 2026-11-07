@@ -1,9 +1,30 @@
-import { ChangeDetectionStrategy, Component, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { CapabilityValue, HomeyCapability } from '@homey-dash/api-client';
-import { clamp } from './device-view';
+import {
+  LucideArrowLeft,
+  LucideChevronDown,
+  LucideChevronLeft,
+  LucideChevronRight,
+  LucideChevronsDown,
+  LucideChevronsUp,
+  LucideChevronUp,
+  LucideDynamicIcon,
+  LucideIconInput,
+  LucidePause,
+  LucidePlay,
+  LucideTv,
+  LucideVolume1,
+  LucideVolume2,
+  LucideVolumeX,
+} from '@lucide/angular';
+import { ChannelKeys, clamp, RemoteKeys, VolumeKeys } from './device-view';
 
 /** How far a thermostat's target moves when its own capability does not say. */
 const THERMOSTAT_STEP = 0.5;
+
+/** How long a button is held before it repeats, and how often it repeats then. */
+const HOLD_MS = 400;
+const REPEAT_MS = 150;
 
 /**
  * Operates a device's capabilities for the controls below, which the device tile and its detail view share: sets a
@@ -43,6 +64,36 @@ export class CapabilityDriver {
   nudge(event: Event, dim: HomeyCapability, by: number) {
     event.preventDefault();
     this.set(dim.id, Math.round(clamp(((dim.value as number) || 0) + by, 0, 1) * 100) / 100);
+  }
+
+  private repeater?: ReturnType<typeof setTimeout>;
+  private repeated = false;
+
+  /** Presses a button capability, which is what a tap does; a toggle such as mute is switched instead. */
+  press(button: HomeyCapability) {
+    if (this.repeated) {
+      this.repeated = false; // The hold already pressed it.
+      return;
+    }
+    this.set(button.id, typeof button.value === 'boolean' ? !button.value : true);
+  }
+
+  /** A button held down presses again and again, as for volume or an arrow, until it is let go. */
+  holdStart(button: HomeyCapability) {
+    this.holdEnd();
+    this.repeated = false;
+    if (typeof button.value === 'boolean') return;
+    const again = () => {
+      this.repeated = true;
+      this.set(button.id, true);
+      this.repeater = setTimeout(again, REPEAT_MS);
+    };
+    this.repeater = setTimeout(again, HOLD_MS);
+  }
+
+  holdEnd() {
+    clearTimeout(this.repeater);
+    this.repeater = undefined;
   }
 
   adjust(target: HomeyCapability, direction: 1 | -1) {
@@ -132,4 +183,181 @@ export class DeviceStepper {
   readonly capability = input.required<HomeyCapability>();
   readonly disabled = input(false);
   readonly driver = input.required<CapabilityDriver>();
+}
+
+interface RemoteKey {
+  key: keyof RemoteKeys | keyof VolumeKeys | keyof ChannelKeys;
+  label: string;
+  icon: LucideIconInput | null;
+}
+
+const PAD: readonly RemoteKey[] = [
+  { key: 'up', label: 'Up', icon: LucideChevronUp },
+  { key: 'left', label: 'Left', icon: LucideChevronLeft },
+  { key: 'select', label: 'Select', icon: null },
+  { key: 'right', label: 'Right', icon: LucideChevronRight },
+  { key: 'down', label: 'Down', icon: LucideChevronDown },
+];
+
+const SHORTCUTS: readonly RemoteKey[] = [
+  { key: 'back', label: 'Back', icon: LucideArrowLeft },
+  { key: 'home', label: 'Home', icon: LucideTv },
+  { key: 'playpause', label: 'Play or pause', icon: LucidePlay },
+];
+
+const CHANNEL: readonly RemoteKey[] = [
+  { key: 'up', label: 'Channel up', icon: LucideChevronsUp },
+  { key: 'down', label: 'Channel down', icon: LucideChevronsDown },
+];
+
+/** The buttons a game controller has besides its arrows, A and B. */
+const EXTRAS: readonly { key: keyof RemoteKeys; label: string }[] = [
+  { key: 'x', label: 'X' },
+  { key: 'y', label: 'Y' },
+  { key: 'view', label: 'View' },
+  { key: 'menu', label: 'Menu' },
+];
+
+// Top to bottom, as on a remote.
+const VOLUME: readonly RemoteKey[] = [
+  { key: 'up', label: 'Volume up', icon: LucideVolume2 },
+  { key: 'mute', label: 'Mute', icon: LucideVolumeX },
+  { key: 'down', label: 'Volume down', icon: LucideVolume1 },
+];
+
+/**
+ * The buttons of a remote control, such as an Apple TV's: arrows around a select button, back and home, and volume
+ * where the device has no slider for it. Holding an arrow or a volume button repeats it.
+ */
+@Component({
+  selector: 'hd-device-remote',
+  imports: [LucideDynamicIcon],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { style: 'display: contents' },
+  template: `
+    <div class="hd-remote">
+      @if (shortcuts().length || playback()) {
+        <div class="hd-remote__keys">
+          @for (k of shortcuts(); track k.key) {
+            <button type="button" class="hd-round-btn" [attr.aria-label]="k.label" [disabled]="disabled()" (click)="driver().press(k.button)">
+              <svg [lucideIcon]="k.icon!" />
+            </button>
+          }
+          @if (playback(); as playing) {
+            <button
+              type="button"
+              class="hd-round-btn"
+              [attr.aria-label]="playing.value ? 'Pause' : 'Play'"
+              [disabled]="disabled()"
+              (click)="driver().set(playing.id, !playing.value)"
+            >
+              <svg [lucideIcon]="playing.value ? pauseIcon : playIcon" />
+            </button>
+          }
+        </div>
+      }
+      @if (hasPad()) {
+        <div class="hd-remote__pad" role="group" aria-label="Navigation">
+          @for (k of pad; track k.key) {
+            @if (padKey(k); as button) {
+              <button
+                type="button"
+                class="hd-remote__key"
+                [attr.data-key]="k.key"
+                [attr.aria-label]="k.label"
+                [disabled]="disabled()"
+                (pointerdown)="driver().holdStart(button)"
+                (pointerup)="driver().holdEnd()"
+                (pointerleave)="driver().holdEnd()"
+                (pointercancel)="driver().holdEnd()"
+                (click)="driver().press(button)"
+              >
+                @if (k.icon; as icon) {
+                  <svg [lucideIcon]="icon" />
+                }
+              </button>
+            }
+          }
+        </div>
+      }
+      @if (channels().length) {
+        <div class="hd-remote__volume hd-remote__channel" role="group" aria-label="Channel">
+          @for (k of channels(); track k.key) {
+            <button type="button" class="hd-round-btn" [attr.aria-label]="k.label" [disabled]="disabled()" (click)="driver().press(k.button)">
+              <svg [lucideIcon]="k.icon!" />
+            </button>
+          }
+        </div>
+      }
+      @if (volumes().length) {
+        <div class="hd-remote__volume" role="group" aria-label="Volume">
+          @for (k of volumes(); track k.key) {
+            <button
+              type="button"
+              class="hd-round-btn"
+              [attr.aria-label]="k.label"
+              [disabled]="disabled()"
+              (pointerdown)="driver().holdStart(k.button)"
+              (pointerup)="driver().holdEnd()"
+              (pointerleave)="driver().holdEnd()"
+              (pointercancel)="driver().holdEnd()"
+              (click)="driver().press(k.button)"
+            >
+              <svg [lucideIcon]="k.icon!" />
+            </button>
+          }
+        </div>
+      }
+    </div>
+    @if (extras().length) {
+      <div class="hd-remote__extras">
+        @for (k of extras(); track k.key) {
+          <button type="button" class="hd-remote__extra" [disabled]="disabled()" (click)="driver().press(k.button)">{{ k.label }}</button>
+        }
+      </div>
+    }
+  `,
+})
+export class DeviceRemote {
+  readonly remote = input<RemoteKeys | null>(null);
+  readonly volume = input<VolumeKeys | null>(null);
+  readonly channel = input<ChannelKeys | null>(null);
+  /** Whether the device plays and pauses by itself in the view, so a play button here would repeat it. */
+  readonly playsElsewhere = input(false);
+  /** The capability that plays and pauses, as a button here, when the view has no transport of its own. */
+  readonly playback = input<HomeyCapability | null>(null);
+  protected readonly playIcon = LucidePlay;
+  protected readonly pauseIcon = LucidePause;
+  readonly disabled = input(false);
+  readonly driver = input.required<CapabilityDriver>();
+
+  protected readonly pad = PAD;
+  protected padKey(k: RemoteKey) {
+    return this.remote()?.[k.key as keyof RemoteKeys];
+  }
+  protected readonly hasPad = computed(() => PAD.some((k) => this.remote()?.[k.key as keyof RemoteKeys]));
+  protected readonly shortcuts = computed(() =>
+    SHORTCUTS.flatMap((k) => {
+      const button = this.remote()?.[k.key as keyof RemoteKeys];
+      return button && !(k.key === 'playpause' && this.playsElsewhere()) ? [{ ...k, button }] : [];
+    }),
+  );
+  protected readonly channels = computed(() =>
+    CHANNEL.flatMap((k) => {
+      const button = this.channel()?.[k.key as keyof ChannelKeys];
+      return button ? [{ ...k, button }] : [];
+    }),
+  );
+  protected readonly extras = computed(() =>
+    EXTRAS.flatMap((k) => {
+      const button = this.remote()?.[k.key];
+      return button ? [{ ...k, button }] : [];
+    }),
+  );
+  protected readonly volumes = computed(() =>
+    VOLUME.flatMap((k) => {
+      const button = this.volume()?.[k.key as keyof VolumeKeys];
+      return button ? [{ ...k, button }] : [];
+    }),
+  );
 }

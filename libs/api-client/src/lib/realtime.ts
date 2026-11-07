@@ -6,7 +6,7 @@ import { DisplayInfo, ScreenDetails, ScreenView } from './displays';
 import { PhotoSet } from './photos';
 import { PlexCommand, PlexItem, PlexOverview, PlexPage, PlexProfileList, PlexSession, PlexSnapshot, PlexTracks } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
-import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
+import { CapabilityValue, DeviceApp, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
 
 // Mirrors apps/api/Realtime/RealtimeHub.cs.
 
@@ -250,6 +250,16 @@ export class Realtime {
   /** Plays one of `speakerMusic` in the speaker's group. */
   playSpeakerMusic(account: number | undefined, deviceId: string, kind: SpeakerMusicKind, music: SpeakerMusic) {
     return this.hub.invoke<void>('PlaySpeakerMusic', account ?? null, deviceId, kind, music.item);
+  }
+
+  /** The apps a device can open, such as an Apple TV's; none when it cannot open any. */
+  deviceApps(account: number | undefined, deviceId: string) {
+    return this.hub.invoke<DeviceApp[]>('DeviceApps', account ?? null, deviceId);
+  }
+
+  /** Opens one of `deviceApps` on the device. */
+  openDeviceApp(account: number | undefined, deviceId: string, app: DeviceApp) {
+    return this.hub.invoke<void>('OpenDeviceApp', account ?? null, deviceId, app.item);
   }
 
   /** Sets the volume (1–100) of every speaker in the speaker's group. */
