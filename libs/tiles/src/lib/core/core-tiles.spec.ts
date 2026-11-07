@@ -228,6 +228,24 @@ describe('core tiles', () => {
       expect(realtime.commands).toEqual([['setCapability', undefined, 'd1', 'target_temperature', 21.5]]);
     });
 
+    it('steps a thermostat by the step its target allows', async () => {
+      const tile = await render(DeviceTile, 'd1', 'large');
+      await push(
+        device([capability('target_temperature', 18, { units: '°C', step: 1 }), capability('measure_temperature', 17.8, { units: '°C', setable: false })], {
+          class: 'thermostat',
+        }),
+      );
+
+      (tile.querySelector('[aria-label="Raise target"]') as HTMLElement).click();
+      (tile.querySelector('[aria-label="Lower target"]') as HTMLElement).click();
+      await settle();
+
+      expect(realtime.commands).toEqual([
+        ['setCapability', undefined, 'd1', 'target_temperature', 19],
+        ['setCapability', undefined, 'd1', 'target_temperature', 17],
+      ]);
+    });
+
     it('sets a cover from its segmented control', async () => {
       const tile = await render(DeviceTile, 'd1', 'wide');
       await push(device([capability('windowcoverings_state', 'idle')], { class: 'curtain' }));

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, input, signal } from '@angular/core
 import { CapabilityValue, HomeyCapability } from '@homey-dash/api-client';
 import { clamp } from './device-view';
 
+/** How far a thermostat's target moves when its own capability does not say. */
 const THERMOSTAT_STEP = 0.5;
 
 /**
@@ -45,8 +46,10 @@ export class CapabilityDriver {
   }
 
   adjust(target: HomeyCapability, direction: 1 | -1) {
-    const next = Math.round(((target.value as number) + direction * THERMOSTAT_STEP) / THERMOSTAT_STEP) * THERMOSTAT_STEP;
-    this.set(target.id, clamp(next, target.min ?? -Infinity, target.max ?? Infinity));
+    // Homey refuses a target that is not a whole number of steps, so a thermostat in whole degrees moves by one.
+    const step = target.step && target.step > 0 ? target.step : THERMOSTAT_STEP;
+    const next = Math.round(((target.value as number) + direction * step) / step) * step;
+    this.set(target.id, clamp(Math.round(next * 100) / 100, target.min ?? -Infinity, target.max ?? Infinity));
   }
 }
 
