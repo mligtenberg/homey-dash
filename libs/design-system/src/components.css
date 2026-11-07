@@ -358,7 +358,7 @@
 .hd-details__head .hd-segmented { flex: none; --segment-height: .26; }
 .hd-details__head .hd-segmented button { flex: none; padding-inline: calc(var(--cell) * .2); }
 /* This view's own surface: the hue mixed into the theme's ground, so it is lighter in the light theme and darker in the dark one. */
-.hd-details--screen:has(:is(.hd-sonos__pane, .hd-stat__pane)) {
+.hd-details--screen:has(:is(.hd-sonos__pane, .hd-stat__pane, .hd-dev)) {
   background:
     radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, var(--k-ink) 26%, transparent), transparent 70%),
     color-mix(in oklab, var(--k-ink) 10%, var(--ground));
@@ -395,6 +395,23 @@
 .hd-details--screen:has(.hd-stat__pane[data-tone="humidity"]) { --k-ink: var(--kind-cover-ink); --k-fill: var(--kind-cover-fill); }
 .hd-details--screen .hd-details__panel > .hd-stat__pane { flex: 1; min-height: 0; }
 .hd-stat__pane { display: flex; flex-direction: column; gap: calc(var(--cell) * .16); }
+.hd-hist__bar { flex: none; display: flex; flex-wrap: wrap; justify-content: space-between; gap: calc(var(--cell) * .1); }
+.hd-hist__readings { flex: none; display: flex; align-items: center; gap: calc(var(--cell) * .08); min-width: 0; }
+.hd-hist__readings .hd-round-btn { flex: none; width: calc(var(--cell) * .3); height: calc(var(--cell) * .3); }
+/* The readings scroll sideways when they do not fit; the arrows move them an item at a time. */
+.hd-hist__strip { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; --segment-height: .26; }
+.hd-hist__strip::-webkit-scrollbar { display: none; }
+/* An item cut off by an edge fades out there, rather than being sliced. */
+.hd-hist__strip { --fade-start: 0px; --fade-end: 0px; --fade: calc(var(--cell) * .3); }
+.hd-hist__strip.has-start { --fade-start: var(--fade); }
+.hd-hist__strip.has-end { --fade-end: var(--fade); }
+.hd-hist__strip {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent 100%);
+}
+.hd-hist__strip button { flex: none; padding-inline: calc(var(--cell) * .2); white-space: nowrap; }
+.hd-hist__bar .hd-segmented { flex: none; --segment-height: .26; }
+.hd-hist__bar .hd-segmented button { flex: none; padding-inline: calc(var(--cell) * .2); }
 .hd-stat__pane .hd-chart { flex: 1; height: auto; min-height: 0; }
 .hd-stat__pane .hd-chart__area { opacity: .22; }
 .hd-stat__pane .hd-chart__dot { stroke: var(--ground); }
@@ -409,6 +426,116 @@
 .hd-stat__figure-value { font: 700 calc(var(--cell) * .2)/1.1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--k-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-stat__figure-note { font-size: calc(var(--cell) * .085); color: var(--ink-muted); }
 .hd-details :is(.hd-round-btn, .hd-segmented button, .hd-slider):focus-visible { outline: 3px solid var(--k-ink); outline-offset: 3px; }
+/*
+ * A device's full screen: a hero that shows its state (a glowing bulb, a temperature dial, a window shade, album art, a
+ * lock, a sensor's icon) beside the controls that fit it. Side by side on a wide screen, stacked on a tall one. The
+ * hue is the tile's own; `--level` (0 to 1) says how lit the hero is, `--fraction` how far the dial is turned and
+ * `--closed` how far the shade is down.
+ */
+.hd-details--screen .hd-details__panel > .hd-dev { flex: 1; min-height: 0; }
+.hd-dev {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: safe center; align-content: safe center;
+  gap: calc(var(--cell) * .3) calc(var(--cell) * .5);
+  /* A scroller clips on both axes, so the hero's glow gets room inside it: padding the glow can spread into, taken
+     back with an equal negative margin so the layout is unchanged. The head sits above it, so the extra room over the
+     head does not catch its clicks. */
+  --glow-room: calc(var(--cell) * 1.5);
+  padding: var(--glow-room) calc(var(--glow-room) + var(--cell) * .1) calc(var(--glow-room) + var(--cell) * .1);
+  margin: calc(var(--glow-room) * -1);
+  overflow-y: auto; scrollbar-width: none;
+}
+.hd-dev::-webkit-scrollbar { display: none; }
+.hd-details--screen .hd-details__head { position: relative; z-index: 1; }
+@media (max-aspect-ratio: 1 / 1) {
+  .hd-dev { grid-template-columns: minmax(0, 1fr); align-content: safe center; gap: calc(var(--cell) * .2); }
+  .hd-dev :is(.hd-dev__disc, .hd-dev__dial, .hd-dev__art) { --size: min(calc(var(--cell) * 2.6), 26dvh, 70vw); width: var(--size); }
+  .hd-dev__window { width: min(calc(var(--cell) * 2), 22dvh); }
+  .hd-dev__big { font-size: calc(var(--cell) * .4); }
+}
+/* A short screen shrinks the whole view. */
+.hd-details--screen:has(.hd-dev) { --cell: clamp(90px, min(22vmin, 24dvh), 190px); }
+.hd-dev__hero { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--cell) * .16); text-align: center; min-width: 0; }
+.hd-dev__controls { display: flex; flex-direction: column; gap: calc(var(--cell) * .22); min-width: 0; }
+.hd-dev__big { font: 800 calc(var(--cell) * .5)/1 var(--font-sans); letter-spacing: -.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.hd-dev__big .hd-unit { font-size: .45em; }
+.hd-dev__glyph { width: 46%; height: 46%; color: var(--k-ink); stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.hd-dev__glyph :is(path, rect, circle, ellipse, polygon) { fill: currentColor; fill-opacity: calc(.08 + var(--level, 0) * .3); }
+
+/* A round hero that lights up with the device: the bulb of a light, a lock, or the icon of a switch or sensor. */
+.hd-dev__disc {
+  --size: min(calc(var(--cell) * 2.6), 38vmin);
+  display: grid; place-items: center; width: var(--size); aspect-ratio: 1; border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 35%, color-mix(in oklab, var(--k-ink) calc(var(--level, 0) * 30%), transparent), transparent 70%),
+    color-mix(in oklab, var(--k-ink) calc(10% + var(--level, 0) * 22%), var(--tile-surface));
+  box-shadow: 0 0 calc(var(--size) * .5 * var(--level, 0)) calc(var(--size) * .04 * var(--level, 0)) color-mix(in oklab, var(--k-ink) calc(var(--level, 0) * 55%), transparent);
+  transition: background .3s, box-shadow .3s;
+}
+
+/* A thermostat's dial: a 270° ring filled to the target, with the measured temperature inside. */
+.hd-dev__dial { --size: min(calc(var(--cell) * 3), 42vmin); position: relative; display: grid; place-items: center; width: var(--size); aspect-ratio: 1; }
+.hd-dev__dial::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 225deg, var(--k-ink) calc(var(--fraction, 0) * 270deg), color-mix(in oklab, var(--k-ink) 16%, transparent) 0 270deg, transparent 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--cell) * .16), #000 calc(100% - var(--cell) * .16 + 1px));
+}
+.hd-dev__dial-inner { display: flex; flex-direction: column; align-items: center; gap: calc(var(--cell) * .08); }
+.hd-dev__stepper .hd-round-btns { justify-content: center; gap: calc(var(--cell) * .4); padding: 0; background: none; }
+.hd-dev__stepper .hd-round-btns .hd-round-btn { width: calc(var(--cell) * .8); height: calc(var(--cell) * .8); font-size: calc(var(--cell) * .4); background: color-mix(in oklab, var(--k-ink) 16%, transparent); }
+
+/* A window with its shade: the shade comes down as far as the cover is closed. */
+.hd-dev__window {
+  position: relative; overflow: hidden; width: min(calc(var(--cell) * 2.3), 34vmin); aspect-ratio: 4 / 5;
+  border: calc(var(--cell) * .07) solid color-mix(in oklab, var(--ink) 35%, var(--tile-surface)); border-radius: calc(var(--cell) * .08);
+  background: linear-gradient(color-mix(in oklab, var(--k-ink) 28%, var(--tile-surface)), color-mix(in oklab, var(--k-ink) 8%, var(--tile-surface)));
+}
+.hd-dev__shade {
+  position: absolute; inset: 0 0 auto; height: calc(var(--closed, 0) * 100%);
+  background: repeating-linear-gradient(var(--k-ink) 0 calc(var(--cell) * .16), color-mix(in oklab, var(--k-ink) 70%, var(--ground)) 0 calc(var(--cell) * .18));
+  border-bottom: calc(var(--cell) * .04) solid color-mix(in oklab, var(--k-ink) 60%, #000);
+  transition: height .5s ease;
+}
+
+/* A speaker: the cover of what plays, with the track, the transport and the volume beside it. */
+.hd-dev__art {
+  --size: min(calc(var(--cell) * 3.2), 44vmin);
+  display: grid; place-items: center; overflow: hidden; width: var(--size); aspect-ratio: 1;
+  border-radius: calc(var(--cell) * var(--tile-radius)); background: color-mix(in oklab, var(--k-ink) 16%, var(--tile-surface));
+  box-shadow: 0 calc(var(--cell) * .12) calc(var(--cell) * .4) color-mix(in oklab, #000 35%, transparent);
+}
+.hd-dev__art img { width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; }
+.hd-dev__titles { display: flex; flex-direction: column; gap: calc(var(--cell) * .06); }
+.hd-dev__titles .hd-dev__big { font-size: calc(var(--cell) * .3); line-height: 1.1; }
+.hd-dev__artist { font-size: calc(var(--cell) * .16); font-weight: 600; color: var(--ink-muted); }
+.hd-dev__transport { display: flex; align-items: center; justify-content: center; gap: calc(var(--cell) * .3); }
+.hd-dev__transport .hd-round-btn { width: calc(var(--cell) * .6); height: calc(var(--cell) * .6); }
+.hd-dev__transport .hd-dev__play { width: calc(var(--cell) * .84); height: calc(var(--cell) * .84); background: var(--k-ink); color: var(--on-kind); }
+
+.hd-dev .hd-segmented { --segment-height: .52; }
+.hd-dev .hd-segmented button { font-size: calc(var(--cell) * .14); }
+.hd-dev__level { display: flex; align-items: center; gap: calc(var(--cell) * .14); }
+.hd-dev__level .hd-slider { --slider-height: .42; flex: 1; min-width: 0; }
+.hd-dev__level .hd-details__label { flex: none; min-width: 2.5em; }
+.hd-dev__level-icon { flex: none; width: calc(var(--cell) * .24); height: calc(var(--cell) * .24); color: var(--k-ink); stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+
+/* Alarms (open, motion, smoke) as rows, readings as cards. */
+.hd-dev__alarms { display: flex; flex-direction: column; gap: calc(var(--cell) * .08); margin: 0; padding: 0; list-style: none; }
+.hd-dev__alarms li {
+  display: flex; align-items: center; justify-content: space-between; gap: calc(var(--cell) * .1);
+  padding: calc(var(--cell) * .12) calc(var(--cell) * .16); border-radius: calc(var(--cell) * var(--tile-radius) * .75);
+  background: color-mix(in oklab, var(--k-ink) 10%, var(--tile-surface)); font-size: calc(var(--cell) * .13); font-weight: 700;
+}
+.hd-dev__alarms li.is-alarm { background: var(--k-ink); color: var(--on-kind); }
+.hd-dev__alarms li.is-alarm .hd-details__label { color: inherit; opacity: .8; }
+.hd-dev .hd-dev__figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(calc(var(--cell) * 1.3), 1fr)); gap: calc(var(--cell) * .1); }
+.hd-dev__figure {
+  display: flex; flex-direction: column; gap: calc(var(--cell) * .04); min-width: 0;
+  padding: calc(var(--cell) * .14) calc(var(--cell) * .16); border-radius: calc(var(--cell) * var(--tile-radius) * .75);
+  background: color-mix(in oklab, var(--k-ink) 12%, var(--tile-surface));
+}
+.hd-dev__figure dd { margin: 0; font: 700 calc(var(--cell) * .24)/1.1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--k-ink); text-align: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-dev[data-mode="sensor"] .hd-dev__figure dd { font-size: calc(var(--cell) * .34); }
+.hd-dev[data-mode="sensor"] .hd-dev__disc { --size: min(calc(var(--cell) * 1.8), 28vmin); }
 
 /* Tile states */
 .hd-tile.is-unavailable { opacity: .6; }

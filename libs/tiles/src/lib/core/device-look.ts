@@ -128,6 +128,24 @@ export function deviceLook(device: HomeyDevice | undefined): { hue: KindHue; ico
   return { hue: HUES[device.class] ?? 'neutral', icon: ICONS[device.class] ?? LucideBox };
 }
 
+/** Capabilities a tile can operate, in the order `auto` prefers them. */
+export const CONTROLS = ['onoff', 'dim', 'target_temperature', 'windowcoverings_state', 'speaker_playing'];
+
+/** The layout of a device's full-screen detail view; each has its own design. */
+export type DeviceMode = 'light' | 'climate' | 'cover' | 'speaker' | 'lock' | 'sensor' | 'switch';
+
+/** Which detail design fits a device: by what it can do first, then by its class. */
+export function deviceMode(device: HomeyDevice): DeviceMode {
+  const caps = device.capabilities;
+  if (caps['speaker_playing']) return 'speaker';
+  if (caps['target_temperature']) return 'climate';
+  if (caps['windowcoverings_state'] || caps['windowcoverings_set']) return 'cover';
+  if (caps['locked']) return 'lock';
+  if (caps['dim'] || device.class === 'light') return 'light';
+  if (device.class === 'sensor' || !caps['onoff']) return 'sensor';
+  return 'switch';
+}
+
 /** A reading split for display: `20.5` and `°C`, rounded to what a tile has room for. */
 export function formatReading(value: number, units: string | null): { value: string; units: string } {
   const rounded = Math.abs(value) >= 100 ? Math.round(value) : Math.round(value * 10) / 10;

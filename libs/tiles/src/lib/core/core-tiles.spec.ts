@@ -13,6 +13,7 @@ import { CORE_TILES } from './core-tiles';
 import { MoodListTile } from './mood-list-tile';
 import { moodTint } from './mood-tint';
 import { PhotoTile, shuffled } from './photo-tile';
+import { stripTarget } from './statistic-history';
 import { drawChart, logOwner, nearestPoint, StatisticTile, statisticTone, summarize } from './statistic-tile';
 import { DETAILS_IDLE_MS } from './tile-details';
 import { FLASH_MS } from './tile-view';
@@ -342,6 +343,152 @@ describe('core tiles', () => {
         ]);
       });
 
+      describe('full screen designs', () => {
+        const open = async (caps: HomeyCapability[], change: Partial<HomeyDevice> = {}) => {
+          const tile = await render(DeviceTile, 'd1', 'small');
+          await push(device(caps, change));
+          tile.click();
+          await settle();
+          const dialog = details(tile);
+          return { dialog, pane: dialog.querySelector('.hd-dev') as HTMLElement };
+        };
+
+        it('takes the whole screen', async () => {
+          const { dialog, pane } = await open([capability('onoff', true), capability('dim', 0.4)]);
+          expect(dialog.classList).toContain('hd-details--screen');
+          expect(pane.dataset['mode']).toBe('light');
+        });
+
+        it('lights a dimmer with its brightness', async () => {
+          const { pane } = await open([capability('onoff', true), capability('dim', 0.4)]);
+          expect(pane.style.getPropertyValue('--level')).toBe('0.4');
+          expect(pane.querySelector('.hd-dev__big')?.textContent?.trim()).toContain('40');
+        });
+
+        it('shows a thermostat as a dial and a cover as a shade', async () => {
+          const thermostat = await open([capability('target_temperature', 21, { units: '°C', min: 5, max: 25 })], { class: 'thermostat' });
+          expect(thermostat.pane.dataset['mode']).toBe('climate');
+          expect(thermostat.pane.style.getPropertyValue('--fraction')).toBe('0.8');
+
+          const cover = await open([capability('windowcoverings_state', 'idle'), capability('windowcoverings_set', 0.25)], { class: 'curtain' });
+          expect(cover.pane.dataset['mode']).toBe('cover');
+          expect(cover.pane.style.getPropertyValue('--closed')).toBe('0.75');
+          expect(cover.pane.querySelector('.hd-dev__big')?.textContent).toBe('25% open');
+          cover.pane.querySelector('[role="slider"]')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+          await settle();
+          expect(realtime.commands[realtime.commands.length - 1]).toEqual(['setCapability', undefined, 'd1', 'windowcoverings_set', 0.35]);
+        });
+
+        it('plays a speaker with its transport and volume', async () => {
+          const { dialog, pane } = await open(
+            [
+              capability('speaker_playing', true),
+              capability('speaker_next', false),
+              capability('volume_set', 0.3),
+              capability('speaker_track', 'Birds of a Feather', { type: 'string' }),
+              capability('speaker_artist', 'Billie Eilish', { type: 'string' }),
+            ],
+            { class: 'speaker', albumArt: { id: 'art', version: '1' } },
+          );
+          expect(pane.dataset['mode']).toBe('speaker');
+          expect(pane.querySelector('img')?.getAttribute('src')).toContain('/api/homey/images/art');
+          expect(pane.textContent).toContain('Billie Eilish');
+          button(dialog, 'Pause').click();
+          button(dialog, 'Next').click();
+          pane.querySelector('[role="slider"]')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+          await settle();
+          expect(realtime.commands).toEqual([
+            ['setCapability', undefined, 'd1', 'speaker_playing', false],
+            ['setCapability', undefined, 'd1', 'speaker_next', true],
+            ['setCapability', undefined, 'd1', 'volume_set', 0.2],
+          ]);
+        });
+
+        it('locks and unlocks a lock', async () => {
+          const { dialog, pane } = await open([capability('locked', true)], { class: 'lock' });
+          expect(pane.dataset['mode']).toBe('lock');
+          expect(pane.querySelector('.hd-dev__big')?.textContent).toBe('Locked');
+          button(dialog, 'Unlock').click();
+          await settle();
+          expect(realtime.commands).toEqual([['setCapability', undefined, 'd1', 'locked', false]]);
+        });
+
+        it('lists a sensor\'s alarms and readings', async () => {
+          const { pane } = await open(
+            [
+              capability('alarm_contact', true, { setable: false, title: 'Contact' }),
+              capability('measure_battery', 80, { setable: false, title: 'Battery', units: '%' }),
+              capability('measure_temperature', 19, { setable: false, title: 'Temperature', units: '°C' }),
+            ],
+            { class: 'sensor' },
+          );
+          expect(pane.dataset['mode']).toBe('sensor');
+          expect(pane.querySelector('.hd-dev__alarms')?.textContent).toContain('Contact');
+          expect(pane.querySelector('.hd-dev__alarms li')?.classList).toContain('is-alarm');
+          expect(pane.querySelector('.hd-dev__figures')?.textContent).toContain('Battery');
+        });
+
+        it('switches to the history of the device\'s readings and back', async () => {
+          const tile = await render(DeviceTile, 'd1', 'small');
+          const http = TestBed.inject(HttpTestingController);
+          http.expectOne('/api/homey/insights?account=1').flush([
+            { id: 'homey:device:d1:measure_power', ownerUri: 'homey:device:d1', ownerName: 'Plug', title: 'Power', type: 'number', units: 'W' },
+            { id: 'homey:device:d1:measure_empty', ownerUri: 'homey:device:d1', ownerName: 'Plug', title: 'Empty', type: 'number', units: 'W' },
+            { id: 'homey:device:d1:alarm_contact', ownerUri: 'homey:device:d1', ownerName: 'Plug', title: 'Contact', type: 'boolean', units: null },
+            { id: 'homey:device:other:measure_power', ownerUri: 'homey:device:other', ownerName: 'Other', title: 'Power', type: 'number', units: 'W' },
+          ]);
+          await push(device([capability('onoff', true)], { class: 'socket' }));
+          // The history alone is enough for the tile to open.
+          expect(tile.getAttribute('role')).toBe('button');
+          tile.click();
+          TestBed.tick();
+
+          const dialog = details(tile);
+          // The tabs wait until it is known which logs have something to draw: one has, one has no values.
+          expect(dialog.querySelector('.hd-details__head .hd-segmented')).toBeNull();
+          TestBed.tick();
+          const probe = (log: string) =>
+            http.expectOne((r) => r.url === '/api/homey/insights/entries' && r.params.get('log') === log && r.params.get('resolution') === 'last31Days');
+          probe('homey:device:d1:measure_power').flush([
+            { t: '2026-10-25T10:00:00Z', v: 100 },
+            { t: '2026-10-25T11:00:00Z', v: 300 },
+          ]);
+          probe('homey:device:d1:measure_empty').flush([{ t: '2026-10-25T10:00:00Z', v: null }]);
+          await settle();
+          const tabs = [...dialog.querySelectorAll<HTMLButtonElement>('.hd-details__head .hd-segmented button')];
+          expect(tabs.map((t) => t.textContent?.trim())).toEqual(['Device', 'History']);
+          expect(dialog.querySelector('.hd-dev')).not.toBeNull();
+
+          tabs[1].click();
+          TestBed.tick();
+          http
+            .expectOne((r) => r.url === '/api/homey/insights/entries' && r.params.get('log') === 'homey:device:d1:measure_power' && r.params.get('resolution') === 'last24Hours')
+            .flush([
+              { t: '2026-10-25T10:00:00Z', v: 100 },
+              { t: '2026-10-25T11:00:00Z', v: 300 },
+            ]);
+          await settle();
+          expect(dialog.querySelector('.hd-dev')).toBeNull();
+          // Only the numeric log is offered; the on/off one cannot be drawn.
+          expect(dialog.querySelector('[aria-label="Reading"]')).toBeNull();
+          expect(dialog.querySelector('.hd-stat__pane')?.getAttribute('data-tone')).toBe('power');
+          expect([...dialog.querySelectorAll('.hd-stat__figure-value')].map((f) => f.textContent)).toEqual(['100W', '300W', '200W', '+200W']);
+
+          tabs[0].click();
+          await settle();
+          expect(dialog.querySelector('.hd-dev')).not.toBeNull();
+          expect(dialog.querySelector('.hd-stat__pane')).toBeNull();
+        });
+
+        it('switches a plug with its power readings', async () => {
+          const { pane } = await open([capability('onoff', true), capability('measure_power', 40, { setable: false, title: 'Power', units: 'W' })], {
+            class: 'socket',
+          });
+          expect(pane.dataset['mode']).toBe('switch');
+          expect(pane.querySelector('.hd-dev__figures')?.textContent).toContain('Power');
+        });
+      });
+
       it('close with the close button, a tap outside, Escape, or after a minute untouched', async () => {
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
         try {
@@ -635,12 +782,29 @@ describe('core tiles', () => {
       expect(tile.querySelector('.hd-value')?.textContent).toBe('450W');
       expect(tile.querySelector('.hd-chart__line')?.getAttribute('d')?.split('L')).toHaveLength(3);
 
+      // A reading of a device opens the device's own details, on the history of this reading.
       tile.click();
-      await settle();
+      TestBed.tick();
       const dialog = details(tile);
       expect(dialog.open).toBe(true);
-      expect(dialog.querySelector('.hd-value--xl')?.textContent).toBe('450W');
-      expect(dialog.querySelector('.hd-chart__line')?.getAttribute('d')?.split('L')).toHaveLength(3);
+      const entries = (resolution: string) => (r: { url: string; params: { get(k: string): string | null } }) =>
+        r.url === '/api/homey/insights/entries' && r.params.get('log') === logId && r.params.get('resolution') === resolution;
+      const history = [
+        { t: '2026-10-25T10:00:00Z', v: 100 },
+        { t: '2026-10-25T11:00:00Z', v: 300 },
+      ];
+      http.expectOne(entries('last31Days')).flush(history);
+      TestBed.tick();
+      await new Promise((resolve) => setTimeout(resolve));
+      TestBed.tick();
+      http.expectOne(entries('last24Hours')).flush(history);
+      await settle();
+
+      expect(dialog.querySelector('.hd-dev')).toBeNull();
+      expect(dialog.querySelector('.hd-stat__pane')?.getAttribute('data-tone')).toBe('power');
+      expect(dialog.querySelector('.hd-value--xl')?.textContent).toBe('300W');
+      expect(dialog.querySelector('.hd-details__name')?.textContent).toBe('Kitchen spots');
+      expect([...dialog.querySelectorAll('.hd-details__head .hd-segmented button')].map((b) => b.textContent?.trim())).toEqual(['Device', 'History']);
     });
 
     it('opens full screen with the figures of the window, and another window on its tab', async () => {
@@ -698,6 +862,33 @@ describe('core tiles', () => {
       TestBed.tick();
 
       http.expectOne(entries);
+    });
+  });
+
+  describe('reading strip arrows', () => {
+    // Four items of 100 in a view of 250, so 400 wide in all and at most 150 to scroll.
+    const items = [0, 100, 200, 300].map((left) => ({ left, right: left + 100 }));
+
+    it('moves the item cut off at the right edge to the left edge', () => {
+      expect(stripTarget(items, 0, 250, 400, 1)).toBe(150); // The third, cut off at 250, would go to 200: stops at the end.
+      expect(stripTarget(items, 150, 250, 400, 1)).toBeNull(); // Nothing is cut off any more.
+      expect(stripTarget(items, 0, 220, 400, 1)).toBe(180); // Capped at the end of the strip rather than overscrolling.
+      expect(stripTarget(items, 0, 150, 400, 1)).toBe(100); // The second is cut off at 150 and goes to the left edge.
+    });
+
+    it('skips an item wider than the view, which no scrolling can show whole', () => {
+      const wide = [
+        { left: 0, right: 132 },
+        { left: 140, right: 248 },
+      ];
+      expect(stripTarget(wide, 0, 114, 248, 1)).toBe(134);
+      expect(stripTarget(wide, 134, 114, 248, -1)).toBe(18);
+    });
+
+    it('moves the item cut off at the left edge to the right edge', () => {
+      expect(stripTarget(items, 150, 250, 400, -1)).toBe(0); // The second is cut off; its right edge at the right of the view would be before the start.
+      expect(stripTarget(items, 0, 250, 400, -1)).toBeNull();
+      expect(stripTarget(items, 300, 100, 400, -1)).toBe(200); // The third ends at 300, so it moves to end at 300: view 200..300.
     });
   });
 

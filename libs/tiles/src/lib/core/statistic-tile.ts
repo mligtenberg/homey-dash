@@ -2,9 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  DestroyRef,
   effect,
-  ElementRef,
   inject,
   input,
   linkedSignal,
@@ -18,259 +16,37 @@ import { HomeyApi, HomeyInsightEntry, HomeyInsightLog, InsightResolution, Realti
 import { LucideChartLine, LucideDynamicIcon } from '@lucide/angular';
 import { KindHue } from '../tile-kind';
 import { TileSettings } from '../tile-data';
+import { DeviceDetails } from './device-details';
 import { deviceLook, formatReading } from './device-look';
+import { STATISTIC_WINDOWS, StatisticChart, statisticFigures, statisticStamp, statisticTone, logOwner } from './statistic-chart';
 import { TileDetails } from './tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
+
+// The chart and what is computed for it live in their own file, so the device's detail view can show them too.
+export * from './statistic-chart';
 
 export interface StatisticTileSettings extends TileSettings {
   /** The time window the chart shows; absent is the last 24 hours. */
   window?: InsightResolution;
 }
 
-const HOUR = 3_600_000;
-
-export const STATISTIC_WINDOWS: Record<InsightResolution, { label: string; tab: string; ago: string; ms: number }> = {
-  lastHour: { label: 'Last hour', tab: 'Hour', ago: '1h ago', ms: HOUR },
-  last24Hours: { label: 'Last 24 hours', tab: 'Day', ago: '24h ago', ms: 24 * HOUR },
-  last7Days: { label: 'Last 7 days', tab: 'Week', ago: '7d ago', ms: 7 * 24 * HOUR },
-  last31Days: { label: 'Last 31 days', tab: 'Month', ago: '31d ago', ms: 31 * 24 * HOUR },
-};
-
-/**
- * What a log measures, for the colour of its full-screen view: power and energy are amber like a lit lamp,
- * temperature warm, humidity cool. Anything else keeps the tile's own hue.
- */
-export type StatisticTone = 'power' | 'temperature' | 'humidity' | 'other';
-
-export function statisticTone(log: Pick<HomeyInsightLog, 'id' | 'units'> | undefined): StatisticTone {
-  const units = log?.units ?? '';
-  const id = log?.id ?? '';
-  if (/power|meter|energy/.test(id) || /^(k?Wh?|A|V)$/.test(units)) return 'power';
-  if (/temperature/.test(id) || /^°/.test(units)) return 'temperature';
-  if (/humidity/.test(id) || units === '%') return 'humidity';
-  return 'other';
-}
-
-export interface StatisticSummary {
-  lowest: HomeyInsightEntry;
-  highest: HomeyInsightEntry;
-  average: number;
-  /** The first and last values of the window. */
-  from: number;
-  to: number;
-}
-
-/** The lowest, highest and average value of the `windowMs` up to the last entry, or null when it has none. */
-export function summarize(entries: readonly HomeyInsightEntry[], windowMs: number): StatisticSummary | null {
-  const values = entries.filter((e): e is HomeyInsightEntry & { v: number } => e.v !== null);
-  if (values.length === 0) return null;
-  const start = Date.parse(values[values.length - 1].t) - windowMs;
-  const inWindow = values.filter((e) => Date.parse(e.t) >= start);
-  const lowest = inWindow.reduce((a, b) => (b.v < a.v ? b : a));
-  const highest = inWindow.reduce((a, b) => (b.v > a.v ? b : a));
-  const average = inWindow.reduce((sum, e) => sum + e.v, 0) / inWindow.length;
-  return { lowest, highest, average, from: inWindow[0].v, to: inWindow[inWindow.length - 1].v };
-}
-
-/**
- * The device and capability a log records, from its id such as `homey:device:<id>:measure_power`. Homey's own
- * `energy_power` log is not a capability; it follows `measure_power`.
- */
-export function logOwner(logId: string): { deviceId: string; capability: string } | null {
-  const match = /^homey:device:([^:]+):(.+)$/.exec(logId);
-  if (!match) return null;
-  return { deviceId: match[1], capability: match[2] === 'energy_power' ? 'measure_power' : match[2] };
-}
-
 function logHue(log: HomeyInsightLog, ownerHue: KindHue): KindHue {
   const units = log.units ?? '';
-  if (/power|meter|energy/.test(log.id) || /^(k?Wh?|A|V)$/.test(units)) return 'energy';
+  if (/power|meter|energy/.test(log.id) || /^(k?Wh?|A|V)$/.test(units))
+    return 'energy';
   if (/temperature/.test(log.id) || units.startsWith('°')) return 'climate';
   return ownerHue === 'neutral' ? 'energy' : ownerHue;
 }
 
-export interface ChartPoint {
-  x: number;
-  y: number;
-  entry: HomeyInsightEntry;
-}
-
-export interface Chart {
-  line: string;
-  area: string;
-  /** Where the plot ends; the value labels go to the right of it. */
-  right: number;
-  points: ChartPoint[];
-  dot: ChartPoint | null;
-  grid: { y: number; label: string }[];
-}
-
-function niceStep(range: number) {
-  const raw = range / 2;
-  const magnitude = 10 ** Math.floor(Math.log10(raw));
-  const n = raw / magnitude;
-  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * magnitude;
-}
-
-const round = (n: number) => Math.round(n * 10) / 10;
-
-/**
- * The chart's shapes in a `width` × `height` box: the window up to the last entry runs left to right, and the
- * values span round grid lines. The value labels take a gutter on the right of `charWidth` per character, so the
- * line never runs under them. A null value is a gap in the line.
- */
-export function drawChart(
-  entries: readonly HomeyInsightEntry[],
-  windowMs: number,
-  width: number,
-  height: number,
-  charWidth = 0,
-): Chart {
-  const values = entries.map((e) => e.v).filter((v): v is number => v !== null);
-  if (values.length === 0) return { line: '', area: '', right: width, points: [], dot: null, grid: [] };
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const step = niceStep(max - min || Math.abs(max) || 1);
-  const low = Math.floor(min / step) * step;
-  const high = Math.max(Math.ceil(max / step) * step, low + step);
-  const decimals = Math.max(0, -Math.floor(Math.log10(step)));
-  const labels: string[] = [];
-  for (let v = low; v <= high + step / 2; v += step) labels.push(v.toFixed(decimals));
-
-  const right = round(width - (charWidth ? (Math.max(...labels.map((l) => l.length)) + 1) * charWidth : 0));
-  const top = height * 0.06;
-  const bottom = height * 0.84; // Room below for the time labels.
-  const end = Date.parse(entries[entries.length - 1].t);
-  const x = (t: number) => round(((t - (end - windowMs)) / windowMs) * right);
-  const y = (v: number) => round(bottom - ((v - low) / (high - low)) * (bottom - top));
-
-  const segments: ChartPoint[][] = [[]];
-  for (const entry of entries) {
-    const t = Date.parse(entry.t);
-    if (t < end - windowMs) continue;
-    if (entry.v === null) segments.push([]);
-    else segments[segments.length - 1].push({ x: x(t), y: y(entry.v), entry });
-  }
-  const drawn = segments.filter((s) => s.length > 0);
-  const path = (s: ChartPoint[]) => s.map((p, i) => `${i ? 'L' : 'M'}${p.x},${p.y}`).join(' ');
-  const points = drawn.flat();
-
-  return {
-    line: drawn.map(path).join(' '),
-    area: drawn.map((s) => `M${s[0].x},${bottom} ${path(s).replace('M', 'L')} L${s[s.length - 1].x},${bottom} Z`).join(' '),
-    right,
-    points,
-    dot: points[points.length - 1] ?? null,
-    grid: labels.map((label, i) => ({ y: y(low + i * step), label })),
-  };
-}
-
-/** The point nearest to `x` along the time axis. */
-export function nearestPoint(points: readonly ChartPoint[], x: number): ChartPoint | null {
-  let nearest: ChartPoint | null = null;
-  for (const p of points) if (!nearest || Math.abs(p.x - x) < Math.abs(nearest.x - x)) nearest = p;
-  return nearest;
-}
-
-/**
- * The chart of a statistic, drawn in its own pixels so the dot stays round and the labels keep their size. With
- * `scrub`, a press or drag along it picks the entry under the finger, until a mouse leaves or the chart goes.
- */
-@Component({
-  selector: 'hd-statistic-chart',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { style: 'display: flex; flex-direction: column; flex: 1; min-height: 0' },
-  template: `
-    <svg
-      #chartSvg
-      class="hd-chart"
-      [class.hd-chart--scrub]="scrub()"
-      [attr.viewBox]="'0 0 ' + box().width + ' ' + box().height"
-      aria-hidden="true"
-      (pointerdown)="onPointer($event)"
-      (pointermove)="onPointer($event)"
-      (pointerleave)="onLeave($event)"
-    >
-      @for (line of chart().grid; track line.label) {
-        <line class="hd-chart__grid" x1="0" [attr.x2]="chart().right" [attr.y1]="line.y" [attr.y2]="line.y" />
-        <text class="hd-chart__axis" [attr.x]="box().width" [attr.y]="line.y" text-anchor="end" dominant-baseline="central">
-          {{ line.label }}
-        </text>
-      }
-      <path class="hd-chart__area" [attr.d]="chart().area" />
-      <path class="hd-chart__line" [attr.d]="chart().line" />
-      @if (cursor(); as cursor) {
-        <line class="hd-chart__cursor" [attr.x1]="cursor.x" [attr.x2]="cursor.x" [attr.y1]="0" [attr.y2]="box().height * 0.84" />
-        <circle class="hd-chart__dot" [attr.cx]="cursor.x" [attr.cy]="cursor.y" r="6" />
-      } @else if (chart().dot; as dot) {
-        <circle class="hd-chart__dot" [attr.cx]="dot.x" [attr.cy]="dot.y" r="5" />
-      }
-      @if (chart().line) {
-        <text class="hd-chart__axis" x="0" [attr.y]="box().height">{{ window().ago }}</text>
-        <text class="hd-chart__axis" [attr.x]="chart().right" [attr.y]="box().height" text-anchor="end">Now</text>
-      }
-    </svg>
-  `,
-})
-export class StatisticChart {
-  readonly entries = input.required<readonly HomeyInsightEntry[]>();
-  readonly window = input.required<{ ago: string; ms: number }>();
-  readonly scrub = input(false);
-  /** The entry picked along the chart, or null when none is. */
-  readonly picked = output<HomeyInsightEntry | null>();
-
-  private readonly chartElement = viewChild.required<ElementRef<SVGSVGElement>>('chartSvg');
-  protected readonly box = signal({ width: 300, height: 120, charWidth: 0 });
-  protected readonly chart = computed(() =>
-    drawChart(this.entries(), this.window().ms, this.box().width, this.box().height, this.box().charWidth),
-  );
-  private readonly pickedX = signal<number | null>(null);
-  protected readonly cursor = computed(() => {
-    const x = this.pickedX();
-    return x === null ? null : nearestPoint(this.chart().points, x);
-  });
-
-  constructor() {
-    effect((onCleanup) => {
-      const element = this.chartElement().nativeElement;
-      if (typeof ResizeObserver === 'undefined') return;
-      const observer = new ResizeObserver(([entry]) => {
-        const { width, height } = entry.contentRect;
-        // The labels are digits of about .6em; the font follows the cell size.
-        const charWidth = parseFloat(getComputedStyle(element).fontSize) * 0.6 || 0;
-        if (width > 0 && height > 0) this.box.set({ width: Math.round(width), height: Math.round(height), charWidth });
-      });
-      observer.observe(element);
-      onCleanup(() => observer.disconnect());
-    });
-
-    let last: HomeyInsightEntry | null = null;
-    effect(() => {
-      const entry = this.cursor()?.entry ?? null;
-      if (entry !== last) untracked(() => this.picked.emit(entry));
-      last = entry;
-    });
-    inject(DestroyRef).onDestroy(() => last && this.picked.emit(null));
-  }
-
-  protected onPointer(event: PointerEvent) {
-    if (!this.scrub() || (event.type === 'pointermove' && event.pointerType !== 'mouse' && !event.buttons)) return;
-    const rect = this.chartElement().nativeElement.getBoundingClientRect();
-    this.pickedX.set(((event.clientX - rect.left) / rect.width) * this.box().width);
-  }
-
-  // A finger stays picked after it lifts, so its value can be read.
-  protected onLeave(event: PointerEvent) {
-    if (event.pointerType === 'mouse') this.pickedX.set(null);
-  }
-}
-
 @Component({
   selector: 'hd-statistic-tile',
-  imports: [LucideDynamicIcon, StatisticChart, TileDetails],
+  imports: [LucideDynamicIcon, StatisticChart, TileDetails, DeviceDetails],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { ...TILE_FACE_HOST, '[class.hd-stat]': "face().state === 'ok' || face().state === 'unavailable'" },
+  host: {
+    ...TILE_FACE_HOST,
+    '[class.hd-stat]':
+      "face().state === 'ok' || face().state === 'unavailable'",
+  },
   template: `
     @if (face().state === 'ok' || face().state === 'unavailable') {
       <div class="hd-stat__head">
@@ -294,96 +70,196 @@ export class StatisticChart {
         <div class="hd-tile__detail">{{ face().detail }}</div>
       </div>
     }
-    <hd-tile-details [screen]="true" [name]="face().name" [icon]="face().icon" [subtitle]="face().detail">
-      <div class="hd-segmented" hdDetailsHead role="group" aria-label="Time window">
-        @for (w of windows; track w.id) {
-          <button type="button" [attr.aria-pressed]="shownWindow() === w.id" (click)="viewWindow.set(w.id)">{{ w.tab }}</button>
-        }
-      </div>
-      <div class="hd-stat__pane" [attr.data-tone]="tone()">
-        @if (readout(); as readout) {
-          <div class="hd-stat__readout">
-            <div class="hd-value hd-value--xl">{{ readout.value }}<span class="hd-unit">{{ readout.units }}</span></div>
-            <div class="hd-details__label">{{ pickedAt() ?? 'Now' }}</div>
-          </div>
-        }
-        <hd-statistic-chart [entries]="shownEntries()" [window]="shownWindowInfo()" [scrub]="true" (picked)="picked.set($event)" />
-        @if (figures(); as figures) {
-          <dl class="hd-stat__figures">
-            @for (f of figures; track f.label) {
-              <div class="hd-stat__figure">
-                <dt class="hd-details__label">{{ f.label }}</dt>
-                <dd class="hd-stat__figure-value">{{ f.value }}</dd>
-                @if (f.note) {
-                  <dd class="hd-stat__figure-note">{{ f.note }}</dd>
-                }
+    @if (ownerDevice(); as device) {
+      <!-- A reading of a device opens the device's own detail view, on the history of this reading. -->
+      <hd-device-details
+        [account]="settings().account"
+        [deviceId]="device.id"
+        [name]="device.name"
+        [icon]="deviceIcon()"
+        [log]="settings().target ?? undefined"
+        [window]="windowId()"
+      />
+    } @else {
+      <hd-tile-details
+        [screen]="true"
+        [name]="face().name"
+        [icon]="face().icon"
+        [subtitle]="face().detail"
+      >
+        <div
+          class="hd-segmented"
+          hdDetailsHead
+          role="group"
+          aria-label="Time window"
+        >
+          @for (w of windows; track w.id) {
+            <button
+              type="button"
+              [attr.aria-pressed]="shownWindow() === w.id"
+              (click)="viewWindow.set(w.id)"
+            >
+              {{ w.tab }}
+            </button>
+          }
+        </div>
+        <div class="hd-stat__pane" [attr.data-tone]="tone()">
+          @if (readout(); as readout) {
+            <div class="hd-stat__readout">
+              <div class="hd-value hd-value--xl">
+                {{ readout.value
+                }}<span class="hd-unit">{{ readout.units }}</span>
               </div>
-            }
-          </dl>
-        }
-      </div>
-    </hd-tile-details>
+              <div class="hd-details__label">{{ pickedAt() ?? 'Now' }}</div>
+            </div>
+          }
+          <hd-statistic-chart
+            [entries]="shownEntries()"
+            [window]="shownWindowInfo()"
+            [scrub]="true"
+            (picked)="picked.set($event)"
+          />
+          @if (figures(); as figures) {
+            <dl class="hd-stat__figures">
+              @for (f of figures; track f.label) {
+                <div class="hd-stat__figure">
+                  <dt class="hd-details__label">{{ f.label }}</dt>
+                  <dd class="hd-stat__figure-value">{{ f.value }}</dd>
+                  @if (f.note) {
+                    <dd class="hd-stat__figure-note">{{ f.note }}</dd>
+                  }
+                </div>
+              }
+            </dl>
+          }
+        </div>
+      </hd-tile-details>
+    }
   `,
 })
 export class StatisticTile extends TileView<StatisticTileSettings> {
   private readonly homeyApi = inject(HomeyApi);
   private readonly realtime = inject(Realtime);
 
-  private readonly log = computed(() => this.homey()?.insights.get(this.settings().target ?? ''));
+  private readonly log = computed(() =>
+    this.homey()?.insights.get(this.settings().target ?? ''),
+  );
   private readonly owner = computed(() => {
     const owner = logOwner(this.settings().target ?? '');
-    return owner ? { device: this.homey()?.devices.get(owner.deviceId), capability: owner.capability } : null;
+    return owner
+      ? {
+          device: this.homey()?.devices.get(owner.deviceId),
+          capability: owner.capability,
+        }
+      : null;
   });
-  private readonly windowId = computed<InsightResolution>(() => this.settings().window ?? 'last24Hours');
-  protected readonly window = computed(() => STATISTIC_WINDOWS[this.windowId()]);
+  /** The device whose reading the tile shows; absent for a log that is not a device's, such as the weather's. */
+  protected readonly ownerDevice = computed(() => this.owner()?.device);
+  protected readonly deviceIcon = computed(
+    () => deviceLook(this.ownerDevice()).icon,
+  );
+  private readonly deviceDetails = viewChild(DeviceDetails);
+  private readonly windowId = computed<InsightResolution>(
+    () => this.settings().window ?? 'last24Hours',
+  );
+  protected readonly window = computed(
+    () => STATISTIC_WINDOWS[this.windowId()],
+  );
 
   private readonly history = rxResource({
     params: () => {
       const log = this.log();
-      return log ? { log: log.id, window: this.windowId(), account: this.settings().account } : undefined;
+      return log
+        ? {
+            log: log.id,
+            window: this.windowId(),
+            account: this.settings().account,
+          }
+        : undefined;
     },
-    stream: ({ params }) => this.homeyApi.insightEntries(params.log, params.window, params.account),
+    stream: ({ params }) =>
+      this.homeyApi.insightEntries(params.log, params.window, params.account),
   });
 
   /** The window the detail view shows: the tile's own until another tab is pressed, and again once it is closed. */
   protected readonly viewWindow = signal<InsightResolution | null>(null);
-  protected readonly windows = Object.entries(STATISTIC_WINDOWS).map(([id, { tab }]) => ({ id: id as InsightResolution, tab }));
-  protected readonly shownWindow = computed(() => this.viewWindow() ?? this.windowId());
-  protected readonly shownWindowInfo = computed(() => STATISTIC_WINDOWS[this.shownWindow()]);
+  protected readonly windows = Object.entries(STATISTIC_WINDOWS).map(
+    ([id, { tab }]) => ({ id: id as InsightResolution, tab }),
+  );
+  protected readonly shownWindow = computed(
+    () => this.viewWindow() ?? this.windowId(),
+  );
+  protected readonly shownWindowInfo = computed(
+    () => STATISTIC_WINDOWS[this.shownWindow()],
+  );
   /** The history of another tab's window, fetched only while the detail view is open on it. */
   private readonly otherHistory = rxResource({
     params: () => {
       const log = this.log();
       const window = this.viewWindow();
-      return log && window && window !== this.windowId() ? { log: log.id, window, account: this.settings().account } : undefined;
+      return log && window && window !== this.windowId()
+        ? { log: log.id, window, account: this.settings().account }
+        : undefined;
     },
-    stream: ({ params }) => this.homeyApi.insightEntries(params.log, params.window, params.account),
+    stream: ({ params }) =>
+      this.homeyApi.insightEntries(params.log, params.window, params.account),
   });
   /** The history with the owner device's live values appended. */
-  private readonly entries = linkedSignal<HomeyInsightEntry[]>(() => (this.history.hasValue() ? this.history.value() : []));
+  private readonly entries = linkedSignal<HomeyInsightEntry[]>(() =>
+    this.history.hasValue() ? this.history.value() : [],
+  );
 
   readonly face = computed<TileFace>(() => {
     const log = this.log();
     const device = this.owner()?.device;
-    const base = { icon: LucideChartLine, hue: log ? logHue(log, deviceLook(device).hue) : ('energy' as const) };
+    const base = {
+      icon: LucideChartLine,
+      hue: log ? logHue(log, deviceLook(device).hue) : ('energy' as const),
+    };
     if (!log) return this.absentFace({ ...base, noun: 'Statistic' });
-    const name = this.settings().label || [log.ownerName, log.title].filter(Boolean).join(' · ');
-    return { ...base, name, detail: this.window().label, details: true, state: device && !device.available ? 'unavailable' : 'ok' };
+    const name =
+      this.settings().label ||
+      [log.ownerName, log.title].filter(Boolean).join(' · ');
+    return {
+      ...base,
+      name,
+      detail: this.window().label,
+      details: true,
+      state: device && !device.available ? 'unavailable' : 'ok',
+    };
   });
+
+  protected override openDetails() {
+    if (this.ownerDevice()) this.deviceDetails()?.open('history');
+    else super.openDetails();
+  }
+
+  protected override closeDetails() {
+    if (this.ownerDevice()) this.deviceDetails()?.close();
+    else super.closeDetails();
+  }
 
   /** The entry picked along the chart in the detail view. */
   protected readonly picked = signal<HomeyInsightEntry | null>(null);
 
   /** The entries of the window the detail view shows. */
   protected readonly shownEntries = computed(() =>
-    this.shownWindow() === this.windowId() ? this.entries() : this.otherHistory.hasValue() ? this.otherHistory.value() : [],
+    this.shownWindow() === this.windowId()
+      ? this.entries()
+      : this.otherHistory.hasValue()
+        ? this.otherHistory.value()
+        : [],
   );
 
-  private readonly latest = computed(() => [...this.entries()].reverse().find((e) => e.v !== null));
+  private readonly latest = computed(() =>
+    [...this.entries()].reverse().find((e) => e.v !== null),
+  );
   protected readonly current = computed(() => this.reading(this.latest()));
   protected readonly readout = computed(() => {
     const shown = this.shownEntries();
-    return this.reading(this.picked() ?? [...shown].reverse().find((e) => e.v !== null));
+    return this.reading(
+      this.picked() ?? [...shown].reverse().find((e) => e.v !== null),
+    );
   });
   protected readonly tone = computed(() => statisticTone(this.log()));
 
@@ -393,35 +269,22 @@ export class StatisticTile extends TileView<StatisticTileSettings> {
   });
 
   /** The lowest, highest, average and change of the shown window. */
-  protected readonly figures = computed(() => {
-    const summary = summarize(this.shownEntries(), this.shownWindowInfo().ms);
-    if (!summary) return null;
-    const units = this.log()?.units ?? null;
-    const show = (v: number) => {
-      const { value, units: u } = formatReading(v, units);
-      return `${value}${u}`;
-    };
-    const change = summary.to - summary.from;
-    const sign = change > 0 ? '+' : change < 0 ? '−' : '';
-    return [
-      { label: 'Lowest', value: show(summary.lowest.v as number), note: this.stamp(summary.lowest.t) },
-      { label: 'Highest', value: show(summary.highest.v as number), note: this.stamp(summary.highest.t) },
-      { label: 'Average', value: show(summary.average), note: '' },
-      { label: 'Change', value: `${sign}${show(Math.abs(change))}`, note: `over the ${this.shownWindowInfo().label.toLowerCase()}` },
-    ];
-  });
+  protected readonly figures = computed(() =>
+    statisticFigures(
+      this.shownEntries(),
+      this.shownWindowInfo(),
+      this.log()?.units ?? null,
+    ),
+  );
 
   private stamp(iso: string) {
-    const days = this.shownWindowInfo().ms > 24 * HOUR;
-    return new Date(iso).toLocaleString([], {
-      ...(days ? { weekday: 'short', day: 'numeric', month: 'short' } : {}),
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return statisticStamp(iso, this.shownWindowInfo().ms);
   }
 
   private reading(entry: HomeyInsightEntry | undefined) {
-    return entry ? formatReading(entry.v as number, this.log()?.units ?? null) : null;
+    return entry
+      ? formatReading(entry.v as number, this.log()?.units ?? null)
+      : null;
   }
 
   constructor() {
@@ -443,7 +306,10 @@ export class StatisticTile extends TileView<StatisticTileSettings> {
       const owner = this.owner();
       const capability = owner?.device?.capabilities[owner.capability];
       if (typeof capability?.value !== 'number') return;
-      const entry = { t: capability.lastUpdated ?? new Date().toISOString(), v: capability.value };
+      const entry = {
+        t: capability.lastUpdated ?? new Date().toISOString(),
+        v: capability.value,
+      };
       const windowMs = untracked(this.window).ms;
       untracked(() =>
         this.entries.update((entries) => {
@@ -464,9 +330,18 @@ export class StatisticTile extends TileView<StatisticTileSettings> {
   template: `
     <div class="hd-field">
       <label class="hd-field__label" for="tile-window">Time window</label>
-      <select id="tile-window" class="hd-select" (change)="changed.emit({ window: $any($event.target).value })">
+      <select
+        id="tile-window"
+        class="hd-select"
+        (change)="changed.emit({ window: $any($event.target).value })"
+      >
         @for (option of windows; track option.id) {
-          <option [value]="option.id" [selected]="option.id === (settings().window ?? 'last24Hours')">{{ option.label }}</option>
+          <option
+            [value]="option.id"
+            [selected]="option.id === (settings().window ?? 'last24Hours')"
+          >
+            {{ option.label }}
+          </option>
         }
       </select>
     </div>
@@ -476,5 +351,7 @@ export class StatisticTileSettingsEditor {
   readonly settings = input.required<StatisticTileSettings>();
   readonly changed = output<Partial<StatisticTileSettings>>();
 
-  protected readonly windows = Object.entries(STATISTIC_WINDOWS).map(([id, { label }]) => ({ id, label }));
+  protected readonly windows = Object.entries(STATISTIC_WINDOWS).map(
+    ([id, { label }]) => ({ id, label }),
+  );
 }

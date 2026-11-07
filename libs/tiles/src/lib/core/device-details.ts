@@ -1,0 +1,297 @@
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, signal, viewChild } from '@angular/core';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { CapabilityValue, HomeyApi, InsightResolution, Realtime } from '@homey-dash/api-client';
+import { LucideDynamicIcon, LucideIconInput, LucideLock, LucideLockOpen, LucidePause, LucidePlay, LucideSkipBack, LucideSkipForward, LucideSpeaker, LucideVolume2 } from '@lucide/angular';
+import { catchError, forkJoin, map, of } from 'rxjs';
+import { TileData } from '../tile-data';
+import { CapabilityDriver, DeviceSegments, DeviceSlider, DeviceStepper } from './device-controls';
+import { describeDevice, deviceLogs, sameLogs } from './device-view';
+import { StatisticHistory } from './statistic-history';
+import { TileDetails } from './tile-details';
+import { FLASH_MS } from './tile-view';
+
+const COVER_STATES = [
+  { value: 'up', label: 'Up' },
+  { value: 'idle', label: 'Stop' },
+  { value: 'down', label: 'Down' },
+];
+
+const ON_OFF_STATES = [
+  { value: false, label: 'Off' },
+  { value: true, label: 'On' },
+];
+
+const LOCK_STATES = [
+  { value: true, label: 'Lock' },
+  { value: false, label: 'Unlock' },
+];
+
+/**
+ * A device's detail view, full screen, with a design for what kind of device it is and, when it has numeric readings
+ * with something to draw, a second page with their history. The device tile and a statistic tile of one of its readings
+ * both open it; the statistic tile opens it on that reading's history.
+ */
+@Component({
+  selector: 'hd-device-details',
+  imports: [LucideDynamicIcon, DeviceSegments, DeviceSlider, DeviceStepper, StatisticHistory, TileDetails],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  // Not a box of its own, so it does not take part in the tile's layout.
+  host: { style: 'display: contents' },
+  template: `
+    <hd-tile-details #dialog [screen]="true" [name]="name()" [icon]="icon()" [subtitle]="view()?.room ?? ''" (closed)="page.set('device')">
+      @if (graphable().length) {
+        <div class="hd-segmented" hdDetailsHead role="group" aria-label="Show">
+          @for (p of pages; track p.id) {
+            <button type="button" [attr.aria-pressed]="page() === p.id" (click)="page.set(p.id)">{{ p.label }}</button>
+          }
+        </div>
+      }
+      @if (probing()) {
+        <div class="hd-details__label">Loading…</div>
+      } @else if (page() === 'history' && graphable().length) {
+        <hd-statistic-history [logs]="graphable()" [account]="account()" [initial]="log()" [initialWindow]="window()" />
+      } @else if (view(); as c) {
+        <div class="hd-dev" [attr.data-mode]="c.mode" [class.is-on]="c.on" [style.--level]="c.level" [style.--fraction]="c.fraction" [style.--closed]="c.closed">
+          <section class="hd-dev__hero">
+            @switch (c.mode) {
+              @case ('light') {
+                <div class="hd-dev__disc"><svg class="hd-dev__glyph" [lucideIcon]="icon()" /></div>
+                <div class="hd-dev__big">
+                  @if (c.dim; as dim) {
+                    {{ c.on ? drive.percent(dim) : 0 }}<span class="hd-unit">%</span>
+                  } @else {
+                    {{ c.on ? 'On' : 'Off' }}
+                  }
+                </div>
+              }
+              @case ('climate') {
+                <div class="hd-dev__dial">
+                  <div class="hd-dev__dial-inner">
+                    @if (c.measured ?? c.target; as main) {
+                      <div class="hd-value hd-value--l">{{ main.value }}<span class="hd-unit">{{ main.units }}</span></div>
+                    }
+                    @if (c.target; as target) {
+                      <div class="hd-details__label">Set to {{ target.value }}{{ target.units }}</div>
+                    }
+                  </div>
+                </div>
+              }
+              @case ('cover') {
+                <div class="hd-dev__window"><div class="hd-dev__shade"></div></div>
+                <div class="hd-dev__big">{{ c.coverText }}</div>
+              }
+              @case ('speaker') {
+                <div class="hd-dev__art">
+                  @if (c.art; as art) {
+                    <img [src]="art" alt="" draggable="false" />
+                  } @else {
+                    <svg class="hd-dev__glyph" [lucideIcon]="speakerIcon" />
+                  }
+                </div>
+              }
+              @case ('lock') {
+                <div class="hd-dev__disc"><svg class="hd-dev__glyph" [lucideIcon]="c.locked ? lockIcon : unlockIcon" /></div>
+                <div class="hd-dev__big">{{ c.locked ? 'Locked' : 'Unlocked' }}</div>
+              }
+              @default {
+                <div class="hd-dev__disc"><svg class="hd-dev__glyph" [lucideIcon]="icon()" /></div>
+              }
+            }
+            @if (c.state && c.showState) {
+              <div class="hd-details__state">{{ c.state }}</div>
+            }
+          </section>
+          <section class="hd-dev__controls">
+            @if (c.mode === 'speaker') {
+              <div class="hd-dev__titles">
+                <div class="hd-dev__big">{{ c.track || c.state }}</div>
+                @if (c.artist) {
+                  <div class="hd-dev__artist">{{ c.artist }}</div>
+                }
+                @if (c.track && c.state) {
+                  <div class="hd-details__state">{{ c.playing ? 'Playing' : 'Not playing' }}</div>
+                }
+              </div>
+              @if (c.playback; as playing) {
+                <div class="hd-dev__transport">
+                  @if (c.previous; as previous) {
+                    <button type="button" class="hd-round-btn" aria-label="Previous" [disabled]="!ok()" (click)="drive.set(previous.id, true)">
+                      <svg [lucideIcon]="previousIcon" />
+                    </button>
+                  }
+                  <button
+                    type="button"
+                    class="hd-round-btn hd-dev__play"
+                    [attr.aria-label]="playing.value ? 'Pause' : 'Play'"
+                    [disabled]="!ok()"
+                    (click)="drive.set(playing.id, !playing.value)"
+                  >
+                    <svg [lucideIcon]="playing.value ? pauseIcon : playIcon" />
+                  </button>
+                  @if (c.next; as next) {
+                    <button type="button" class="hd-round-btn" aria-label="Next" [disabled]="!ok()" (click)="drive.set(next.id, true)">
+                      <svg [lucideIcon]="nextIcon" />
+                    </button>
+                  }
+                </div>
+              }
+              @if (c.volume; as volume) {
+                <div class="hd-dev__level">
+                  <svg class="hd-dev__level-icon" [lucideIcon]="volumeIcon" />
+                  <hd-device-slider [capability]="volume" label="Volume" [disabled]="!ok()" [driver]="drive" />
+                  <span class="hd-details__label">{{ drive.percent(volume) }}%</span>
+                </div>
+              }
+            }
+            @if (c.lock; as lock) {
+              <hd-device-segments [capability]="lock" [options]="lockStates" [disabled]="!ok()" [driver]="drive" />
+            }
+            @if (c.onoff; as onoff) {
+              <hd-device-segments [capability]="onoff" [options]="onOffStates" [disabled]="!ok()" [driver]="drive" />
+            }
+            @if (c.dim; as dim) {
+              <div class="hd-dev__level">
+                <span class="hd-details__label">Brightness</span>
+                <hd-device-slider [capability]="dim" [label]="brightnessLabel()" [disabled]="!ok()" [driver]="drive" />
+                @if (c.mode !== 'light') {
+                  <span class="hd-details__label">{{ drive.percent(dim) }}%</span>
+                }
+              </div>
+            }
+            @if (c.thermostat; as target) {
+              <div class="hd-dev__stepper">
+                <hd-device-stepper [capability]="target" [disabled]="!ok()" [driver]="drive" />
+              </div>
+            }
+            @if (c.cover; as cover) {
+              <hd-device-segments [capability]="cover" [options]="coverStates" [disabled]="!ok()" [driver]="drive" />
+            }
+            @if (c.position; as position) {
+              <div class="hd-dev__level">
+                <span class="hd-details__label">Open</span>
+                <hd-device-slider [capability]="position" label="Open" [disabled]="!ok()" [driver]="drive" />
+                <span class="hd-details__label">{{ drive.percent(position) }}%</span>
+              </div>
+            }
+            @if (c.alarms.length) {
+              <ul class="hd-dev__alarms">
+                @for (alarm of c.alarms; track alarm.id) {
+                  <li [class.is-alarm]="alarm.active">
+                    <span class="hd-details__label">{{ alarm.title }}</span>
+                    <span>{{ alarm.text }}</span>
+                  </li>
+                }
+              </ul>
+            }
+            @if (c.readings.length) {
+              <dl class="hd-details__readings hd-dev__figures">
+                @for (reading of c.readings; track reading.id) {
+                  <div class="hd-dev__figure">
+                    <dt class="hd-details__label">{{ reading.title }}</dt>
+                    <dd>{{ reading.value }}<span class="hd-unit">{{ reading.units }}</span></dd>
+                  </div>
+                }
+              </dl>
+            }
+          </section>
+        </div>
+      }
+    </hd-tile-details>
+  `,
+})
+export class DeviceDetails {
+  private readonly data = inject(TileData);
+  private readonly realtime = inject(Realtime);
+  private readonly homeyApi = inject(HomeyApi);
+
+  readonly account = input<number>();
+  readonly deviceId = input.required<string>();
+  readonly name = input.required<string>();
+  readonly icon = input.required<LucideIconInput>();
+  /** The log its history opens on, when it has one for it. */
+  readonly log = input<string>();
+  /** The time window its history opens on. */
+  readonly window = input<InsightResolution>('last24Hours');
+
+  private readonly dialog = viewChild.required(TileDetails);
+  readonly isOpen = computed(() => this.dialog().isOpen());
+
+  protected readonly coverStates = COVER_STATES;
+  protected readonly onOffStates = ON_OFF_STATES;
+  protected readonly lockStates = LOCK_STATES;
+  protected readonly pages = [
+    { id: 'device', label: 'Device' },
+    { id: 'history', label: 'History' },
+  ] as const;
+  /** Which page shows: the device's state and controls, or the history of its readings. */
+  protected readonly page = signal<'device' | 'history'>('device');
+  protected readonly playIcon = LucidePlay;
+  protected readonly pauseIcon = LucidePause;
+  protected readonly previousIcon = LucideSkipBack;
+  protected readonly nextIcon = LucideSkipForward;
+  protected readonly volumeIcon = LucideVolume2;
+  protected readonly speakerIcon = LucideSpeaker;
+  protected readonly lockIcon = LucideLock;
+  protected readonly unlockIcon = LucideLockOpen;
+
+  private readonly homey = computed(() => this.data.homey(this.account()));
+  private readonly device = computed(() => this.homey()?.devices.get(this.deviceId()));
+  protected readonly brightnessLabel = computed(() => `${this.name()} brightness`);
+  protected readonly ok = computed(() => this.device()?.available ?? false);
+
+  /** Whether the last command went unanswered, for a moment. */
+  private readonly failed = signal(false);
+  private failedTimer?: ReturnType<typeof setTimeout>;
+
+  protected readonly view = computed(() => {
+    const device = this.device();
+    return device ? describeDevice(device, this.homey()?.accountId, this.failed()) : null;
+  });
+
+  protected readonly drive = new CapabilityDriver((capability, value) => this.set(capability, value));
+
+  /** The insight logs of the device's readings that can be charted. */
+  readonly logs = computed(() => deviceLogs(this.homey()?.insights, this.deviceId()), { equal: sameLogs });
+
+  /** Which of those logs have something to draw, found while open: two values in the last 31 days. */
+  protected readonly drawn = rxResource({
+    params: () => (this.isOpen() && this.logs().length ? { logs: this.logs(), account: this.account() } : undefined),
+    stream: ({ params }) =>
+      forkJoin(
+        params.logs.map((log) =>
+          this.homeyApi.insightEntries(log.id, 'last31Days', params.account).pipe(
+            map((entries) => entries.filter((e) => e.v !== null).length >= 2),
+            catchError(() => of(false)),
+          ),
+        ),
+      ).pipe(map((has) => params.logs.filter((_, i) => has[i]))),
+  });
+
+  /** The logs the history offers; none until they are known, so the tab shows only when there is a graph. */
+  protected readonly graphable = computed(() => (this.drawn.hasValue() ? this.drawn.value() : []));
+  /** Whether the history was asked for but it is not known yet which logs it has. */
+  protected readonly probing = computed(() => this.page() === 'history' && this.logs().length > 0 && !this.drawn.hasValue());
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.failedTimer));
+  }
+
+  open(page: 'device' | 'history' = 'device') {
+    this.page.set(page);
+    this.dialog().open();
+  }
+
+  close() {
+    this.dialog().close();
+  }
+
+  private async set(capability: string, value: CapabilityValue) {
+    try {
+      await this.realtime.setCapability(this.account(), this.deviceId(), capability, value);
+    } catch {
+      clearTimeout(this.failedTimer);
+      this.failed.set(true);
+      this.failedTimer = setTimeout(() => this.failed.set(false), FLASH_MS);
+    }
+  }
+}

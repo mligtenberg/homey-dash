@@ -9,7 +9,7 @@ The history of one recorded value over a time window, with its current value, up
 
 On a `large` tile the current value is `.hd-value--m`, so the name keeps room beside it; `full-large` uses `.hd-value--l`.
 
-A tap opens the [TileDetails](TileDetails.md) over the whole screen (`.hd-details--screen`, like Sonos), in the theme's colours with the ground tinted by the hue. It holds:
+When the log is a reading of a device, a tap opens that device's own details on its `History` page, with this reading selected and the tile's time window (see [TileDetails](TileDetails.md)). For any other log, such as the weather's, a tap opens the [TileDetails](TileDetails.md) over the whole screen (`.hd-details--screen`, like Sonos), in the theme's colours with the ground tinted by the hue. It holds:
 
 - In the head, between the title and the close button, a `.hd-segmented` tab per window (`Hour`, `Day`, `Week`, `Month`). It opens on the tile's own window and goes back to it when closed; another tab loads that window's history.
 - `.hd-stat__pane`: the current value (`.hd-value--xl`) and, under it, a chart that takes all the room left. `.hd-chart--scrub` lets a press or drag along the chart pick a moment: an `.hd-chart__cursor` line and the dot mark it, and the `.hd-stat__readout` above shows its value and time instead of `Now`.
