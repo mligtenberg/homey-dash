@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
-import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, PlexTracks, Realtime, plexAudioUrl, plexImageUrl } from '@homey-dash/api-client';
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
+import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, PlexProfile, PlexProfileList, PlexTracks, Realtime, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
 import { TileSize } from '@homey-dash/layout';
 import {
   LucideAirplay,
@@ -8,10 +8,13 @@ import {
   LucideClapperboard,
   LucideDynamicIcon,
   LucideLibrary,
+  LucideLock,
   LucidePause,
   LucidePlay,
   LucideSquare,
+  LucideTv,
   LucideStar,
+  LucideUser,
   LucideVolume2,
 } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
@@ -25,6 +28,12 @@ export const RECENT_POSTERS: Record<TileSize, number> = { small: 1, wide: 2, ful
 
 /** How many items the detail view lists. */
 const DETAIL_COUNT = 24;
+
+/** The next number for a tile's profile popover. */
+let nextProfilesId = 0;
+
+/** How often Plex is told where a playing video is (ms). */
+const VIDEO_REPORT_EVERY = 10_000;
 
 /** How many items of a library are asked for at a time, and how close to the end of the list that asks for the next ones (px). */
 const PAGE = 60;
@@ -118,6 +127,26 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
       </div>
     }
     <hd-tile-details [screen]="true" [name]="face().name" [icon]="icon" [subtitle]="subtitle()" (closed)="closeScreen()">
+      @if (video(); as v) {
+        <div class="hd-plex-recent__player" role="dialog" [attr.aria-label]="v.title">
+          <video
+            class="hd-plex-recent__video"
+            [src]="videoUrl(v)"
+            autoplay
+            controls
+            playsinline
+            (play)="onVideo(v, 'playing', $any($event.target).currentTime)"
+            (pause)="onVideo(v, 'paused', $any($event.target).currentTime)"
+            (timeupdate)="onVideoTime(v, $any($event.target).currentTime)"
+            (ended)="stopVideo(true)"
+            (error)="videoFailed(v)"
+          ></video>
+          <div class="hd-plex-recent__player-bar">
+            <strong>{{ v.title }}</strong>
+            <button type="button" class="hd-plex-recent__receiver" (click)="stopVideo()"><svg [lucideIcon]="stopIcon" />Stop</button>
+          </div>
+        </div>
+      }
       @if (!selected() && tabs().length > (browse ? 1 : 2)) {
         <div class="hd-segmented" hdDetailsHead role="group" aria-label="Show">
           @for (t of tabs(); track t.id) {
@@ -236,11 +265,9 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
                     <button type="button" class="hd-plex-recent__play" (click)="findReceivers(item)">
                       <svg [lucideIcon]="airPlayIcon" />{{ item.kind === 'album' ? 'Play album on AirPlay' : 'Play on AirPlay' }}
                     </button>
-                    @if (item.kind === 'track' || item.kind === 'album') {
-                      <button type="button" class="hd-plex-recent__receiver" (click)="playHere(item)">
-                        <svg [lucideIcon]="speakerIcon" />{{ item.kind === 'album' ? 'Play album here' : 'Play here' }}
-                      </button>
-                    }
+                    <button type="button" class="hd-plex-recent__receiver" (click)="playHere(item)">
+                      <svg [lucideIcon]="item.kind === 'movie' || item.kind === 'episode' ? tvIcon : speakerIcon" />{{ item.kind === 'album' ? 'Play album here' : 'Play here' }}
+                    </button>
                   }
                   @case ('searching') {
                     <div class="hd-plex-recent__cast-note">Looking for Apple TVs…</div>
@@ -323,16 +350,63 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
           }
         </div>
       } @else {
-        <input
-          type="search"
-          class="hd-plex-recent__search"
-          placeholder="Search"
-          aria-label="Search"
-          autocomplete="off"
-          [value]="query()"
-          (input)="onSearch($any($event.target).value)"
-        />
-        <div class="hd-plex-recent__pane" (scroll)="onPaneScroll($any($event.target))">
+        <div class="hd-plex-recent__bar">
+          <input
+            type="search"
+            class="hd-plex-recent__search"
+            placeholder="Search"
+            aria-label="Search"
+            autocomplete="off"
+            [value]="query()"
+            (input)="onSearch($any($event.target).value)"
+          />
+          @if (profileName(); as name) {
+            <button
+              type="button"
+              class="hd-plex-recent__receiver hd-plex-recent__profile"
+              [attr.popovertarget]="profilesId"
+              [style.anchor-name]="'--' + profilesId"
+              aria-haspopup="true"
+            >
+              <svg [lucideIcon]="profileIcon" />{{ name }}
+            </button>
+            <div
+              #profilesPanel
+              class="hd-plex-recent__profiles"
+              popover
+              role="group"
+              aria-label="Profile"
+              [id]="profilesId"
+              [style.position-anchor]="'--' + profilesId"
+              (toggle)="onProfilesToggle($any($event).newState)"
+            >
+              @for (p of profiles()?.profiles ?? []; track p.id) {
+                <button
+                  type="button"
+                  class="hd-plex-recent__profile-option"
+                  [attr.aria-pressed]="p.id === profiles()?.currentId"
+                  [disabled]="switching()"
+                  (click)="chooseProfile(p)"
+                >
+                  {{ p.name }}
+                  @if (p.protected) {
+                    <svg role="img" aria-label="PIN" [lucideIcon]="lockIcon" />
+                  }
+                </button>
+              }
+              @if (pinFor(); as p) {
+                <form class="hd-plex-recent__pin" (submit)="$event.preventDefault(); switchProfile(p, pin.value)">
+                  <input #pin type="password" inputmode="numeric" autocomplete="off" [placeholder]="'PIN for ' + p.name" [attr.aria-label]="'PIN for ' + p.name" />
+                  <button type="submit" class="hd-plex-recent__play" [disabled]="switching()">Switch</button>
+                </form>
+              }
+              @if (profileError(); as error) {
+                <div class="hd-plex-recent__cast-error" role="alert">{{ error }}</div>
+              }
+            </div>
+          }
+        </div>
+        <div #pane class="hd-plex-recent__pane" (scroll)="onPaneScroll($any($event.target))">
           @for (item of listed(); track item.id) {
             <button type="button" class="hd-plex-recent__card" (click)="open(item)">
               <div class="hd-plex-recent__cover">
@@ -396,7 +470,10 @@ export class RecentlyAddedTile extends TileView {
   protected readonly playIcon = LucidePlay;
   protected readonly pauseIcon = LucidePause;
   protected readonly speakerIcon = LucideVolume2;
+  protected readonly tvIcon = LucideTv;
   protected readonly seenIcon = LucideCheck;
+  protected readonly profileIcon = LucideUser;
+  protected readonly lockIcon = LucideLock;
 
   private readonly overview = computed(() => this.plex.overview(this.settings().account));
 
@@ -466,6 +543,9 @@ export class RecentlyAddedTile extends TileView {
   private theme?: HTMLAudioElement;
   private themeOf?: string;
 
+  /** The film or episode playing in this screen's own picture, over the dialog. */
+  protected readonly video = signal<PlexItem | null>(null);
+
   /** What the tile's face says plays: on an Apple TV, or here. */
   protected readonly badge = computed(() => {
     const local = this.local();
@@ -532,6 +612,7 @@ export class RecentlyAddedTile extends TileView {
 
   /** The next page comes when the list is scrolled near its end. */
   protected onPaneScroll(pane: HTMLElement) {
+    this.paneScroll = pane.scrollTop;
     if (this.browse && !this.results() && pane.scrollTop + pane.clientHeight >= pane.scrollHeight - NEAR_END) void this.loadPage(this.shownLibrary());
   }
 
@@ -542,6 +623,10 @@ export class RecentlyAddedTile extends TileView {
       const id = this.shownLibrary();
       if (this.browse && this.details()?.isOpen()) untracked(() => (this.pageOf(id) ? undefined : void this.loadPage(id)));
     });
+    // The profiles are asked for each time the dialog opens, so a change made elsewhere shows.
+    effect(() => {
+      if (this.details()?.isOpen()) untracked(() => void this.loadProfiles());
+    });
     // A show's theme plays from opening the show and goes on through its seasons and episodes; it stops when the show is left.
     effect(() => {
       const root = this.trail()[0];
@@ -550,6 +635,7 @@ export class RecentlyAddedTile extends TileView {
     inject(DestroyRef).onDestroy(() => {
       this.stopTheme();
       this.stopLocal();
+      this.stopVideo();
     });
     // Each thing that plays gets its tracks, to choose between.
     effect(() => this.casting().forEach((p) => void this.loadTracks(p)));
@@ -654,9 +740,87 @@ export class RecentlyAddedTile extends TileView {
     void this.loadChildren(item);
   }
 
-  /** Back to the cover before, or to the grid from the first. */
+  /** The Plex Home's profiles, once the dialog has asked; empty for an account with no home. */
+  protected readonly profiles = signal<PlexProfileList | null>(null);
+  /** Gives each tile's popover and its anchor a name of their own. */
+  protected readonly profilesId = `hd-plex-profiles-${nextProfilesId++}`;
+  private readonly profilesPanel = viewChild<ElementRef<HTMLElement>>('profilesPanel');
+  /** The profile with a PIN that is being switched to, until the PIN is given. */
+  protected readonly pinFor = signal<PlexProfile | null>(null);
+  protected readonly switching = signal(false);
+  protected readonly profileError = signal('');
+
+  /** Whose watching it is: the profile in use, named on the button that chooses another; nothing when the account has only one. */
+  protected readonly profileName = computed(() => {
+    const { profiles = [], currentId = null } = this.profiles() ?? {};
+    if (profiles.length < 2) return '';
+    return this.overview()?.profile ?? profiles.find((p) => p.id === currentId)?.name ?? profiles[0].name;
+  });
+
+  private async loadProfiles() {
+    try {
+      this.profiles.set(await this.realtime.plexProfiles(this.overview()?.accountId ?? 0));
+    } catch {
+      // No home, or Plex can't be reached: there is nothing to choose.
+      this.profiles.set(null);
+    }
+  }
+
+  /** Closed, by choosing, a press outside or Escape (the popover does that itself): the next opening starts clean. */
+  protected onProfilesToggle(state: string) {
+    if (state === 'open') return;
+    this.pinFor.set(null);
+    this.profileError.set('');
+  }
+
+  private closeProfiles() {
+    this.profilesPanel()?.nativeElement.hidePopover?.();
+  }
+
+  /** A profile with a PIN asks for it first. */
+  protected chooseProfile(profile: PlexProfile) {
+    this.profileError.set('');
+    if (profile.id === this.profiles()?.currentId) return this.closeProfiles();
+    if (profile.protected) return this.pinFor.set(profile);
+    void this.switchProfile(profile, null);
+  }
+
+  protected async switchProfile(profile: PlexProfile, pin: string | null) {
+    this.switching.set(true);
+    this.profileError.set('');
+    try {
+      await this.realtime.plexSelectProfile(this.overview()?.accountId ?? 0, profile.id, pin || null);
+      this.closeProfiles();
+      this.pinFor.set(null);
+      // What was loaded was the other profile's: what it has watched, and what it may see.
+      this.pages.set({});
+      this.under.set({});
+      this.onSearch(this.query());
+      if (this.browse) void this.loadPage(this.shownLibrary());
+      await this.loadProfiles();
+    } catch (error) {
+      this.profileError.set(reason(error, `Could not switch to ${profile.name}.`));
+    } finally {
+      this.switching.set(false);
+    }
+  }
+
+  /** The grid of covers, which is gone while one is open. */
+  private readonly pane = viewChild<ElementRef<HTMLElement>>('pane');
+  private readonly injector = inject(Injector);
+  /** How far the grid was scrolled, to be there again when the cover opened from it is left. */
+  private paneScroll = 0;
+
+  /** Back to the cover before, or to the grid from the first, scrolled to where it was. */
   protected back() {
     this.trail.update((t) => t.slice(0, -1));
+    if (!this.trail().length) {
+      const top = this.paneScroll;
+      afterNextRender(() => {
+        const pane = this.pane()?.nativeElement;
+        if (pane) pane.scrollTop = top;
+      }, { injector: this.injector });
+    }
   }
 
   private async loadChildren(item: PlexItem) {
@@ -722,9 +886,63 @@ export class RecentlyAddedTile extends TileView {
     this.themeOf = undefined;
   }
 
-  /** Plays a track, or an album track after track, in this screen's own speakers. A track chosen from its album goes on with the rest of it. */
+  protected videoUrl(item: PlexItem) {
+    return plexVideoUrl(this.overview()?.accountId ?? 0, item.id);
+  }
+
+  /** Plays a film or episode in this screen's own picture, over the dialog. */
+  private playVideo(item: PlexItem) {
+    this.stopTheme();
+    this.stopLocal();
+    this.stopVideo();
+    this.videoAt = 0;
+    this.videoReportedAt = 0;
+    this.video.set(item);
+  }
+
+  /** Where the video was last seen to be (ms), and when Plex was last told. */
+  private videoAt = 0;
+  private videoReportedAt = 0;
+
+  /** Tells Plex where this screen's own player is, which is how it keeps what was watched. A failed report is no reason to stop. */
+  private report(item: PlexItem, state: 'playing' | 'paused' | 'stopped', timeMs: number) {
+    this.realtime.plexProgress(this.overview()?.accountId ?? 0, item.id, state, Math.round(timeMs), item.durationMs ?? 0).catch(() => undefined);
+  }
+
+  protected onVideo(item: PlexItem, state: 'playing' | 'paused', seconds: number) {
+    this.videoAt = seconds * 1000;
+    this.videoReportedAt = Date.now();
+    this.report(item, state, this.videoAt);
+  }
+
+  /** While it plays Plex hears every ten seconds, so a stop that is never seen still leaves a place to resume. */
+  protected onVideoTime(item: PlexItem, seconds: number) {
+    this.videoAt = seconds * 1000;
+    if (Date.now() - this.videoReportedAt >= VIDEO_REPORT_EVERY) {
+      this.videoReportedAt = Date.now();
+      this.report(item, 'playing', this.videoAt);
+    }
+  }
+
+  /** Closes the video, telling Plex where it stopped: at its end when it played to it, so it counts as watched. */
+  protected stopVideo(ended = false) {
+    const item = this.video();
+    if (!item) return;
+    this.report(item, 'stopped', ended ? (item.durationMs ?? this.videoAt) : this.videoAt);
+    this.video.set(null);
+    this.videoAt = 0;
+  }
+
+  protected videoFailed(item: PlexItem) {
+    this.video.set(null);
+    this.videoAt = 0;
+    this.localError.set(`Could not play ${item.title}.`);
+  }
+
+  /** Plays a film or episode in this screen's own picture; a track, or an album track after track, in its own speakers. A track chosen from its album goes on with the rest of it. */
   protected async playHere(item: PlexItem) {
     this.localError.set('');
+    if (item.kind === 'movie' || item.kind === 'episode') return this.playVideo(item);
     const trail = this.trail();
     const album = item.kind === 'album' ? item : item.kind === 'track' ? trail[trail.length - 2] : undefined;
     if (album?.kind !== 'album') return this.startLocal({ queue: [item], index: 0, paused: false, album: null });
@@ -751,11 +969,20 @@ export class RecentlyAddedTile extends TileView {
       this.localError.set(`Could not play ${play.queue[play.index].title}.`);
       this.stopLocal();
     };
-    audio.onended = () => (play.index + 1 >= play.queue.length ? this.stopLocal() : this.startLocal({ ...play, index: play.index + 1 }));
+    audio.onended = () => {
+      this.reportTrack(play.queue[play.index], 'stopped', play.queue[play.index].durationMs ?? 0);
+      if (play.index + 1 >= play.queue.length) this.stopLocal(false);
+      else this.startLocal({ ...play, index: play.index + 1 });
+    };
     audio.onerror = fail;
     audio.src = plexAudioUrl(this.overview()?.accountId ?? 0, play.queue[play.index].id);
     this.local.set(play);
+    this.reportTrack(play.queue[play.index], 'playing', 0);
     audio.play()?.catch(fail);
+  }
+
+  private reportTrack(track: PlexItem, state: 'playing' | 'paused' | 'stopped', timeMs: number) {
+    this.report(track, state, timeMs);
   }
 
   protected toggleLocal() {
@@ -763,11 +990,15 @@ export class RecentlyAddedTile extends TileView {
     if (!play || !this.audio) return;
     if (play.paused) this.audio.play()?.catch(() => this.stopLocal());
     else this.audio.pause();
+    this.reportTrack(play.queue[play.index], play.paused ? 'playing' : 'paused', this.audio.currentTime * 1000);
     this.local.set({ ...play, paused: !play.paused });
   }
 
-  protected stopLocal() {
+  /** Stops the music; `report` is false for a track that just ended and has told Plex already. */
+  protected stopLocal(report = true) {
     const audio = this.audio;
+    const play = this.local();
+    if (report && play && audio) this.reportTrack(play.queue[play.index], 'stopped', audio.currentTime * 1000);
     if (audio) {
       audio.onended = audio.onerror = null;
       audio.pause();
@@ -872,6 +1103,11 @@ export class RecentlyAddedTile extends TileView {
   }
 
   protected closeScreen() {
+    this.stopVideo();
+    this.closeProfiles();
+    this.pinFor.set(null);
+    this.profileError.set('');
+    this.paneScroll = 0;
     this.trail.set([]);
     // Opened again, a listing is of what the library holds then.
     this.pages.set({});

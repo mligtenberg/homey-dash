@@ -53,6 +53,38 @@ public sealed class PlexApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Profiles_ListTheHome_AndSwitchingNamesTheProfileInTheSnapshot()
+    {
+        var hub = await ConnectAsync();
+
+        var list = await hub.InvokeAsync<JsonElement>("PlexProfiles", 1);
+        Assert.Equal(["fake-plex", "Sam", "Kids"], list.GetProperty("profiles").EnumerateArray().Select(p => p.GetProperty("name").GetString()).ToArray());
+        Assert.Equal("1", list.GetProperty("currentId").GetString());
+
+        await hub.InvokeAsync("PlexSelectProfile", 1, "2", null as string);
+        try
+        {
+            Assert.Equal("Sam", (await hub.InvokeAsync<JsonElement>("Plex")).GetProperty("accounts")[0].GetProperty("profile").GetString());
+            Assert.Equal("2", (await hub.InvokeAsync<JsonElement>("PlexProfiles", 1)).GetProperty("currentId").GetString());
+        }
+        finally
+        {
+            await hub.InvokeAsync("PlexSelectProfile", 1, "1", null as string);
+        }
+    }
+
+    [Fact]
+    public async Task AProtectedProfile_NeedsItsPin()
+    {
+        var hub = await ConnectAsync();
+
+        var wrong = await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("PlexSelectProfile", 1, "3", "0000"));
+        Assert.Contains("That PIN is not right.", wrong.Message);
+        var missing = await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("PlexSelectProfile", 1, "3", null as string));
+        Assert.Contains("That PIN is not right.", missing.Message);
+    }
+
+    [Fact]
     public async Task TheSnapshot_HasWhatPlaysAndTheLibraries()
     {
         var snapshot = await LoadedSnapshotAsync(await ConnectAsync());

@@ -10,6 +10,7 @@ import {
   PlexCommand,
   PlexItem,
   PlexSnapshot,
+  PlexProfileList,
   PlexTracks,
   Realtime,
   RealtimeMessages,
@@ -129,6 +130,26 @@ export class FakeRealtime implements Partial<Realtime> {
   async plexChildren(accountId: number, itemId: string) {
     this.commands.push(['plexChildren', accountId, itemId]);
     return this.plexChildrenList;
+  }
+
+  /** The profiles of the Plex Home, as an account first asks for them. */
+  plexProfileList: PlexProfileList = { profiles: [], currentId: null };
+  /** What choosing a profile fails with, when it should. */
+  plexProfileError: Error | null = null;
+
+  async plexProfiles(accountId: number) {
+    this.commands.push(['plexProfiles', accountId]);
+    return this.plexProfileList;
+  }
+
+  async plexSelectProfile(accountId: number, profileId: string, pin: string | null) {
+    this.commands.push(['plexSelectProfile', accountId, profileId, pin]);
+    if (this.plexProfileError) throw this.plexProfileError;
+    this.plexProfileList = { ...this.plexProfileList, currentId: profileId };
+  }
+
+  async plexProgress(accountId: number, itemId: string, state: string, timeMs: number, durationMs: number) {
+    this.commands.push(['plexProgress', accountId, itemId, state, timeMs, durationMs]);
   }
 
   plexTrackList: PlexTracks = {

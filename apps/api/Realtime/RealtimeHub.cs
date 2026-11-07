@@ -32,6 +32,8 @@ public sealed class RealtimeHub(
     PlexWatcher plexWatcher,
     IPlex plex,
     PlexAccounts plexAccounts,
+    PlexTimeline plexTimeline,
+    PlexSignIn plexSignIn,
     IAirPlay airPlay,
     AirPlayNow nowPlaying,
     PlexPlayback playback,
@@ -76,10 +78,12 @@ public sealed class RealtimeHub(
     public async Task<PlexPage> PlexLibraryItems(int accountId, string libraryId, int start, int size)
     {
         if (plexAccounts.Find(accountId)?.Connection is not { } server) throw new HubException("Sign in with Plex under Accounts first.");
-        var library = plexWatcher.Snapshot.Accounts.FirstOrDefault(a => a.AccountId == accountId)?.Libraries.FirstOrDefault(l => l.Id == libraryId)
-            ?? throw new HubException("Plex no longer has that library.");
         try
         {
+            // The watcher has the libraries once it has looked; right after a profile was chosen it is still looking, so ask the server.
+            var library = plexWatcher.Snapshot.Accounts.FirstOrDefault(a => a.AccountId == accountId)?.Libraries.FirstOrDefault(l => l.Id == libraryId)
+                ?? (await plex.LibrariesAsync(server, 0, Context.ConnectionAborted)).FirstOrDefault(l => l.Id == libraryId)
+                ?? throw new HubException("Plex no longer has that library.");
             return await plex.LibraryItemsAsync(server, library.Id, library.Type, Math.Max(0, start), Math.Clamp(size, 1, 100), Context.ConnectionAborted);
         }
         catch (PlexException e)
@@ -152,6 +156,43 @@ public sealed class RealtimeHub(
         var playing = nowPlaying.Find(deviceId) ?? throw new HubException("Nothing is playing on that Apple TV.");
         return playback.PlayAsync(playing.AccountId, playing.ItemId, deviceId, null,
             new PlexStreamChoice(audioStreamId, subtitleStreamId, nowPlaying.PositionSeconds(playing)), Context.ConnectionAborted);
+    }
+
+    // The profiles of the Plex Home the account belongs to, to use as; none when it has no home.
+    public async Task<PlexProfileList> PlexProfiles(int accountId)
+    {
+        if (plexAccounts.Find(accountId) is not { } account) throw new HubException("Sign in with Plex under Accounts first.");
+        try
+        {
+            var (profiles, current) = await plexSignIn.ProfilesAsync(account, Context.ConnectionAborted);
+            return new PlexProfileList(profiles, current);
+        }
+        catch (PlexException e)
+        {
+            throw new HubException(e.Message);
+        }
+    }
+
+    // Uses the account as one of its profiles, for every screen: what is watched and seen is that profile's. A profile with a PIN needs it.
+    public async Task PlexSelectProfile(int accountId, string profileId, string? pin)
+    {
+        if (plexAccounts.Find(accountId) is not { } account) throw new HubException("Sign in with Plex under Accounts first.");
+        try
+        {
+            await plexSignIn.UseProfileAsync(account, profileId, pin, Context.ConnectionAborted);
+        }
+        catch (PlexException e)
+        {
+            throw new HubException(e.Message);
+        }
+    }
+
+    // Where this screen's own player is in a film, episode or track: playing, paused or stopped, so Plex keeps what was watched.
+    public async Task PlexProgress(int accountId, string itemId, string state, long timeMs, long durationMs)
+    {
+        if (state is not ("playing" or "paused" or "stopped") || itemId.Length is 0 or > 12 || !itemId.All(char.IsAsciiDigit))
+            throw new HubException("That is not a progress Plex knows.");
+        await plexTimeline.ReportAsync(accountId, itemId, state, timeMs, durationMs, Context.ConnectionAborted);
     }
 
     // The audio and subtitle tracks of a movie or episode, to choose between.

@@ -21,6 +21,10 @@ public sealed record PlexAccount(string ClientId, string Token, string? Username
     public string? ServerUri { get; init; }
     // A server shared with the account has a token of its own.
     public string? ServerToken { get; init; }
+    // The Plex Home profile the server is used as, so what is watched and resumed is that profile's; null is the profile that signed in.
+    // Token stays the signed-in one, which is what switches profiles.
+    public string? ProfileId { get; init; }
+    public string? ProfileName { get; init; }
 
     public PlexConnection? Connection =>
         ServerUri is null || ServerToken is null ? null : new PlexConnection(ServerUri, ServerToken, ClientId);
@@ -56,6 +60,12 @@ public sealed record PlexConnection(string Uri, string Token, string ClientId);
 
 // A sign-in waiting on plex.tv: someone approves Code at AuthUrl.
 public sealed record PlexPin(long Id, string Code, Uri AuthUrl);
+
+// A profile of the Plex Home: Admin owns it, Protected asks for a PIN before it is used.
+public sealed record PlexProfile(string Id, string Name, bool Admin, bool Protected);
+
+// The profiles to choose between, and the one in use.
+public sealed record PlexProfileList(IReadOnlyList<PlexProfile> Profiles, string? CurrentId);
 
 // A Plex Media Server the account can use, with every address plex.tv knows for it.
 public sealed record PlexServerChoice(string Id, string Name, bool Owned, string AccessToken, IReadOnlyList<PlexServerAddress> Addresses);
@@ -101,7 +111,7 @@ public sealed record PlexItem(string Id, string Kind, string Title, string? Subt
 public sealed record PlexTrack(string Id, string Label, bool Selected);
 
 /// <summary>
-/// A track's file or a show's theme as the server serves it, for a screen to play: Status is 200 or, for a range that was asked
+/// A track's file, a show's theme or a video stream as the server serves it, for a screen to play: Status is 200 or, for a range that was asked
 /// for, 206 with ContentRange.
 /// </summary>
 public sealed record PlexAudio(Stream Content, string ContentType, int Status, long? Length, string? ContentRange);
@@ -139,6 +149,12 @@ public interface IPlex
 
     Task<IReadOnlyList<PlexSession>> SessionsAsync(PlexConnection server, CancellationToken ct);
 
+    // The profiles of the Plex Home the token belongs to; none when it is no home's.
+    Task<IReadOnlyList<PlexProfile>> ProfilesAsync(string clientId, string token, CancellationToken ct);
+
+    // The token of a profile, for what it watches to be its own. A profile with a PIN needs it; a wrong one is a PlexException.
+    Task<string> SwitchProfileAsync(string clientId, string token, string profileId, string? pin, CancellationToken ct);
+
     // The libraries of movies, shows and music, each with its newest items.
     Task<IReadOnlyList<PlexLibrary>> LibrariesAsync(PlexConnection server, int recent, CancellationToken ct);
 
@@ -162,6 +178,14 @@ public interface IPlex
     // A track's own file, or a show's theme song, from the server; range is the Range header of the request that wants it. Null when
     // there is none (a show without a theme, an item that is no track).
     Task<PlexAudio?> AudioAsync(PlexConnection server, string itemId, bool theme, string? range, CancellationToken ct);
+
+    // Tells the server where a player is in an item, as a Plex client does: that is how it keeps what was watched and where to resume.
+    // state is playing, paused or stopped; a stop near the end counts the item as watched.
+    Task ReportAsync(PlexConnection server, string itemId, string state, long timeMs, long durationMs, CancellationToken ct);
+
+    // A movie or episode as one fragmented mp4 stream the server makes of whatever the file holds, for a browser to play. Null when the
+    // server has no such item. It can't be skipped through: a Range request is not passed on.
+    Task<PlexAudio?> VideoAsync(PlexConnection server, string itemId, CancellationToken ct);
 
     // A picture from the server, scaled to fit width × height.
     Task<(Stream Content, string ContentType)?> ImageAsync(PlexConnection server, string path, int width, int height, CancellationToken ct);
@@ -189,4 +213,7 @@ public static class PlexSearch
 }
 
 // plex.tv or the server could not be reached, or refused. The message says what to do about it.
-public sealed class PlexException(string message, Exception? inner = null) : Exception(message, inner);
+public class PlexException(string message, Exception? inner = null) : Exception(message, inner);
+
+// The server knows who is asking and says they may not: a profile that isn't the owner can't see what plays for others.
+public sealed class PlexForbiddenException(string message) : PlexException(message);

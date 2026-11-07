@@ -38,6 +38,7 @@ public static class PlexEndpoints
         services.AddSingleton<PlexWatcher>();
         services.AddHostedService(s => s.GetRequiredService<PlexWatcher>());
         services.AddSingleton<PlexSignIn>();
+        services.AddSingleton<PlexTimeline>();
         return services;
     }
 
@@ -168,6 +169,25 @@ public static class PlexEndpoints
                 var audio = await plex.AudioAsync(server, item, theme == true, http.Request.Headers.Range.ToString() is { Length: > 0 } range ? range : null, ct);
                 if (audio is null) return Results.NotFound();
                 await WriteAudioAsync(http, audio, ct);
+                return Results.Empty;
+            }
+            catch (PlexException e)
+            {
+                return Results.Problem(e.Message, statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
+        // A movie or episode as a video a screen plays, made by the account's server; like the audio, the screen never has the server's
+        // address or token. The stream can't be skipped through.
+        api.MapGet("/plex/video", async (string? item, int? account, PlexAccounts accounts, IPlex plex, HttpContext http, CancellationToken ct) =>
+        {
+            if (item is null || item.Length is 0 or > 12 || !item.All(char.IsAsciiDigit)) return Results.NotFound();
+            if (accounts.For(account)?.Connection is not { } server) return NotSignedIn();
+            try
+            {
+                var video = await plex.VideoAsync(server, item, ct);
+                if (video is null) return Results.NotFound();
+                await WriteAudioAsync(http, video, ct);
                 return Results.Empty;
             }
             catch (PlexException e)

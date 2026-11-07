@@ -13,7 +13,7 @@ public sealed record PlexSignInStatus(string State, Uri? AuthUrl, string? Error,
 /// stay. An account with one server connects to it at once, and one signed in again to the server it had; otherwise
 /// someone chooses in Management. Only the latest sign-in counts.
 /// </summary>
-public sealed class PlexSignIn(IPlex plex, PlexAccounts accounts, IServiceScopeFactory scopes, ILogger<PlexSignIn> logger)
+public sealed class PlexSignIn(IPlex plex, PlexAccounts accounts, PlexOptions options, IServiceScopeFactory scopes, ILogger<PlexSignIn> logger)
 {
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan CheckEvery = TimeSpan.FromSeconds(2);
@@ -53,12 +53,50 @@ public sealed class PlexSignIn(IPlex plex, PlexAccounts accounts, IServiceScopeF
     public async Task<PlexAccount> UseServerAsync(PlexAccount account, PlexServerChoice server, CancellationToken ct)
     {
         var uri = await plex.ConnectAsync(account.ClientId, server, ct);
-        return await SaveAsync(account with { ServerId = server.Id, ServerName = server.Name, ServerUri = uri, ServerToken = server.AccessToken }, ct);
+        // The server's own token is the signed-in profile's, so any other profile is left.
+        return await SaveAsync(account with
+        {
+            ServerId = server.Id, ServerName = server.Name, ServerUri = uri, ServerToken = server.AccessToken, ProfileId = null, ProfileName = null,
+        }, ct);
+    }
+
+    /// <summary>
+    /// What the signed-in account's home has to choose from, and which it is using: the one chosen, else the one that signed in.
+    /// </summary>
+    public async Task<(IReadOnlyList<PlexProfile> Profiles, string? CurrentId)> ProfilesAsync(PlexAccount account, CancellationToken ct)
+    {
+        var profiles = await plex.ProfilesAsync(account.ClientId, account.Token, ct);
+        var current = account.ProfileId
+            ?? profiles.FirstOrDefault(p => string.Equals(p.Name, account.Username, StringComparison.OrdinalIgnoreCase))?.Id
+            ?? profiles.FirstOrDefault(p => p.Admin)?.Id;
+        return (profiles, current);
+    }
+
+    /// <summary>
+    /// Uses the account's server as one of its home's profiles, so what is watched, resumed and listed as seen is that profile's.
+    /// Anything the profile is not allowed fails with a <see cref="PlexException"/> and leaves the account as it was.
+    /// </summary>
+    public async Task<PlexAccount> UseProfileAsync(PlexAccount account, string profileId, string? pin, CancellationToken ct)
+    {
+        if (account.ServerId is null) throw new PlexException("Choose a server for this account first.");
+        var profile = (await plex.ProfilesAsync(account.ClientId, account.Token, ct)).FirstOrDefault(p => p.Id == profileId)
+            ?? throw new PlexException("That profile is not in the home.");
+        var token = await plex.SwitchProfileAsync(account.ClientId, account.Token, profile.Id, pin, ct);
+        var server = (await plex.ServersAsync(account.ClientId, token, ct)).FirstOrDefault(s => s.Id == account.ServerId)
+            ?? throw new PlexException($"{profile.Name} can't use {account.ServerName}.");
+        var uri = await plex.ConnectAsync(account.ClientId, server, ct);
+        return await SaveAsync(account with { ServerUri = uri, ServerToken = server.AccessToken, ProfileId = profile.Id, ProfileName = profile.Name }, ct);
     }
 
     // Adds the account when it is new (Id 0), else changes it. Answers with it as kept.
     public async Task<PlexAccount> SaveAsync(PlexAccount account, CancellationToken ct)
     {
+        if (options.Fake)
+        {
+            // The fake's one account lives in memory only.
+            accounts.Set(accounts.All.Select(a => a.Id == account.Id ? account : a));
+            return account;
+        }
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<HomeyDashDbContext>();
         db.PlexAccounts.Update(account);
@@ -95,7 +133,7 @@ public sealed class PlexSignIn(IPlex plex, PlexAccounts accounts, IServiceScopeF
             var servers = await plex.ServersAsync(clientId, token, ct);
             var server = servers.FirstOrDefault(s => s.Id == account.ServerId) ?? (servers.Count == 1 ? servers[0] : null);
             if (server is not null) await UseServerAsync(account, server, ct);
-            else await SaveAsync(account with { ServerId = null, ServerName = null, ServerUri = null, ServerToken = null }, ct);
+            else await SaveAsync(account with { ServerId = null, ServerName = null, ServerUri = null, ServerToken = null, ProfileId = null, ProfileName = null }, ct);
             Finish(cancel, null);
         }
         catch (OperationCanceledException)

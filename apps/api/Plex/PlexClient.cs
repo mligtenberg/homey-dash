@@ -44,6 +44,26 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
         return Str(json, "username") ?? Str(json, "title");
     }
 
+    public async Task<IReadOnlyList<PlexProfile>> ProfilesAsync(string clientId, string token, CancellationToken ct)
+    {
+        // plex.tv's home users answer in XML.
+        var xml = await SendXmlAsync(HttpMethod.Get, "https://plex.tv/api/home/users", clientId, token, null, ct);
+        return xml.Descendants("User")
+            .Where(u => u.Attribute("id") is not null)
+            .Select(u => new PlexProfile((string)u.Attribute("id")!, (string?)u.Attribute("title") ?? (string?)u.Attribute("username") ?? "Profile",
+                (string?)u.Attribute("admin") == "1", (string?)u.Attribute("protected") == "1"))
+            .ToList();
+    }
+
+    public async Task<string> SwitchProfileAsync(string clientId, string token, string profileId, string? pin, CancellationToken ct)
+    {
+        var url = $"https://plex.tv/api/home/users/{Uri.EscapeDataString(profileId)}/switch";
+        if (!string.IsNullOrEmpty(pin)) url = QueryHelpers.AddQueryString(url, "pin", pin);
+        var xml = await SendXmlAsync(HttpMethod.Post, url, clientId, token, "That PIN is not right.", ct);
+        return (string?)xml.Attribute("authenticationToken") ?? (string?)xml.Attribute("authToken")
+            ?? throw new PlexException("Plex did not hand over that profile.");
+    }
+
     public async Task<IReadOnlyList<PlexServerChoice>> ServersAsync(string clientId, string token, CancellationToken ct)
     {
         var json = await SendAsync(HttpMethod.Get, PlexTv + "resources?includeHttps=1&includeRelay=1", clientId, token, ct);
@@ -83,7 +103,16 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
 
     public async Task<IReadOnlyList<PlexSession>> SessionsAsync(PlexConnection server, CancellationToken ct)
     {
-        var json = await ServerAsync(server, HttpMethod.Get, "/status/sessions", ct);
+        JsonElement json;
+        try
+        {
+            json = await ServerAsync(server, HttpMethod.Get, "/status/sessions", ct);
+        }
+        catch (PlexForbiddenException)
+        {
+            // Only the server's owner sees what plays; any other profile sees the libraries and nothing playing.
+            return [];
+        }
         var now = time.GetUtcNow();
         return Metadata(json).Select(m =>
         {
@@ -278,6 +307,67 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
             (int)response.StatusCode, response.Content.Headers.ContentLength, response.Content.Headers.ContentRange?.ToString());
     }
 
+    public async Task ReportAsync(PlexConnection server, string itemId, string state, long timeMs, long durationMs, CancellationToken ct)
+    {
+        const string identifier = "com.plexapp.plugins.library";
+        var key = $"/library/metadata/{Uri.EscapeDataString(itemId)}";
+        await SendOkAsync(server, QueryHelpers.AddQueryString("/:/timeline", new Dictionary<string, string?>
+        {
+            ["ratingKey"] = itemId, ["key"] = key, ["identifier"] = identifier, ["state"] = state,
+            ["time"] = timeMs.ToString(), ["duration"] = durationMs.ToString(),
+        }), ct);
+        if (state != "stopped") return;
+        // The timeline alone leaves it to the server to notice a stop; saying so keeps the watched state and the resume point right.
+        if (durationMs > 0 && timeMs >= durationMs * 9 / 10)
+            await SendOkAsync(server, QueryHelpers.AddQueryString("/:/scrobble", new Dictionary<string, string?> { ["key"] = itemId, ["identifier"] = identifier }), ct);
+        else if (timeMs > 0)
+            await SendOkAsync(server, QueryHelpers.AddQueryString("/:/progress", new Dictionary<string, string?>
+                { ["key"] = itemId, ["identifier"] = identifier, ["time"] = timeMs.ToString(), ["state"] = "stopped" }), ct);
+    }
+
+    private async Task SendOkAsync(PlexConnection server, string path, CancellationToken ct)
+    {
+        using var request = Request(HttpMethod.Get, server.Uri + path, server.ClientId, server.Token);
+        HttpResponseMessage response;
+        try
+        {
+            response = await Http().SendAsync(request, ct);
+        }
+        catch (HttpRequestException e)
+        {
+            throw Unreachable(e);
+        }
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode) throw new PlexException($"The Plex server answered {(int)response.StatusCode} to a progress report.");
+        }
+    }
+
+    public async Task<PlexAudio?> VideoAsync(PlexConnection server, string itemId, CancellationToken ct)
+    {
+        var json = await ServerAsync(server, HttpMethod.Get, $"/library/metadata/{Uri.EscapeDataString(itemId)}", ct);
+        if (Metadata(json).FirstOrDefault() is not { ValueKind: JsonValueKind.Object } m || Str(m, "type") is not ("movie" or "episode")) return null;
+        var request = Request(HttpMethod.Get, PlexStream.BrowserUrl(server, itemId), server.ClientId, server.Token);
+        request.Headers.Accept.Clear();
+        request.Headers.Accept.ParseAdd("*/*");
+        HttpResponseMessage response;
+        try
+        {
+            response = await Http().SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        }
+        catch (HttpRequestException e)
+        {
+            throw Unreachable(e);
+        }
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            response.Dispose();
+            return null;
+        }
+        // The transcoder streams until the video ends, so it has no length.
+        return new PlexAudio(await response.Content.ReadAsStreamAsync(ct), "video/mp4", 200, null, null);
+    }
+
     public async Task<(Stream Content, string ContentType)?> ImageAsync(PlexConnection server, string path, int width, int height, CancellationToken ct)
     {
         var url = QueryHelpers.AddQueryString(server.Uri + "/photo/:/transcode", new Dictionary<string, string?>
@@ -344,6 +434,36 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
     private Task<JsonElement> ServerAsync(PlexConnection server, HttpMethod method, string path, CancellationToken ct) =>
         SendAsync(method, server.Uri + path, server.ClientId, server.Token, ct);
 
+    // plex.tv answers some of its older calls in XML only. badLogin is what a refusal (401, 403) says.
+    private async Task<System.Xml.Linq.XElement> SendXmlAsync(HttpMethod method, string url, string clientId, string? token, string? badLogin, CancellationToken ct)
+    {
+        using var request = Request(method, url, clientId, token);
+        request.Headers.Accept.Clear();
+        request.Headers.Accept.ParseAdd("application/xml");
+        HttpResponseMessage response;
+        try
+        {
+            response = await Http().SendAsync(request, ct);
+        }
+        catch (HttpRequestException e)
+        {
+            throw Unreachable(e);
+        }
+        using (response)
+        {
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden && badLogin is not null) throw new PlexException(badLogin);
+            if (!response.IsSuccessStatusCode) throw new PlexException($"plex.tv answered {(int)response.StatusCode}.");
+            try
+            {
+                return System.Xml.Linq.XDocument.Parse(await response.Content.ReadAsStringAsync(ct)).Root ?? throw new PlexException("plex.tv answered nothing.");
+            }
+            catch (System.Xml.XmlException)
+            {
+                throw new PlexException("plex.tv's answer was not understood.");
+            }
+        }
+    }
+
     private async Task<JsonElement> SendAsync(HttpMethod method, string url, string clientId, string? token, CancellationToken ct)
     {
         using var request = Request(method, url, clientId, token);
@@ -360,6 +480,8 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
         {
             if (response.StatusCode == HttpStatusCode.Unauthorized)
                 throw new PlexException("Plex no longer accepts HomeyDash's sign-in. Sign in with Plex again under Accounts.");
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+                throw new PlexForbiddenException($"Plex answered 403 to {new Uri(url).AbsolutePath}.");
             if (!response.IsSuccessStatusCode)
                 throw new PlexException($"Plex answered {(int)response.StatusCode} to {new Uri(url).AbsolutePath}.");
             try

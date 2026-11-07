@@ -602,6 +602,87 @@ describe('Plex tiles', () => {
         expect(text(tile, '.hd-plex-recent__children ~ *, .hd-plex-recent__cast .hd-plex-recent__cast-error')).toBe('Could not play First.');
       });
 
+      describe('profiles', () => {
+        const home = () => {
+          realtime.plexProfileList = {
+            profiles: [
+              { id: '1', name: 'Martin', admin: true, protected: false },
+              { id: '2', name: 'Sam', admin: false, protected: false },
+              { id: '3', name: 'Kids', admin: false, protected: true },
+            ],
+            currentId: '1',
+          };
+        };
+
+        it('names the profile in use, and switches to another with one press', async () => {
+          home();
+          const { tile, press } = await openFound({ ...item(5, '1970-01-01T00:00:00Z'), title: 'A Film' });
+          expect(text(tile, '.hd-plex-recent__profile')).toBe('Martin');
+          // The button opens the popover (the browser's own doing); its options are the home's profiles.
+          expect(tile.querySelector('.hd-plex-recent__profile')?.getAttribute('popovertarget')).toBe(tile.querySelector('.hd-plex-recent__profiles')?.id);
+          expect([...tile.querySelectorAll('.hd-plex-recent__profile-option')].map((o) => o.textContent?.trim())).toEqual(['Martin', 'Sam', 'Kids']);
+
+          await press('.hd-plex-recent__profile-option', 'Sam');
+
+          expect(realtime.commands).toContainEqual(['plexSelectProfile', 1, '2', null]);
+          expect(text(tile, '.hd-plex-recent__profile')).toBe('Sam');
+        });
+
+        it('asks a protected profile for its PIN, and says when Plex does not accept it', async () => {
+          home();
+          const { tile, press } = await openFound({ ...item(5, '1970-01-01T00:00:00Z'), title: 'A Film' });
+          await press('.hd-plex-recent__profile-option', 'Kids');
+          expect(realtime.commands.some((c) => c[0] === 'plexSelectProfile')).toBe(false);
+
+          realtime.plexProfileError = new Error('HubException: That PIN is not right.');
+          (tile.querySelector('.hd-plex-recent__pin input') as HTMLInputElement).value = '0000';
+          await press('.hd-plex-recent__pin button');
+
+          expect(realtime.commands).toContainEqual(['plexSelectProfile', 1, '3', '0000']);
+          expect(text(tile, '.hd-plex-recent__profiles .hd-plex-recent__cast-error')).toBe('That PIN is not right.');
+          expect(text(tile, '.hd-plex-recent__profile')).toBe('Martin');
+        });
+
+        it('has no profile button for an account without a home', async () => {
+          const { tile } = await openFound({ ...item(5, '1970-01-01T00:00:00Z'), title: 'A Film' });
+          expect(tile.querySelector('.hd-plex-recent__profile')).toBeNull();
+        });
+      });
+
+      it('is back at the same place in the covers after one is opened and left', async () => {
+        const { tile, press } = await openFound({ ...item(5, '1970-01-01T00:00:00Z'), title: 'A Film' });
+        const pane = () => tile.querySelector('.hd-plex-recent__pane') as HTMLElement;
+        pane().scrollTop = 240;
+        pane().dispatchEvent(new Event('scroll'));
+        await press('.hd-plex-recent__card');
+        expect(tile.querySelector('.hd-plex-recent__pane')).toBeNull();
+
+        await press('.hd-plex-recent__back');
+        await settle();
+
+        expect(pane().scrollTop).toBe(240);
+      });
+
+      it('plays a film or an episode here, in a video over the dialog, until it is stopped', async () => {
+        for (const kind of ['movie', 'episode'] as const) {
+          const { tile, press } = await openFound({ ...item(7, '1970-01-01T00:00:00Z'), kind, title: 'The Film' });
+          await press('.hd-plex-recent__card');
+          expect(tile.querySelector('.hd-plex-recent__player')).toBeNull();
+
+          await press('.hd-plex-recent__receiver', 'Play here');
+
+          const video = tile.querySelector('video.hd-plex-recent__video') as HTMLVideoElement;
+          expect(video.getAttribute('src')).toBe('/api/plex/video?account=1&item=7');
+          video.dispatchEvent(new Event('play'));
+          await press('.hd-plex-recent__player .hd-plex-recent__receiver', 'Stop');
+          expect(tile.querySelector('.hd-plex-recent__player')).toBeNull();
+          // Plex hears it start and stop, as a Plex client would tell it.
+          const reports = realtime.commands.filter((c) => c[0] === 'plexProgress').map((c) => c.slice(1, 4));
+          expect(reports.slice(-2)).toEqual([[1, '7', 'playing'], [1, '7', 'stopped']]);
+          tile.remove();
+        }
+      });
+
       it('shows what was played: a film, an episode, a season', async () => {
         realtime.plexChildrenList = [
           child('91', 'season', 'Season 1', 1, { watched: true }),

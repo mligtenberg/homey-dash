@@ -28,6 +28,50 @@ public class PlexClientTests
 
     private static PlexClient Client(ScriptedPlex plex) => new(plex, TimeProvider.System);
 
+    private static HttpResponseMessage Xml(string xml, HttpStatusCode status = HttpStatusCode.OK) =>
+        new(status) { Content = new StringContent(xml, Encoding.UTF8, "application/xml") };
+
+    [Fact]
+    public async Task AProfileThatIsNotTheOwner_SeesNothingPlaying_NotAnError()
+    {
+        var plex = new ScriptedPlex(_ => new HttpResponseMessage(HttpStatusCode.Forbidden));
+
+        Assert.Empty(await Client(plex).SessionsAsync(Server, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AForbiddenLibrary_IsStillAnError()
+    {
+        var plex = new ScriptedPlex(_ => new HttpResponseMessage(HttpStatusCode.Forbidden));
+
+        await Assert.ThrowsAsync<PlexForbiddenException>(() => Client(plex).ItemAsync(Server, "1", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TheHome_ListsItsProfiles_AndASwitchGivesTheProfilesToken()
+    {
+        var plex = new ScriptedPlex(request => request.Method == HttpMethod.Get
+            ? Xml("<MediaContainer><User id=\"1\" title=\"Martin\" admin=\"1\" protected=\"0\"/><User id=\"7\" title=\"Kids\" admin=\"0\" protected=\"1\"/></MediaContainer>")
+            : Xml("<user id=\"7\" title=\"Kids\" authenticationToken=\"kids-token\"/>"));
+        var client = Client(plex);
+
+        var profiles = await client.ProfilesAsync("client-1", "token", CancellationToken.None);
+        var token = await client.SwitchProfileAsync("client-1", "token", "7", "1234", CancellationToken.None);
+
+        Assert.Equal([("1", "Martin", true, false), ("7", "Kids", false, true)], profiles.Select(p => (p.Id, p.Name, p.Admin, p.Protected)).ToArray());
+        Assert.Equal("kids-token", token);
+        Assert.Equal("https://plex.tv/api/home/users/7/switch?pin=1234", plex.Requests[1].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task AWrongPin_SaysSo()
+    {
+        var plex = new ScriptedPlex(_ => new HttpResponseMessage(HttpStatusCode.Forbidden));
+
+        var e = await Assert.ThrowsAsync<PlexException>(() => Client(plex).SwitchProfileAsync("client-1", "token", "7", "0000", CancellationToken.None));
+        Assert.Equal("That PIN is not right.", e.Message);
+    }
+
     [Fact]
     public async Task APin_LinksToPlexsOwnPage()
     {

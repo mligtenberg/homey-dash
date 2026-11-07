@@ -86,46 +86,48 @@ export function plexIdle(status: string | undefined, error: string | null | unde
         <div class="hd-tile__detail">{{ face().detail }}</div>
       </div>
     }
-    <hd-tile-details [name]="face().name" [icon]="tvIcon" [subtitle]="detailsSubtitle()">
-      @for (item of sessions(); track item.id) {
-        <div class="hd-plex-details__row">
-          @if (item.image) {
-            <img class="hd-plex-details__poster" [src]="posterUrl(item, item.image)" alt="" draggable="false" />
-          }
-          <div class="hd-plex-details__info">
-            <div class="hd-details__label">{{ item.title }}</div>
-            @if (item.subtitle) {
-              <div class="hd-plex__sub">{{ item.subtitle }}</div>
+    <hd-tile-details [screen]="true" [name]="face().name" [icon]="tvIcon" [subtitle]="detailsSubtitle()">
+      <div class="hd-plex-now__pane" [attr.data-count]="sessions().length">
+        @for (item of sessions(); track item.id) {
+          <article class="hd-plex-now__session">
+            @if (item.image) {
+              <img class="hd-plex-now__poster" [src]="posterUrl(item, item.image)" alt="" draggable="false" />
             }
-            <div class="hd-plex__sub">{{ who(item) }}</div>
-            <div class="hd-plex__progress hd-plex__progress--inline">
-              <div class="hd-plex__progress-fill" [style.width.%]="percent(item)"></div>
+            <div class="hd-plex-now__info">
+              <h3 class="hd-plex-now__title">{{ item.title }}</h3>
+              @if (item.subtitle) {
+                <div class="hd-plex-now__sub">{{ item.subtitle }}</div>
+              }
+              <div class="hd-plex-now__who">{{ who(item) }}</div>
+              <div class="hd-plex__progress hd-plex__progress--inline" role="progressbar" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="percent(item)">
+                <div class="hd-plex__progress-fill" [style.width.%]="percent(item)"></div>
+              </div>
+              <span class="hd-plex__time">{{ time(item) }}</span>
+              <div class="hd-plex-now__controls">
+                <button type="button" class="hd-round-btn" [attr.aria-label]="'Skip back on ' + item.playerName" (click)="control(item, 'skipPrevious')">
+                  <svg [lucideIcon]="backIcon" />
+                </button>
+                <button
+                  type="button"
+                  class="hd-round-btn hd-plex-now__play"
+                  [attr.aria-label]="(item.state === 'playing' ? 'Pause ' : 'Play ') + item.playerName"
+                  (click)="control(item, item.state === 'playing' ? 'pause' : 'play')"
+                >
+                  <svg [lucideIcon]="item.state === 'playing' ? pauseIcon : playIcon" />
+                </button>
+                <button type="button" class="hd-round-btn" [attr.aria-label]="'Skip forward on ' + item.playerName" (click)="control(item, 'skipNext')">
+                  <svg [lucideIcon]="forwardIcon" />
+                </button>
+              </div>
             </div>
-            <span class="hd-plex__time">{{ time(item) }}</span>
-          </div>
-          <div class="hd-round-btns">
-            <button type="button" class="hd-round-btn" [attr.aria-label]="'Skip back on ' + item.playerName" (click)="control(item, 'skipPrevious')">
-              <svg [lucideIcon]="backIcon" />
-            </button>
-            <button
-              type="button"
-              class="hd-round-btn"
-              [attr.aria-label]="(item.state === 'playing' ? 'Pause ' : 'Play ') + item.playerName"
-              (click)="control(item, item.state === 'playing' ? 'pause' : 'play')"
-            >
-              <svg [lucideIcon]="item.state === 'playing' ? pauseIcon : playIcon" />
-            </button>
-            <button type="button" class="hd-round-btn" [attr.aria-label]="'Skip forward on ' + item.playerName" (click)="control(item, 'skipNext')">
-              <svg [lucideIcon]="forwardIcon" />
-            </button>
-          </div>
-        </div>
-      } @empty {
-        <p class="hd-details__label">Nothing playing</p>
-      }
-      @if (flash() === 'error') {
-        <p class="hd-plex-details__error" role="alert">The player didn't take it. Turn on Advertise as player in its Plex settings.</p>
-      }
+          </article>
+        } @empty {
+          <p class="hd-details__label">Nothing playing</p>
+        }
+        @if (flash() === 'error') {
+          <p class="hd-plex-details__error" role="alert">The player didn't take it. Turn on Advertise as player in its Plex settings.</p>
+        }
+      </div>
     </hd-tile-details>
   `,
 })

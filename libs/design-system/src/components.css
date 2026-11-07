@@ -758,21 +758,24 @@
  * The recently added screen: Plex's own look, whatever the theme. Charcoal ground, white text, and the Plex gold
  * for the active tab, the "New" badge and when each was added.
  */
-.hd-details--screen:has(:is(.hd-plex-recent__pane, .hd-plex-recent__detail)) {
+.hd-details--screen:has(:is(.hd-plex-recent__pane, .hd-plex-recent__detail, .hd-plex-now__pane)) {
   --ink: #fff; --ink-muted: rgb(255 255 255 / .62); --k-ink: #e5a00d; --on-kind: #1f2326; --danger: #ff8a98;
   background:
     radial-gradient(120% 60% at 50% 0%, rgb(229 160 13 / .16), transparent 70%),
     linear-gradient(#282a2d, #1f2326 40%, #14171a);
   color: #fff;
 }
-.hd-details--screen:has(:is(.hd-plex-recent__pane, .hd-plex-recent__detail)) .hd-round-btn { background: rgb(255 255 255 / .12); color: #fff; }
-.hd-details--screen:has(:is(.hd-plex-recent__pane, .hd-plex-recent__detail)) .hd-segmented button { background-color: rgb(255 255 255 / .1); color: #fff; }
-.hd-details--screen:has(:is(.hd-plex-recent__pane, .hd-plex-recent__detail)) .hd-segmented button[aria-pressed="true"] { background-color: #e5a00d; color: #1f2326; }
-.hd-details--screen .hd-details__panel > :is(.hd-plex-recent__pane, .hd-plex-recent__detail) { flex: 1; min-height: 0; }
+.hd-details--screen:has(:is(.hd-plex-recent__pane, .hd-plex-recent__detail, .hd-plex-now__pane)) .hd-round-btn { background: rgb(255 255 255 / .12); color: #fff; }
+.hd-details--screen:has(:is(.hd-plex-recent__pane, .hd-plex-recent__detail, .hd-plex-now__pane)) .hd-segmented button { background-color: rgb(255 255 255 / .1); color: #fff; }
+.hd-details--screen:has(:is(.hd-plex-recent__pane, .hd-plex-recent__detail, .hd-plex-now__pane)) .hd-segmented button[aria-pressed="true"] { background-color: #e5a00d; color: #1f2326; }
+.hd-details--screen .hd-details__panel > :is(.hd-plex-recent__pane, .hd-plex-recent__detail, .hd-plex-now__pane) { flex: 1; min-height: 0; }
 .hd-plex-recent__pane {
   display: grid; align-content: start; gap: calc(var(--cell) * .2) calc(var(--cell) * .14);
   grid-template-columns: repeat(auto-fill, minmax(calc(var(--cell) * 1.1), 1fr));
-  overflow-y: auto; scrollbar-width: none; padding-bottom: calc(var(--cell) * .1);
+  overflow-y: auto; scrollbar-width: none; padding-block: var(--fade) calc(var(--cell) * .1);
+  /* Covers scrolled past the edges fade out instead of being cut off; the padding keeps the first row clear of the fade at rest. */
+  --fade: calc(var(--cell) * .16);
+  mask-image: linear-gradient(transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
 }
 .hd-plex-recent__pane::-webkit-scrollbar { display: none; }
 .hd-plex-recent__card {
@@ -882,9 +885,49 @@
   margin-bottom: calc(var(--cell) * .12); padding: calc(var(--cell) * .1) calc(var(--cell) * .16);
   border-radius: var(--radius-lg, 16px); background: rgb(31 35 38 / .92); box-shadow: inset 0 0 0 2px #e5a00d; backdrop-filter: blur(8px);
 }
+/* A film or episode playing on this screen: over the whole dialog, the picture as large as fits with its title and Stop beneath. */
+.hd-plex-recent__player {
+  position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; background: #000; color: #fff;
+}
+.hd-plex-recent__video { flex: 1; min-height: 0; width: 100%; object-fit: contain; background: #000; }
+.hd-plex-recent__player-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: calc(var(--cell, 150px) * .1);
+  padding: calc(var(--cell, 150px) * .08) calc(var(--cell, 150px) * .16); background: #14171a;
+  font: 800 calc(var(--cell, 150px) * .12)/1.2 var(--font-sans);
+}
+.hd-plex-recent__player-bar strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hd-plex-recent__now-text { align-self: center; display: flex; flex: 1 1 10em; flex-direction: column; gap: .2em; min-width: 0; font: 700 calc(var(--cell) * .1)/1.2 var(--font-sans); color: var(--ink-muted); }
 .hd-plex-recent__now-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: calc(var(--cell) * .13); color: #fff; }
 .hd-plex-recent__now .hd-plex-recent__receiver { box-shadow: inset 0 0 0 2px #e5a00d; }
+.hd-plex-recent__bar { display: flex; align-items: center; gap: calc(var(--cell) * .1); margin-bottom: calc(var(--cell) * .12); }
+.hd-plex-recent__bar .hd-plex-recent__search { flex: 1; width: auto; min-width: 0; margin-bottom: 0; }
+.hd-plex-recent__profile { flex: none; white-space: nowrap; }
+/* Who is watching: a dropdown of the Plex Home's profiles (a popover, so it sits above the dialog and closes on a press outside or
+   Escape), the one in use filled, and a PIN for a protected one. Anchored under its button where the browser can; else centred. */
+.hd-plex-recent__profiles {
+  box-sizing: border-box; min-width: 12em; max-width: min(92vw, 22em); margin: 0; padding: calc(var(--cell) * .08); border: 0;
+  border-radius: var(--radius-lg, 16px); background: #2a2d31; color: #fff; box-shadow: 0 calc(var(--cell) * .08) calc(var(--cell) * .3) rgb(0 0 0 / .55), inset 0 0 0 2px rgb(255 255 255 / .12);
+  font: 700 calc(var(--cell) * .11)/1.2 var(--font-sans);
+}
+.hd-plex-recent__profiles:popover-open { display: flex; flex-direction: column; gap: calc(var(--cell) * .04); }
+@supports (anchor-name: --a) {
+  .hd-plex-recent__profiles { inset: auto; top: calc(anchor(bottom) + var(--cell) * .06); right: anchor(right); position-try-fallbacks: flip-block; }
+}
+.hd-plex-recent__profile-option {
+  display: flex; align-items: center; justify-content: space-between; gap: .6em; min-height: 44px; padding: 0 calc(var(--cell) * .14); border: 0;
+  border-radius: calc(var(--cell) * .08); background: none; color: inherit; font: inherit; text-align: start; cursor: pointer;
+}
+.hd-plex-recent__profile-option:active { background: rgb(255 255 255 / .12); }
+.hd-plex-recent__profile-option[aria-pressed="true"] { background: #e5a00d; color: #1f2326; }
+.hd-plex-recent__profile-option:disabled { opacity: .5; cursor: default; }
+.hd-plex-recent__profile-option:focus-visible { outline: 3px solid #e5a00d; outline-offset: 2px; }
+.hd-plex-recent__profiles svg { width: 1em; height: 1em; flex: none; }
+.hd-plex-recent__pin { display: flex; gap: calc(var(--cell) * .08); padding-top: calc(var(--cell) * .04); }
+.hd-plex-recent__pin input {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 calc(var(--cell) * .16); border: 0; border-radius: var(--radius-pill);
+  background: rgb(255 255 255 / .12); color: #fff; font: 700 calc(var(--cell) * .12)/1 var(--font-sans); box-shadow: inset 0 0 0 2px rgb(255 255 255 / .18);
+}
+.hd-plex-recent__pin input:focus-visible { outline: 3px solid #e5a00d; outline-offset: 2px; }
 .hd-plex-recent__search {
   width: 100%; min-height: 44px; margin-bottom: calc(var(--cell) * .12); padding: 0 calc(var(--cell) * .18); border: 0;
   border-radius: var(--radius-pill); background: rgb(255 255 255 / .12); color: #fff; font: 700 calc(var(--cell) * .12)/1 var(--font-sans);
@@ -901,9 +944,33 @@
 .hd-plex-recent__track select:focus-visible { outline: 3px solid #e5a00d; outline-offset: 2px; }
 .hd-plex-recent__receiver:disabled { opacity: .5; cursor: default; }
 .hd-plex-recent__empty { grid-column: 1 / -1; font-size: calc(var(--cell) * .12); color: var(--ink-muted); }
-.hd-plex-details__row { display: flex; align-items: center; gap: calc(var(--cell) * .1); }
-.hd-plex-details__poster { width: calc(var(--cell) * .45); aspect-ratio: 2 / 3; object-fit: cover; border-radius: calc(var(--cell) * .04); flex: none; }
-.hd-plex-details__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* Now playing, full screen: a card per session with its poster, progress and a large transport. */
+.hd-plex-now__pane {
+  display: grid; align-content: safe center; gap: calc(var(--cell) * .3); overflow-y: auto; scrollbar-width: none;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--cell) * 3.6)), 1fr));
+}
+.hd-plex-now__pane::-webkit-scrollbar { display: none; }
+/* More sessions shrink everything, so they all fit on the screen instead of scrolling. */
+.hd-details--screen:has(.hd-plex-now__pane[data-count="2"]) { --cell: clamp(100px, 17vmin, 150px); }
+.hd-details--screen:has(.hd-plex-now__pane:is([data-count="3"], [data-count="4"])) { --cell: clamp(80px, 12vmin, 110px); }
+.hd-details--screen:has(.hd-plex-now__pane:not([data-count="0"], [data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"])) { --cell: clamp(60px, 8vmin, 80px); }
+.hd-plex-now__pane { grid-auto-rows: minmax(0, 1fr); }
+.hd-plex-now__poster { max-height: 100%; }
+.hd-plex-now__session { display: flex; align-items: center; gap: calc(var(--cell) * .3); min-width: 0; }
+.hd-plex-now__poster {
+  flex: none; width: min(calc(var(--cell) * 1.8), 30vmin); aspect-ratio: 2 / 3; object-fit: cover;
+  border-radius: calc(var(--cell) * .08); box-shadow: 0 calc(var(--cell) * .1) calc(var(--cell) * .35) rgb(0 0 0 / .5);
+}
+.hd-plex-now__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: calc(var(--cell) * .06); }
+.hd-plex-now__title { margin: 0; font: 800 calc(var(--cell) * .26)/1.1 var(--font-sans); overflow-wrap: anywhere; }
+.hd-plex-now__sub { font-size: calc(var(--cell) * .14); color: rgb(255 255 255 / .85); }
+.hd-plex-now__who { font-size: calc(var(--cell) * .11); font-weight: 700; color: var(--ink-muted); margin-bottom: calc(var(--cell) * .1); }
+.hd-plex-now__info .hd-plex__time { font-size: calc(var(--cell) * .11); }
+.hd-plex-now__info .hd-plex__progress-fill { background: #e5a00d; }
+.hd-plex-now__info .hd-plex__progress--inline { height: calc(var(--cell) * .05); background: rgb(255 255 255 / .16); }
+.hd-plex-now__controls { display: flex; align-items: center; gap: calc(var(--cell) * .2); margin-top: calc(var(--cell) * .1); }
+.hd-plex-now__controls .hd-round-btn { width: calc(var(--cell) * .56); height: calc(var(--cell) * .56); }
+.hd-plex-now__controls .hd-plex-now__play { width: calc(var(--cell) * .76); height: calc(var(--cell) * .76); background: #e5a00d; color: #1f2326; }
 .hd-plex-details__error { margin: 0; color: var(--danger); font-weight: 700; font-size: calc(var(--cell) * .1); }
 @media (prefers-reduced-motion: reduce) {
   .hd-plex__progress-fill { transition: none; }

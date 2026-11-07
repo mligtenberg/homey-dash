@@ -101,6 +101,23 @@ export interface PlexOverview {
   loaded: boolean;
   libraries: PlexLibrary[];
   players: PlexPlayer[];
+  /** The Plex Home profile it is used as; null is the one that signed in. */
+  profile?: string | null;
+}
+
+/** A profile of the Plex Home an account belongs to: what is watched and resumed is kept per profile. */
+export interface PlexProfile {
+  id: string;
+  name: string;
+  admin: boolean;
+  /** Asks for a PIN before it is used. */
+  protected: boolean;
+}
+
+/** The profiles to choose between, and the one in use (`currentId`). Empty when the account has no home. */
+export interface PlexProfileList {
+  profiles: PlexProfile[];
+  currentId: string | null;
 }
 
 /** Every Plex account, oldest first, and what plays on any of them. */
@@ -132,6 +149,11 @@ export function plexImageUrl(accountId: number, path: string, width: number, hei
 /** A track's own file, or a show's theme song (`theme`), from a Plex account's server through HomeyDash, for an audio element. */
 export function plexAudioUrl(accountId: number, itemId: string, theme = false) {
   return `/api/plex/audio?account=${accountId}&item=${encodeURIComponent(itemId)}${theme ? '&theme=true' : ''}`;
+}
+
+/** A movie or episode as a video a browser plays, made by a Plex account's server through HomeyDash. It can't be skipped through. */
+export function plexVideoUrl(accountId: number, itemId: string) {
+  return `/api/plex/video?account=${accountId}&item=${encodeURIComponent(itemId)}`;
 }
 
 /**

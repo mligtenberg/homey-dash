@@ -4,7 +4,7 @@ import { AirPlayInfo, AirPlayPlayback } from './airplay';
 import { DashboardSummary } from './dashboards';
 import { DisplayInfo, ScreenDetails, ScreenView } from './displays';
 import { PhotoSet } from './photos';
-import { PlexCommand, PlexItem, PlexOverview, PlexPage, PlexSession, PlexSnapshot, PlexTracks } from './plex';
+import { PlexCommand, PlexItem, PlexOverview, PlexPage, PlexProfileList, PlexSession, PlexSnapshot, PlexTracks } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
 import { CapabilityValue, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
 
@@ -150,9 +150,24 @@ export class Realtime {
     return this.hub.invoke<PlexItem[]>('PlexChildren', accountId, itemId);
   }
 
+  /** The profiles of the Plex Home an account belongs to; none when it has no home. */
+  plexProfiles(accountId: number) {
+    return this.hub.invoke<PlexProfileList>('PlexProfiles', accountId);
+  }
+
+  /** Uses the account as one of its profiles, on every screen; a profile with a PIN needs it. Fails with what Plex says. */
+  plexSelectProfile(accountId: number, profileId: string, pin: string | null) {
+    return this.hub.invoke<void>('PlexSelectProfile', accountId, profileId, pin);
+  }
+
   /** The audio and subtitle tracks of a movie or episode. */
   plexTracks(accountId: number, itemId: string) {
     return this.hub.invoke<PlexTracks>('PlexTracks', accountId, itemId);
+  }
+
+  /** Where this screen's own player is in a film, episode or track, so Plex keeps what was watched and where to resume. */
+  plexProgress(accountId: number, itemId: string, state: 'playing' | 'paused' | 'stopped', timeMs: number, durationMs: number) {
+    return this.hub.invoke<void>('PlexProgress', accountId, itemId, state, timeMs, durationMs);
   }
 
   /** What plays on AirPlay now; changes that follow arrive as `AirPlayNow`. */

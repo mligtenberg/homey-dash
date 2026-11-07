@@ -40,11 +40,13 @@ public sealed class AirPlayNow : IDisposable
     private readonly ConcurrentDictionary<string, AirPlayQueue> _queues = new();
     private readonly IHubContext<RealtimeHub> _hub;
     private readonly IAirPlay _airPlay;
+    private readonly PlexTimeline _timeline;
     private readonly TimeProvider _time;
     private readonly ILogger<AirPlayNow> _log;
 
-    public AirPlayNow(IHubContext<RealtimeHub> hub, IAirPlay airPlay, TimeProvider time, ILogger<AirPlayNow> log)
+    public AirPlayNow(IHubContext<RealtimeHub> hub, IAirPlay airPlay, PlexTimeline timeline, TimeProvider time, ILogger<AirPlayNow> log)
     {
+        _timeline = timeline;
         _hub = hub;
         _airPlay = airPlay;
         _time = time;
@@ -72,19 +74,33 @@ public sealed class AirPlayNow : IDisposable
     public int PositionSeconds(AirPlayPlayback playback) =>
         (int)(Math.Max(0, playback.OffsetMs + (playback.Paused ? 0 : (_time.GetUtcNow() - playback.At).TotalMilliseconds)) / 1000);
 
-    public Task StartedAsync(AirPlayPlayback playback) => SetAsync(playback with { At = _time.GetUtcNow() });
+    // The receiver isn't a Plex client, so what it plays is reported to the server here, as watched on the account that started it.
+    private Task ReportAsync(AirPlayPlayback playback, string state, long? timeMs = null) =>
+        _timeline.ReportAsync(playback.AccountId, playback.ItemId, state, timeMs ?? PositionSeconds(playback) * 1000L, playback.DurationMs);
+
+    public async Task StartedAsync(AirPlayPlayback playback)
+    {
+        var started = playback with { At = _time.GetUtcNow() };
+        await SetAsync(started);
+        await ReportAsync(started, "playing");
+    }
 
     public Task PausedAsync(string deviceId, bool paused)
     {
         if (_playing.GetValueOrDefault(deviceId) is not { } playback || playback.Paused == paused) return Task.CompletedTask;
         var now = _time.GetUtcNow();
-        return SetAsync(playback with { Paused = paused, OffsetMs = PositionSeconds(playback) * 1000L, At = now });
+        var changed = playback with { Paused = paused, OffsetMs = PositionSeconds(playback) * 1000L, At = now };
+        return Task.WhenAll(SetAsync(changed), ReportAsync(changed, paused ? "paused" : "playing"));
     }
 
     public async Task StoppedAsync(string deviceId)
     {
         _queues.TryRemove(deviceId, out _);
-        if (_playing.TryRemove(deviceId, out _)) await PushAsync();
+        if (_playing.TryRemove(deviceId, out var playing))
+        {
+            await PushAsync();
+            await ReportAsync(playing, "stopped");
+        }
     }
 
     private async Task SetAsync(AirPlayPlayback playback)
@@ -97,7 +113,15 @@ public sealed class AirPlayNow : IDisposable
 
     private async Task EndedAsync(string deviceId)
     {
-        if (_playing.GetValueOrDefault(deviceId) is { } playing && Advance is { } advance && Finished(playing) && await advance(deviceId)) return;
+        if (_playing.GetValueOrDefault(deviceId) is { } playing && Advance is { } advance && Finished(playing))
+        {
+            // A finished track is watched whatever the count says; the next one replaces it.
+            await ReportAsync(playing, "stopped", playing.DurationMs);
+            if (await advance(deviceId)) return;
+            _queues.TryRemove(deviceId, out _);
+            if (_playing.TryRemove(deviceId, out _)) await PushAsync();
+            return;
+        }
         await StoppedAsync(deviceId);
     }
 

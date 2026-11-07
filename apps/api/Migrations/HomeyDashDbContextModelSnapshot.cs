@@ -232,6 +232,12 @@ namespace HomeyDash.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ProfileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProfileName")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ServerId")
                         .HasColumnType("TEXT");
 

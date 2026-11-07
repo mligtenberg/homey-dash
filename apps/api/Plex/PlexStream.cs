@@ -57,6 +57,23 @@ public static partial class PlexStream
             ["X-Plex-Client-Identifier"] = server.ClientId, ["X-Plex-Token"] = server.Token,
         });
 
+    /// <summary>
+    /// A movie or episode as one fragmented mp4 a browser plays: H.264 and AAC, the server copying the video where it already is that.
+    /// The URL carries the account's token, so it is fetched by the backend and never goes to a screen.
+    /// </summary>
+    public static string BrowserUrl(PlexConnection server, string itemId, string? session = null) =>
+        QueryHelpers.AddQueryString(server.Uri + "/video/:/transcode/universal/start.mp4", new Dictionary<string, string?>
+        {
+            ["path"] = $"/library/metadata/{itemId}",
+            ["mediaIndex"] = "0", ["partIndex"] = "0", ["protocol"] = "http", ["container"] = "mp4",
+            ["directPlay"] = "0", ["directStream"] = "1", ["directStreamAudio"] = "0",
+            ["videoCodec"] = "h264", ["audioCodec"] = "aac", ["subtitles"] = "none",
+            ["maxVideoBitrate"] = "8000", ["videoQuality"] = "100",
+            ["session"] = session ?? Guid.NewGuid().ToString("N"),
+            ["X-Plex-Product"] = "HomeyDash", ["X-Plex-Platform"] = "Chrome",
+            ["X-Plex-Client-Identifier"] = server.ClientId, ["X-Plex-Token"] = server.Token,
+        });
+
     // Plex names a local address 192-168-1-23.<id>.plex.direct and serves it over https. A receiver has to resolve that
     // name through public DNS, which routers and DNS filters often refuse for a private address: the IP over http, which
     // a Plex server allows on the local network unless told to require secure connections, needs neither.

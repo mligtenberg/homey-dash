@@ -12,7 +12,11 @@ namespace HomeyDash.Api.Plex;
 /// </summary>
 public sealed record PlexOverview(
     int AccountId, string AccountName, string Status, string? Error, bool Loaded, IReadOnlyList<PlexLibrary> Libraries,
-    IReadOnlyList<PlexPlayer> Players);
+    IReadOnlyList<PlexPlayer> Players)
+{
+    // The Plex Home profile it is used as; null is the profile that signed in.
+    public string? Profile { get; init; }
+}
 
 // What a connection gets when it (re)connects: every account, oldest first, and what plays on any of them.
 public sealed record PlexSnapshot(IReadOnlyList<PlexOverview> Accounts, IReadOnlyList<PlexSession> Sessions);
@@ -72,7 +76,7 @@ public sealed class PlexWatcher(
 
     // Before the first look: loading, or waiting for someone to choose a server.
     private static PlexOverview Initial(PlexAccount account) =>
-        new(account.Id, account.Name, account.Connection is null ? "choosingServer" : "connected", null, false, [], []);
+        new(account.Id, account.Name, account.Connection is null ? "choosingServer" : "connected", null, false, [], []) { Profile = account.ProfileName };
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -123,6 +127,15 @@ public sealed class PlexWatcher(
                     continue;
                 }
                 watch.Stop.Cancel();
+                var previous = watch;
+                var restarted = new Watch(account);
+                // Another profile of the same server: its tiles keep what they show until the new look arrives, a moment later.
+                if (previous.Account.ServerId == account.ServerId && previous.Overview.Loaded)
+                    restarted.Overview = previous.Overview with { AccountName = account.Name, Profile = account.ProfileName };
+                _watches[account.Id] = restarted;
+                _ = WatchAsync(restarted, stoppingToken);
+                changed = true;
+                continue;
             }
             var started = new Watch(account);
             _watches[account.Id] = started;
@@ -162,7 +175,7 @@ public sealed class PlexWatcher(
                         libraries = await plex.LibrariesAsync(server, RecentCount, ct);
                         librariesAt = time.GetUtcNow();
                     }
-                    await SetOverviewAsync(watch, new(account.Id, account.Name, "connected", null, true, libraries, Players(watch)));
+                    await SetOverviewAsync(watch, new(account.Id, account.Name, "connected", null, true, libraries, Players(watch)) { Profile = account.ProfileName });
                     await SetSessionsAsync(watch, sessions);
                 }
             }
