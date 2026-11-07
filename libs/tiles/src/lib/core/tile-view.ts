@@ -133,5 +133,5 @@ export abstract class TileView<TSettings extends TileSettings = TileSettings> {
 
 /** Whether a press is on an inline control or in the detail view, which handle their own presses. */
 function isInline(event: Event) {
-  return !!(event.target as Element).closest('button, [role="slider"], dialog');
+  return !!(event.target as Element).closest('button, select, [role="slider"], dialog');
 }

@@ -1,5 +1,5 @@
 import { TileModule } from '../tile-kind';
-import { SonosTile } from './sonos-tile';
+import { SonosTile, SonosTileSettingsEditor } from './sonos-tile';
 
 export * from './sonos-tile';
 
@@ -19,6 +19,7 @@ export const SONOS_TILES: TileModule = {
       sizes: ['small', 'wide', 'full', 'large', 'full-large', 'full-tall'],
       defaultSettings: { target: null, targets: [] },
       component: SonosTile,
+      settings: SonosTileSettingsEditor,
     },
   ],
 };

@@ -77,7 +77,11 @@ describe('Sonos tile', () => {
 
   const settle = () => TestBed.inject(ApplicationRef).whenStable();
 
-  async function render(devices: HomeyDevice[], size: TileSize = 'full-tall') {
+  async function render(
+    devices: HomeyDevice[],
+    size: TileSize = 'full-tall',
+    lock?: string,
+  ) {
     TestBed.inject(TileData);
     await settle();
     for (const device of devices)
@@ -86,6 +90,7 @@ describe('Sonos tile', () => {
     fixture.componentRef.setInput('settings', {
       target: null,
       targets: devices.map((d) => d.id),
+      lock,
     });
     fixture.componentRef.setInput('size', size);
     await settle();
@@ -209,6 +214,75 @@ describe('Sonos tile', () => {
     ).toEqual(['Dinner jazz']);
     // The music itself is only asked once: filtering is on the screen.
     expect(realtime.commands.filter((c) => c[0] === 'speakerMusic')).toHaveLength(1);
+  });
+
+  it('stays on the locked room even when another plays', async () => {
+    const tile = await render(
+      [
+        speaker('a', 'Living room', 'Living room'),
+        speaker('b', 'Kitchen', 'Kitchen', true),
+      ],
+      'full-large',
+      'a',
+    );
+    expect(tile.querySelector('select.hd-sonos__pick')).toBeNull();
+    expect(tile.textContent).toContain('Living room · Not playing');
+    button(tile, 'Play').click();
+    await settle();
+    expect(realtime.commands).toEqual([
+      ['setCapability', undefined, 'a', 'speaker_playing', true],
+    ]);
+  });
+
+  it('lets an unlocked tile pick another room', async () => {
+    const tile = await render(
+      [
+        speaker('a', 'Living room', 'Living room', true),
+        speaker('b', 'Kitchen', 'Kitchen'),
+      ],
+      'full-large',
+    );
+    const pick = tile.querySelector('select.hd-sonos__pick') as HTMLSelectElement;
+    expect(pick.value).toBe('a');
+    pick.value = 'b';
+    pick.dispatchEvent(new Event('change'));
+    await settle();
+    expect(tile.textContent).toContain('Kitchen · Not playing');
+    button(tile, 'Play').click();
+    await settle();
+    expect(realtime.commands).toEqual([
+      ['setCapability', undefined, 'b', 'speaker_playing', true],
+    ]);
+  });
+
+  it('has the transport buttons and picks a room from its list in the detail view', async () => {
+    HTMLDialogElement.prototype.showModal ??= function (
+      this: HTMLDialogElement,
+    ) {
+      this.open = true;
+    };
+    const tile = await render(
+      [
+        speaker('a', 'Living room', 'Living room'),
+        speaker('b', 'Kitchen', 'Kitchen'),
+      ],
+      'small',
+    );
+    tile.click();
+    await settle();
+    const dialog = tile.querySelector('dialog') as HTMLElement;
+    for (const label of ['Previous', 'Play', 'Next'])
+      expect(button(dialog, label)).toBeTruthy();
+    expect(dialog.querySelector('select')).toBeNull();
+    (Array.from(dialog.querySelectorAll('.hd-sonos__room')).find((b) =>
+      b.textContent?.includes('Kitchen'),
+    ) as HTMLElement).click();
+    await settle();
+    button(dialog, 'Play').click();
+    await settle();
+    expect(realtime.commands).toEqual([
+      ['setCapability', undefined, 'b', 'speaker_playing', true],
+    ]);
   });
 
   it('registers the kind for several devices', () => {

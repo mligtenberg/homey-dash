@@ -6,6 +6,7 @@ import {
   effect,
   inject,
   input,
+  output,
   signal,
 } from '@angular/core';
 import {
@@ -19,6 +20,7 @@ import {
   LucideAudioLines,
   LucideDynamicIcon,
   LucideLink,
+  LucideLock,
   LucideMusic,
   LucidePause,
   LucidePlay,
@@ -30,6 +32,12 @@ import {
 } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
+import { TileData, TileSettings } from '../tile-data';
+
+export interface SonosTileSettings extends TileSettings {
+  /** The id of the room the tile is locked to; absent leaves the tile free to switch rooms. */
+  lock?: string;
+}
 
 /** What a result of the music picker plays as, with where it came from. */
 interface MusicItem {
@@ -211,12 +219,37 @@ interface Drag {
     <div class="hd-sonos__head">
       <svg class="hd-icon" [lucideIcon]="speakerIcon" />
       <div class="hd-sonos__titles">
-        <div class="hd-tile__name">{{ face().name }}</div>
+        @if (canPick()) {
+          <ng-container *ngTemplateOutlet="picker" />
+        } @else {
+          <div class="hd-tile__name">
+            {{ face().name }}
+            @if (locked()) {
+              <svg class="hd-sonos__lock" aria-label="Locked" [lucideIcon]="lockIcon" />
+            }
+          </div>
+        }
         <div class="hd-tile__detail">{{ face().detail }}</div>
       </div>
+      <ng-container *ngTemplateOutlet="transport; context: { $implicit: false }" />
+    </div>
+    <ng-template #picker>
+      <select
+        class="hd-sonos__pick"
+        aria-label="Room to control"
+        (change)="picked.set($any($event.target).value)"
+      >
+        @for (room of foundRooms(); track room.id) {
+          <option [value]="room.id" [selected]="room.id === lead()?.id">
+            {{ room.name }}
+          </option>
+        }
+      </select>
+    </ng-template>
+    <ng-template #transport let-all>
       @if (lead(); as lead) {
         <div class="hd-round-btns">
-          @if (canSkip() && size() !== 'small') {
+          @if (canSkip() && (all || size() !== 'small')) {
             <button
               type="button"
               class="hd-round-btn"
@@ -234,7 +267,7 @@ interface Drag {
           >
             <svg [lucideIcon]="playing() ? pauseIcon : playIcon" />
           </button>
-          @if (canSkip() && size() !== 'small') {
+          @if (canSkip() && (all || size() !== 'small')) {
             <button
               type="button"
               class="hd-round-btn"
@@ -246,7 +279,7 @@ interface Drag {
           }
         </div>
       }
-    </div>
+    </ng-template>
     <ng-template #groupRow>
       @if (lead(); as lead) {
         <div class="hd-sonos__row">
@@ -282,8 +315,17 @@ interface Drag {
       <div class="hd-sonos__rooms">
         @for (room of rooms(); track room.id) {
           <div class="hd-sonos__row" [class.is-in-group]="inGroup(room)">
-            <span class="hd-sonos__label">{{ room.name }}</span>
             @if (room.found) {
+              <button
+                type="button"
+                class="hd-sonos__label hd-sonos__room"
+                [class.is-lead]="room.id === lead()?.id"
+                [attr.aria-pressed]="room.id === lead()?.id"
+                [disabled]="!!locked()"
+                (click)="picked.set(room.id)"
+              >
+                {{ room.name }}
+              </button>
               <div
                 class="hd-slider"
                 role="slider"
@@ -323,6 +365,7 @@ interface Drag {
                 }
               </button>
             } @else {
+              <span class="hd-sonos__label">{{ room.name }}</span>
               <span class="hd-sonos__label">Not found in Homey</span>
             }
           </div>
@@ -354,6 +397,17 @@ interface Drag {
         }
       </div>
       <div class="hd-sonos__pane">
+        @if (lead(); as lead) {
+          <div class="hd-sonos__now">
+            <span class="hd-sonos__now-name">
+              {{ lead.name }}
+              @if (locked()) {
+                <svg class="hd-sonos__lock" aria-label="Locked" [lucideIcon]="lockIcon" />
+              }
+            </span>
+            <ng-container *ngTemplateOutlet="transport; context: { $implicit: true }" />
+          </div>
+        }
         @let current = tab();
         @if (current === 'devices') {
           <ng-container *ngTemplateOutlet="groupRow" />
@@ -369,7 +423,7 @@ interface Drag {
     </hd-tile-details>
   `,
 })
-export class SonosTile extends TileView {
+export class SonosTile extends TileView<SonosTileSettings> {
   private readonly realtime = inject(Realtime);
 
   protected readonly speakerIcon = LucideSpeaker;
@@ -377,6 +431,7 @@ export class SonosTile extends TileView {
   protected readonly forwardIcon = LucideSkipForward;
   protected readonly playIcon = LucidePlay;
   protected readonly pauseIcon = LucidePause;
+  protected readonly lockIcon = LucideLock;
   protected readonly linkIcon = LucideLink;
   protected readonly unlinkIcon = LucideUnlink;
 
@@ -386,6 +441,9 @@ export class SonosTile extends TileView {
     { id: 'playlist', label: 'Playlists' },
   ] as const;
   protected readonly tab = signal<'devices' | SpeakerMusicKind>('devices');
+
+  /** The room chosen on an unlocked tile; until then the tile follows what plays. */
+  protected readonly picked = signal<string | null>(null);
 
   protected readonly drag = signal<Drag | null>(null);
   /** Rooms whose group change Homey is still working on, by the membership they are waiting for. */
@@ -430,13 +488,33 @@ export class SonosTile extends TileView {
     });
   });
 
-  /** The room whose music the tile shows: the first that plays, else the first. */
+  protected readonly foundRooms = computed(() => this.rooms().filter((r) => r.found));
+
+  /** The room the tile is locked to, when its settings name one of the tile's rooms. */
+  protected readonly locked = computed(() => {
+    const lock = this.settings().lock;
+    return lock ? this.rooms().find((r) => r.id === lock) : undefined;
+  });
+
+  /** Whether the tile offers a choice of room: not locked, and more than one to choose from. */
+  protected readonly canPick = computed(
+    () => !this.locked() && this.foundRooms().length > 1,
+  );
+
+  /**
+   * The room whose music the tile shows: the locked room; else the one picked on the tile; else the first that
+   * plays, else the first.
+   */
   protected readonly lead = computed((): Room | undefined => {
-    const rooms = this.rooms().filter((r) => r.found);
+    const locked = this.locked();
+    if (locked) return locked.found ? locked : undefined;
+    const rooms = this.foundRooms();
     return (
+      rooms.find((r) => r.id === this.picked()) ??
       rooms.find(
         (r) => r.device?.capabilities['speaker_playing']?.value === true,
-      ) ?? rooms[0]
+      ) ??
+      rooms[0]
     );
   });
 
@@ -468,7 +546,8 @@ export class SonosTile extends TileView {
 
   readonly face = computed<TileFace>(() => {
     const look = { icon: LucideSpeaker, hue: 'appliance' as const };
-    const name = this.settings().label || 'Speakers';
+    const name =
+      this.settings().label || this.locked()?.name || 'Speakers';
     if (!this.rooms().length)
       return { ...look, name, detail: 'Pick speakers', state: 'unset' };
     if (!this.homeyLoaded())
@@ -599,5 +678,52 @@ export class SonosTile extends TileView {
       Math.min(1, Math.max(0, room.volume + by)),
       wholeGroup,
     );
+  }
+}
+
+/** Management's choice of the room a Sonos tile is locked to. */
+@Component({
+  selector: 'hd-sonos-tile-settings',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <div class="hd-field">
+      <label class="hd-field__label" for="tile-lock">Locked to</label>
+      <select
+        id="tile-lock"
+        class="hd-select"
+        (change)="pick($any($event.target).value)"
+      >
+        <option value="" [selected]="!isRoom(settings().lock)">
+          Not locked (pick a room on the tile)
+        </option>
+        @for (room of rooms(); track room.id) {
+          <option [value]="room.id" [selected]="room.id === settings().lock">
+            {{ room.name }}
+          </option>
+        }
+      </select>
+    </div>
+  `,
+})
+export class SonosTileSettingsEditor {
+  readonly settings = input.required<SonosTileSettings>();
+  readonly changed = output<Partial<SonosTileSettings>>();
+
+  private readonly data = inject(TileData);
+
+  protected readonly rooms = computed(() => {
+    const devices = this.data.homey(this.settings().account)?.devices;
+    return (this.settings().targets ?? []).map((id) => ({
+      id,
+      name: devices?.get(id)?.name ?? 'Not found',
+    }));
+  });
+
+  protected isRoom(id: string | undefined) {
+    return !!id && (this.settings().targets ?? []).includes(id);
+  }
+
+  protected pick(id: string) {
+    this.changed.emit({ lock: id || undefined });
   }
 }

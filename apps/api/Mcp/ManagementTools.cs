@@ -52,7 +52,8 @@ public sealed class ManagementTools(
           devices in order and settings.target is null. The tile shows what the first room that plays is playing with play/pause
           (and skip, from wide up) and one volume for its group; a press opens every room with its own volume and a button that
           adds it to that group. A full-tall tile lists the rooms on the tile too. Speakers are in a group when their sonos_group
-          capability matches. All speakers are in the tile's one account.
+          capability matches. All speakers are in the tile's one account. Optional settings.lock is the id of one of settings.targets: the
+          tile then always controls that room; without it the tile shows a room picker and controls the room picked there.
         - "logic" (small, wide, full, large, full-large): shows the first of the tiles it holds whose rule holds, else its
           fallback tile, else nothing (like empty cells). settings.target is null; settings.entries is an ordered list of
           { "tile": { "kind", "settings" }, "rule": <rule> }; settings.fallback is { "kind", "settings" } or null; optional
