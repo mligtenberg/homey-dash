@@ -16,6 +16,7 @@ import { DashboardLayout } from '@homey-dash/api-client';
 import { sectionsPerPage } from '@homey-dash/layout';
 import { backgroundStyle, hasImage, renderedBackgroundStyle } from './background';
 import { shownSections } from './logic/shown-sections';
+import { PageDots, pager } from './core/pager';
 import { TileHost } from './tile-host';
 import { chunk } from '@homey-dash/design-system';
 
@@ -26,7 +27,7 @@ import { chunk } from '@homey-dash/design-system';
  */
 @Component({
   selector: 'hd-dashboard-view',
-  imports: [TileHost],
+  imports: [PageDots, TileHost],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'hd-dashboard',
@@ -34,7 +35,7 @@ import { chunk } from '@homey-dash/design-system';
     '[class.hd-has-image]': 'hasImage()',
   },
   template: `
-    <div #pager class="hd-dashboard__pages" (scroll)="onScroll()">
+    <div #pager class="hd-dashboard__pages" (scroll)="scroll.onScroll()">
       @for (page of pages(); track $index) {
         <div class="hd-dashboard__page">
           @for (section of page; track section.id) {
@@ -51,17 +52,13 @@ import { chunk } from '@homey-dash/design-system';
       }
     </div>
     @if (pages().length > 1) {
-      <div class="hd-page-dots">
-        @for (page of pages(); track $index) {
-          <button
-            type="button"
-            class="hd-page-dot"
-            [attr.aria-label]="'Show ' + sectionNames(page)"
-            [attr.aria-current]="$index === current() || null"
-            (click)="go($index)"
-          ></button>
-        }
-      </div>
+      <hd-page-dots
+        class="hd-page-dots"
+        [count]="pages().length"
+        [current]="current()"
+        [labelOf]="pageLabel"
+        (picked)="go($event)"
+      />
     }
   `,
 })
@@ -81,7 +78,9 @@ export class DashboardView {
 
   private readonly shown = shownSections(() => this.layout().sections);
   private readonly perPage = signal(1);
-  protected readonly current = signal(0);
+  private readonly scroll = pager(() => this.pager().nativeElement);
+  protected readonly current = this.scroll.current;
+  protected readonly pageLabel = (page: number) => 'Show ' + this.sectionNames(this.pages()[page]);
   protected readonly pages = computed(() => {
     const shown = this.shown();
     const sections = this.layout().sections.filter((s) => shown.has(s.id));
@@ -124,14 +123,8 @@ export class DashboardView {
     if (cell > 0 && width > 0) this.perPage.set(sectionsPerPage(width, cell));
   }
 
-  protected onScroll() {
-    const pager = this.pager().nativeElement;
-    if (pager.clientWidth > 0) this.current.set(Math.round(pager.scrollLeft / pager.clientWidth));
-  }
-
   protected go(page: number) {
-    const pager = this.pager().nativeElement;
-    pager.scrollTo({ left: page * pager.clientWidth, behavior: 'smooth' });
+    this.scroll.go(page);
   }
 
   protected sectionNames(page: { title: string }[]) {

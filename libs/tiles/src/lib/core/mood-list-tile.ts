@@ -3,6 +3,7 @@ import { Realtime } from '@homey-dash/api-client';
 import { TileSize } from '@homey-dash/layout';
 import { LucideSparkles } from '@lucide/angular';
 import { moodTint } from './mood-tint';
+import { PageDots, pager } from './pager';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
 import { chunk } from '@homey-dash/design-system';
 
@@ -33,6 +34,7 @@ const PAGE: Partial<Record<TileSize, { columns: number; rows: number }>> = {
 @Component({
   selector: 'hd-mood-list-tile',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [PageDots],
   host: {
     ...TILE_FACE_HOST,
     '[class.has-tint]': '!!glow()',
@@ -44,21 +46,17 @@ const PAGE: Partial<Record<TileSize, { columns: number; rows: number }>> = {
       @if (face().detail || pages().length < 2) {
         <div class="hd-tile__detail">{{ face().detail }}</div>
       } @else {
-        <div class="hd-mood-list__dots">
-          @for (page of pages(); track $index) {
-            <button
-              type="button"
-              class="hd-page-dot"
-              [attr.aria-label]="'Show moods ' + ($index + 1) + ' of ' + pages().length"
-              [attr.aria-current]="$index === current() || null"
-              (click)="go($index)"
-            ></button>
-          }
-        </div>
+        <hd-page-dots
+          class="hd-mood-list__dots"
+          [count]="pages().length"
+          [current]="current()"
+          [labelOf]="pageLabel"
+          (picked)="go($event)"
+        />
       }
     </div>
     @if (face().state === 'ok') {
-      <div #pager class="hd-mood-list" (scroll)="onScroll()">
+      <div #pager class="hd-mood-list" (scroll)="scroll.onScroll()">
         @for (page of pages(); track $index) {
           <div class="hd-mood-list__page" [style.--columns]="columns()">
             @for (mood of page; track mood.id) {
@@ -87,7 +85,9 @@ export class MoodListTile extends TileView {
 
   /** The mood last pressed, whose name the detail line shows while the tile flashes. */
   protected readonly pressed = signal<string | null>(null);
-  protected readonly current = signal(0);
+  private readonly scroll = pager(() => this.pager()?.nativeElement);
+  protected readonly current = this.scroll.current;
+  protected readonly pageLabel = (page: number) => `Show moods ${page + 1} of ${this.pages().length}`;
 
   /** While the tile flashes, the pressed mood's colours, which the whole tile glows in. */
   protected readonly glow = computed(() => (this.flash() === 'ok' ? this.moods().find((m) => m.id === this.pressed())?.tint : null) ?? null);
@@ -128,13 +128,7 @@ export class MoodListTile extends TileView {
     this.send(() => this.realtime.activateMood(this.settings().account, mood.id), 'early');
   }
 
-  protected onScroll() {
-    const pager = this.pager()?.nativeElement;
-    if (pager && pager.clientWidth > 0) this.current.set(Math.round(pager.scrollLeft / pager.clientWidth));
-  }
-
   protected go(page: number) {
-    const pager = this.pager()?.nativeElement;
-    pager?.scrollTo({ left: page * pager.clientWidth, behavior: 'smooth' });
+    this.scroll.go(page);
   }
 }
