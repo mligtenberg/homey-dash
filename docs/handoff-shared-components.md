@@ -21,10 +21,10 @@ Decisions already made:
 | 0. design-system becomes an Angular lib | done | `1bb0f9b` |
 | 1. Shared pure helpers | done (see "Skipped" below) | `3d37357` |
 | 2. Tokens and CSS | done for Management; display-side CSS cleanup deferred (see below) | see git log |
-| 3. design-system Angular primitives | partly done: `hd-reorder-buttons`, shared picker | see git log |
-| 4. Management domain components | partly done: shared Homey/Immich account form and state | see git log |
-| 5. Shared tile controls | started: `hd-statistic-readings` | see git log |
-| 6. Split the big tile files | todo | — |
+| 3. design-system Angular primitives | done as far as it paid off (see "Update, second pass") | see git log |
+| 4. Management domain components | done as far as it paid off (see "Update, second pass") | see git log |
+| 5. Shared tile controls | done as far as it paid off (see "Update, second pass") | see git log |
+| 6. Split the big tile files | done for the Plex and Sonos tiles (see "Update, second pass") | see git log |
 
 ### Phase 0 (done)
 `libs/design-system` is now an Angular lib:
@@ -124,7 +124,31 @@ If this matters, there are two options:
 - Move the Management-only sections of `components.css` (picker, account, page) into a stylesheet that only `apps/management` loads.
 - Put them back as component `styles` on the shared components: `PickerDialog`, `AddressKeyForm`.
 
-## Next steps
+## Update, second pass
+Lint, tests and builds were green for design-system, tiles, layout, api-client, management and display after every commit. **None of it was checked in a browser**: the dev-server ports and the Nx task lock were held by another process, so the style-diff and the display baseline were not run. Do that first (see "How to verify"). The intended visual changes are the Lucide back-arrow and the segmented/transport buttons keeping their classes, so the style diff should show only the arrow.
+
+**Added**
+- `hd-back-link` (design-system).
+- Management: `hd-account-panel` (frame, status slot, error line; Homey, Immich, Plex, AirPlay use it), `editor/tree-utils.ts` (`byName`, `searchWords`, `matchesWords`, `findNode`, used by `signal-tree.ts` and `target-tree.ts`), `hd-album-select` (photo-sets page and photo-set field), `hd-account-select` (tile panel, Plex target field, lock tab).
+- Fixed the `immich-partners` race: the effect now cancels its previous request. `preview-page` loads with `rxResource`.
+- Tiles (`libs/tiles/src/lib/core/`): `hd-segmented` (device details, statistic tile and history, Plex, Sonos), `WINDOW_TABS` (statistic windows), `pager()` and `hd-page-dots` (dashboard view and mood list), `brokenImages()` (device apps and details, Plex now playing, Sonos), `SliderDrag` (capability driver and Sonos volume), `hd-transport` (Sonos, device details, Plex), `hd-setting-select` (device, statistic, photo and Sonos settings editors).
+- Phase 6: `recently-added-tile.ts` went from 1149 to 870 lines. The profile picker is `hd-plex-profile-picker`, the local music player is `PlexLocalPlayer`, and the Apple TV controls are `hd-plex-airplay-controls`. `reason()` moved to `plex/hub-reason.ts`. `sonos-tile.ts` went from 712 to 460 lines: `SonosMusic` is in `sonos-music.ts`, and the settings editor is in `sonos-tile-settings.ts`.
+
+**Skipped on purpose** (each would have added code, or changed pixels, rather than removed duplication)
+- `hd-error-line`: `.hd-error` already does it.
+- `hd-empty-state`: the nine empty states differ in content and markup.
+- `hd-confirm-inline`, `hdRenameInput`, `hdAutofocus`, `hdIcon`: not started. The inline Remove/Cancel copies differ per panel, and the native `confirm()` in `editor-page.ts` is still there.
+- `hd-rule-row`: the only duplicate is two rows inside `logic-panel`.
+- `ImmichAccountsStore`: `loadAlbums()` already covers it.
+- `fittedCell`: `fittedCellSize` in `libs/layout` already exists and both apps use it.
+- `rxResource` in `editor-page.ts`: its load effect also flushes the old draft on cleanup.
+- `hd-device-segments` stays as it is: it has no group label to give `hd-segmented`.
+- `hd-tile-titles`, `hd-reading`, `hd-note`, `hd-art`, `hd-playbar`, `hd-level-row`, `hdHold`, `hd-statistic-pane`: not started. The tile titles sit in CSS selectors such as `.hd-row:has(+ …)`, so wrapping them would change the layout.
+- Phase 6 not done: the `keyedLoader`, `PlexTileView` base class and `<hd-plex-item-detail>` / `<hd-plex-card>` parts.
+
+**Formatting note.** Early in this pass, `prettier --write` reflowed whole files that were never prettier-formatted, so four commits carry big noisy diffs. A later commit ("Restore the original formatting…") puts those files back. Only run prettier on files you created.
+
+## Next steps (original plan, partly done; see the update above)
 
 ### Phase 2: tokens and CSS (`libs/design-system/src/tokens.css`, `components.css`)
 1. **`tokens.css`:**
