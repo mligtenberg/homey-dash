@@ -18,7 +18,8 @@ import { KindHue } from '../tile-kind';
 import { TileSettings } from '../tile-data';
 import { DeviceDetails } from './device-details';
 import { deviceLook, formatReading } from './device-look';
-import { STATISTIC_WINDOWS, StatisticChart, statisticFigures, statisticStamp, statisticTone, logOwner } from './statistic-chart';
+import { STATISTIC_WINDOWS, StatisticChart, statisticTone, logOwner } from './statistic-chart';
+import { StatisticReadings } from './statistic-readings';
 import { TileDetails } from './tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
 
@@ -40,7 +41,7 @@ function logHue(log: HomeyInsightLog, ownerHue: KindHue): KindHue {
 
 @Component({
   selector: 'hd-statistic-tile',
-  imports: [LucideDynamicIcon, StatisticChart, TileDetails, DeviceDetails],
+  imports: [LucideDynamicIcon, StatisticChart, StatisticReadings, TileDetails, DeviceDetails],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     ...TILE_FACE_HOST,
@@ -104,34 +105,7 @@ function logHue(log: HomeyInsightLog, ownerHue: KindHue): KindHue {
           }
         </div>
         <div class="hd-stat__pane" [attr.data-tone]="tone()">
-          @if (readout(); as readout) {
-            <div class="hd-stat__readout">
-              <div class="hd-value hd-value--xl">
-                {{ readout.value
-                }}<span class="hd-unit">{{ readout.units }}</span>
-              </div>
-              <div class="hd-details__label">{{ pickedAt() ?? 'Now' }}</div>
-            </div>
-          }
-          <hd-statistic-chart
-            [entries]="shownEntries()"
-            [window]="shownWindowInfo()"
-            [scrub]="true"
-            (picked)="picked.set($event)"
-          />
-          @if (figures(); as figures) {
-            <dl class="hd-stat__figures">
-              @for (f of figures; track f.label) {
-                <div class="hd-stat__figure">
-                  <dt class="hd-details__label">{{ f.label }}</dt>
-                  <dd class="hd-stat__figure-value">{{ f.value }}</dd>
-                  @if (f.note) {
-                    <dd class="hd-stat__figure-note">{{ f.note }}</dd>
-                  }
-                </div>
-              }
-            </dl>
-          }
+          <hd-statistic-readings [entries]="shownEntries()" [window]="shownWindowInfo()" [units]="log()?.units ?? null" />
         </div>
       </hd-tile-details>
     }
@@ -239,9 +213,6 @@ export class StatisticTile extends TileView<StatisticTileSettings> {
     else super.closeDetails();
   }
 
-  /** The entry picked along the chart in the detail view. */
-  protected readonly picked = signal<HomeyInsightEntry | null>(null);
-
   /** The entries of the window the detail view shows. */
   protected readonly shownEntries = computed(() =>
     this.shownWindow() === this.windowId()
@@ -255,31 +226,7 @@ export class StatisticTile extends TileView<StatisticTileSettings> {
     [...this.entries()].reverse().find((e) => e.v !== null),
   );
   protected readonly current = computed(() => this.reading(this.latest()));
-  protected readonly readout = computed(() => {
-    const shown = this.shownEntries();
-    return this.reading(
-      this.picked() ?? [...shown].reverse().find((e) => e.v !== null),
-    );
-  });
   protected readonly tone = computed(() => statisticTone(this.log()));
-
-  protected readonly pickedAt = computed(() => {
-    const picked = this.picked();
-    return picked ? this.stamp(picked.t) : null;
-  });
-
-  /** The lowest, highest, average and change of the shown window. */
-  protected readonly figures = computed(() =>
-    statisticFigures(
-      this.shownEntries(),
-      this.shownWindowInfo(),
-      this.log()?.units ?? null,
-    ),
-  );
-
-  private stamp(iso: string) {
-    return statisticStamp(iso, this.shownWindowInfo().ms);
-  }
 
   private reading(entry: HomeyInsightEntry | undefined) {
     return entry

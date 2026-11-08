@@ -2,14 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, injec
 import { rxResource } from '@angular/core/rxjs-interop';
 import { HomeyApi, HomeyInsightEntry, HomeyInsightLog, InsightResolution } from '@homey-dash/api-client';
 import { LucideChevronLeft, LucideChevronRight, LucideDynamicIcon } from '@lucide/angular';
-import { formatReading } from './device-look';
-import {
-  STATISTIC_WINDOWS,
-  StatisticChart,
-  statisticFigures,
-  statisticStamp,
-  statisticTone,
-} from './statistic-chart';
+import { STATISTIC_WINDOWS, statisticTone } from './statistic-chart';
+import { StatisticReadings } from './statistic-readings';
 
 const WINDOWS = Object.entries(STATISTIC_WINDOWS).map(([id, { tab }]) => ({ id: id as InsightResolution, tab }));
 
@@ -44,7 +38,7 @@ export function stripTarget(
  */
 @Component({
   selector: 'hd-statistic-history',
-  imports: [StatisticChart, LucideDynamicIcon],
+  imports: [StatisticReadings, LucideDynamicIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-stat__pane hd-hist', '[attr.data-tone]': 'tone()' },
   template: `
@@ -82,29 +76,11 @@ export function stripTarget(
         }
       </div>
     </div>
-    @if (readout(); as readout) {
-      <div class="hd-stat__readout">
-        <div class="hd-value hd-value--xl">{{ readout.value }}<span class="hd-unit">{{ readout.units }}</span></div>
-        <div class="hd-details__label">{{ pickedAt() ?? 'Now' }}</div>
-      </div>
-    }
-    <hd-statistic-chart [entries]="entries()" [window]="windowInfo()" [scrub]="true" (picked)="picked.set($event)" />
-    @if (!history.isLoading() && entries().length === 0) {
-      <div class="hd-details__label">No history for this window</div>
-    }
-    @if (figures(); as figures) {
-      <dl class="hd-stat__figures">
-        @for (f of figures; track f.label) {
-          <div class="hd-stat__figure">
-            <dt class="hd-details__label">{{ f.label }}</dt>
-            <dd class="hd-stat__figure-value">{{ f.value }}</dd>
-            @if (f.note) {
-              <dd class="hd-stat__figure-note">{{ f.note }}</dd>
-            }
-          </div>
-        }
-      </dl>
-    }
+    <hd-statistic-readings [entries]="entries()" [window]="windowInfo()" [units]="log().units">
+      @if (!history.isLoading() && entries().length === 0) {
+        <div class="hd-details__label">No history for this window</div>
+      }
+    </hd-statistic-readings>
   `,
 })
 export class StatisticHistory {
@@ -127,7 +103,6 @@ export class StatisticHistory {
   protected readonly overflow = computed(() => this.edges().start || this.edges().end);
   protected readonly window = linkedSignal<InsightResolution>(() => this.initialWindow());
   protected readonly logId = linkedSignal<string | undefined>(() => this.initial());
-  protected readonly picked = signal<HomeyInsightEntry | null>(null);
 
   protected readonly log = computed(() => this.logs().find((l) => l.id === this.logId()) ?? this.logs()[0]);
   protected readonly windowInfo = computed(() => STATISTIC_WINDOWS[this.window()]);
@@ -138,16 +113,6 @@ export class StatisticHistory {
     stream: ({ params }) => this.homeyApi.insightEntries(params.log, params.window, params.account),
   });
   protected readonly entries = computed<readonly HomeyInsightEntry[]>(() => (this.history.hasValue() ? this.history.value() : []));
-
-  protected readonly readout = computed(() => {
-    const entry = this.picked() ?? [...this.entries()].reverse().find((e) => e.v !== null);
-    return entry ? formatReading(entry.v as number, this.log().units) : null;
-  });
-  protected readonly pickedAt = computed(() => {
-    const picked = this.picked();
-    return picked ? statisticStamp(picked.t, this.windowInfo().ms) : null;
-  });
-  protected readonly figures = computed(() => statisticFigures(this.entries(), this.windowInfo(), this.log().units));
 
   constructor() {
     effect((onCleanup) => {
