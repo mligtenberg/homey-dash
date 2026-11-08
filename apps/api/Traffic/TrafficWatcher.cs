@@ -17,6 +17,9 @@ namespace HomeyDash.Api.Traffic;
 public sealed class TrafficWatcher(TomTomAccounts accounts, ITraffic source, IHubContext<RealtimeHub> hub, IServiceScopeFactory scopes,
     TimeProvider time, ILogger<TrafficWatcher> logger) : BackgroundService
 {
+    // The tile kind whose settings.route it watches.
+    public const string Kind = "traffic";
+
     public static TimeSpan Every { get; set; } = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan RetryEvery = TimeSpan.FromMinutes(2);
     // How often it looks whether a route came or went, or one is due.
@@ -57,7 +60,15 @@ public sealed class TrafficWatcher(TomTomAccounts accounts, ITraffic source, IHu
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                await LookAsync(stoppingToken);
+                // Whatever goes wrong in one look, the watcher keeps looking: a dead background service stops the API.
+                try
+                {
+                    await LookAsync(stoppingToken);
+                }
+                catch (Exception e) when (e is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
+                {
+                    logger.LogError(e, "Could not look at the traffic");
+                }
                 await _wake.WaitAsync(LookEvery, stoppingToken);
             }
         }
@@ -121,6 +132,13 @@ public sealed class TrafficWatcher(TomTomAccounts accounts, ITraffic source, IHu
             watch.Failed = true;
             return known with { Status = "disconnected", Error = e.Message };
         }
+        // Anything else, such as a timeout or a bug, fails this route only, and is tried again like TomTom refusing.
+        catch (Exception e) when (e is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogError(e, "No traffic for {Route}", uses[0].Route.Name);
+            watch.Failed = true;
+            return known with { Status = "disconnected", Error = "Cannot reach TomTom." };
+        }
     }
 
     // The routes of every traffic tile in a dashboard's draft or published version, logic tiles' included, and of every
@@ -135,8 +153,9 @@ public sealed class TrafficWatcher(TomTomAccounts accounts, ITraffic source, IHu
             var tiles = dashboards
                 .SelectMany(d => d.Published is null ? [d.Draft] : new[] { d.Draft, d.Published })
                 .SelectMany(layout => layout.Sections.SelectMany(s => s.Tiles))
-                .SelectMany(t => t.Kind == LogicTiles.Kind ? LogicTiles.Held(t.Settings) : [t.Settings])
-                .Select(settings => (Route: TrafficRoute.Of(settings), Account: AccountOf(settings)))
+                .SelectMany(t => t.Kind == LogicTiles.Kind ? LogicTiles.HeldTiles(t.Settings) : [(t.Kind, t.Settings)])
+                .Where(t => t.Kind == Kind)
+                .Select(t => (Route: TrafficRoute.Of(t.Settings), Account: AccountOf(t.Settings)))
                 .Where(u => u.Route is not null)
                 .Select(u => new Use(u.Route!, u.Account));
             var widgets = (await db.Displays.AsNoTracking().ToListAsync(ct))

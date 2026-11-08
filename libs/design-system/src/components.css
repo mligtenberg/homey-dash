@@ -1418,7 +1418,7 @@ a.hd-btn { text-decoration: none; }
 .hd-weather__week .hd-weather__what { color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-weather__credit { margin: 0; font-size: calc(var(--cell) * .075); color: var(--ink-muted); }
 
-/* Traffic tile (ADR-0014): the car travel time on a route. The hue says the delay: climate on time, light a delay, heat a heavy one. */
+/* Traffic tile (ADR-0015): the car travel time on a route. The hue says the delay: climate on time, light a delay, heat a heavy one. */
 .hd-traffic { display: grid; gap: calc(var(--cell) * .06) calc(var(--cell) * .16); grid-template: "now" auto "titles" 1fr / minmax(0, 1fr); }
 .hd-traffic:not(.has-traffic) { display: flex; }
 .hd-traffic__now { grid-area: now; }

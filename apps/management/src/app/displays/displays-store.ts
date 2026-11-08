@@ -186,11 +186,15 @@ export class DisplaysStore {
     this.saveLock(display, changedAt(display.lockWidgets, index, (w) => ({ ...w, spot })));
   }
 
-  // The oldest Homey is the one a weather without an account shows.
-  setLockAccount(display: DisplayInfo, index: number, account: string) {
+  // The oldest account of its kind is the one a widget without an account uses: a weather's Homey, or traffic's TomTom
+  // account, which the caller knows.
+  setLockAccount(display: DisplayInfo, index: number, account: string, oldest = this.homeys()[0]?.accountId) {
     const id = Number(account);
-    const chosen = id === this.homeys()[0]?.accountId ? null : id;
-    this.saveLock(display, display.lockWidgets.map((w, i) => (i === index && w.kind === 'weather' ? { ...w, account: chosen } : w)));
+    const chosen = id === oldest ? null : id;
+    this.saveLock(
+      display,
+      display.lockWidgets.map((w, i) => (i === index && (w.kind === 'weather' || w.kind === 'traffic') ? { ...w, account: chosen } : w)),
+    );
   }
 
   // Traffic shows nothing until its route is chosen.

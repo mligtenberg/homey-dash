@@ -119,6 +119,13 @@ describe('Traffic tile', () => {
     expect(loading.querySelector('.hd-tile__detail')?.textContent).toBe('…');
   });
 
+  it('asks for two different places when its route goes nowhere', async () => {
+    realtime.trafficList = [];
+    const tile = await render('small', { target: null, route: { ...route, destination: { ...route.origin, name: 'Also home', latitude: 52.0891 } } });
+
+    expect(tile.querySelector('.hd-tile__detail')?.textContent).toBe('Pick two different places');
+  });
+
   it('says TomTom is not set up, without crashing', async () => {
     realtime.trafficList = [traffic({ status: 'noAccount', travelSeconds: null, usualSeconds: null, delaySeconds: null, distanceMeters: null, arrival: null, updatedAt: null })];
 
@@ -213,6 +220,18 @@ describe('Traffic route field', () => {
     field.pick('destination', route.destination);
 
     expect(emitted).toEqual([{ name: 'Home → Work', origin: route.origin, destination: route.destination }]);
+  });
+
+  it('says so, and emits nothing, when both places are the same', () => {
+    const { fixture, emitted, element } = render({ route });
+    const field = fixture.componentInstance as unknown as { pick(end: 'origin' | 'destination', place: unknown): void };
+
+    // Within 100 m of the origin.
+    field.pick('destination', { name: 'Next door', latitude: 52.0891, longitude: 5.1102 });
+    fixture.detectChanges();
+
+    expect(emitted).toEqual([]);
+    expect(element.querySelector('[role="alert"]')?.textContent).toContain('Pick two different places');
   });
 
   it('keeps a name that was typed when a place changes', () => {

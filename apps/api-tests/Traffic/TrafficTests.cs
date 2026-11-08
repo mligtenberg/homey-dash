@@ -3,8 +3,11 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using HomeyDash.Api.Traffic;
 using HomeyDash.Api.Weather;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HomeyDash.Api.Tests.Traffic;
 
@@ -119,6 +122,31 @@ public sealed class TrafficApiTests(ApiFactory factory) : IClassFixture<ApiFacto
     }
 
     [Fact]
+    public async Task OnlyTrafficTiles_HaveARoute_IncludingThoseALogicTileHolds()
+    {
+        _hub = await TrafficHelpers.ConnectAsync(factory);
+        var created = await _client.PostAsJsonAsync("/api/dashboards", new { name = "Mixed" });
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString()!;
+        var held = new { kind = "traffic", settings = new { target = (string?)null, route = TrafficHelpers.Route("Held", 51.1, 5.1, "There", 51.2, 5.2) } };
+        var tiles = new object[]
+        {
+            // A clock with a route in its settings is still a clock.
+            new { id = "c", kind = "clock", size = "small", position = new { column = 0, row = 0 }, settings = new { target = (string?)null, route = TrafficHelpers.Route("Clock", 51.3, 5.3, "There", 51.2, 5.2) } },
+            new
+            {
+                id = "l", kind = "logic", size = "small", position = new { column = 1, row = 0 },
+                settings = new { target = (string?)null, entries = Array.Empty<object>(), fallback = held, minShowSeconds = 0 },
+            },
+        };
+        (await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft", new { rows = 4, sections = new[] { new { id = "s", title = "", tiles } } })).EnsureSuccessStatusCode();
+
+        var all = await TrafficHelpers.UntilAsync(_hub, all => all.Any(t => t.GetProperty("routeKey").GetString() == "51.100,5.100>51.200,5.200"));
+
+        Assert.DoesNotContain(all, t => t.GetProperty("routeKey").GetString() == "51.300,5.300>51.200,5.200");
+        (await _client.DeleteAsync($"/api/dashboards/{id}")).EnsureSuccessStatusCode();
+    }
+
+    [Fact]
     public async Task ALockWidgetsRoute_IsWatchedToo()
     {
         _hub = await TrafficHelpers.ConnectAsync(factory);
@@ -153,8 +181,54 @@ public sealed class TrafficApiTests(ApiFactory factory) : IClassFixture<ApiFacto
         Assert.Equal(HttpStatusCode.BadRequest, (await Save(new { kind = "traffic", spot = "center", route = TrafficHelpers.Route("A", 52, 5, "B", 52, 5) })).StatusCode);
         // A place without a name.
         Assert.Equal(HttpStatusCode.BadRequest, (await Save(new { kind = "traffic", spot = "center", route = TrafficHelpers.Route("", 52, 5, "B", 53, 5) })).StatusCode);
+        // No places at all.
+        var placeless = await Save(new { kind = "traffic", spot = "center", route = new { name = "x" } });
+        Assert.Equal(HttpStatusCode.BadRequest, placeless.StatusCode);
+        Assert.True((await placeless.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").TryGetProperty("widgets[0].route", out _));
         Assert.Equal(HttpStatusCode.BadRequest, (await Save(new { kind = "clock", spot = "center", route = TrafficHelpers.Route() })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Save(new { kind = "traffic", spot = "center", account = 1, route = TrafficHelpers.Route() })).StatusCode);
+    }
+}
+
+// Against a TomTom that breaks in a way it shouldn't for routes from "Boom".
+public sealed class BrokenTrafficApiFactory : ApiFactory
+{
+    private sealed class BrokenTraffic(FakeTraffic fake) : ITraffic
+    {
+        public Task CheckAsync(string apiKey, CancellationToken ct) => fake.CheckAsync(apiKey, ct);
+
+        public Task<RouteTime> RouteAsync(string apiKey, TrafficRoute route, CancellationToken ct) =>
+            route.Origin.Name == "Boom" ? throw new InvalidOperationException("Boom") : fake.RouteAsync(apiKey, route, ct);
+
+        public Task<IReadOnlyList<PlaceMatch>> SearchAsync(string apiKey, string query, string language, CancellationToken ct) =>
+            fake.SearchAsync(apiKey, query, language, ct);
+    }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureTestServices(services =>
+            services.AddSingleton<ITraffic>(s => new BrokenTraffic(new FakeTraffic(s.GetRequiredService<TimeProvider>()))));
+    }
+}
+
+public sealed class BrokenTrafficTests(BrokenTrafficApiFactory factory) : IClassFixture<BrokenTrafficApiFactory>
+{
+    [Fact]
+    public async Task ARouteThatBreaks_FailsAlone_AndTheApiKeepsRunning()
+    {
+        var client = factory.CreateClient();
+        await using var hub = await TrafficHelpers.ConnectAsync(factory);
+        await TrafficHelpers.DraftWithAsync(client, "Broken",
+            new { target = (string?)null, route = TrafficHelpers.Route("Boom", 51.5, 5.5, "Amsterdam Centraal", 52.379, 4.900) },
+            new { target = (string?)null, route = TrafficHelpers.Route() });
+
+        var all = await TrafficHelpers.UntilAsync(hub, all => all.Length == 2 && all.All(t => t.GetProperty("status").GetString() != "loading"));
+
+        var broken = all.Single(t => t.GetProperty("routeKey").GetString() == "51.500,5.500>52.379,4.900");
+        Assert.Equal(("disconnected", "Cannot reach TomTom."), (broken.GetProperty("status").GetString(), broken.GetProperty("error").GetString()));
+        Assert.Equal("connected", all.Single(t => t.GetProperty("routeKey").GetString() == "52.089,5.110>52.379,4.900").GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/health")).StatusCode);
     }
 }
 

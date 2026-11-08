@@ -33,7 +33,7 @@ describe('TomTomAccountPanel', () => {
     (root.querySelector('#tomtom-name') as HTMLInputElement).value = 'Home';
     (root.querySelector('#tomtom-key') as HTMLInputElement).value = 'secret-key';
 
-    root.querySelector('form')!.dispatchEvent(new Event('submit'));
+    (root.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
 
     const request = http().expectOne('/api/accounts/tomtom');
     expect(request.request.body).toEqual({ name: 'Home', apiKey: 'secret-key' });
@@ -49,7 +49,7 @@ describe('TomTomAccountPanel', () => {
     (root.querySelector('.hd-actions button') as HTMLButtonElement).click();
     await stable();
 
-    root.querySelector('form')!.dispatchEvent(new Event('submit'));
+    (root.querySelector('form') as HTMLFormElement).dispatchEvent(new Event('submit'));
     http().expectOne('/api/accounts/tomtom/1').flush({ errors: { apiKey: ["TomTom doesn't accept that API key."] } }, { status: 400, statusText: 'Bad Request' });
     await stable();
 

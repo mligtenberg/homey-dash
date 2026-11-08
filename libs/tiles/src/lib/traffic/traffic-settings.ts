@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { TomTomAccountApi, TrafficRoute } from '@homey-dash/api-client';
+import { TomTomAccountApi } from '@homey-dash/api-client';
 import { TrafficTileSettings } from './traffic-data';
 import { TrafficRouteField } from './traffic-route-field';
 

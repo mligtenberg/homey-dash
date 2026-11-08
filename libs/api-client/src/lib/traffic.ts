@@ -24,6 +24,12 @@ export function routeKey(route: Pick<TrafficRoute, 'origin' | 'destination'>): s
   return `${at(route.origin)}>${at(route.destination)}`;
 }
 
+/** Whether a route's places are the same, to three decimals: HomeyDash asks no traffic for such a route. */
+export function samePlaces(route: Pick<TrafficRoute, 'origin' | 'destination'>): boolean {
+  const [from, to] = routeKey(route).split('>');
+  return from === to;
+}
+
 /**
  * The traffic on one route now, from TomTom. Times are seconds. `status` is `noAccount` without a TomTom account, and
  * `disconnected` when TomTom can't be reached (the last result stays).

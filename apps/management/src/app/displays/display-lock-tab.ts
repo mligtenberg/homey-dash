@@ -1,6 +1,7 @@
-import { AccountSelect } from '../account-select';
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { LOCK_SPOTS, LockSpot } from '@homey-dash/api-client';
+import { AccountOption, AccountSelect } from '../account-select';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { LOCK_SPOTS, LockSpot, TomTomAccountApi } from '@homey-dash/api-client';
 import { TrafficRouteField } from '@homey-dash/tiles';
 import { SignalPicker } from '../editor/signal-picker';
 import { DisplayContext } from './display-context';
@@ -44,6 +45,13 @@ const SPOT_NAMES: Record<LockSpot, string> = {
                 [ariaLabel]="'Whose weather widget ' + (i + 1) + ' shows'"
                 (picked)="store.setLockAccount(display, i, '' + $event)"
               />
+            } @else if (widget.kind === 'traffic' && tomtoms().length > 1) {
+              <hd-account-select
+                [accounts]="tomtoms()"
+                [selected]="widget.account ?? tomtoms()[0].accountId"
+                [ariaLabel]="'Which TomTom account widget ' + (i + 1) + ' asks'"
+                (picked)="store.setLockAccount(display, i, '' + $event, tomtoms()[0].accountId)"
+              />
             } @else if (widget.kind === 'value') {
               <hd-signal-picker class="signal" [value]="widget.signal" [only]="isCapability" (picked)="store.setLockSignal(display, i, $event)" />
             } @else {
@@ -76,6 +84,12 @@ export class DisplayLockTab {
   protected readonly spots = LOCK_SPOTS;
   protected readonly maxLock = MAX_LOCK_WIDGETS;
   protected readonly isCapability = isCapabilitySignal;
+
+  private readonly tomtomAccounts = toSignal(inject(TomTomAccountApi).list(), { initialValue: null });
+  // The TomTom accounts a traffic widget can ask with, oldest first.
+  protected readonly tomtoms = computed<AccountOption[]>(() =>
+    (this.tomtomAccounts()?.accounts ?? []).map((a) => ({ accountId: a.id, accountName: a.name })),
+  );
 
   protected spotName(spot: LockSpot) {
     return SPOT_NAMES[spot];

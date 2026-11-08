@@ -62,7 +62,8 @@ public sealed record TrafficRoute(string Name, TrafficPlace Origin, TrafficPlace
 {
     public string Key => Origin.Key + ">" + Destination.Key;
 
-    public bool IsValid => Origin.IsValid && Destination.IsValid && Key.Split('>')[0] != Key.Split('>')[1];
+    // Null-safe, because a route read from JSON may lack a place.
+    public bool IsValid => Origin is { IsValid: true } && Destination is { IsValid: true } && Origin.Key != Destination.Key;
 
     // The route of a traffic tile's settings (<c>settings.route</c>); null when it has none or an unusable one.
     public static TrafficRoute? Of(JsonElement settings)
@@ -70,7 +71,7 @@ public sealed record TrafficRoute(string Name, TrafficPlace Origin, TrafficPlace
         if (settings.ValueKind != JsonValueKind.Object || !settings.TryGetProperty("route", out var route)) return null;
         try
         {
-            return route.Deserialize<TrafficRoute>(Dashboards.Dashboard.Json) is { Origin: not null, Destination: not null } found && found.IsValid ? found : null;
+            return route.Deserialize<TrafficRoute>(Dashboards.Dashboard.Json) is { IsValid: true } found ? found : null;
         }
         catch (JsonException)
         {

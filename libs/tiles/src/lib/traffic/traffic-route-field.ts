@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output } from '@angular/core';
-import { TrafficPlace, TrafficRoute } from '@homey-dash/api-client';
+import { samePlaces, TrafficPlace, TrafficRoute } from '@homey-dash/api-client';
 import { TrafficPlaceField } from './traffic-place-field';
 
 /**
  * Management's choice of a route (ADR-0015): a name, and an origin and destination found by name. Used by a traffic tile's
- * settings and by a lock screen's traffic widget. Emits the route once both places are chosen, and only then (a half chosen route is kept here, not in settings); it names itself
+ * settings and by a lock screen's traffic widget. Emits the route once two different places are chosen, and only then (a half chosen route is kept here, not in settings); it names itself
  * `Origin → Destination` until it has a name of its own.
  */
 @Component({
@@ -26,6 +26,12 @@ import { TrafficPlaceField } from './traffic-place-field';
     </div>
     <hd-traffic-place-field [id]="idPrefix() + '-origin'" label="From" [place]="origin()" [account]="account()" (picked)="pick('origin', $event)" />
     <hd-traffic-place-field [id]="idPrefix() + '-destination'" label="To" [place]="destination()" [account]="account()" (picked)="pick('destination', $event)" />
+    @if (same()) {
+      <p class="error" role="alert">From and To are the same place. Pick two different places.</p>
+    }
+  `,
+  styles: `
+    .error { color: var(--danger); margin: 0; }
   `,
 })
 export class TrafficRouteField {
@@ -40,6 +46,12 @@ export class TrafficRouteField {
   protected readonly origin = linkedSignal<TrafficPlace | null>(() => this.route()?.origin ?? null);
   protected readonly destination = linkedSignal<TrafficPlace | null>(() => this.route()?.destination ?? null);
   protected readonly name = linkedSignal(() => this.route()?.name ?? '');
+
+  /** Both places are the same (to about 100 m), which has no traffic, so such a route is never emitted. */
+  protected readonly same = computed(() => {
+    const [origin, destination] = [this.origin(), this.destination()];
+    return !!origin && !!destination && samePlaces({ origin, destination });
+  });
 
   /** `Utrecht → Amsterdam`, once both places are known. */
   protected readonly suggested = computed(() => {
@@ -62,7 +74,7 @@ export class TrafficRouteField {
 
   private emit(auto: boolean) {
     const [origin, destination] = [this.origin(), this.destination()];
-    if (!origin || !destination) return;
+    if (!origin || !destination || this.same()) return;
     const name = auto ? `${origin.name} → ${destination.name}` : this.name();
     this.name.set(name);
     this.changed.emit({ name, origin, destination });

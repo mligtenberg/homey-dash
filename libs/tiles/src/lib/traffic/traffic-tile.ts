@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { samePlaces } from '@homey-dash/api-client';
 import { LucideCar, LucideDynamicIcon } from '@lucide/angular';
 import { KindHue } from '../tile-kind';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
@@ -81,6 +82,8 @@ export class TrafficTile extends TileView<TrafficTileSettings> {
     const { label, route } = this.settings();
     const name = label || route?.name || 'Traffic';
     if (!route) return { ...look, hue: 'climate', name, detail: 'Pick a route', state: 'unset' };
+    // HomeyDash asks no traffic for a route that goes nowhere.
+    if (samePlaces(route)) return { ...look, hue: 'climate', name, detail: 'Pick two different places', state: 'unset' };
     const shown = this.shown();
     const result = this.result();
     if (shown) {
