@@ -167,7 +167,7 @@ export class DisplaysStore {
 
   // A value starts on a temperature, the reading a lock screen shows most, or else on the first capability there is.
   setLockKind(display: DisplayInfo, index: number, kind: LockWidget['kind']) {
-    const spot = display.lockWidgets[index].spot;
+    const { spot, hidden, rule } = display.lockWidgets[index];
     let widget: LockWidget = { kind: 'clock', spot };
     if (kind === 'weather' || kind === 'traffic') widget = { kind, spot };
     if (kind === 'value') {
@@ -179,7 +179,21 @@ export class DisplaysStore {
       }
       widget = { kind, spot, signal: signal.id };
     }
-    this.saveLock(display, changedAt(display.lockWidgets, index, () => widget));
+    // Whether and when it shows belongs to the place in the list, not to what it shows.
+    this.saveLock(display, changedAt(display.lockWidgets, index, () => ({ ...widget, ...(hidden ? { hidden } : {}), ...(rule ? { rule } : {}) })));
+  }
+
+  // Always shows it, never (kept, but left out) or only while a rule holds; a rule starts as one that always holds.
+  setLockVisibility(display: DisplayInfo, index: number, choice: 'always' | 'never' | 'rule') {
+    const rule = display.lockWidgets[index].rule ?? alwaysRule();
+    this.saveLock(
+      display,
+      changedAt(display.lockWidgets, index, (w) => ({ ...w, hidden: choice === 'never' || undefined, rule: choice === 'rule' ? rule : undefined })),
+    );
+  }
+
+  setLockRule(display: DisplayInfo, index: number, rule: Rule) {
+    this.saveLock(display, changedAt(display.lockWidgets, index, (w) => ({ ...w, rule })));
   }
 
   setLockSpot(display: DisplayInfo, index: number, spot: LockSpot) {

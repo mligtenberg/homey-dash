@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using HomeyDash.Api.Data;
 using HomeyDash.Api.Realtime;
@@ -179,7 +180,8 @@ public static partial class DisplayEndpoints
     /// <summary>
     /// Gives a display what its lock screen shows; answers what is wrong, by widget, when it can't. Each widget is a
     /// clock, the weather (of a Homey account, or the oldest), the traffic on a route (with a TomTom account, or the oldest) or a value, which names a capability of a device in Homey
-    /// as a signal (<c>homey:&lt;account&gt;:capability:&lt;device&gt;:&lt;capability&gt;</c>), in one of the spots.
+    /// as a signal (<c>homey:&lt;account&gt;:capability:&lt;device&gt;:&lt;capability&gt;</c>), in one of the spots. A widget can be
+    /// hidden, or shown only while a valid rule holds.
     /// </summary>
     public static Dictionary<string, string[]>? SetLockScreen(Display display, IReadOnlyList<LockWidget> widgets, RuleEngine engine)
     {
@@ -208,9 +210,11 @@ public static partial class DisplayEndpoints
             }
             else if (widget.Route is not null)
                 errors[$"widgets[{i}].route"] = ["Only traffic shows a route."];
+            if (widget.Rule is { ValueKind: not JsonValueKind.Null } rule && RuleSetup.Check(rule, engine).Error is { } error)
+                errors[$"widgets[{i}].rule"] = [error];
         }
         if (errors.Count > 0) return errors;
-        display.LockWidgets = [.. widgets];
+        display.LockWidgets = widgets.Select(w => w.Rule is { ValueKind: not JsonValueKind.Null } rule ? w with { Rule = rule.Clone() } : w with { Rule = null }).ToList();
         return null;
     }
 

@@ -256,6 +256,30 @@ describe('Displays', () => {
       expect(lockRequest().body.widgets).toEqual([{ kind: 'weather', spot: 'bottom-left' }]);
     });
 
+    it('shows a widget always, never or while a rule holds, keeping the rule it had', async () => {
+      const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'center' }] }], [], '/displays/1/lock');
+      const visibility = () => root.querySelector('[aria-label="When widget 1 shows"]') as HTMLSelectElement;
+      const choose = (value: string) => {
+        visibility().value = value;
+        visibility().dispatchEvent(new Event('change'));
+      };
+
+      choose('rule');
+      const { rule, ...bare } = lockRequest().body.widgets[0];
+      expect(bare).toEqual({ kind: 'clock', spot: 'center' });
+      expect(rule.conditions.length).toBeGreaterThan(0);
+      await stable();
+      expect(root.querySelector('.lock hd-rule-editor')).not.toBeNull();
+
+      choose('never');
+      expect(lockRequest().body.widgets).toEqual([{ kind: 'clock', spot: 'center', hidden: true }]);
+      await stable();
+      expect(root.querySelector('.lock hd-rule-editor')).toBeNull();
+
+      choose('always');
+      expect(lockRequest().body.widgets).toEqual([{ kind: 'clock', spot: 'center' }]);
+    });
+
     it('adds a traffic widget that has nothing to show until a route is chosen', async () => {
       const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'bottom-right' }] }], [], '/displays/1/lock');
       const kind = root.querySelector('[aria-label="What widget 1 shows"]') as HTMLSelectElement;
@@ -266,6 +290,21 @@ describe('Displays', () => {
       expect(lockRequest().body.widgets).toEqual([{ kind: 'traffic', spot: 'bottom-right' }]);
       await stable();
       expect(root.querySelector('.lock hd-traffic-route-field')).not.toBeNull();
+    });
+
+    it('keeps when a widget shows as it turns into traffic and back', async () => {
+      const rule = alwaysRule();
+      const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'center', rule }] }], [], '/displays/1/lock');
+      const kind = () => root.querySelector('[aria-label="What widget 1 shows"]') as HTMLSelectElement;
+
+      kind().value = 'traffic';
+      kind().dispatchEvent(new Event('change'));
+      expect(lockRequest().body.widgets).toEqual([{ kind: 'traffic', spot: 'center', rule }]);
+      await stable();
+
+      kind().value = 'weather';
+      kind().dispatchEvent(new Event('change'));
+      expect(lockRequest().body.widgets).toEqual([{ kind: 'weather', spot: 'center', rule }]);
     });
 
     it('lets a traffic widget pick its TomTom account once there are several, and searches with it', async () => {

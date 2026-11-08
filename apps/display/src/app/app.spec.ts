@@ -375,6 +375,24 @@ describe('App', () => {
           expect(root.querySelector('hd-lock-screen')).toBeNull();
         });
 
+        it('leaves out the widgets that are hidden, or whose rule does not hold, and follows the rule', async () => {
+          const when = (signal: string) => ({ match: 'all' as const, conditions: [{ signal, operator: 'isTrue' as const }] });
+          const lockWidgets: LockWidget[] = [
+            { kind: 'clock', spot: 'center' },
+            { kind: 'clock', spot: 'top-left', hidden: true },
+            { kind: 'clock', spot: 'top-right', rule: when('weekend') },
+            { kind: 'clock', spot: 'bottom-left', rule: when('weekday') },
+          ];
+          holding = { night: true, weekend: true };
+          const root = await startOpen({ ...fills(), display: { ...fills().display, lockWidgets } });
+          const spots = () => [...root.querySelectorAll('hd-lock-screen .clock')].map((c) => c.closest('.spot')?.className.replace('spot spot--', ''));
+
+          expect(spots()).toEqual(['top-right', 'center']);
+
+          await hold({ night: true, weekday: true });
+          expect(spots()).toEqual(['center', 'bottom-left']);
+        });
+
         it('shows no lock screen over a dashboard', async () => {
           const root = await start({ ...several, display: { ...several.display, lockWidgets: [{ kind: 'clock', spot: 'center' }] } });
           expect(root.querySelector('hd-lock-screen')).toBeNull();
