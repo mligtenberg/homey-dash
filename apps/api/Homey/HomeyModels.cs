@@ -74,6 +74,23 @@ public sealed record HomeyWeather(double? Temperature, string? State, double? Hu
 // Where Homey is, in degrees, as set in its own settings; the weather tile's forecast is for here.
 public sealed record HomeyLocation(double Latitude, double Longitude);
 
+// Homey's own energy report, for the energy tile (ADR-0014). Status is "ok", or "unavailable" when Homey won't tell: the API key
+// lacks the homey.energy.readonly scope, or the Homey has no energy. Live and Day are null until read, or when Homey left them out.
+public sealed record HomeyEnergy(string Status, EnergyLive? Live, EnergyDay? Day)
+{
+    public static readonly HomeyEnergy Unavailable = new("unavailable", null, null);
+}
+
+// Power now, in watts. Grid is positive while importing and negative while exporting; Solar is what is produced (null without
+// solar) and Home what the home consumes.
+public sealed record EnergyLive(double? Grid, double? Solar, double? Home);
+
+// Today's totals in kWh, and the day by the hour.
+public sealed record EnergyDay(double? Imported, double? Exported, double? Solar, double? Home, IReadOnlyList<EnergyPoint> History);
+
+// One step of today's history, in kWh over the step; T is where it starts.
+public sealed record EnergyPoint(DateTimeOffset T, double? Home, double? Solar);
+
 // Something a Sonos speaker can play, as its flow card offers it. Item is the card's own answer, handed back to play it.
 public sealed record SpeakerMusic(string Name, string? Description, string? Image, JsonElement Item);
 
@@ -111,6 +128,8 @@ public sealed record VariableRemoved(string VariableId) : HomeyChange;
 public sealed record CatalogChanged : HomeyChange;
 
 public sealed record WeatherChanged(HomeyWeather Weather) : HomeyChange;
+
+public sealed record EnergyChanged(HomeyEnergy Energy) : HomeyChange;
 
 public sealed record ConnectionChanged(HomeyStatus Status) : HomeyChange;
 

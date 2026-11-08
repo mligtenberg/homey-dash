@@ -6,6 +6,7 @@ import {
   LOGIC_TILES,
   PLEX_TILES,
   WEATHER_TILES,
+  ENERGY_TILES,
   SONOS_TILES,
   provideTileModules,
   RealtimeRuleAnswers,
@@ -20,7 +21,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(appRoutes, withComponentInputBinding()),
     provideHttpClient(),
-    provideTileModules(CORE_TILES, PLEX_TILES, WEATHER_TILES, SONOS_TILES, LOGIC_TILES),
+    provideTileModules(CORE_TILES, PLEX_TILES, WEATHER_TILES, ENERGY_TILES, SONOS_TILES, LOGIC_TILES),
     { provide: TileData, useExisting: RealtimeTileData },
     // The Editor and Preview see rules as on the display picked with AsDisplayPicker.
     { provide: RuleAnswers, useExisting: RealtimeRuleAnswers },

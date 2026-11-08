@@ -1417,3 +1417,59 @@ a.hd-btn { text-decoration: none; }
 .hd-weather__week .hd-weather__temp { text-align: end; }
 .hd-weather__week .hd-weather__what { color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-weather__credit { margin: 0; font-size: calc(var(--cell) * .075); color: var(--ink-muted); }
+
+/*
+ * Energy (ADR-0014): the grid power as the headline, by size with what the sun makes and the home uses beside it, a flow bar
+ * of where the power comes from, and on the large sizes today's totals and the day by the hour. The hue is energy's.
+ */
+.hd-energy { display: grid; gap: calc(var(--cell) * .06) calc(var(--cell) * .16); grid-template: "now" auto "titles" 1fr / minmax(0, 1fr); }
+.hd-energy:not(.has-live) { display: flex; }
+.hd-energy__now { grid-area: now; }
+.hd-energy__now .hd-value { font-weight: 700; font-variant-numeric: tabular-nums; font-size: calc(var(--cell) * .2); white-space: nowrap; }
+.hd-energy[data-size="small"] .hd-energy__now .hd-value { font-size: calc(var(--cell) * .17); }
+.hd-energy[data-size="full-large"] .hd-energy__now .hd-value { font-size: calc(var(--cell) * .3); }
+.hd-energy__titles { grid-area: titles; align-self: end; min-width: 0; }
+.hd-energy[data-size="wide"], .hd-energy[data-size="full"] { grid-template: "now figures" auto "titles figures" 1fr "flow flow" auto / minmax(0, 1fr) minmax(0, 1fr); }
+.hd-energy[data-size="large"] { grid-template: "now" auto "titles" auto "figures" auto "flow" auto "day" 1fr / minmax(0, 1fr); }
+.hd-energy[data-size="full-large"] { grid-template: "now figures" auto "titles figures" auto "flow flow" auto "today day" 1fr / minmax(0, 1fr) minmax(0, 1fr); }
+.hd-energy__figures { grid-area: figures; display: flex; flex-direction: column; justify-content: center; gap: calc(var(--cell) * .04); margin: 0; min-width: 0; }
+.hd-energy__figures div { display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--cell) * .08); }
+.hd-energy__figures dt { display: flex; align-items: center; gap: calc(var(--cell) * .05); font-size: calc(var(--cell) * .09); font-weight: 600; color: var(--ink-muted); }
+.hd-energy__figures dt .hd-icon { width: calc(var(--cell) * .11); height: calc(var(--cell) * .11); }
+.hd-energy__figures dd { margin: 0; font-size: calc(var(--cell) * .12); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Where the power comes from: the sun's share of the home, the grid's, and what goes back; widths follow flex-grow. */
+.hd-energy__flow { grid-area: flow; display: flex; gap: 2px; height: calc(var(--cell) * .07); border-radius: var(--radius-pill); overflow: hidden; background: color-mix(in oklab, var(--k-ink) 18%, transparent); }
+.hd-energy__seg { flex: 0 1 0; min-width: 0; }
+.hd-energy__seg--solar { background: var(--k-ink); }
+.hd-energy__seg--grid { background: var(--ink-muted); }
+.hd-energy__seg--export { background: color-mix(in oklab, var(--k-ink) 45%, transparent); }
+.hd-energy__today { grid-area: today; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(var(--cell) * .04) calc(var(--cell) * .12); margin: 0; align-content: center; }
+.hd-energy__today div { display: flex; flex-direction: column; min-width: 0; }
+.hd-energy__today dt { font-size: calc(var(--cell) * .08); font-weight: 600; color: var(--ink-muted); }
+.hd-energy__today dd { margin: 0; font-size: calc(var(--cell) * .12); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hd-energy__day { grid-area: day; display: flex; flex-direction: column; justify-content: flex-end; gap: calc(var(--cell) * .03); min-height: 0; }
+.hd-energy__day svg { width: 100%; flex: 1; min-height: 0; }
+.hd-energy__bar-solar { fill: var(--k-ink); }
+.hd-energy__bar-home { fill: var(--ink); }
+.hd-energy__axis { display: flex; justify-content: space-between; font-size: calc(var(--cell) * .075); font-weight: 600; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+/* The day in full. */
+.hd-details--screen:has(.hd-energy__pane) {
+  background:
+    radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, var(--k-ink) 26%, transparent), transparent 70%),
+    color-mix(in oklab, var(--k-ink) 10%, var(--ground));
+}
+.hd-details--screen .hd-details__panel > .hd-energy__pane { flex: 1; min-height: 0; }
+.hd-energy__pane { display: flex; flex-direction: column; gap: calc(var(--cell) * .2); overflow-y: auto; scrollbar-width: none; }
+.hd-energy__pane::-webkit-scrollbar { display: none; }
+.hd-energy__pane .hd-energy__flow { height: calc(var(--cell) * .1); }
+.hd-energy__hero { display: flex; align-items: center; gap: calc(var(--cell) * .2); }
+.hd-energy__hero > .hd-icon { width: calc(var(--cell) * .6); height: calc(var(--cell) * .6); }
+.hd-energy__section { display: flex; flex-direction: column; gap: calc(var(--cell) * .08); }
+.hd-energy__section h3 { margin: 0; }
+.hd-energy__section .hd-energy__day { height: calc(var(--cell) * 1.2); }
+.hd-energy__legend { display: flex; align-items: center; gap: calc(var(--cell) * .06); margin: 0; font-size: calc(var(--cell) * .09); color: var(--ink-muted); }
+.hd-energy__key { width: calc(var(--cell) * .1); height: calc(var(--cell) * .1); border-radius: 2px; margin-left: calc(var(--cell) * .1); }
+.hd-energy__key:first-child { margin-left: 0; }
+.hd-energy__key--solar { background: var(--k-ink); }
+.hd-energy__key--home { background: var(--ink); }
+.hd-energy__credit { margin: 0; font-size: calc(var(--cell) * .075); color: var(--ink-muted); }

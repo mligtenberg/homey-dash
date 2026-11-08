@@ -19,6 +19,7 @@ public sealed class TargetCatalog(Homeys homeys, PhotoSetIndex photoSets, PlexWa
     public const string WeatherPrefix = "weather:";
     public const string WeatherHere = WeatherPrefix + "here";
     public const string WeatherPlace = WeatherPrefix + "place";
+    public const string EnergyHome = "energy:home";
 
     // Whether a target exists in the tile's account (settings.account; null for the oldest of its kind); null while
     // that cannot be told, such as before Homey's or Plex's data first arrived.
@@ -27,6 +28,7 @@ public sealed class TargetCatalog(Homeys homeys, PhotoSetIndex photoSets, PlexWa
         : target.StartsWith(PlexPlayerPrefix, StringComparison.Ordinal) || target.StartsWith(PlexLibraryPrefix, StringComparison.Ordinal)
             ? KnowsPlex(target, account)
         : target.StartsWith(WeatherPrefix, StringComparison.Ordinal) ? KnowsWeather(target, account)
+        : target == EnergyHome ? KnowsEnergy(account)
         : KnowsHomey(target, account);
 
     // Whether a signal exists; null while that can't be told yet.
@@ -44,6 +46,10 @@ public sealed class TargetCatalog(Homeys homeys, PhotoSetIndex photoSets, PlexWa
         : target != WeatherHere ? false
         : homeys.For(account) is not null ? true
         : account is null ? null : false;
+
+    // The energy report of the tile's Homey (ADR-0014) is missing only with that Homey's account.
+    private bool? KnowsEnergy(int? account) =>
+        homeys.For(account) is not null ? true : account is null ? null : false;
 
     // A tile naming an account that was removed is missing. Players come and go as they play, so one is never missing.
     private bool? KnowsPlex(string target, int? account) =>

@@ -26,6 +26,39 @@ export interface HomeyWeather {
   city: string | null;
 }
 
+/**
+ * Homey's own energy report (ADR-0014). `unavailable` when Homey won't tell: the API key lacks the `homey.energy.readonly`
+ * scope, or the Homey has no energy. `live` and `day` are null until read, or when Homey left them out.
+ */
+export interface HomeyEnergy {
+  status: 'ok' | 'unavailable';
+  live: EnergyLive | null;
+  day: EnergyDay | null;
+}
+
+/** Power now, in watts: `grid` is positive while importing and negative while exporting; `solar` is null without solar. */
+export interface EnergyLive {
+  grid: number | null;
+  solar: number | null;
+  home: number | null;
+}
+
+/** Today's totals in kWh, and the day by the hour. */
+export interface EnergyDay {
+  imported: number | null;
+  exported: number | null;
+  solar: number | null;
+  home: number | null;
+  history: EnergyPoint[];
+}
+
+/** One step of today's history, in kWh over the step; `t` is where it starts. */
+export interface EnergyPoint {
+  t: string;
+  home: number | null;
+  solar: number | null;
+}
+
 export type CapabilityValue = boolean | number | string | null;
 
 export interface HomeyCapability {
