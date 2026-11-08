@@ -1443,8 +1443,8 @@ a.hd-btn { text-decoration: none; }
  * Clock and date: tiles that point at nothing, in the neutral hue. The clock centres the time, digital at a size that fits
  * the cell (smaller while the seconds show) or an analog dial, with the date under it, or beside the dial on the wide sizes.
  */
-.hd-clock { --clock-size: .3; align-items: center; justify-content: center; gap: calc(var(--cell) * .04); text-align: center; }
-.hd-clock[data-size="small"].has-seconds { --clock-size: .2; }
+.hd-clock { --clock-size: .22; align-items: center; justify-content: center; gap: calc(var(--cell) * .04); text-align: center; }
+.hd-clock[data-size="small"].has-seconds { --clock-size: .15; }
 .hd-clock[data-size="wide"] { --clock-size: .52; }
 .hd-clock[data-size="wide"].has-seconds { --clock-size: .4; }
 .hd-clock[data-size="full"] { --clock-size: .6; }
@@ -1452,7 +1452,7 @@ a.hd-btn { text-decoration: none; }
 .hd-clock[data-size="large"].has-seconds { --clock-size: .38; }
 .hd-clock[data-size="full-large"] { --clock-size: .9; }
 .hd-clock[data-size="full-large"].has-seconds { --clock-size: .7; }
-.hd-clock__time { display: flex; align-items: baseline; justify-content: center; gap: .1em; max-width: 100%; }
+.hd-clock__time { display: flex; align-items: baseline; justify-content: center; gap: .1em; max-width: 100%; padding-inline: calc(var(--cell) * .06); box-sizing: border-box; }
 .hd-clock__digits { font-size: calc(var(--cell) * var(--clock-size)); font-weight: 800; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hd-clock__time .hd-unit { font-size: calc(var(--cell) * var(--clock-size) * .3); }
 .hd-clock__date { font-size: calc(var(--cell) * .11); font-weight: 600; color: var(--ink-muted); white-space: nowrap; }
@@ -1470,6 +1470,9 @@ a.hd-btn { text-decoration: none; }
 .hd-clock__pin { fill: var(--ink); }
 
 .hd-date { gap: calc(var(--cell) * .04); }
+.hd-date[data-size="small"] { justify-content: center; align-items: center; text-align: center; }
+.hd-date[data-size="small"] .hd-date__day { align-items: center; }
+.hd-date[data-size="small"] .hd-date__number { font-size: calc(var(--cell) * .4); line-height: 1; }
 .hd-date__weekday { font-size: calc(var(--cell) * .12); font-weight: 700; color: var(--k-ink); text-transform: capitalize; }
 .hd-date__day { display: flex; flex-direction: column; gap: calc(var(--cell) * .02); min-width: 0; }
 .hd-date__number { font-size: calc(var(--cell) * .5); font-weight: 800; }
