@@ -1,5 +1,6 @@
 import { Segmented } from '../core/segmented';
 import { reason } from './hub-reason';
+import { PlexLocalPlayer } from './plex-local-player';
 import { PlexProfilePicker } from './plex-profile-picker';
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
 import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, PlexTracks, Realtime, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
@@ -54,14 +55,6 @@ interface Cast {
 }
 
 const IDLE: Cast = { step: 'idle', devices: [] };
-
-/** Music playing on this screen: the tracks to play and which one plays now, and the album they are part of. */
-interface LocalPlay {
-  queue: PlexItem[];
-  index: number;
-  paused: boolean;
-  album: PlexItem | null;
-}
 
 /** What is under a show, season or album: nothing while it loads. */
 interface Under {
@@ -140,19 +133,19 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
       @if (!selected() && tabs().length > (browse ? 1 : 2)) {
         <hd-segmented hdDetailsHead label="Show" [options]="tabs()" [value]="activeTab()" (picked)="selectTab($event)" />
       }
-      @if (local(); as l) {
+      @if (player.play(); as l) {
         <div class="hd-plex-recent__now" role="group" aria-label="Playing here">
           <div class="hd-plex-recent__now-text">
             <strong>{{ l.queue[l.index].title }}</strong>
-            @if (localDetail(l); as detail) {
+            @if (player.detail(l); as detail) {
               <span>{{ detail }}</span>
             }
             <span>{{ l.paused ? 'Paused here' : 'Playing here' }}</span>
           </div>
-          <button type="button" class="hd-plex-recent__receiver" (click)="toggleLocal()">
+          <button type="button" class="hd-plex-recent__receiver" (click)="player.toggle()">
             <svg [lucideIcon]="l.paused ? playIcon : pauseIcon" />{{ l.paused ? 'Resume' : 'Pause' }}
           </button>
-          <button type="button" class="hd-plex-recent__receiver" (click)="stopLocal()"><svg [lucideIcon]="stopIcon" />Stop</button>
+          <button type="button" class="hd-plex-recent__receiver" (click)="player.stop()"><svg [lucideIcon]="stopIcon" />Stop</button>
         </div>
       }
       @for (p of casting(); track p.deviceId) {
@@ -272,7 +265,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
                 @if (c.error) {
                   <div class="hd-plex-recent__cast-error" role="alert">{{ c.error }}</div>
                 }
-                @if (localError(); as error) {
+                @if (player.error(); as error) {
                   <div class="hd-plex-recent__cast-error" role="alert">{{ error }}</div>
                 }
               </div>
@@ -478,9 +471,11 @@ export class RecentlyAddedTile extends TileView {
   private searchTimer?: ReturnType<typeof setTimeout>;
 
   /** Music playing on this screen, which goes on when the cover is closed. */
-  protected readonly local = signal<LocalPlay | null>(null);
-  protected readonly localError = signal('');
-  private audio?: HTMLAudioElement;
+  protected readonly player = new PlexLocalPlayer(
+    () => this.overview()?.accountId ?? 0,
+    (track, state, timeMs) => this.report(track, state, timeMs),
+    () => this.stopTheme(),
+  );
   private theme?: HTMLAudioElement;
   private themeOf?: string;
 
@@ -489,7 +484,7 @@ export class RecentlyAddedTile extends TileView {
 
   /** What the tile's face says plays: on an Apple TV, or here. */
   protected readonly badge = computed(() => {
-    const local = this.local();
+    const local = this.player.play();
     if (this.casting().length) {
       const paused = this.allPaused();
       return { paused, label: (paused ? 'Paused on ' : 'Playing on ') + this.casting()[0].deviceName };
@@ -575,7 +570,7 @@ export class RecentlyAddedTile extends TileView {
     });
     inject(DestroyRef).onDestroy(() => {
       this.stopTheme();
-      this.stopLocal();
+      this.player.stop();
       this.stopVideo();
     });
     // Each thing that plays gets its tracks, to choose between.
@@ -759,7 +754,7 @@ export class RecentlyAddedTile extends TileView {
     if (show && show.id === this.themeOf) return;
     this.stopTheme();
     // Nothing talks over music that already plays.
-    if (!show || this.local() || this.casting().length) return;
+    if (!show || this.player.play() || this.casting().length) return;
     this.themeOf = show.id;
     this.theme = new Audio(plexAudioUrl(this.overview()?.accountId ?? 0, show.id, true));
     this.theme.volume = 0.6;
@@ -786,7 +781,7 @@ export class RecentlyAddedTile extends TileView {
   /** Plays a film or episode in this screen's own picture, over the dialog. */
   private playVideo(item: PlexItem, next: PlexItem[] = []) {
     this.stopTheme();
-    this.stopLocal();
+    this.player.stop();
     this.stopVideo();
     this.videoNext = next;
     this.videoAt = 0;
@@ -840,12 +835,12 @@ export class RecentlyAddedTile extends TileView {
   protected videoFailed(item: PlexItem) {
     this.video.set(null);
     this.videoAt = 0;
-    this.localError.set(`Could not play ${item.title}.`);
+    this.player.error.set(`Could not play ${item.title}.`);
   }
 
   /** Plays a film or episode in this screen's own picture; a track, or an album track after track, in its own speakers. A track chosen from its album goes on with the rest of it. */
   protected async playHere(item: PlexItem) {
-    this.localError.set('');
+    this.player.error.set('');
     const trail = this.trail();
     if (item.kind === 'movie') return this.playVideo(item);
     if (item.kind === 'episode') {
@@ -855,66 +850,12 @@ export class RecentlyAddedTile extends TileView {
       return this.playVideo(item, at < 0 ? [] : episodes.slice(at + 1));
     }
     const album = item.kind === 'album' ? item : item.kind === 'track' ? trail[trail.length - 2] : undefined;
-    if (album?.kind !== 'album') return this.startLocal({ queue: [item], index: 0, paused: false, album: null });
+    if (album?.kind !== 'album') return this.player.start({ queue: [item], index: 0, paused: false, album: null });
     await this.loadChildren(album);
     const tracks = (this.under()[album.id]?.items ?? []).filter((t) => t.kind === 'track');
-    if (!tracks.length) return this.localError.set('That album has no tracks.');
+    if (!tracks.length) return this.player.error.set('That album has no tracks.');
     const index = item.kind === 'track' ? Math.max(0, tracks.findIndex((t) => t.id === item.id)) : 0;
-    this.startLocal({ queue: tracks, index, paused: false, album });
-  }
-
-  /** What the track is part of: the artist, the album and its place in it; for a lone track, what the server says of it. */
-  protected localDetail(play: LocalPlay) {
-    const { album, index, queue } = play;
-    return album
-      ? `${album.subtitle ? album.subtitle + ' — ' : ''}${album.title} · ${index + 1} of ${queue.length}`
-      : queue[index].subtitle;
-  }
-
-  private startLocal(play: LocalPlay) {
-    this.stopTheme();
-    this.audio ??= new Audio();
-    const audio = this.audio;
-    const fail = () => {
-      this.localError.set(`Could not play ${play.queue[play.index].title}.`);
-      this.stopLocal();
-    };
-    audio.onended = () => {
-      this.reportTrack(play.queue[play.index], 'stopped', play.queue[play.index].durationMs ?? 0);
-      if (play.index + 1 >= play.queue.length) this.stopLocal(false);
-      else this.startLocal({ ...play, index: play.index + 1 });
-    };
-    audio.onerror = fail;
-    audio.src = plexAudioUrl(this.overview()?.accountId ?? 0, play.queue[play.index].id);
-    this.local.set(play);
-    this.reportTrack(play.queue[play.index], 'playing', 0);
-    audio.play()?.catch(fail);
-  }
-
-  private reportTrack(track: PlexItem, state: 'playing' | 'paused' | 'stopped', timeMs: number) {
-    this.report(track, state, timeMs);
-  }
-
-  protected toggleLocal() {
-    const play = this.local();
-    if (!play || !this.audio) return;
-    if (play.paused) this.audio.play()?.catch(() => this.stopLocal());
-    else this.audio.pause();
-    this.reportTrack(play.queue[play.index], play.paused ? 'playing' : 'paused', this.audio.currentTime * 1000);
-    this.local.set({ ...play, paused: !play.paused });
-  }
-
-  /** Stops the music; `report` is false for a track that just ended and has told Plex already. */
-  protected stopLocal(report = true) {
-    const audio = this.audio;
-    const play = this.local();
-    if (report && play && audio) this.reportTrack(play.queue[play.index], 'stopped', audio.currentTime * 1000);
-    if (audio) {
-      audio.onended = audio.onerror = null;
-      audio.pause();
-      audio.removeAttribute('src');
-    }
-    this.local.set(null);
+    this.player.start({ queue: tracks, index, paused: false, album });
   }
 
   protected async togglePause(playing: AirPlayPlayback) {
