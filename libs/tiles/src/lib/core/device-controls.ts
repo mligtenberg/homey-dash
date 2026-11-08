@@ -18,6 +18,7 @@ import {
   LucideVolumeX,
 } from '@lucide/angular';
 import { ChannelKeys, clamp, RemoteKeys, VolumeKeys } from './device-view';
+import { SliderDrag } from './slider-drag';
 
 /** The states a cover without a position moves between, as segments to press. */
 export const COVER_STATES = [
@@ -40,32 +41,16 @@ const REPEAT_MS = 150;
  */
 export class CapabilityDriver {
   /** Which slider a finger is on and where it is, until Homey has the new value. */
-  readonly dragging = signal<{ id: string; value: number } | null>(null);
+  readonly drag = new SliderDrag();
 
   constructor(readonly set: (capability: string, value: CapabilityValue) => Promise<unknown>) {}
 
   percent(dim: HomeyCapability) {
-    const drag = this.dragging();
-    return Math.round((drag?.id === dim.id ? drag.value : (dim.value as number) || 0) * 100);
+    return Math.round(this.drag.shown(dim.id, (dim.value as number) || 0) * 100);
   }
 
-  slideStart(event: PointerEvent, dim: HomeyCapability) {
-    (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
-    this.slideMove(event, dim, true);
-  }
-
-  slideMove(event: PointerEvent, dim: HomeyCapability, starting = false) {
-    if (!starting && this.dragging()?.id !== dim.id) return;
-    const track = (event.currentTarget as Element).getBoundingClientRect();
-    this.dragging.set({ id: dim.id, value: clamp((event.clientX - track.left) / (track.width || 1), 0, 1) });
-  }
-
-  async slideEnd(event: PointerEvent, dim: HomeyCapability) {
-    this.slideMove(event, dim);
-    const drag = this.dragging();
-    if (drag?.id !== dim.id) return;
-    await this.set(dim.id, Math.round(drag.value * 100) / 100);
-    this.dragging.set(null);
+  slideEnd(event: PointerEvent, dim: HomeyCapability) {
+    return this.drag.end(event, dim.id, (value) => this.set(dim.id, Math.round(value * 100) / 100));
   }
 
   nudge(event: Event, dim: HomeyCapability, by: number) {
@@ -126,10 +111,10 @@ export class CapabilityDriver {
       [attr.aria-valuenow]="driver().percent(capability())"
       [attr.aria-disabled]="disabled() || null"
       [attr.tabindex]="disabled() ? null : 0"
-      (pointerdown)="driver().slideStart($event, capability())"
-      (pointermove)="driver().slideMove($event, capability())"
+      (pointerdown)="driver().drag.start($event, capability().id)"
+      (pointermove)="driver().drag.move($event, capability().id)"
       (pointerup)="driver().slideEnd($event, capability())"
-      (pointercancel)="driver().dragging.set(null)"
+      (pointercancel)="driver().drag.cancel()"
       (keydown.arrowleft)="driver().nudge($event, capability(), -0.1)"
       (keydown.arrowright)="driver().nudge($event, capability(), 0.1)"
     >

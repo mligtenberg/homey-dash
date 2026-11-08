@@ -27,6 +27,7 @@ import {
 } from '@lucide/angular';
 import { albumArtUrl, isPlaying, nowPlaying } from '../core/device-look';
 import { brokenImages, loadableArt } from '../core/loadable-art';
+import { SliderDrag } from '../core/slider-drag';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { TileData, TileSettings } from '../tile-data';
@@ -185,12 +186,6 @@ interface Room {
   device: HomeyDevice | undefined;
 }
 
-/** What a drag on one of the sliders is at: a room's own volume, or `group` for the whole group's. */
-interface Drag {
-  key: string;
-  value: number;
-}
-
 /**
  * Sonos multiroom on one tile (several speakers, picked in Management): what the lead room plays over its album art, with
  * buttons to skip back, play or pause, and skip on, and one volume for the whole group. A press opens the detail view
@@ -289,10 +284,10 @@ interface Drag {
             "
             [attr.aria-valuenow]="percent('group', lead.volume)"
             tabindex="0"
-            (pointerdown)="slideStart($event, 'group')"
-            (pointermove)="slideMove($event, 'group')"
+            (pointerdown)="drag.start($event, 'group')"
+            (pointermove)="drag.move($event, 'group')"
             (pointerup)="slideEnd($event, 'group', lead)"
-            (pointercancel)="drag.set(null)"
+            (pointercancel)="drag.cancel()"
             (keydown.arrowleft)="nudge($event, lead, -0.05, true)"
             (keydown.arrowright)="nudge($event, lead, 0.05, true)"
           >
@@ -327,10 +322,10 @@ interface Drag {
                 [attr.aria-label]="'Volume of ' + room.name"
                 [attr.aria-valuenow]="percent(room.id, room.volume)"
                 tabindex="0"
-                (pointerdown)="slideStart($event, room.id)"
-                (pointermove)="slideMove($event, room.id)"
+                (pointerdown)="drag.start($event, room.id)"
+                (pointermove)="drag.move($event, room.id)"
                 (pointerup)="slideEnd($event, room.id, room)"
-                (pointercancel)="drag.set(null)"
+                (pointercancel)="drag.cancel()"
                 (keydown.arrowleft)="nudge($event, room, -0.05, false)"
                 (keydown.arrowright)="nudge($event, room, 0.05, false)"
               >
@@ -428,7 +423,8 @@ export class SonosTile extends TileView<SonosTileSettings> {
   /** The room chosen on an unlocked tile; until then the tile follows what plays. */
   protected readonly picked = signal<string | null>(null);
 
-  protected readonly drag = signal<Drag | null>(null);
+  /** A drag on one of the volume sliders: a room's own, or `group` for the whole group's. */
+  protected readonly drag = new SliderDrag();
   /** Rooms whose group change Homey is still working on, by the membership they are waiting for. */
   protected readonly joining = signal<ReadonlyMap<string, boolean>>(new Map());
 
@@ -554,8 +550,7 @@ export class SonosTile extends TileView<SonosTileSettings> {
   }
 
   protected percent(key: string, volume: number) {
-    const drag = this.drag();
-    return Math.round((drag?.key === key ? drag.value : volume) * 100);
+    return Math.round(this.drag.shown(key, volume) * 100);
   }
 
   protected toggle(room: Room) {
@@ -616,29 +611,8 @@ export class SonosTile extends TileView<SonosTileSettings> {
     );
   }
 
-  protected slideStart(event: PointerEvent, key: string) {
-    (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
-    this.slideMove(event, key, true);
-  }
-
-  protected slideMove(event: PointerEvent, key: string, starting = false) {
-    if (!starting && this.drag()?.key !== key) return;
-    const track = (event.currentTarget as Element).getBoundingClientRect();
-    this.drag.set({
-      key,
-      value: Math.min(
-        1,
-        Math.max(0, (event.clientX - track.left) / (track.width || 1)),
-      ),
-    });
-  }
-
-  protected async slideEnd(event: PointerEvent, key: string, room: Room) {
-    this.slideMove(event, key);
-    const drag = this.drag();
-    if (drag?.key !== key) return;
-    await this.setVolume(room, drag.value, key === 'group');
-    this.drag.set(null);
+  protected slideEnd(event: PointerEvent, key: string, room: Room) {
+    return this.drag.end(event, key, (value) => this.setVolume(room, value, key === 'group'));
   }
 
   protected nudge(event: Event, room: Room, by: number, wholeGroup: boolean) {
