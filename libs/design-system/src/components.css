@@ -671,6 +671,9 @@
 a.hd-btn { text-decoration: none; }
 .hd-btn:active { transform: scale(.97); }
 .hd-btn--sm { padding: 4px 8px; font-size: 12px; }
+/* A button showing only an icon, as tall as a text button beside it. */
+.hd-btn--icon { display: inline-flex; align-items: center; justify-content: center; padding-inline: 10px; }
+.hd-btn--icon svg { width: 18px; height: 18px; flex: none; }
 .hd-btn--primary { background: var(--brand); color: var(--on-brand); border-color: transparent; }
 .hd-btn--danger { background: none; border: 0; padding-inline: 0; color: var(--danger); }
 .hd-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }

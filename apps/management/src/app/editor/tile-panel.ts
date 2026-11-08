@@ -22,7 +22,7 @@ import { PlexTargetField } from './plex-target-field';
 import { SizePicker } from './size-picker';
 import { TargetPicker } from './target-picker';
 import { allOptions, buildTree, TargetNode } from './target-tree';
-import { moved, removedAt } from '@homey-dash/design-system';
+import { moved, removedAt, ReorderButtons } from '@homey-dash/design-system';
 
 /**
  * Settings of the selected tile: its target, its kind's own settings, label and size. A tile a logic tile holds is
@@ -30,7 +30,7 @@ import { moved, removedAt } from '@homey-dash/design-system';
  */
 @Component({
   selector: 'hd-tile-panel',
-  imports: [PhotoSetField, PlexTargetField, SizePicker, TargetPicker],
+  imports: [PhotoSetField, PlexTargetField, SizePicker, TargetPicker, ReorderButtons],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h2 class="hd-section-title">{{ kind()?.label ?? 'Unknown tile' }}</h2>
@@ -67,9 +67,7 @@ import { moved, removedAt } from '@homey-dash/design-system';
           @for (picked of pickedTargets(); track picked.id; let i = $index, last = $last) {
             <div class="picked">
               <span class="picked__name" [class.missing]="!picked.found">{{ picked.label }}</span>
-              <button type="button" class="hd-btn" [attr.aria-label]="'Move ' + picked.label + ' up'" [disabled]="i === 0" (click)="moveTarget(i, -1)">↑</button>
-              <button type="button" class="hd-btn" [attr.aria-label]="'Move ' + picked.label + ' down'" [disabled]="last" (click)="moveTarget(i, 1)">↓</button>
-              <button type="button" class="hd-btn" [attr.aria-label]="'Remove ' + picked.label" (click)="removeTarget(i)">✕</button>
+              <hd-reorder-buttons [label]="picked.label" [first]="i === 0" [last]="last" (moved)="moveTarget(i, $event)" (removed)="removeTarget(i)" />
             </div>
           }
           <hd-target-picker
@@ -131,7 +129,6 @@ import { moved, removedAt } from '@homey-dash/design-system';
     .picked { display: flex; align-items: center; gap: var(--space-1); }
     .picked__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .picked__name.missing { color: var(--danger); }
-    .picked .hd-btn { padding-inline: 10px; }
   `,
 })
 export class TilePanel {

@@ -1,10 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { DisplayContext } from './display-context';
 import { DisplaysStore } from './displays-store';
+import { ReorderButtons } from '@homey-dash/design-system';
 
 /** The dashboards a display offers, in the order of its tape. It starts on the first. */
 @Component({
   selector: 'hd-display-dashboards-tab',
+  imports: [ReorderButtons],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
@@ -17,8 +19,7 @@ import { DisplaysStore } from './displays-store';
               <input type="checkbox" checked (change)="store.offer(display, id, false)" />
               {{ store.dashboardName(id) }}
             </label>
-            <button type="button" class="hd-btn" [attr.aria-label]="'Move ' + store.dashboardName(id) + ' up'" [disabled]="first" (click)="store.moveDashboard(display, i, -1)">↑</button>
-            <button type="button" class="hd-btn" [attr.aria-label]="'Move ' + store.dashboardName(id) + ' down'" [disabled]="last" (click)="store.moveDashboard(display, i, 1)">↓</button>
+            <hd-reorder-buttons [label]="store.dashboardName(id)" [first]="first" [last]="last" [removable]="false" (moved)="store.moveDashboard(display, i, $event)" />
           </div>
         }
         @for (option of store.offerable(display); track option.id) {
@@ -39,7 +40,6 @@ import { DisplaysStore } from './displays-store';
     .dashboards legend { padding: 0; margin-bottom: var(--space-2); }
     .entry { display: flex; align-items: center; gap: var(--space-1); }
     .entry .hd-check { min-width: 180px; }
-    .entry .hd-btn { padding-inline: 10px; }
   `,
 })
 export class DisplayDashboardsTab {

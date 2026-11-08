@@ -6,11 +6,12 @@ import { describeRule } from '../editor/rule-text';
 import { SignalCatalogue } from '../editor/signal-catalogue';
 import { DisplayContext } from './display-context';
 import { DisplaysStore } from './displays-store';
+import { ReorderButtons } from '@homey-dash/design-system';
 
 /** What a display does when left alone: the first idle rule whose rule holds decides what it shows. */
 @Component({
   selector: 'hd-display-idle-tab',
-  imports: [RuleEditor, RouterLink],
+  imports: [RuleEditor, RouterLink, ReorderButtons],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
@@ -82,9 +83,7 @@ import { DisplaysStore } from './displays-store';
               <button type="button" class="rule" [attr.aria-expanded]="isOpen(display, i)" (click)="toggleRule(display, i)">
                 {{ describe(idle.rule) }}
               </button>
-              <button type="button" class="hd-btn" [attr.aria-label]="'Move rule ' + (i + 1) + ' up'" [disabled]="i === 0" (click)="move(display, i, -1)">↑</button>
-              <button type="button" class="hd-btn" [attr.aria-label]="'Move rule ' + (i + 1) + ' down'" [disabled]="last" (click)="move(display, i, 1)">↓</button>
-              <button type="button" class="hd-btn" [attr.aria-label]="'Remove rule ' + (i + 1)" (click)="remove(display, i)">✕</button>
+              <hd-reorder-buttons [label]="'rule ' + (i + 1)" [first]="i === 0" [last]="last" (moved)="move(display, i, $event)" (removed)="remove(display, i)" />
             </div>
             @if (isOpen(display, i)) {
               <hd-rule-editor class="editor" [rule]="idle.rule" (changed)="store.setIdleRule(display, i, $event)" />
@@ -100,7 +99,6 @@ import { DisplaysStore } from './displays-store';
     .idle { display: flex; flex-direction: column; gap: var(--space-2); }
     .entry { display: flex; align-items: center; gap: var(--space-1); }
     .entry .hd-select { flex: 0 1 200px; min-width: 0; }
-    .entry .hd-btn { padding-inline: 10px; }
     .rule {
       flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
       color: var(--ink-muted); font: inherit; font-size: 13px; text-align: left; cursor: pointer;

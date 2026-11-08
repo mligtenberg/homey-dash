@@ -12,7 +12,7 @@ import {
 } from '@homey-dash/tiles';
 import { describeRule } from './rule-text';
 import { SignalCatalogue } from './signal-catalogue';
-import { moved, removedAt } from '@homey-dash/design-system';
+import { moved, RemoveButton, removedAt, ReorderButtons } from '@homey-dash/design-system';
 
 /** Which of a logic tile's tiles is open in the panel: an entry's index, or its fallback. */
 export type OpenEntry = number | 'fallback';
@@ -23,6 +23,7 @@ export type OpenEntry = number | 'fallback';
  */
 @Component({
   selector: 'hd-logic-panel',
+  imports: [ReorderButtons, RemoveButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="hd-field">
@@ -34,9 +35,7 @@ export type OpenEntry = number | 'fallback';
             <span class="entry__name" [class.missing]="!find(entry.tile)">{{ i + 1 }}. {{ name(entry.tile) }}</span>
             <span class="entry__rule">{{ describe(entry.rule) }}</span>
           </button>
-          <button type="button" class="hd-btn" [attr.aria-label]="'Move ' + name(entry.tile) + ' up'" [disabled]="i === 0" (click)="move(i, -1)">↑</button>
-          <button type="button" class="hd-btn" [attr.aria-label]="'Move ' + name(entry.tile) + ' down'" [disabled]="last" (click)="move(i, 1)">↓</button>
-          <button type="button" class="hd-btn" [attr.aria-label]="'Remove ' + name(entry.tile)" (click)="remove(i)">✕</button>
+          <hd-reorder-buttons [label]="name(entry.tile)" [first]="i === 0" [last]="last" (moved)="move(i, $event)" (removed)="remove(i)" />
         </div>
       }
       <select class="hd-select" aria-label="Add a tile" (change)="add($any($event.target))">
@@ -55,7 +54,7 @@ export type OpenEntry = number | 'fallback';
             <span class="entry__name" [class.missing]="!find(fallback)">{{ name(fallback) }}</span>
             <span class="entry__rule">When no rule holds</span>
           </button>
-          <button type="button" class="hd-btn" aria-label="Remove the fallback" (click)="patch({ fallback: null })">✕</button>
+          <hd-remove-button label="the fallback" (removed)="patch({ fallback: null })" />
         </div>
       } @else {
         <p class="hd-hint">Without one, it shows nothing when no rule holds.</p>
@@ -89,7 +88,6 @@ export type OpenEntry = number | 'fallback';
   styles: `
     :host { display: flex; flex-direction: column; gap: var(--space-4); }
     .entry { display: flex; align-items: center; gap: var(--space-1); }
-    .entry .hd-btn { padding-inline: 10px; }
     .entry__open {
       flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
       padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: inherit;

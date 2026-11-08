@@ -3,6 +3,7 @@ import { LOCK_SPOTS, LockSpot } from '@homey-dash/api-client';
 import { SignalPicker } from '../editor/signal-picker';
 import { DisplayContext } from './display-context';
 import { DisplaysStore, isCapabilitySignal, MAX_LOCK_WIDGETS } from './displays-store';
+import { ReorderButtons } from '@homey-dash/design-system';
 
 const SPOT_NAMES: Record<LockSpot, string> = {
   'top-left': 'Top left',
@@ -15,7 +16,7 @@ const SPOT_NAMES: Record<LockSpot, string> = {
 /** The widgets a display's lock screen shows over a photo set or colour while an idle rule plays it. */
 @Component({
   selector: 'hd-display-lock-tab',
-  imports: [SignalPicker],
+  imports: [SignalPicker, ReorderButtons],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
@@ -44,9 +45,7 @@ const SPOT_NAMES: Record<LockSpot, string> = {
             } @else {
               <span class="spacer"></span>
             }
-            <button type="button" class="hd-btn" [attr.aria-label]="'Move widget ' + (i + 1) + ' up'" [disabled]="i === 0" (click)="store.moveLock(display, i, -1)">↑</button>
-            <button type="button" class="hd-btn" [attr.aria-label]="'Move widget ' + (i + 1) + ' down'" [disabled]="last" (click)="store.moveLock(display, i, 1)">↓</button>
-            <button type="button" class="hd-btn" [attr.aria-label]="'Remove widget ' + (i + 1)" (click)="store.removeLock(display, i)">✕</button>
+            <hd-reorder-buttons [label]="'widget ' + (i + 1)" [first]="i === 0" [last]="last" (moved)="store.moveLock(display, i, $event)" (removed)="store.removeLock(display, i)" />
           </div>
         }
         <button type="button" class="hd-btn lock__add" [disabled]="display.lockWidgets.length >= maxLock" (click)="store.addLock(display)">Add a widget</button>
@@ -57,7 +56,6 @@ const SPOT_NAMES: Record<LockSpot, string> = {
     .lock { display: flex; flex-direction: column; gap: var(--space-2); }
     .entry { display: flex; align-items: center; gap: var(--space-1); }
     .entry .hd-select { flex: 0 1 170px; min-width: 0; }
-    .entry .hd-btn { padding-inline: 10px; }
     .signal, .spacer { flex: 1 1 0; min-width: 0; display: block; }
     .lock__add { align-self: flex-start; }
   `,
