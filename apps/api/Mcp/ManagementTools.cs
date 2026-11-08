@@ -29,7 +29,7 @@ public sealed class ManagementTools(
     // Arguments and results read and write dashboards as the API does. The SDK needs a resolver set explicitly.
     public static JsonSerializerOptions Json { get; } = new(Dashboard.Json) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() };
 
-    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts, PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts, WEATHER_TILES in libs/tiles/src/lib/weather/weather-tiles.ts, SONOS_TILES in libs/tiles/src/lib/sonos/sonos-tiles.ts and
+    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts, PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts, WEATHER_TILES in libs/tiles/src/lib/weather/weather-tiles.ts, TIME_TILES in libs/tiles/src/lib/time/time-tiles.ts, SONOS_TILES in libs/tiles/src/lib/sonos/sonos-tiles.ts and
     // LOGIC_TILES in libs/tiles/src/lib/logic/logic-tile.ts; the API only looks inside a logic tile's rules (ADR-0003, ADR-0010).
     private const string TileKinds = """
         Tile kinds, with the sizes each supports and the target type its settings.target takes:
@@ -53,6 +53,11 @@ public sealed class ManagementTools(
           full-large the coming days. A press opens the full forecast. settings.target is "weather:here" for where a Homey is
           (settings.account picks which), or "weather:place" for a place of its own in settings.place,
           { "name", "latitude", "longitude" } in degrees.
+        - "clock" (small, wide, full, large, full-large): the time, with the date from wide up; settings.target is null.
+          Optional settings.style is digital (default) or analog, settings.hours 12 or 24 (absent: the display's language),
+          settings.seconds true to show seconds, settings.showDate false to hide the date.
+        - "date" (small, wide, full, large, full-large): today's date, and from large the month as a calendar with today
+          marked; settings.target is null; optional settings.weekNumbers true numbers the weeks of the calendar.
         - "sonos" (small, wide, full, large, full-large, full-tall): Sonos multiroom; settings.targets lists the ids of the speaker
           devices in order and settings.target is null. The tile shows what the first room that plays is playing with play/pause
           (and skip, from wide up) and one volume for its group; a press opens every room with its own volume and a button that
