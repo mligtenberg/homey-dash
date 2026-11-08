@@ -1,5 +1,22 @@
-import { afterNextRender, ChangeDetectionStrategy, Component, effect, ElementRef, inject, Injector, input, signal, untracked } from '@angular/core';
-import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner } from '@homey-dash/api-client';
+import {
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  ElementRef,
+  inject,
+  Injector,
+  input,
+  signal,
+  untracked,
+} from '@angular/core';
+import {
+  apiProblem,
+  fieldErrors,
+  ImmichAccount,
+  ImmichAccountApi,
+  ImmichPartner,
+} from '@homey-dash/api-client';
 
 /**
  * The people who share their photos with an Immich account through partner sharing, as Immich says when it opens.
@@ -11,14 +28,22 @@ import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (partners()?.length) {
-      <div class="partners" [attr.aria-label]="'Partners of ' + account().name" role="group">
+      <div
+        class="partners"
+        [attr.aria-label]="'Partners of ' + account().name"
+        role="group"
+      >
         <span class="hd-field__label">Shared by partners</span>
         @for (partner of partners(); track partner.id) {
           <div class="partner">
             @if (adding() === partner.id) {
               <form class="form" (submit)="save($event, partner, apiKey.value)">
                 <div class="hd-field">
-                  <label class="hd-field__label" [for]="'partner-key-' + partner.id">API key of {{ partner.name }}</label>
+                  <label
+                    class="hd-field__label"
+                    [for]="'partner-key-' + partner.id"
+                    >API key of {{ partner.name }}</label
+                  >
                   <input
                     #apiKey
                     class="hd-input"
@@ -28,31 +53,64 @@ import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner
                     [attr.aria-invalid]="!!keyError()"
                     [attr.aria-describedby]="'partner-key-hint-' + partner.id"
                   />
-                  <span [id]="'partner-key-hint-' + partner.id" [class]="keyError() ? 'hd-error hd-small' : 'hd-hint'">
+                  <span
+                    [id]="'partner-key-hint-' + partner.id"
+                    [class]="keyError() ? 'hd-error hd-small' : 'hd-hint'"
+                  >
                     {{
                       keyError() ??
-                        'Make one in Immich while signed in as ' + partner.name + ', with user.read, asset.read, asset.edit.get, asset.edit.create and asset.edit.delete.'
+                        'Make one in Immich while signed in as ' +
+                          partner.name +
+                          ', with user.read, asset.read, asset.edit.get, asset.edit.create and asset.edit.delete.'
                     }}
                   </span>
                 </div>
                 <div class="hd-actions">
-                  <button class="hd-btn hd-btn--primary" type="submit" [disabled]="saving()">
+                  <button
+                    class="hd-btn hd-btn--primary"
+                    type="submit"
+                    [disabled]="saving()"
+                  >
                     {{ saving() ? 'Checking with Immich…' : 'Save key' }}
                   </button>
-                  <button class="hd-btn" type="button" (click)="add(null)">Cancel</button>
+                  <button class="hd-btn" type="button" (click)="add(null)">
+                    Cancel
+                  </button>
                 </div>
               </form>
             } @else {
               <div class="hd-account__info">
                 <strong>{{ partner.name }}</strong>
-                <span class="hd-muted">{{ partner.hasKey ? 'Displays can rotate their photos' : 'Their photos can\\'t be rotated without a key of theirs' }}</span>
+                <span class="hd-muted">{{
+                  partner.hasKey
+                    ? 'Displays can rotate their photos'
+                    : "Their photos can't be rotated without a key of theirs"
+                }}</span>
               </div>
               <div class="hd-actions">
                 @if (partner.hasKey) {
-                  <button class="hd-btn" type="button" (click)="add(partner.id)">Change key</button>
-                  <button class="hd-btn hd-btn--danger" type="button" (click)="removeKey(partner)">Remove key</button>
+                  <button
+                    class="hd-btn"
+                    type="button"
+                    (click)="add(partner.id)"
+                  >
+                    Change key
+                  </button>
+                  <button
+                    class="hd-btn hd-btn--danger"
+                    type="button"
+                    (click)="removeKey(partner)"
+                  >
+                    Remove key
+                  </button>
                 } @else {
-                  <button class="hd-btn" type="button" (click)="add(partner.id)">Add API key</button>
+                  <button
+                    class="hd-btn"
+                    type="button"
+                    (click)="add(partner.id)"
+                  >
+                    Add API key
+                  </button>
                 }
               </div>
             }
@@ -65,11 +123,33 @@ import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner
     }
   `,
   styles: `
-    :host { display: contents; }
-    .partners { display: flex; flex-direction: column; gap: var(--space-3); flex-basis: 100%; padding-left: var(--space-4); border-left: 2px solid var(--line); }
-    .partner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
-    .form { display: flex; flex-direction: column; gap: var(--space-3); flex: 1; }
-    .hd-muted[role='alert'] { flex-basis: 100%; }
+    :host {
+      display: contents;
+    }
+    .partners {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      flex-basis: 100%;
+      padding-left: var(--space-4);
+      border-left: 2px solid var(--line);
+    }
+    .partner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+    }
+    .form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      flex: 1;
+    }
+    .hd-muted[role='alert'] {
+      flex-basis: 100%;
+    }
   `,
 })
 export class ImmichPartners {
@@ -87,14 +167,20 @@ export class ImmichPartners {
   protected readonly saving = signal(false);
 
   constructor() {
-    effect(() => {
+    // A load for an account that is no longer shown is cancelled, so it can't land on the one that is.
+    effect((onCleanup) => {
       const id = this.account().id;
-      untracked(() =>
+      const loading = untracked(() =>
         this.api.partners(id).subscribe({
           next: (partners) => this.done(partners),
-          error: (e: unknown) => this.fail(e, 'Could not ask Immich who shares photos with this account.'),
+          error: (e: unknown) =>
+            this.fail(
+              e,
+              'Could not ask Immich who shares photos with this account.',
+            ),
         }),
       );
+      onCleanup(() => loading.unsubscribe());
     });
   }
 
@@ -103,7 +189,11 @@ export class ImmichPartners {
     this.adding.set(partnerId);
     this.keyError.set(null);
     this.error.set(null);
-    if (partnerId) afterNextRender(() => this.host.nativeElement.querySelector('input')?.focus(), { injector: this.injector });
+    if (partnerId)
+      afterNextRender(
+        () => this.host.nativeElement.querySelector('input')?.focus(),
+        { injector: this.injector },
+      );
   }
 
   protected save(event: Event, partner: ImmichPartner, apiKey: string) {
@@ -123,7 +213,8 @@ export class ImmichPartners {
   protected removeKey(partner: ImmichPartner) {
     this.api.removePartnerKey(this.account().id, partner.id).subscribe({
       next: (partners) => this.done(partners),
-      error: (e: unknown) => this.fail(e, 'Could not remove the key. Try again.'),
+      error: (e: unknown) =>
+        this.fail(e, 'Could not remove the key. Try again.'),
     });
   }
 
