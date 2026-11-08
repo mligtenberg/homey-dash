@@ -33,9 +33,9 @@ interface MusicItem {
       />
     </label>
     @if (error()) {
-      <div class="hd-sonos__note">{{ error() }}</div>
+      <div class="hd-note">{{ error() }}</div>
     } @else if (items() === null) {
-      <div class="hd-sonos__note">Loading…</div>
+      <div class="hd-note">Loading…</div>
     } @else {
       <div class="hd-sonos__list">
         @for (item of shown(); track item.kind + item.music.name) {
@@ -74,7 +74,7 @@ interface MusicItem {
             </span>
           </button>
         } @empty {
-          <div class="hd-sonos__note">
+          <div class="hd-note">
             {{ query().trim() ? 'No matches' : 'Nothing here yet' }}
           </div>
         }

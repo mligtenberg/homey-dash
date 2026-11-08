@@ -213,15 +213,15 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
                     </button>
                   }
                   @case ('searching') {
-                    <div class="hd-plex-recent__cast-note">Looking for Apple TVs…</div>
+                    <div class="hd-details__label">Looking for Apple TVs…</div>
                   }
                   @case ('choosing') {
-                    <div class="hd-plex-recent__cast-note">Play on</div>
+                    <div class="hd-details__label">Play on</div>
                     <div class="hd-plex-recent__receivers">
                       @for (d of c.devices; track d.id) {
                         <button type="button" class="hd-plex-recent__receiver" (click)="playOn(item, d)">{{ d.name }}</button>
                       } @empty {
-                        <div class="hd-plex-recent__cast-note">No paired Apple TV. Pair one in Management under Accounts.</div>
+                        <div class="hd-details__label">No paired Apple TV. Pair one in Management under Accounts.</div>
                       }
                     </div>
                   }
@@ -240,11 +240,11 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
             <div class="hd-plex-recent__children">
               <h4 class="hd-plex-recent__section">{{ childrenTitle(item) }}</h4>
               @if (under.error) {
-                <div class="hd-plex-recent__empty" role="alert">{{ under.error }}</div>
+                <div class="hd-note hd-plex-recent__empty" role="alert">{{ under.error }}</div>
               } @else if (!under.items) {
-                <div class="hd-plex-recent__empty">Loading…</div>
+                <div class="hd-note hd-plex-recent__empty">Loading…</div>
               } @else if (!under.items.length) {
-                <div class="hd-plex-recent__empty">Nothing here</div>
+                <div class="hd-note hd-plex-recent__empty">Nothing here</div>
               } @else if (item.kind === 'show') {
                 <div class="hd-plex-recent__seasons">
                   @for (child of under.items; track child.id) {
@@ -330,7 +330,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
               }
             </button>
           } @empty {
-            <div class="hd-plex-recent__empty">
+            <div class="hd-note hd-plex-recent__empty">
               {{ searching() ? 'Searching…' : searchError() || (results() ? 'Nothing found for “' + query().trim() + '”' : emptyText()) }}
             </div>
           }

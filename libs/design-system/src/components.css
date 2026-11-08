@@ -164,10 +164,10 @@
 
 /* Values */
 .hd-value { font-weight: 800; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.hd-value--xl { font-size: calc(var(--cell) * .5); font-weight: 700; }
-.hd-value--l { font-size: calc(var(--cell) * .42); }
-.hd-value--m { font-size: calc(var(--cell) * .24); }
-.hd-unit { font-size: .45em; font-weight: 600; letter-spacing: 0; color: var(--ink-muted); margin-left: .08em; }
+.hd-value--xl { font-size: calc(var(--cell) * var(--value-scale-xl)); font-weight: 700; }
+.hd-value--l { font-size: calc(var(--cell) * var(--value-scale-l)); }
+.hd-value--m { font-size: calc(var(--cell) * var(--value-scale-m)); }
+.hd-unit { font-size: var(--unit-scale); font-weight: 600; letter-spacing: 0; color: var(--ink-muted); margin-left: .08em; }
 
 .hd-chip { display: inline-flex; align-items: center; gap: .35em; font-size: calc(var(--cell) * .09); font-weight: 700; color: var(--k-ink); margin-top: .2em; }
 .hd-chip::before { content: ""; width: .6em; height: .6em; border-radius: 50%; background: currentColor; }
@@ -300,8 +300,17 @@
 }
 .hd-slider__fill { position: absolute; inset: 0 auto 0 0; background: var(--k-ink); border-radius: inherit; }
 
-.hd-progress { height: calc(var(--cell) * .06); border-radius: var(--radius-pill); background: var(--ground); overflow: hidden; }
-.hd-progress__bar { display: block; height: 100%; background: var(--k-ink); border-radius: inherit; }
+/*
+ * A thin bar that fills with progress. Set --progress-height (a multiple of --cell), --progress-track, --progress-fill and
+ * --progress-radius on it, or on what holds it, to restyle it.
+ */
+.hd-progress {
+  height: calc(var(--cell) * var(--progress-height, .07));
+  border-radius: var(--progress-radius, var(--radius-pill));
+  background: var(--progress-track, color-mix(in oklab, var(--k-ink) 18%, transparent));
+  overflow: hidden;
+}
+.hd-progress__bar { display: block; height: 100%; border-radius: inherit; background: var(--progress-fill, var(--k-ink)); }
 
 /* Statistic */
 .hd-stat { justify-content: flex-start; gap: calc(var(--cell) * .04); }
@@ -383,6 +392,8 @@
 .hd-tile.is-error .hd-details__state { color: var(--danger); }
 .hd-details__row { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--cell) * .1); }
 .hd-details__label { font-size: calc(var(--cell) * .1); line-height: 1.2; font-weight: 700; color: var(--ink-muted); }
+/* A quiet line in a tile's detail view: loading, an error, nothing found. Set --note-size or --note-color to restyle it. */
+.hd-note { padding-block: calc(var(--cell) * .05); font-size: var(--note-size, calc(var(--cell) * .11)); color: var(--note-color, var(--ink-muted)); }
 .hd-details__readings { display: grid; grid-template-columns: 1fr auto; gap: calc(var(--cell) * .06) calc(var(--cell) * .12); margin: 0; }
 .hd-details__readings dd { margin: 0; font-size: calc(var(--cell) * .12); font-weight: 700; font-variant-numeric: tabular-nums; text-align: end; }
 .hd-details .hd-chart { flex: none; height: calc(var(--cell) * 1.8); }
@@ -457,7 +468,6 @@
 .hd-dev__hero { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--cell) * .16); text-align: center; min-width: 0; }
 .hd-dev__controls { display: flex; flex-direction: column; gap: calc(var(--cell) * .22); min-width: 0; }
 .hd-dev__big { font: 800 calc(var(--cell) * .5)/1 var(--font-sans); letter-spacing: -.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.hd-dev__big .hd-unit { font-size: .45em; }
 .hd-dev__glyph { width: 46%; height: 46%; color: var(--k-ink); stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; fill: none; }
 .hd-dev__glyph :is(path, rect, circle, ellipse, polygon) { fill: currentColor; fill-opacity: calc(.08 + var(--level, 0) * .3); }
 
@@ -507,8 +517,6 @@
 .hd-dev__titles { display: flex; flex-direction: column; gap: calc(var(--cell) * .06); }
 .hd-dev__titles .hd-dev__big { font-size: calc(var(--cell) * .3); line-height: 1.1; }
 .hd-dev__progress { display: flex; flex-direction: column; gap: calc(var(--cell) * .06); width: min(100%, calc(var(--cell) * 3.2)); margin-top: calc(var(--cell) * .1); align-self: center; }
-.hd-dev__progress-bar { height: calc(var(--cell) * .07); border-radius: var(--radius-pill); background: color-mix(in oklab, var(--k-ink) 18%, transparent); overflow: hidden; }
-.hd-dev__progress-bar > div { height: 100%; border-radius: inherit; background: var(--k-ink); }
 .hd-dev__progress-times { display: flex; justify-content: space-between; font: 700 calc(var(--cell) * .11)/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink-muted); }
 .hd-dev__artist { font-size: calc(var(--cell) * .16); font-weight: 600; color: var(--ink-muted); }
 .hd-dev__transport { display: flex; align-items: center; justify-content: center; gap: calc(var(--cell) * .3); }
@@ -765,6 +773,10 @@ a.hd-btn { text-decoration: none; }
 
 /* Text roles: secondary text, a hint under a field, and what went wrong. .hd-small makes any of them 13px. */
 .hd-muted { margin: 0; color: var(--ink-muted); }
+/* A page's empty state: a panel with a title and a line of text. Set --empty-padding to change the padding. */
+.hd-empty { padding: var(--empty-padding, var(--space-6)); }
+.hd-empty .hd-panel__title { margin-bottom: var(--space-2); }
+.hd-empty p { margin: 0; color: var(--ink-muted); }
 .hd-hint { margin: 0; color: var(--ink-muted); font-size: 13px; }
 .hd-error { margin: 0; color: var(--danger); font-weight: 700; }
 .hd-small { font-size: 13px; }
@@ -1019,9 +1031,9 @@ a.hd-btn { text-decoration: none; }
 .hd-plex.has-art .hd-round-btn { color: #fff; }
 .hd-plex.is-feedback.has-art, .hd-plex.is-error.has-art { background: #111; }
 .hd-plex.is-error .hd-round-btns { outline: 2px solid var(--danger); }
-.hd-plex__progress { position: absolute; inset: auto 0 0 0; z-index: 2; height: calc(var(--cell) * .03); background: rgb(255 255 255 / .2); }
-.hd-plex__progress--inline { position: relative; inset: auto; margin-top: calc(var(--cell) * .04); border-radius: 999px; overflow: hidden; background: var(--line); }
-.hd-plex__progress-fill { height: 100%; background: var(--brand); transition: width 1s linear; }
+.hd-plex__progress { position: absolute; inset: auto 0 0 0; z-index: 2; --progress-height: .03; --progress-track: rgb(255 255 255 / .2); --progress-fill: var(--brand); --progress-radius: 0; }
+.hd-plex__progress--inline { position: relative; inset: auto; margin-top: calc(var(--cell) * .04); --progress-track: var(--line); --progress-radius: var(--radius-pill); }
+.hd-plex__progress-fill { transition: width 1s linear; }
 .hd-plex-recent__grid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--cols, 1), 1fr); gap: 2px; }
 .hd-plex-recent__grid[data-count="2"] { --cols: 2; }
 .hd-plex-recent__grid[data-count="3"] { --cols: 3; }
@@ -1156,7 +1168,6 @@ a.hd-btn { text-decoration: none; }
 .hd-plex-recent__play:focus-visible, .hd-plex-recent__receiver:focus-visible { outline: 3px solid #e5a00d; outline-offset: 3px; }
 .hd-plex-recent__play svg, .hd-plex-recent__receiver svg { width: 1.3em; height: 1.3em; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
 .hd-plex-recent__receivers { display: flex; flex-wrap: wrap; gap: calc(var(--cell) * .08); }
-.hd-plex-recent__cast-note { font: 700 calc(var(--cell) * .1)/1.2 var(--font-sans); color: var(--ink-muted); }
 .hd-plex-recent__cast-error { flex-basis: 100%; font: 700 calc(var(--cell) * .1)/1.3 var(--font-sans); color: var(--danger); }
 .hd-plex-recent__casting {
   position: absolute; z-index: 2; top: calc(var(--cell) * .08); right: calc(var(--cell) * .08); display: grid; place-items: center;
@@ -1231,7 +1242,7 @@ a.hd-btn { text-decoration: none; }
 .hd-plex-recent__track select option { color: #1f2326; }
 .hd-plex-recent__track select:focus-visible { outline: 3px solid #e5a00d; outline-offset: 2px; }
 .hd-plex-recent__receiver:disabled { opacity: .5; cursor: default; }
-.hd-plex-recent__empty { grid-column: 1 / -1; font-size: calc(var(--cell) * .12); color: var(--ink-muted); }
+.hd-plex-recent__empty { grid-column: 1 / -1; }
 /* Now playing, full screen: a card per session with its poster, progress and a large transport. */
 .hd-plex-now__pane {
   display: grid; align-content: safe center; gap: calc(var(--cell) * .3); overflow-y: auto; scrollbar-width: none;
@@ -1256,8 +1267,7 @@ a.hd-btn { text-decoration: none; }
 .hd-plex-now__sub { font-size: calc(var(--cell) * .14); color: rgb(255 255 255 / .85); }
 .hd-plex-now__who { font-size: calc(var(--cell) * .11); font-weight: 700; color: var(--ink-muted); margin-bottom: calc(var(--cell) * .1); }
 .hd-plex-now__info .hd-plex__time { font-size: calc(var(--cell) * .11); }
-.hd-plex-now__info .hd-plex__progress-fill { background: #e5a00d; }
-.hd-plex-now__info .hd-plex__progress--inline { height: calc(var(--cell) * .05); background: rgb(255 255 255 / .16); }
+.hd-plex-now__info .hd-plex__progress--inline { --progress-height: .05; --progress-track: rgb(255 255 255 / .16); --progress-fill: #e5a00d; }
 .hd-plex-now__controls { display: flex; align-items: center; gap: calc(var(--cell) * .2); margin-top: calc(var(--cell) * .1); }
 .hd-plex-now__controls .hd-round-btn { width: calc(var(--cell) * .56); height: calc(var(--cell) * .56); }
 .hd-plex-now__controls .hd-plex-now__play { width: calc(var(--cell) * .76); height: calc(var(--cell) * .76); background: #e5a00d; color: #1f2326; }
@@ -1325,7 +1335,6 @@ a.hd-btn { text-decoration: none; }
 .hd-sonos__search svg { flex: none; width: calc(var(--cell) * .14); height: calc(var(--cell) * .14); stroke: currentColor; stroke-width: 2.5; fill: none; opacity: .7; }
 .hd-sonos__search input { flex: 1; min-width: 0; padding: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: 600 calc(var(--cell) * .12)/1.4 var(--font-sans); }
 .hd-sonos__search:focus-within { outline: 3px solid var(--k-ink); outline-offset: 2px; }
-.hd-sonos__note { font-size: calc(var(--cell) * .11); opacity: .65; padding-block: calc(var(--cell) * .05); }
 .hd-details .hd-sonos__row { margin-block: calc(var(--cell) * .06); }
 .hd-sonos[data-size="small"] .hd-sonos__head { flex: 1; flex-direction: column; align-items: stretch; justify-content: space-between; }
 .hd-sonos[data-size="small"] .hd-sonos__titles .hd-tile__name { overflow-wrap: normal; word-break: normal; -webkit-line-clamp: 1; line-clamp: 1; }

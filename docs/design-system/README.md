@@ -74,6 +74,7 @@ Use one family, Rubik, from Google Fonts: `font-sans`.
 
 - **Display type scales with the cell.** Every size is a fraction of `--cell`, and the type tokens list them at a 200px cell. Use `tile-value-xl` (0.62 × cell) for the one hero reading of a Large tile. Use `tile-value-l` and `tile-value-m` for values on Statistic and Wide tiles. Use `tile-name`, `tile-detail` and `tile-badge` for labels.
 - Set a unit at 0.45em of its value, weight 600, in `ink-muted`: `20.5°C`, `1.84 kW`, `42 min left`.
+- In the CSS the value sizes are the tokens `--value-scale-xl`, `--value-scale-l` and `--value-scale-m` (multiples of `--cell`, used by `.hd-value--xl/--l/--m`), and the unit is `--unit-scale`.
 - Numbers always use tabular figures.
 - **Management** uses fixed sizes: `page-title`, `panel-title`, `body`, `body-strong`, `label` and `overline`. Only `overline` is uppercase.
 - In Management, give a page's `h1` `.hd-page__title` (22px), a panel's heading `.hd-panel__title` (18px) and a heading within a panel `.hd-section-title` (16px). No other heading sizes.
@@ -149,6 +150,14 @@ Management pages share these classes instead of styling the same things per comp
 - **Page:** `.hd-page__header` holds the `h1.hd-page__title` and the page's actions. `.hd-page__body` (900px wide at most; `--narrow` is 640px) stacks its panels.
 - **Text:** `.hd-muted` for secondary text, `.hd-hint` for the 13px hint under a field, `.hd-error` for what went wrong, and `.hd-small` to make any of them 13px. A field's error is `.hd-error.hd-small`.
 - **Rows:** `.hd-actions` for a wrapping row of buttons. An account panel is `.hd-account`, with `__head`, and one `__item` per account whose name and details sit in `__info`.
+- **Empty state:** `.hd-empty` on a `.hd-panel` that holds a title and a line of text. Set `--empty-padding` to change its padding (24px by default).
 - **Controls:** `.hd-btn--sm` for a small button, and `.hd-color-input` for a colour input (set its width where it is used).
+
+Tiles share these classes, each with tokens you set on the element or what holds it:
+
+- **Note:** `.hd-note` is a quiet line in a tile's detail view ("Loading…", an error, nothing found). Tokens: `--note-size` and `--note-color`.
+- **Progress:** `.hd-progress` holds a `.hd-progress__bar` whose width is the progress. Tokens: `--progress-height` (a multiple of `--cell`), `--progress-track`, `--progress-fill` and `--progress-radius`. A slider is `.hd-slider`, with `--slider-height`.
+
+`<hd-confirm-inline message="…" (confirmed) (cancelled)>` replaces a Remove button with what removing does, then Remove and Cancel.
 
 `@homey-dash/design-system` also exports small helpers both apps use: `clock()`, `minuteClock()` and `timeAgo()` for times that stay current, and `moved()`, `removedAt()`, `changedAt()` and `chunk()` for editing lists.

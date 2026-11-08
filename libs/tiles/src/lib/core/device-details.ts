@@ -214,7 +214,7 @@ const LOCK_STATES = [
           }
           @if (progress) {
             <div class="hd-dev__progress" role="progressbar" aria-label="Playback" aria-valuemin="0" [attr.aria-valuemax]="progress.duration" [attr.aria-valuenow]="progress.position">
-              <div class="hd-dev__progress-bar"><div [style.width.%]="progress.fraction * 100"></div></div>
+              <div class="hd-progress"><div class="hd-progress__bar" [style.width.%]="progress.fraction * 100"></div></div>
               <div class="hd-dev__progress-times"><span>{{ progress.elapsed }}</span><span>{{ progress.total }}</span></div>
             </div>
           }

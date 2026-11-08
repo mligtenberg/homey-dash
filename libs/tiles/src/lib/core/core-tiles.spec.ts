@@ -603,7 +603,7 @@ describe('core tiles', () => {
             { class: 'speaker' },
           );
           expect(pane.querySelector('.hd-dev__progress-times')?.textContent).toBe('18:45' + '1:31:56');
-          expect(pane.querySelector('.hd-dev__progress-bar > div')?.getAttribute('style')).toContain('20.39');
+          expect(pane.querySelector('.hd-dev__progress .hd-progress__bar')?.getAttribute('style')).toContain('20.39');
           expect(dialog.querySelector('.hd-details__readings')).toBeNull();
         });
 

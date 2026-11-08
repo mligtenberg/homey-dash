@@ -1,3 +1,4 @@
+import { ConfirmInline } from '@homey-dash/design-system';
 import { AccountPanel } from './account-panel';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
@@ -14,7 +15,7 @@ const CHECK_MS = 2000;
  */
 @Component({
   selector: 'hd-plex-account-panel',
-  imports: [AccountPanel],
+  imports: [AccountPanel, ConfirmInline],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-account-panel key="plex" title="Plex" [error]="error()">
@@ -68,9 +69,11 @@ const CHECK_MS = 2000;
               @if (!info.fake) {
                 <div class="hd-actions">
                   @if (removing() === account.id) {
-                    <span class="hd-muted">Its Plex tiles show Plex as not set up until you give them another account.</span>
-                    <button class="hd-btn hd-btn--danger" type="button" (click)="remove(account)">Remove</button>
-                    <button class="hd-btn" type="button" (click)="removing.set(null)">Cancel</button>
+                    <hd-confirm-inline
+                      message="Its Plex tiles show Plex as not set up until you give them another account."
+                      (confirmed)="remove(account)"
+                      (cancelled)="removing.set(null)"
+                    />
                   } @else if (choosing() !== account.id) {
                     <button class="hd-btn" type="button" (click)="startRenaming(account)">Rename</button>
                     <button class="hd-btn" type="button" (click)="loadServers(account)">{{ account.serverId ? 'Change server' : 'Choose server' }}</button>

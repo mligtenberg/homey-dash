@@ -14,7 +14,7 @@ import { DisplaysStore } from './displays-store';
     </header>
     <div class="hd-page__body">
       @if (store.loaded() && store.list().length === 0) {
-        <div class="empty hd-panel">
+        <div class="hd-empty hd-panel">
           <h2 class="hd-panel__title">No displays yet</h2>
           <p>Open HomeyDash's display address on a screen in the home. It asks for a name and then shows up here.</p>
         </div>
@@ -35,9 +35,7 @@ import { DisplaysStore } from './displays-store';
   `,
   styles: `
     .hd-page__body { max-width: none; }
-    .empty h2 { margin-bottom: var(--space-2); }
-    .empty { padding: var(--space-6); max-width: 640px; }
-    .empty p { margin: 0; color: var(--ink-muted); }
+    .hd-empty { max-width: 640px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-3); }
     .card { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); color: inherit; text-decoration: none; }
     .card:hover, .card:focus-visible { border-color: var(--brand); }

@@ -55,8 +55,8 @@ export const NOW_PLAYING_CYCLE_MS = 12_000;
           />
         </div>
       </div>
-      <div class="hd-plex__progress" role="progressbar" [attr.aria-valuenow]="percent(session)" aria-valuemin="0" aria-valuemax="100">
-        <div class="hd-plex__progress-fill" [style.width.%]="percent(session)"></div>
+      <div class="hd-progress hd-plex__progress" role="progressbar" [attr.aria-valuenow]="percent(session)" aria-valuemin="0" aria-valuemax="100">
+        <div class="hd-progress__bar hd-plex__progress-fill" [style.width.%]="percent(session)"></div>
       </div>
     } @else {
       <svg class="hd-icon" [lucideIcon]="tvIcon" />
@@ -80,8 +80,8 @@ export const NOW_PLAYING_CYCLE_MS = 12_000;
                 <div class="hd-plex-now__sub">{{ item.subtitle }}</div>
               }
               <div class="hd-plex-now__who">{{ who(item) }}</div>
-              <div class="hd-plex__progress hd-plex__progress--inline" role="progressbar" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="percent(item)">
-                <div class="hd-plex__progress-fill" [style.width.%]="percent(item)"></div>
+              <div class="hd-progress hd-plex__progress hd-plex__progress--inline" role="progressbar" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="percent(item)">
+                <div class="hd-progress__bar hd-plex__progress-fill" [style.width.%]="percent(item)"></div>
               </div>
               <span class="hd-plex__time">{{ time(item) }}</span>
               <hd-transport

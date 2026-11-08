@@ -1,3 +1,4 @@
+import { ConfirmInline } from '@homey-dash/design-system';
 import { AccountPanel } from './account-panel';
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
@@ -26,7 +27,7 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
  */
 @Component({
   selector: 'hd-homey-account-panel',
-  imports: [AccountPanel, NgTemplateOutlet, AddressKeyForm],
+  imports: [AccountPanel, ConfirmInline, NgTemplateOutlet, AddressKeyForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-account-panel key="homey" title="Homey" [error]="error()">
@@ -66,9 +67,11 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
                 <span class="hd-pill hd-pill--dot" [class]="pill.tone ? 'hd-pill--' + pill.tone : ''">{{ pill.label }}</span>
                 @if (!info.fake) {
                   @if (removing() === account.id) {
-                    <span class="hd-muted">Its tiles show as missing until you give them another Homey.</span>
-                    <button class="hd-btn hd-btn--danger" type="button" (click)="remove(account)">Remove</button>
-                    <button class="hd-btn" type="button" (click)="removing.set(null)">Cancel</button>
+                    <hd-confirm-inline
+                      message="Its tiles show as missing until you give them another Homey."
+                      (confirmed)="remove(account)"
+                      (cancelled)="removing.set(null)"
+                    />
                   } @else {
                     <button class="hd-btn" type="button" (click)="edit(account.id)">Edit</button>
                     <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(account.id)">Remove</button>

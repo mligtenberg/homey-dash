@@ -1,3 +1,4 @@
+import { ConfirmInline } from '@homey-dash/design-system';
 import { AccountPanel } from './account-panel';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
@@ -13,7 +14,7 @@ import { ImmichPartners } from './immich-partners';
  */
 @Component({
   selector: 'hd-immich-account-panel',
-  imports: [AccountPanel, NgTemplateOutlet, AddressKeyForm, ImmichPartners],
+  imports: [AccountPanel, ConfirmInline, NgTemplateOutlet, AddressKeyForm, ImmichPartners],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-account-panel key="immich" title="Immich" [error]="error()">
@@ -50,9 +51,11 @@ import { ImmichPartners } from './immich-partners';
                 </div>
                 <div class="hd-actions">
                   @if (removing() === account.id) {
-                    <span class="hd-muted">Its photo sets stay, but displays can't show their photos until you give them another account.</span>
-                    <button class="hd-btn hd-btn--danger" type="button" (click)="remove(account)">Remove</button>
-                    <button class="hd-btn" type="button" (click)="removing.set(null)">Cancel</button>
+                    <hd-confirm-inline
+                      message="Its photo sets stay, but displays can't show their photos until you give them another account."
+                      (confirmed)="remove(account)"
+                      (cancelled)="removing.set(null)"
+                    />
                   } @else {
                     <button class="hd-btn" type="button" (click)="edit(account.id)">Edit</button>
                     <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(account.id)">Remove</button>

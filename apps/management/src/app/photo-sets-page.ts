@@ -83,7 +83,7 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
         </div>
       }
       @if (data.photoSetsLoaded() && sets().length === 0 && !adding()) {
-        <div class="empty hd-panel">
+        <div class="hd-empty hd-panel">
           <h2 class="hd-panel__title">No photo sets yet</h2>
           <p>
             A photo set follows an album in Immich, or draws photos at random from Immich by rules, such as who is in them
@@ -145,9 +145,6 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
   `,
   styles: `
     .hd-page__header { justify-content: space-between; }
-    .empty h2 { margin-bottom: var(--space-2); }
-    .empty { padding: var(--space-6); }
-    .empty p { margin: 0; color: var(--ink-muted); }
     .sets { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
     .set { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-4); padding: var(--space-4); color: inherit; text-decoration: none; }
     .set:hover { border-color: var(--brand); }

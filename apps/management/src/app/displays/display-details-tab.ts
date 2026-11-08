@@ -116,7 +116,7 @@ import { DisplaysStore } from './displays-store';
           </dl>
         </section>
       } @else {
-        <div class="hd-panel empty">
+        <div class="hd-panel hd-empty">
           <h2 class="hd-section-title">No details yet</h2>
           <p class="hd-hint">
             A screen tells HomeyDash about itself when it connects. @if (display.status.held) { Open or reload the display page on it. } @else {
@@ -156,7 +156,7 @@ import { DisplaysStore } from './displays-store';
     section { padding: var(--space-4); }
     .wide { grid-column: 1 / -1; }
     .remove { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
-    .empty { grid-column: 1 / -1; padding: var(--space-5); }
+    .hd-empty { grid-column: 1 / -1; --empty-padding: var(--space-5); }
     dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-4); margin: 0; }
     dt { color: var(--ink-muted); }
     dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }

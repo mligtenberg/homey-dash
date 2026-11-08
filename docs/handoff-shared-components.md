@@ -150,6 +150,18 @@ Lint, tests and builds were green for design-system, tiles, layout, api-client, 
 
 **Formatting note.** Early in this pass, `prettier --write` reflowed whole files that were never prettier-formatted, so four commits carry big noisy diffs. A later commit ("Restore the original formatting…") puts those files back. Only run prettier on files you created.
 
+## Update, third pass: shared atoms and tokens
+Decision: when the surroundings differ, share only the design-system atom (a class with tokens, or a small component) and leave the surroundings at each site.
+- **Progress bar:** `.hd-progress` / `.hd-progress__bar` with `--progress-height/-track/-fill/-radius`. The device-details playback bar and both Plex bars use it. The unused `.hd-progress` and the `.hd-dev__progress-bar` CSS are gone. Sliders were already `.hd-slider`.
+- **Note line:** `.hd-note` (`--note-size`, `--note-color`) for the Sonos music notes and the Plex empty lines. The Plex "cast note" was the same style as `.hd-details__label`, so it uses that.
+- **Empty state:** `.hd-empty` (`--empty-padding`) for the photo-sets, displays, home and display-details empty panels; their local `.empty` rules are gone.
+- **Value sizes:** `--value-scale-xl/l/m` and `--unit-scale` in `tokens.css`.
+- **`hd-confirm-inline`** (design-system, with a spec): the Remove / Cancel question in the Plex, Homey and Immich panels.
+- **Intended visual changes:** Sonos notes are muted ink instead of 65% opacity text; Plex empty lines are 0.11 cell, not 0.12; both gain 0.05 cell of block padding.
+- **Left alone:** the statistic pane (the tile's own detail view stays), `hd-playbar` surroundings, `hd-level-row`, `hd-art`, `hd-tile-titles`, `hd-page-header` (already `.hd-page__*`), `hdRenameInput`, `hd-rule-row`, and the Plex card and item-detail split.
+- **Checked in the browser:** computed styles of the Plex bars, the notes, the cast label and the details-tab empty panel match the old CSS (except the changes above). The device-details playback bar passes its unit test but was not reachable in the fake data. The home, photo-sets and displays empty panels were not shown, because the fake data has dashboards, photo sets and displays.
+- **Docs:** the README's Type and "Using it in the Angular apps" sections list the new tokens and classes. It still describes the value sizes as 0.62 / 0.42 / 0.24 of the cell, which differs from the CSS (0.5 / 0.42 / 0.24); that predates this work.
+
 ## Next: type tokens (agreed, not started)
 The display's text sizes are about 25 different `calc(var(--cell) * x)` multiples (`.085`, `.09`, `.095`, `.1` and so on), and Management uses fixed pixels (12, 13, 16, 18, 22, 28). Weights are 500, 600, 700 and 800 as literals. `tokens.css` only defines `--font-sans`. Plan:
 1. **Weights:** `--weight-regular/medium/bold/heavy` (500, 600, 700, 800). No pixel change, so do it first.
