@@ -1,7 +1,9 @@
 import { TileModule } from '../tile-kind';
-import { SonosTile, SonosTileSettingsEditor } from './sonos-tile';
+import { SonosTile } from './sonos-tile';
+import { SonosTileSettingsEditor } from './sonos-tile-settings';
 
 export * from './sonos-tile';
+export * from './sonos-tile-settings';
 
 // The Sonos tile kind: multiroom control through the speakers' Homey devices. Mirrored for assistants in apps/api/Mcp/ManagementTools.cs.
 
