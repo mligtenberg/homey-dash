@@ -23,6 +23,7 @@ import {
 } from '@lucide/angular';
 import { albumArtUrl, isPlaying, nowPlaying } from '../core/device-look';
 import { brokenImages, loadableArt } from '../core/loadable-art';
+import { SettingSelect } from '../core/setting-select';
 import { SliderDrag } from '../core/slider-drag';
 import { Transport } from '../core/transport';
 import { TileDetails } from '../core/tile-details';
@@ -600,25 +601,17 @@ export class SonosTile extends TileView<SonosTileSettings> {
 /** Management's choice of the room a Sonos tile is locked to. */
 @Component({
   selector: 'hd-sonos-tile-settings',
+  imports: [SettingSelect],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="hd-field">
-      <label class="hd-field__label" for="tile-lock">Locked to</label>
-      <select
-        id="tile-lock"
-        class="hd-select"
-        (change)="pick($any($event.target).value)"
-      >
-        <option value="" [selected]="!isRoom(settings().lock)">
-          Not locked (pick a room on the tile)
-        </option>
-        @for (room of rooms(); track room.id) {
-          <option [value]="room.id" [selected]="room.id === settings().lock">
-            {{ room.name }}
-          </option>
-        }
-      </select>
-    </div>
+    <hd-setting-select
+      label="Locked to"
+      selectId="tile-lock"
+      emptyLabel="Not locked (pick a room on the tile)"
+      [options]="rooms()"
+      [value]="isRoom(settings().lock) ? settings().lock : ''"
+      (picked)="pick($event)"
+    />
   `,
 })
 export class SonosTileSettingsEditor {
@@ -630,8 +623,8 @@ export class SonosTileSettingsEditor {
   protected readonly rooms = computed(() => {
     const devices = this.data.homey(this.settings().account)?.devices;
     return (this.settings().targets ?? []).map((id) => ({
-      id,
-      name: devices?.get(id)?.name ?? 'Not found',
+      value: id,
+      label: devices?.get(id)?.name ?? 'Not found',
     }));
   });
 

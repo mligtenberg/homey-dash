@@ -1,3 +1,4 @@
+import { SettingSelect } from './setting-select';
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, input, linkedSignal, output, signal, untracked, viewChild } from '@angular/core';
 import { Photo, photoUrl, Realtime } from '@homey-dash/api-client';
 import { LucideDynamicIcon, LucideImage } from '@lucide/angular';
@@ -285,21 +286,21 @@ interface PhotoLayer {
 /** Management's choice of how long a photo tile shows each photo. */
 @Component({
   selector: 'hd-photo-tile-settings',
+  imports: [SettingSelect],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="hd-field">
-      <label class="hd-field__label" for="tile-interval">Next photo every</label>
-      <select id="tile-interval" class="hd-select" (change)="changed.emit({ interval: +$any($event.target).value })">
-        @for (option of intervals; track option.seconds) {
-          <option [value]="option.seconds" [selected]="option.seconds === (settings().interval ?? 30)">{{ option.label }}</option>
-        }
-      </select>
-    </div>
+    <hd-setting-select
+      label="Next photo every"
+      selectId="tile-interval"
+      [options]="intervals"
+      [value]="settings().interval ?? 30"
+      (picked)="changed.emit({ interval: +$event })"
+    />
   `,
 })
 export class PhotoTileSettingsEditor {
   readonly settings = input.required<PhotoTileSettings>();
   readonly changed = output<Partial<PhotoTileSettings>>();
 
-  protected readonly intervals = PHOTO_INTERVALS;
+  protected readonly intervals = PHOTO_INTERVALS.map(({ seconds, label }) => ({ value: seconds, label }));
 }

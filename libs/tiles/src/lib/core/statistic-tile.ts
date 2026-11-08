@@ -1,3 +1,4 @@
+import { SettingSelect } from './setting-select';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -257,25 +258,16 @@ export class StatisticTile extends TileView<StatisticTileSettings> {
 /** Management's choice of the time window a statistic tile shows. */
 @Component({
   selector: 'hd-statistic-tile-settings',
+  imports: [SettingSelect],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="hd-field">
-      <label class="hd-field__label" for="tile-window">Time window</label>
-      <select
-        id="tile-window"
-        class="hd-select"
-        (change)="changed.emit({ window: $any($event.target).value })"
-      >
-        @for (option of windows; track option.id) {
-          <option
-            [value]="option.id"
-            [selected]="option.id === (settings().window ?? 'last24Hours')"
-          >
-            {{ option.label }}
-          </option>
-        }
-      </select>
-    </div>
+    <hd-setting-select
+      label="Time window"
+      selectId="tile-window"
+      [options]="windows"
+      [value]="settings().window ?? 'last24Hours'"
+      (picked)="changed.emit({ window: $any($event) })"
+    />
   `,
 })
 export class StatisticTileSettingsEditor {
@@ -283,6 +275,6 @@ export class StatisticTileSettingsEditor {
   readonly changed = output<Partial<StatisticTileSettings>>();
 
   protected readonly windows = Object.entries(STATISTIC_WINDOWS).map(
-    ([id, { label }]) => ({ id, label }),
+    ([value, { label }]) => ({ value, label }),
   );
 }

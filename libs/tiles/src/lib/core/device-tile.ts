@@ -1,3 +1,4 @@
+import { SettingSelect } from './setting-select';
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, viewChild } from '@angular/core';
 import { CapabilityValue, HomeyCapability, HomeyDevice, Realtime } from '@homey-dash/api-client';
 import { LucideDynamicIcon, LucideIconInput, LucidePause, LucidePlay, LucidePower } from '@lucide/angular';
@@ -214,17 +215,17 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
 /** Management's choice of the capability a device tile is about. */
 @Component({
   selector: 'hd-device-tile-settings',
+  imports: [SettingSelect],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="hd-field">
-      <label class="hd-field__label" for="tile-capability">Shows</label>
-      <select id="tile-capability" class="hd-select" (change)="pick($any($event.target).value)">
-        <option value="" [selected]="!settings().capability">Automatic</option>
-        @for (capability of capabilities(); track capability.id) {
-          <option [value]="capability.id" [selected]="capability.id === settings().capability">{{ capability.title }}</option>
-        }
-      </select>
-    </div>
+    <hd-setting-select
+      label="Shows"
+      selectId="tile-capability"
+      emptyLabel="Automatic"
+      [options]="options()"
+      [value]="settings().capability"
+      (picked)="pick($event)"
+    />
   `,
 })
 export class DeviceTileSettingsEditor {
@@ -236,6 +237,8 @@ export class DeviceTileSettingsEditor {
   protected readonly capabilities = computed(() =>
     Object.values(this.data.homey(this.settings().account)?.devices.get(this.settings().target ?? '')?.capabilities ?? {}),
   );
+
+  protected readonly options = computed(() => this.capabilities().map((c) => ({ value: c.id, label: c.title })));
 
   protected pick(capability: string) {
     this.changed.emit({ capability: capability || undefined });
