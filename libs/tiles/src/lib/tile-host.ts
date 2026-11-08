@@ -6,9 +6,12 @@ import { TileData, TileSettings } from './tile-data';
 import { isHomeyTarget, TileKind } from './tile-kind';
 import { TileKindRegistry } from './tile-kind-registry';
 
-/** Whether a tile points at something in a Homey that HomeyDash can't reach (`TileData.homeyLost`). */
+/**
+ * Whether a tile shows what only a Homey that HomeyDash can't reach tells (`TileData.homeyLost`): something in it, or its
+ * energy report. Not the weather, which comes from Open-Meteo whether the Homey is there or not.
+ */
 export function homeyLost(tile: Tile, kind: TileKind | undefined, data: TileData) {
-  return !!kind && isHomeyTarget(kind.target) && data.homeyLost((tile.settings as TileSettings).account);
+  return !!kind && (isHomeyTarget(kind.target) || kind.target === 'energy') && data.homeyLost((tile.settings as TileSettings).account);
 }
 
 /**
