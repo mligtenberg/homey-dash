@@ -14,9 +14,9 @@ import { ImmichPartners } from './immich-partners';
   imports: [NgTemplateOutlet, ImmichPartners],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="account hd-panel" aria-labelledby="immich-title">
-      <div class="head">
-        <h2 id="immich-title">Immich</h2>
+    <section class="hd-account hd-panel" aria-labelledby="immich-title">
+      <div class="hd-account__head">
+        <h2 class="hd-panel__title" id="immich-title">Immich</h2>
         @if (info(); as info) {
           @if (info.fake) {
             <span class="hd-pill hd-pill--ok hd-pill--dot">Fake Immich</span>
@@ -29,27 +29,27 @@ import { ImmichPartners } from './immich-partners';
       </div>
       @if (info(); as info) {
         @if (info.fake) {
-          <p class="muted">HomeyDash runs against a fake Immich with sample albums, set in its configuration.</p>
+          <p class="hd-muted">HomeyDash runs against a fake Immich with sample albums, set in its configuration.</p>
           @for (account of info.accounts; track account.id) {
-            <div class="item"><hd-immich-partners [account]="account" /></div>
+            <div class="hd-account__item"><hd-immich-partners [account]="account" /></div>
           }
         } @else {
-          <p class="muted">
+          <p class="hd-muted">
             Photo sets follow albums in Immich. Add an account for each Immich server, or for each person whose photos you
             want to show. Displays get their photos through HomeyDash, so only HomeyDash needs to reach Immich.
           </p>
           @for (account of info.accounts; track account.id) {
-            <div class="item">
+            <div class="hd-account__item">
               @if (editing() === account.id) {
                 <ng-container *ngTemplateOutlet="form; context: { $implicit: account }" />
               } @else {
-                <div class="item__info">
+                <div class="hd-account__info">
                   <strong>{{ account.name }}</strong>
-                  <span class="muted">{{ account.address }}</span>
+                  <span class="hd-muted">{{ account.address }}</span>
                 </div>
-                <div class="actions">
+                <div class="hd-actions">
                   @if (removing() === account.id) {
-                    <span class="muted">Its photo sets stay, but displays can't show their photos until you give them another account.</span>
+                    <span class="hd-muted">Its photo sets stay, but displays can't show their photos until you give them another account.</span>
                     <button class="hd-btn hd-btn--danger" type="button" (click)="remove(account)">Remove</button>
                     <button class="hd-btn" type="button" (click)="removing.set(null)">Cancel</button>
                   } @else {
@@ -62,11 +62,11 @@ import { ImmichPartners } from './immich-partners';
             </div>
           }
           @if (editing() === 'new') {
-            <div class="item">
+            <div class="hd-account__item">
               <ng-container *ngTemplateOutlet="form; context: { $implicit: null }" />
             </div>
           } @else if (editing() === null) {
-            <div class="actions">
+            <div class="hd-actions">
               <button class="hd-btn" [class.hd-btn--primary]="!info.accounts.length" type="button" (click)="edit('new')">
                 {{ info.accounts.length ? 'Add another Immich account' : 'Set up Immich' }}
               </button>
@@ -75,7 +75,7 @@ import { ImmichPartners } from './immich-partners';
         }
       }
       @if (error(); as error) {
-        <p class="error" role="alert">{{ error }}</p>
+        <p class="hd-error" role="alert">{{ error }}</p>
       }
     </section>
 
@@ -94,7 +94,7 @@ import { ImmichPartners } from './immich-partners';
             aria-describedby="immich-name-error"
           />
           @if (errors()['name']; as error) {
-            <span id="immich-name-error" class="field-error">{{ error }}</span>
+            <span id="immich-name-error" class="hd-error hd-small">{{ error }}</span>
           }
         </div>
         <div class="hd-field">
@@ -110,7 +110,7 @@ import { ImmichPartners } from './immich-partners';
             aria-describedby="immich-address-error"
           />
           @if (errors()['address']; as error) {
-            <span id="immich-address-error" class="field-error">{{ error }}</span>
+            <span id="immich-address-error" class="hd-error hd-small">{{ error }}</span>
           }
         </div>
         <div class="hd-field">
@@ -125,14 +125,14 @@ import { ImmichPartners } from './immich-partners';
             [attr.aria-invalid]="!!errors()['apiKey']"
             aria-describedby="immich-key-hint"
           />
-          <span id="immich-key-hint" [class]="errors()['apiKey'] ? 'field-error' : 'hint'">
+          <span id="immich-key-hint" [class]="errors()['apiKey'] ? 'hd-error hd-small' : 'hd-hint'">
             {{
               errors()['apiKey'] ??
                 'Make one in Immich under Account Settings → API Keys, with at least album.read, asset.read, asset.view, face.read and person.read.'
             }}
           </span>
         </div>
-        <div class="actions">
+        <div class="hd-actions">
           <button class="hd-btn hd-btn--primary" type="submit" [disabled]="saving()">
             {{ saving() ? 'Checking with Immich…' : account ? 'Save' : 'Add account' }}
           </button>
@@ -142,17 +142,7 @@ import { ImmichPartners } from './immich-partners';
     </ng-template>
   `,
   styles: `
-    .account { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); }
-    .head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-    h2 { font-size: 18px; font-weight: 800; margin: 0; }
-    .item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--line); }
-    .item__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .form { display: flex; flex-direction: column; gap: var(--space-4); flex: 1; }
-    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-    .muted, .hint { color: var(--ink-muted); margin: 0; }
-    .hint, .field-error { font-size: 13px; }
-    .field-error { color: var(--danger); font-weight: 700; }
-    .error { margin: 0; color: var(--danger); font-weight: 700; }
   `,
 })
 export class ImmichAccountPanel {

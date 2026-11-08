@@ -20,7 +20,7 @@ const SPOT_NAMES: Record<LockSpot, string> = {
   template: `
     @if (context.display(); as display) {
       <div class="lock">
-        <p class="hint">Shown over a photo set or colour while an idle rule plays it. Widgets in the same place stack in this order.</p>
+        <p class="hd-hint">Shown over a photo set or colour while an idle rule plays it. Widgets in the same place stack in this order.</p>
         @for (widget of display.lockWidgets; track $index; let i = $index, last = $last) {
           <div class="entry">
             <select class="hd-select" [attr.aria-label]="'What widget ' + (i + 1) + ' shows'" (change)="store.setLockKind(display, i, $any($event.target).value)">
@@ -55,7 +55,6 @@ const SPOT_NAMES: Record<LockSpot, string> = {
   `,
   styles: `
     .lock { display: flex; flex-direction: column; gap: var(--space-2); }
-    .hint { margin: 0; font-size: 13px; color: var(--ink-muted); }
     .entry { display: flex; align-items: center; gap: var(--space-1); }
     .entry .hd-select { flex: 0 1 170px; min-width: 0; }
     .entry .hd-btn { padding-inline: 10px; }

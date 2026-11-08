@@ -10,7 +10,7 @@ import { DisplaysStore } from './displays-store';
     @if (context.display(); as display) {
       <fieldset class="dashboards">
         <legend class="hd-field__label">Dashboards</legend>
-        <p class="hint">Check the ones this display offers. They sit on its tape in this order, and it starts on the first.</p>
+        <p class="hd-hint">Check the ones this display offers. They sit on its tape in this order, and it starts on the first.</p>
         @for (id of display.dashboardIds; track id; let i = $index, first = $first, last = $last) {
           <div class="entry">
             <label class="hd-check">
@@ -28,7 +28,7 @@ import { DisplaysStore } from './displays-store';
           </label>
         } @empty {
           @if (!display.dashboardIds.length) {
-            <span class="hint">Publish a dashboard to offer it here.</span>
+            <span class="hd-hint">Publish a dashboard to offer it here.</span>
           }
         }
       </fieldset>
@@ -37,7 +37,6 @@ import { DisplaysStore } from './displays-store';
   styles: `
     .dashboards { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); margin: 0; padding: 0; border: 0; }
     .dashboards legend { padding: 0; margin-bottom: var(--space-2); }
-    .hint { margin: 0; font-size: 13px; color: var(--ink-muted); }
     .entry { display: flex; align-items: center; gap: var(--space-1); }
     .entry .hd-check { min-width: 180px; }
     .entry .hd-btn { padding-inline: 10px; }

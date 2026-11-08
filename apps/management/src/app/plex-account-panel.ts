@@ -15,9 +15,9 @@ const CHECK_MS = 2000;
   selector: 'hd-plex-account-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="account hd-panel" aria-labelledby="plex-title">
-      <div class="head">
-        <h2 id="plex-title">Plex</h2>
+    <section class="hd-account hd-panel" aria-labelledby="plex-title">
+      <div class="hd-account__head">
+        <h2 class="hd-panel__title" id="plex-title">Plex</h2>
         @if (info(); as info) {
           @if (info.fake) {
             <span class="hd-pill hd-pill--ok hd-pill--dot">Fake Plex</span>
@@ -31,7 +31,7 @@ const CHECK_MS = 2000;
         }
       </div>
       @if (info(); as info) {
-        <p class="muted">
+        <p class="hd-muted">
           @if (info.fake) {
             HomeyDash runs against a fake Plex server, set in its configuration.
           } @else {
@@ -40,34 +40,34 @@ const CHECK_MS = 2000;
           }
         </p>
         @for (account of info.accounts; track account.id) {
-          <div class="item">
+          <div class="hd-account__item">
             @if (renaming() === account.id) {
               <form class="form" (submit)="rename($event, account, newName.value)">
                 <div class="hd-field">
                   <label class="hd-field__label" for="plex-rename">Name</label>
                   <input #newName id="plex-rename" class="hd-input" autocomplete="off" [value]="account.name" (keydown.escape)="renaming.set(null)" />
                   @if (nameError(); as error) {
-                    <span class="field-error">{{ error }}</span>
+                    <span class="hd-error hd-small">{{ error }}</span>
                   }
                 </div>
-                <div class="actions">
+                <div class="hd-actions">
                   <button class="hd-btn hd-btn--primary" type="submit">Save</button>
                   <button class="hd-btn" type="button" (click)="renaming.set(null)">Cancel</button>
                 </div>
               </form>
             } @else {
-              <div class="item__info">
+              <div class="hd-account__info">
                 <strong>{{ account.name }}</strong>
                 @if (account.serverId) {
-                  <span class="muted">{{ account.serverName }}{{ account.username ? ', as ' + account.username : '' }}</span>
+                  <span class="hd-muted">{{ account.serverName }}{{ account.username ? ', as ' + account.username : '' }}</span>
                 } @else {
                   <span class="warn">Choose a server</span>
                 }
               </div>
               @if (!info.fake) {
-                <div class="actions">
+                <div class="hd-actions">
                   @if (removing() === account.id) {
-                    <span class="muted">Its Plex tiles show Plex as not set up until you give them another account.</span>
+                    <span class="hd-muted">Its Plex tiles show Plex as not set up until you give them another account.</span>
                     <button class="hd-btn hd-btn--danger" type="button" (click)="remove(account)">Remove</button>
                     <button class="hd-btn" type="button" (click)="removing.set(null)">Cancel</button>
                   } @else if (choosing() !== account.id) {
@@ -94,7 +94,7 @@ const CHECK_MS = 2000;
                     }
                   </select>
                 </div>
-                <div class="actions">
+                <div class="hd-actions">
                   <button class="hd-btn hd-btn--primary" type="submit" [disabled]="busy() || !servers()">
                     {{ busy() ? 'Connecting…' : 'Use this server' }}
                   </button>
@@ -106,11 +106,11 @@ const CHECK_MS = 2000;
         }
         @if (info.signIn; as signIn) {
           @if (signIn.state === 'waiting') {
-            <div class="item">
-              <p class="muted" role="status">
+            <div class="hd-account__item">
+              <p class="hd-muted" role="status">
                 Waiting for you to approve HomeyDash on Plex's page, in the tab that opened, for {{ signIn.name }}.
               </p>
-              <div class="actions">
+              <div class="hd-actions">
                 @if (signIn.authUrl; as url) {
                   <a class="hd-btn" [href]="url" target="_blank" rel="noopener">Open Plex's page again</a>
                 }
@@ -118,12 +118,12 @@ const CHECK_MS = 2000;
               </div>
             </div>
           } @else {
-            <p class="error" role="alert">{{ signIn.error }}</p>
+            <p class="hd-error" role="alert">{{ signIn.error }}</p>
           }
         }
         @if (!info.fake && info.signIn?.state !== 'waiting') {
           @if (adding() || !info.accounts.length) {
-            <form class="form item" (submit)="add($event, name.value)">
+            <form class="form hd-account__item" (submit)="add($event, name.value)">
               <div class="hd-field">
                 <label class="hd-field__label" for="plex-name">Name</label>
                 <input
@@ -135,10 +135,10 @@ const CHECK_MS = 2000;
                   [attr.aria-invalid]="!!nameError() && !renaming()"
                 />
                 @if (nameError() && !renaming()) {
-                  <span class="field-error">{{ nameError() }}</span>
+                  <span class="hd-error hd-small">{{ nameError() }}</span>
                 }
               </div>
-              <div class="actions">
+              <div class="hd-actions">
                 <button class="hd-btn hd-btn--primary" type="submit" [disabled]="busy()">Sign in with Plex</button>
                 @if (info.accounts.length) {
                   <button class="hd-btn" type="button" (click)="adding.set(false)">Cancel</button>
@@ -146,29 +146,20 @@ const CHECK_MS = 2000;
               </div>
             </form>
           } @else {
-            <div class="actions">
+            <div class="hd-actions">
               <button class="hd-btn" type="button" (click)="startAdding()">Add another Plex account</button>
             </div>
           }
         }
       }
       @if (error(); as error) {
-        <p class="error" role="alert">{{ error }}</p>
+        <p class="hd-error" role="alert">{{ error }}</p>
       }
     </section>
   `,
   styles: `
-    .account { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); }
-    .head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-    h2 { font-size: 18px; font-weight: 800; margin: 0; }
-    .item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--line); }
-    .item__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .form { display: flex; flex-direction: column; gap: var(--space-4); flex: 1 1 100%; }
-    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-    .muted { color: var(--ink-muted); margin: 0; }
     .warn { color: var(--warn); font-weight: 700; }
-    .field-error { font-size: 13px; color: var(--danger); font-weight: 700; }
-    .error { margin: 0; color: var(--danger); font-weight: 700; }
   `,
 })
 export class PlexAccountPanel {

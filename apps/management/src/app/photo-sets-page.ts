@@ -17,13 +17,13 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
   imports: [RouterLink, PhotoSelectionForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header class="header">
-      <h1>Photo sets</h1>
+    <header class="hd-page__header">
+      <h1 class="hd-page__title">Photo sets</h1>
       @if (!adding()) {
         <button class="hd-btn hd-btn--primary" type="button" (click)="startAdding()">New photo set</button>
       }
     </header>
-    <div class="body">
+    <div class="hd-page__body">
       @if (adding()) {
         <div class="hd-panel new-panel">
           <div class="source" role="radiogroup" aria-label="Photos from">
@@ -91,7 +91,7 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
       }
       @if (data.photoSetsLoaded() && sets().length === 0 && !adding()) {
         <div class="empty hd-panel">
-          <h2>No photo sets yet</h2>
+          <h2 class="hd-panel__title">No photo sets yet</h2>
           <p>
             A photo set follows an album in Immich, or draws photos at random from Immich by rules, such as who is in them
             and what they show. Photo tiles show its photos.
@@ -110,7 +110,7 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
                 </div>
                 <div class="info">
                   <span class="name">{{ set.name }}</span>
-                  <span class="muted">
+                  <span class="hd-muted">
                     {{ set.photos.length }} {{ set.photos.length === 1 ? 'photo' : 'photos' }}
                     @if (set.selection) {
                       at random, by rules
@@ -121,7 +121,7 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
                       · {{ set.excluded.length }} excluded
                     }
                   </span>
-                  <span class="muted">
+                  <span class="hd-muted">
                     @if (set.dashboards.length) {
                       Shown on {{ set.dashboards.join(', ') }}
                     } @else {
@@ -141,7 +141,7 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
         </ul>
       }
       @if (error(); as error) {
-        <p class="error" role="alert">
+        <p class="hd-error" role="alert">
           {{ error }}
           @if (error.includes('Accounts')) {
             <a routerLink="/accounts">Go to Accounts</a>
@@ -151,10 +151,8 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
     </div>
   `,
   styles: `
-    .header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line); }
-    h1 { font-size: 22px; font-weight: 800; margin: 0; }
-    h2 { font-size: 18px; font-weight: 800; margin: 0 0 var(--space-2); }
-    .body { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); max-width: 900px; }
+    .hd-page__header { justify-content: space-between; }
+    .empty h2 { margin-bottom: var(--space-2); }
     .empty { padding: var(--space-6); }
     .empty p { margin: 0; color: var(--ink-muted); }
     .sets { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
@@ -170,10 +168,8 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
     .previews img { width: 100%; height: 100%; object-fit: cover; }
     .info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .name { font-weight: 700; }
-    .muted { color: var(--ink-muted); margin: 0; }
     .status { margin: 0; font-weight: 700; }
-    .status.failed, .error { color: var(--danger); }
-    .error { margin: 0; font-weight: 700; }
+    .status.failed { color: var(--danger); }
     .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
     @media (max-width: 860px) {
       .new { grid-template-columns: 1fr; }

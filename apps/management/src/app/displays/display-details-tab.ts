@@ -15,15 +15,15 @@ import { DisplaysStore } from './displays-store';
   template: `
     @if (context.display(); as display) {
       <section class="hd-panel wide">
-        <h2>Screenshot</h2>
+        <h2 class="hd-section-title">Screenshot</h2>
         <hd-display-screenshot [display]="display" />
       </section>
       @if (display.status.details; as d) {
         <section class="hd-panel">
-          <h2>Screen</h2>
+          <h2 class="hd-section-title">Screen</h2>
           <dl>
             <dt>Resolution</dt>
-            <dd>{{ size(d.screenWidth, d.screenHeight) }}&ngsp;@if (physical(); as p) { <span class="muted">({{ p }} pixels)</span> }</dd>
+            <dd>{{ size(d.screenWidth, d.screenHeight) }}&ngsp;@if (physical(); as p) { <span class="hd-hint">({{ p }} pixels)</span> }</dd>
             <dt>Page size</dt>
             <dd>{{ size(d.viewportWidth, d.viewportHeight) }}</dd>
             <dt>Pixel ratio</dt>
@@ -35,7 +35,7 @@ import { DisplaysStore } from './displays-store';
           </dl>
         </section>
         <section class="hd-panel">
-          <h2>Browser</h2>
+          <h2 class="hd-section-title">Browser</h2>
           <dl>
             <dt>Browser</dt>
             <dd>{{ text().browser ?? 'Unknown' }}</dd>
@@ -49,7 +49,7 @@ import { DisplaysStore } from './displays-store';
             <dd>
               {{ d.secureContext ? 'Yes' : 'No' }}
               @if (!d.secureContext) {
-                <span class="muted">The camera and light sensor need https or localhost.</span>
+                <span class="hd-hint">The camera and light sensor need https or localhost.</span>
               }
             </dd>
             @if (d.userAgent) {
@@ -59,7 +59,7 @@ import { DisplaysStore } from './displays-store';
           </dl>
         </section>
         <section class="hd-panel">
-          <h2>Fully Kiosk Browser</h2>
+          <h2 class="hd-section-title">Fully Kiosk Browser</h2>
           @if (d.fully; as fully) {
             <dl>
               <dt>JavaScript interface</dt>
@@ -78,21 +78,21 @@ import { DisplaysStore } from './displays-store';
               </dd>
             </dl>
           } @else {
-            <p class="muted">
+            <p class="hd-hint">
               Not supported here: the page doesn't run in Fully Kiosk Browser, or its "JavaScript Interface" setting is off. Idle rules can't turn
               this screen off; it goes black instead.
             </p>
           }
         </section>
         <section class="hd-panel">
-          <h2>Light</h2>
+          <h2 class="hd-section-title">Light</h2>
           <dl>
             <dt>Current</dt>
             <dd>
               @if (display.status.lux !== null) {
                 {{ display.status.lux | number: '1.0-0' }} lx
                 @if (!display.status.connected) {
-                  <span class="muted">as last measured</span>
+                  <span class="hd-hint">as last measured</span>
                 }
               } @else {
                 None measured yet
@@ -103,7 +103,7 @@ import { DisplaysStore } from './displays-store';
           </dl>
         </section>
         <section class="hd-panel">
-          <h2>Device</h2>
+          <h2 class="hd-section-title">Device</h2>
           <dl>
             <dt>Battery</dt>
             <dd>{{ battery() }}</dd>
@@ -117,8 +117,8 @@ import { DisplaysStore } from './displays-store';
         </section>
       } @else {
         <div class="hd-panel empty">
-          <h2>No details yet</h2>
-          <p class="muted">
+          <h2 class="hd-section-title">No details yet</h2>
+          <p class="hd-hint">
             A screen tells HomeyDash about itself when it connects. @if (display.status.held) { Open or reload the display page on it. } @else {
               This display has no screen; take it over from setup on a screen.
             }
@@ -126,7 +126,7 @@ import { DisplaysStore } from './displays-store';
         </div>
       }
       <section class="hd-panel">
-        <h2>Display</h2>
+        <h2 class="hd-section-title">Display</h2>
         <div class="hd-field">
           <label class="hd-field__label" for="display-name">Name</label>
           <input
@@ -140,7 +140,7 @@ import { DisplaysStore } from './displays-store';
         </div>
         <div class="remove">
           @if (removing()) {
-            <span class="muted">Its screen goes back to setup.</span>
+            <span class="hd-hint">Its screen goes back to setup.</span>
             <button class="hd-btn hd-btn--primary" type="button" (click)="remove(display)">Remove</button>
             <button class="hd-btn" type="button" (click)="removing.set(false)">Cancel</button>
           } @else {
@@ -151,16 +151,15 @@ import { DisplaysStore } from './displays-store';
     }
   `,
   styles: `
+    h2 { margin-bottom: var(--space-3); }
     :host { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-3); align-items: start; }
     section { padding: var(--space-4); }
     .wide { grid-column: 1 / -1; }
     .remove { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
     .empty { grid-column: 1 / -1; padding: var(--space-5); }
-    h2 { font-size: 16px; font-weight: 800; margin: 0 0 var(--space-3); }
     dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-4); margin: 0; }
     dt { color: var(--ink-muted); }
     dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-    .muted { color: var(--ink-muted); font-size: 13px; margin: 0; }
     .ua { color: var(--ink-muted); font-size: 12px; }
     .api { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
     .api li::before { content: '✓ '; color: var(--ok); }

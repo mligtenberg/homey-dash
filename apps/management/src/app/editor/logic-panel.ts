@@ -27,7 +27,7 @@ export type OpenEntry = number | 'fallback';
   template: `
     <div class="hd-field">
       <span class="hd-field__label">Tiles</span>
-      <p class="hint">It shows the first whose rule holds.</p>
+      <p class="hd-hint">It shows the first whose rule holds.</p>
       @for (entry of settings().entries; track $index; let i = $index, last = $last) {
         <div class="entry">
           <button type="button" class="entry__open" (click)="opened.emit(i)">
@@ -58,7 +58,7 @@ export type OpenEntry = number | 'fallback';
           <button type="button" class="hd-btn" aria-label="Remove the fallback" (click)="patch({ fallback: null })">✕</button>
         </div>
       } @else {
-        <p class="hint">Without one, it shows nothing when no rule holds.</p>
+        <p class="hd-hint">Without one, it shows nothing when no rule holds.</p>
         <select class="hd-select" aria-label="Add a fallback tile" (change)="addFallback($any($event.target))">
           <option value="" selected>Add a fallback tile…</option>
           @for (kind of holdable(); track kind.id) {
@@ -83,12 +83,11 @@ export type OpenEntry = number | 'fallback';
         />
         <span>seconds</span>
       </div>
-      <p class="hint">Keeps a tile it switched to on screen at least this long, so it doesn't flicker.</p>
+      <p class="hd-hint">Keeps a tile it switched to on screen at least this long, so it doesn't flicker.</p>
     </div>
   `,
   styles: `
     :host { display: flex; flex-direction: column; gap: var(--space-4); }
-    .hint { color: var(--ink-muted); margin: 0; font-size: 13px; }
     .entry { display: flex; align-items: center; gap: var(--space-1); }
     .entry .hd-btn { padding-inline: 10px; }
     .entry__open {

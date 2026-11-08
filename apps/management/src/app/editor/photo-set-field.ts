@@ -50,17 +50,16 @@ import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue } from 
         </select>
       }
       @if (selected()?.syncError; as syncError) {
-        <span class="error" role="status">{{ syncError }}</span>
+        <span class="hd-error hd-small" role="status">{{ syncError }}</span>
       }
       @if (error(); as error) {
-        <span class="error" role="alert">{{ error }}</span>
+        <span class="hd-error hd-small" role="alert">{{ error }}</span>
       }
       <a class="hint" routerLink="/photo-sets">Manage photo sets</a>
     </div>
   `,
   styles: `
     .hint { font-size: 13px; color: var(--brand); }
-    .error { font-size: 13px; color: var(--danger); font-weight: 700; }
   `,
 })
 export class PhotoSetField {

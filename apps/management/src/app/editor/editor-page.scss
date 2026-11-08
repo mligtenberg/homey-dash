@@ -1,12 +1,5 @@
 :host { display: flex; flex-direction: column; height: 100dvh; }
 
-.header {
-  display: flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-4) var(--space-6);
-  border-bottom: 1px solid var(--line);
-  h1 { font-size: 22px; font-weight: 800; margin: 0; }
-  .hd-btn { text-decoration: none; }
-}
 .spacer { flex: 1; }
 
 .body { flex: 1; display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
@@ -71,11 +64,9 @@ hd-tile-host.is-selected { outline: 2.5px solid var(--brand); outline-offset: 4p
   display: flex; flex-direction: column; gap: var(--space-4);
   overflow-y: auto;
   border-radius: var(--radius-panel);
-  h2 { font-size: 16px; font-weight: 800; margin: 0; }
 }
 .kinds { display: flex; flex-direction: column; gap: var(--space-2); }
 .kind { text-align: left; }
-.hint { color: var(--ink-muted); margin: 0; }
 .delete { align-self: flex-start; }
 .back {
   align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-1);
@@ -86,5 +77,5 @@ hd-tile-host.is-selected { outline: 2.5px solid var(--brand); outline-offset: 4p
 @media (max-width: 860px) {
   :host { height: auto; }
   .body { grid-template-columns: 1fr; }
-  .header { flex-wrap: wrap; padding: var(--space-3) var(--space-4); }
+  .hd-page__header { flex-wrap: wrap; padding: var(--space-3) var(--space-4); }
 }

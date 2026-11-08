@@ -11,7 +11,7 @@ import { Observable } from 'rxjs';
       <h1>Set up this screen</h1>
 
       <form class="hd-panel card" (submit)="setUp($event, name.value)">
-        <h2>New display</h2>
+        <h2 class="hd-panel__title">New display</h2>
         <div class="hd-field">
           <label class="hd-field__label" for="display-name">Name</label>
           <input #name id="display-name" class="hd-input" placeholder="Name, such as Kitchen wall" autocomplete="off" />
@@ -21,8 +21,8 @@ import { Observable } from 'rxjs';
 
       @if (displays().length > 0) {
         <section class="hd-panel card">
-          <h2>Take over a display</h2>
-          <p class="muted">This screen gets that display's name and dashboard. The screen showing it now goes back to setup.</p>
+          <h2 class="hd-panel__title">Take over a display</h2>
+          <p class="hd-muted">This screen gets that display's name and dashboard. The screen showing it now goes back to setup.</p>
           <ul>
             @for (display of displays(); track display.id) {
               <li>
@@ -42,7 +42,7 @@ import { Observable } from 'rxjs';
       }
 
       @if (error(); as error) {
-        <p class="error" role="alert">{{ error }}</p>
+        <p class="hd-error" role="alert">{{ error }}</p>
       }
     </div>
   `,
@@ -50,14 +50,11 @@ import { Observable } from 'rxjs';
     :host { display: grid; place-items: center; min-height: 100%; padding: var(--space-6) var(--space-4); box-sizing: border-box; overflow-y: auto; }
     .setup { width: min(480px, 100%); display: flex; flex-direction: column; gap: var(--space-4); }
     h1 { font-size: 28px; font-weight: 800; margin: 0; }
-    h2 { font-size: 18px; font-weight: 800; margin: 0; }
     .card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); }
     .hd-input, .hd-btn { font-size: 16px; padding: 14px 18px; }
-    .muted { margin: 0; color: var(--ink-muted); }
     ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
     li { display: flex; align-items: center; gap: var(--space-2); }
     .name { flex: 1; font-weight: 700; }
-    .error { margin: 0; color: var(--danger); font-weight: 700; }
   `,
 })
 export class Setup {

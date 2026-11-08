@@ -35,7 +35,7 @@ export function selectionSummary(selection: PhotoSelection) {
             <button type="button" class="chip__remove" [attr.aria-label]="'Remove ' + person.name" (click)="remove(person)">×</button>
           </span>
         } @empty {
-          <span class="hint">Anyone. Add people to only show photos with at least one of them.</span>
+          <span class="hd-hint">Anyone. Add people to only show photos with at least one of them.</span>
         }
       </div>
     </div>
@@ -48,7 +48,7 @@ export function selectionSummary(selection: PhotoSelection) {
             <button type="button" class="chip__remove" [attr.aria-label]="'Remove ' + person.name" (click)="remove(person)">×</button>
           </span>
         } @empty {
-          <span class="hint">Nobody left out.</span>
+          <span class="hd-hint">Nobody left out.</span>
         }
       </div>
     </div>
@@ -74,7 +74,7 @@ export function selectionSummary(selection: PhotoSelection) {
           }
         </ul>
       } @else if (search() && people()) {
-        <span class="hint">Nobody by that name. Name people in Immich to find them here.</span>
+        <span class="hd-hint">Nobody by that name. Name people in Immich to find them here.</span>
       }
     </div>
     <div class="hd-field">
@@ -87,7 +87,7 @@ export function selectionSummary(selection: PhotoSelection) {
         [value]="selection().query ?? ''"
         (change)="set({ query: $any($event.target).value.trim() || null })"
       />
-      <span class="hint">Immich's smart search finds photos by what they show. Leave it empty for anything.</span>
+      <span class="hd-hint">Immich's smart search finds photos by what they show. Leave it empty for anything.</span>
     </div>
     <div class="row">
       <div class="hd-field">
@@ -112,7 +112,7 @@ export function selectionSummary(selection: PhotoSelection) {
       </div>
     </div>
     @if (error(); as error) {
-      <span class="error" role="alert">{{ error }}</span>
+      <span class="hd-error hd-small" role="alert">{{ error }}</span>
     }
   `,
   styles: `
@@ -126,8 +126,6 @@ export function selectionSummary(selection: PhotoSelection) {
     .matches li { display: flex; align-items: center; gap: var(--space-2); }
     .matches span { flex: 1; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
-    .hint { font-size: 13px; color: var(--ink-muted); }
-    .error { font-size: 13px; color: var(--danger); font-weight: 700; }
   `,
 })
 export class PhotoSelectionForm {

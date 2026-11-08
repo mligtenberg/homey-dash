@@ -11,9 +11,9 @@ import { firstValueFrom } from 'rxjs';
   selector: 'hd-airplay-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="account hd-panel" aria-labelledby="airplay-title">
-      <div class="head">
-        <h2 id="airplay-title">AirPlay</h2>
+    <section class="hd-account hd-panel" aria-labelledby="airplay-title">
+      <div class="hd-account__head">
+        <h2 class="hd-panel__title" id="airplay-title">AirPlay</h2>
         @if (status(); as status) {
           @if (!status.configured) {
             <span class="hd-pill hd-pill--warn hd-pill--dot">Not set up</span>
@@ -30,27 +30,27 @@ import { firstValueFrom } from 'rxjs';
       </div>
       @if (status(); as status) {
         @if (!status.configured) {
-          <p class="muted">
+          <p class="hd-muted">
             AirPlay is switched off, so Plex covers can't play on an Apple TV. Switch it on by removing
             <code>AirPlay:Enabled=false</code> (<code>AirPlay__Enabled</code> in Docker) from HomeyDash's configuration.
           </p>
         } @else if (!status.reachable) {
-          <p class="error" role="alert">{{ status.error }}</p>
-          <p class="muted">HomeyDash looks for Apple TVs with multicast DNS, which needs to reach your network.</p>
+          <p class="hd-error" role="alert">{{ status.error }}</p>
+          <p class="hd-muted">HomeyDash looks for Apple TVs with multicast DNS, which needs to reach your network.</p>
         } @else {
-          <p class="muted">
+          <p class="hd-muted">
             {{ status.fake ? 'HomeyDash runs against fake Apple TVs, set in its configuration. ' : '' }}Covers in the recently
             added screen play on these. Pair an Apple TV when it asks for a PIN.
           </p>
           @for (device of tvs(status); track device.id) {
-            <div class="item">
-              <div class="item__info">
+            <div class="hd-account__item">
+              <div class="hd-account__info">
                 <strong>{{ device.name }}</strong>
-                <span class="muted">{{ device.paired ? 'Paired' : 'Not paired' }}</span>
+                <span class="hd-muted">{{ device.paired ? 'Paired' : 'Not paired' }}</span>
               </div>
               @if (pairing()?.id === device.id) {
                 @if (pairing()!.step === 'starting') {
-                  <span class="muted" role="status">Asking {{ device.name }} for a PIN…</span>
+                  <span class="hd-muted" role="status">Asking {{ device.name }} for a PIN…</span>
                 } @else {
                   <form class="pin" (submit)="finish($event, device, pin.value)">
                     <div class="hd-field">
@@ -65,10 +65,10 @@ import { firstValueFrom } from 'rxjs';
                         [attr.aria-invalid]="!!pairing()!.error"
                       />
                       @if (pairing()!.error; as error) {
-                        <span class="field-error">{{ error }}</span>
+                        <span class="hd-error hd-small">{{ error }}</span>
                       }
                     </div>
-                    <div class="actions">
+                    <div class="hd-actions">
                       <button class="hd-btn hd-btn--primary" type="submit" [disabled]="pairing()!.step === 'finishing'">
                         {{ pairing()!.step === 'finishing' ? 'Pairing…' : 'Pair' }}
                       </button>
@@ -77,7 +77,7 @@ import { firstValueFrom } from 'rxjs';
                   </form>
                 }
               } @else {
-                <div class="actions">
+                <div class="hd-actions">
                   <button class="hd-btn" type="button" [disabled]="!!pairing()" (click)="startPairing(device)">
                     {{ device.paired ? 'Pair again' : 'Pair' }}
                   </button>
@@ -85,7 +85,7 @@ import { firstValueFrom } from 'rxjs';
               }
             </div>
           } @empty {
-            <p class="muted item">
+            <p class="hd-muted hd-account__item">
               No Apple TV found on the network. HomeyDash finds them with multicast DNS, which a container reaches only with
               host networking on Linux (<code>network_mode: host</code>); Docker Desktop on macOS or Windows can't. Run
               HomeyDash directly on the computer there.
@@ -93,7 +93,7 @@ import { firstValueFrom } from 'rxjs';
           }
         }
         @if (status.configured) {
-          <div class="actions">
+          <div class="hd-actions">
             <button class="hd-btn" type="button" [disabled]="looking()" (click)="load()">
               {{ looking() ? 'Looking…' : 'Look again' }}
             </button>
@@ -101,21 +101,12 @@ import { firstValueFrom } from 'rxjs';
         }
       }
       @if (error(); as error) {
-        <p class="error" role="alert">{{ error }}</p>
+        <p class="hd-error" role="alert">{{ error }}</p>
       }
     </section>
   `,
   styles: `
-    .account { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); }
-    .head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-    h2 { font-size: 18px; font-weight: 800; margin: 0; }
-    .item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--line); }
-    .item__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .pin { display: flex; flex-direction: column; gap: var(--space-4); flex: 1 1 100%; }
-    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-    .muted { color: var(--ink-muted); margin: 0; }
-    .field-error { font-size: 13px; color: var(--danger); font-weight: 700; }
-    .error { margin: 0; color: var(--danger); font-weight: 700; }
   `,
 })
 export class AirPlayPanel {

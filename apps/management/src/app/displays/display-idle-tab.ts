@@ -15,15 +15,15 @@ import { DisplaysStore } from './displays-store';
   template: `
     @if (context.display(); as display) {
       @if (!display.dashboardIds.length) {
-        <p class="hint">Offer a dashboard on the <a routerLink="../dashboards">Dashboards</a> page first.</p>
+        <p class="hd-hint">Offer a dashboard on the <a routerLink="../dashboards">Dashboards</a> page first.</p>
       } @else {
         <div class="idle">
-          <p class="hint">
+          <p class="hd-hint">
             A minute after the last touch, and for as long as no one touches it, it does the first of these whose rule
             holds. While none holds, it stays on what it shows. A photo set or colour fills the screen until someone touches it.
           </p>
           @if (!kiosk(display)) {
-            <p class="hint">
+            <p class="hd-hint">
               Turning the screen off needs Fully Kiosk Browser with its JavaScript interface on; this display doesn't report it.
             </p>
           }
@@ -61,7 +61,7 @@ import { DisplaysStore } from './displays-store';
               @if (idle.color) {
                 <input
                   type="color"
-                  class="color"
+                  class="hd-color-input color"
                   [attr.aria-label]="'Colour of rule ' + (i + 1)"
                   [value]="idle.color"
                   (change)="store.setIdleColor(display, i, $any($event.target).value)"
@@ -96,12 +96,11 @@ import { DisplaysStore } from './displays-store';
     }
   `,
   styles: `
+    .color { width: 40px; }
     .idle { display: flex; flex-direction: column; gap: var(--space-2); }
-    .hint { margin: 0; font-size: 13px; color: var(--ink-muted); }
     .entry { display: flex; align-items: center; gap: var(--space-1); }
     .entry .hd-select { flex: 0 1 200px; min-width: 0; }
     .entry .hd-btn { padding-inline: 10px; }
-    .color { flex: none; width: 40px; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--chrome); cursor: pointer; }
     .rule {
       flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
       color: var(--ink-muted); font: inherit; font-size: 13px; text-align: left; cursor: pointer;

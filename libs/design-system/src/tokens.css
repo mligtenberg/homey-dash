@@ -46,7 +46,6 @@
   --kind-climate-fill: #74e0ff;
   --kind-neutral-ink: #355bbd;
   --kind-neutral-fill: #aad0ff;
-  --tile-raised: 0 1px 2px color-mix(in oklab, #c5c8d6 60%, transparent), 0 6px 16px -5px #c5c8d6;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -90,8 +89,7 @@
     --kind-climate-fill: #004a69;
     --kind-neutral-ink: #91bbff;
     --kind-neutral-fill: #2a4072;
-    --tile-raised: 0 1px 2px color-mix(in oklab, #0f1015 60%, transparent), 0 6px 16px -5px #0f1015;
-  }
+    }
 }
 
 :root[data-theme="dark"] {
@@ -134,7 +132,6 @@
   --kind-climate-fill: #004a69;
   --kind-neutral-ink: #91bbff;
   --kind-neutral-fill: #2a4072;
-  --tile-raised: 0 1px 2px color-mix(in oklab, #0f1015 60%, transparent), 0 6px 16px -5px #0f1015;
 }
 
 :root {
@@ -149,6 +146,7 @@
   --radius-control: 8px;
   --radius-panel: 10px;
   --radius-pill: 999px;
+  --radius-lg: 16px;
   /* cell */
   --cell-gap: 0.08;
   --section-gap: 0.176;

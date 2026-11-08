@@ -20,7 +20,7 @@ Decisions already made:
 |---|---|---|
 | 0. design-system becomes an Angular lib | done | `1bb0f9b` |
 | 1. Shared pure helpers | done (see "Skipped" below) | `3d37357` |
-| 2. Tokens and CSS | **in progress**: baseline style snapshots taken, no CSS changed yet | — |
+| 2. Tokens and CSS | done for Management; display-side CSS cleanup deferred (see below) | see git log |
 | 3. design-system Angular primitives | todo | — |
 | 4. Management domain components | todo | — |
 | 5. Shared tile controls | todo | — |
@@ -67,6 +67,18 @@ Each of these would have added code rather than removed it:
 - **`attempt()` / busy-error runner.** Not done in Phase 1. Reconsider in Phase 4 together with the account panels.
 - **Extending `absentFace()` for the mood-list, Sonos and photo tiles.** Each copy is three lines, and the parameters needed would cost more than they save.
 - **The statistic windows list.** Folded into Phase 5's `<hd-statistic-pane>` instead.
+
+### Phase 2 (done for Management)
+- **New shared classes in `components.css`** (Management section): `.hd-muted`, `.hd-hint`, `.hd-error`, `.hd-small`, `.hd-actions`, `.hd-page__header/__title/__body(--narrow)`, `.hd-panel__title`, `.hd-section-title`, `.hd-account/__head/__item/__info`, `.hd-color-input`, `.hd-btn--sm`, `a.hd-btn { text-decoration: none }`.
+- **Components moved onto them:** all 4 account panels, immich-partners, accounts, photo sets, photo set, displays, display page and its tabs, display-screenshot, the editor page (`editor-page.html/.scss`), tile-panel, logic-panel, plex-target-field, photo-set-field, background-field, color-scheme-wheel, photo-selection-form, and the display app's `setup.ts`.
+- **Tokens:** removed the unused `--tile-raised` token, and renamed `.hd-tile`'s own `--raised` to `--tile-raised` to match the docs. Defined `--radius-lg: 16px`. Removed the dead `.hd-stage .hd-tile.is-selected` rule.
+- **Verified:** the style diff on 14 Management pages shows only `gap` on single-child headers, which has no visible effect.
+- **Intended change:** the home page's h1 went from 20px to 22px. That page only shows when no dashboard exists.
+- **Deferred, display side:**
+  - Plex gold literals → `var(--k-ink)`. This needs a check of every Plex dialog state, because some `.hd-plex-recent__*` classes may sit on tile faces that set their own `--k-ink`.
+  - The 21 ellipsis and 11 hidden-scrollbar blocks.
+  - Motion and z-index tokens.
+  - Collapsing the duplicated dark-theme block in `tokens.css`. This needs `light-dark()`, which old Fully Kiosk WebViews may lack, so it may be better left as it is.
 
 ## Next steps
 

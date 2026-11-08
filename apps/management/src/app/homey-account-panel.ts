@@ -27,9 +27,9 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
   imports: [NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="account hd-panel" aria-labelledby="homey-title">
-      <div class="head">
-        <h2 id="homey-title">Homey</h2>
+    <section class="hd-account hd-panel" aria-labelledby="homey-title">
+      <div class="hd-account__head">
+        <h2 class="hd-panel__title" id="homey-title">Homey</h2>
         @if (info(); as info) {
           @if (!info.accounts.length) {
             <span class="hd-pill hd-pill--warn hd-pill--dot">Not set up</span>
@@ -38,9 +38,9 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
       </div>
       @if (info(); as info) {
         @if (info.fake) {
-          <p class="muted">HomeyDash runs against a fake Homey with sample devices, set in its configuration.</p>
+          <p class="hd-muted">HomeyDash runs against a fake Homey with sample devices, set in its configuration.</p>
         } @else {
-          <p class="muted">
+          <p class="hd-muted">
             Add each Homey Pro HomeyDash should control, such as one per house. Displays reach Homey through HomeyDash, so
             only HomeyDash needs to be on Homey's network.
           </p>
@@ -48,24 +48,24 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
         @for (account of info.accounts; track account.id) {
           @let status = statuses().get(account.id);
           @let pill = statusPill(status);
-          <div class="item">
+          <div class="hd-account__item">
             @if (editing() === account.id) {
               <ng-container *ngTemplateOutlet="form; context: { $implicit: account }" />
             } @else {
-              <div class="item__info">
+              <div class="hd-account__info">
                 <strong>{{ account.name }}</strong>
                 @if (!info.fake) {
-                  <span class="muted">{{ account.address }}</span>
+                  <span class="hd-muted">{{ account.address }}</span>
                 }
                 @if (status?.connection === 'disconnected' && status?.lastError; as error) {
-                  <span class="muted small" role="status">{{ error }}</span>
+                  <span class="hd-muted hd-small" role="status">{{ error }}</span>
                 }
               </div>
-              <div class="actions">
+              <div class="hd-actions">
                 <span class="hd-pill hd-pill--dot" [class]="pill.tone ? 'hd-pill--' + pill.tone : ''">{{ pill.label }}</span>
                 @if (!info.fake) {
                   @if (removing() === account.id) {
-                    <span class="muted">Its tiles show as missing until you give them another Homey.</span>
+                    <span class="hd-muted">Its tiles show as missing until you give them another Homey.</span>
                     <button class="hd-btn hd-btn--danger" type="button" (click)="remove(account)">Remove</button>
                     <button class="hd-btn" type="button" (click)="removing.set(null)">Cancel</button>
                   } @else {
@@ -79,11 +79,11 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
         }
         @if (!info.fake) {
           @if (editing() === 'new') {
-            <div class="item">
+            <div class="hd-account__item">
               <ng-container *ngTemplateOutlet="form; context: { $implicit: null }" />
             </div>
           } @else if (editing() === null) {
-            <div class="actions">
+            <div class="hd-actions">
               <button class="hd-btn" [class.hd-btn--primary]="!info.accounts.length" type="button" (click)="edit('new')">
                 {{ info.accounts.length ? 'Add another Homey' : 'Set up Homey' }}
               </button>
@@ -92,7 +92,7 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
         }
       }
       @if (error(); as error) {
-        <p class="error" role="alert">{{ error }}</p>
+        <p class="hd-error" role="alert">{{ error }}</p>
       }
     </section>
 
@@ -111,7 +111,7 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
             aria-describedby="homey-name-error"
           />
           @if (errors()['name']; as error) {
-            <span id="homey-name-error" class="field-error">{{ error }}</span>
+            <span id="homey-name-error" class="hd-error hd-small">{{ error }}</span>
           }
         </div>
         <div class="hd-field">
@@ -127,7 +127,7 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
             aria-describedby="homey-address-error"
           />
           @if (errors()['address']; as error) {
-            <span id="homey-address-error" class="field-error">{{ error }}</span>
+            <span id="homey-address-error" class="hd-error hd-small">{{ error }}</span>
           }
         </div>
         <div class="hd-field">
@@ -142,11 +142,11 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
             [attr.aria-invalid]="!!errors()['apiKey']"
             aria-describedby="homey-key-hint"
           />
-          <span id="homey-key-hint" [class]="errors()['apiKey'] ? 'field-error' : 'hint'">
+          <span id="homey-key-hint" [class]="errors()['apiKey'] ? 'hd-error hd-small' : 'hd-hint'">
             {{ errors()['apiKey'] ?? 'Make one in the Homey web app under Settings → API keys.' }}
           </span>
         </div>
-        <div class="actions">
+        <div class="hd-actions">
           <button class="hd-btn hd-btn--primary" type="submit" [disabled]="saving()">{{ account ? 'Save' : 'Add Homey' }}</button>
           <button class="hd-btn" type="button" (click)="edit(null)">Cancel</button>
         </div>
@@ -154,17 +154,7 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
     </ng-template>
   `,
   styles: `
-    .account { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); }
-    .head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-    h2 { font-size: 18px; font-weight: 800; margin: 0; }
-    .item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--line); }
-    .item__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .form { display: flex; flex-direction: column; gap: var(--space-4); flex: 1; }
-    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-    .muted, .hint { color: var(--ink-muted); margin: 0; }
-    .hint, .field-error, .small { font-size: 13px; }
-    .field-error { color: var(--danger); font-weight: 700; }
-    .error { margin: 0; color: var(--danger); font-weight: 700; }
   `,
 })
 export class HomeyAccountPanel {

@@ -13,14 +13,14 @@ import { DisplayInfo, DisplaysApi } from '@homey-dash/api-client';
       </button>
       @if (picture(); as shot) {
         <a class="hd-btn" [href]="shot.url" [download]="shot.name">Download</a>
-        <span class="muted">Taken {{ shot.at }}</span>
+        <span class="hd-hint">Taken {{ shot.at }}</span>
       }
       @if (!display().status.connected) {
-        <span class="muted">The display must be connected.</span>
+        <span class="hd-hint">The display must be connected.</span>
       }
     </div>
     @if (error(); as message) {
-      <p class="error" role="alert">{{ message }}</p>
+      <p class="hd-error" role="alert">{{ message }}</p>
     }
     @if (picture(); as shot) {
       <img class="shot" [src]="shot.url" alt="What the display shows" />
@@ -29,9 +29,6 @@ import { DisplayInfo, DisplaysApi } from '@homey-dash/api-client';
   styles: `
     :host { display: flex; flex-direction: column; gap: var(--space-3); }
     .bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
-    .hd-btn { text-decoration: none; }
-    .muted { color: var(--ink-muted); font-size: 13px; }
-    .error { margin: 0; color: var(--danger); font-weight: 700; }
     .shot { max-width: 100%; max-height: 70vh; align-self: flex-start; border: 1px solid var(--line); border-radius: 10px; }
   `,
 })

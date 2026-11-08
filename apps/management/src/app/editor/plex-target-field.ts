@@ -37,16 +37,15 @@ import { PlexData } from '@homey-dash/tiles';
         }
       </select>
       @if (type() === 'plexPlayer') {
-        <span class="hint">Players show up here once they played something.</span>
+        <span class="hd-hint">Players show up here once they played something.</span>
       }
       @if (status(); as status) {
-        <span class="hint">{{ status }} <a routerLink="/accounts">Go to Accounts</a></span>
+        <span class="hd-hint">{{ status }} <a routerLink="/accounts">Go to Accounts</a></span>
       }
     </div>
   `,
   styles: `
     :host { display: flex; flex-direction: column; gap: var(--space-4); }
-    .hint { font-size: 13px; color: var(--ink-muted); }
     a { color: var(--brand); }
   `,
 })

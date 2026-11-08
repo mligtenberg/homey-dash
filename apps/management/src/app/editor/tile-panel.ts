@@ -33,7 +33,7 @@ import { moved, removedAt } from '@homey-dash/design-system';
   imports: [PhotoSetField, PlexTargetField, SizePicker, TargetPicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <h2>{{ kind()?.label ?? 'Unknown tile' }}</h2>
+    <h2 class="hd-section-title">{{ kind()?.label ?? 'Unknown tile' }}</h2>
 
     @if (kind(); as kind) {
       @if (homeyAccounts(); as accounts) {
@@ -118,7 +118,7 @@ import { moved, removedAt } from '@homey-dash/design-system';
         </div>
       }
     } @else {
-      <p class="muted">No installed module registers the kind "{{ tile().kind }}". It shows as missing until you remove it.</p>
+      <p class="hd-muted">No installed module registers the kind "{{ tile().kind }}". It shows as missing until you remove it.</p>
     }
 
     <button type="button" class="hd-btn hd-btn--danger remove" (click)="removed.emit()">
@@ -127,8 +127,6 @@ import { moved, removedAt } from '@homey-dash/design-system';
   `,
   styles: `
     :host { display: flex; flex-direction: column; gap: var(--space-4); }
-    h2 { font-size: 16px; font-weight: 800; margin: 0; }
-    .muted { color: var(--ink-muted); margin: 0; }
     .remove { align-self: flex-start; margin-top: var(--space-2); }
     .picked { display: flex; align-items: center; gap: var(--space-1); }
     .picked__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -76,6 +76,7 @@ Use one family, Rubik, from Google Fonts: `font-sans`.
 - Set a unit at 0.45em of its value, weight 600, in `ink-muted`: `20.5°C`, `1.84 kW`, `42 min left`.
 - Numbers always use tabular figures.
 - **Management** uses fixed sizes: `page-title`, `panel-title`, `body`, `body-strong`, `label` and `overline`. Only `overline` is uppercase.
+- In Management, give a page's `h1` `.hd-page__title` (22px), a panel's heading `.hd-panel__title` (18px) and a heading within a panel `.hd-section-title` (16px). No other heading sizes.
 
 ## Layout
 
@@ -142,3 +143,12 @@ The icons in these previews were drawn to match Lucide. Use the real Lucide set 
 ## Using it in the Angular apps
 
 Both `display` and `management` load `libs/design-system/src/index.css` (the Rubik font, `tokens.css` and `components.css`) as a global style. Set `--cell` on the display's root from `innerHeight / rows`, and add the `hd-display` class to that root. The component guidelines name the classes and data attributes each component expects. They are plain CSS. The one piece of script is the [Ripple](components/Ripple.md): each app calls `installRipple()` from `@homey-dash/design-system` once in `main.ts`.
+
+Management pages share these classes instead of styling the same things per component:
+
+- **Page:** `.hd-page__header` holds the `h1.hd-page__title` and the page's actions. `.hd-page__body` (900px wide at most; `--narrow` is 640px) stacks its panels.
+- **Text:** `.hd-muted` for secondary text, `.hd-hint` for the 13px hint under a field, `.hd-error` for what went wrong, and `.hd-small` to make any of them 13px. A field's error is `.hd-error.hd-small`.
+- **Rows:** `.hd-actions` for a wrapping row of buttons. An account panel is `.hd-account`, with `__head`, and one `__item` per account whose name and details sit in `__info`.
+- **Controls:** `.hd-btn--sm` for a small button, and `.hd-color-input` for a colour input (set its width where it is used).
+
+`@homey-dash/design-system` also exports small helpers both apps use: `clock()`, `minuteClock()` and `timeAgo()` for times that stay current, and `moved()`, `removedAt()`, `changedAt()` and `chunk()` for editing lists.

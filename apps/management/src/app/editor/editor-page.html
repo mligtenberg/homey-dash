@@ -1,6 +1,6 @@
 @if (dashboard(); as dashboard) {
-  <header class="header">
-    <h1>{{ dashboard.name }}</h1>
+  <header class="hd-page__header">
+    <h1 class="hd-page__title">{{ dashboard.name }}</h1>
     @if (justPublished()) {
       <span class="hd-pill hd-pill--ok">Published</span>
     } @else if (unpublished()) {
@@ -117,7 +117,7 @@
 
     <aside class="hd-panel panel">
       @if (adding()) {
-        <h2>Add a tile</h2>
+        <h2 class="hd-section-title">Add a tile</h2>
         <div class="kinds">
           @for (kind of kinds.all(); track kind.id) {
             <button class="hd-btn kind" type="button" [disabled]="!canAdd(kind)" (click)="add(kind)">{{ kind.label }}</button>
@@ -125,7 +125,7 @@
         </div>
         <button class="hd-btn" type="button" (click)="adding.set(null)">Cancel</button>
       } @else if (openSection(); as section) {
-        <h2>{{ section.title || 'Untitled section' }}</h2>
+        <h2 class="hd-section-title">{{ section.title || 'Untitled section' }}</h2>
         <div class="hd-field">
           <label class="hd-field__label" for="section-visibility">Show on displays</label>
           <select
@@ -141,7 +141,7 @@
         @if (section.rule && !section.hidden) {
           <hd-rule-editor [rule]="section.rule" (changed)="setSectionRule(section.id, $event)" />
         }
-        <p class="hint">The editor always shows every section, dimming those a display would leave out now.</p>
+        <p class="hd-muted">The editor always shows every section, dimming those a display would leave out now.</p>
         <button class="hd-btn" type="button" (click)="openSectionId.set(null)">Done</button>
       } @else if (selected(); as selected) {
         @if (open(); as open) {
@@ -149,7 +149,7 @@
             <svg [lucideIcon]="icons.LucideChevronLeft" />
             Logic tile
           </button>
-          <p class="hint">{{ open.rule ? 'Tile ' + open.label : 'The fallback' }} of the logic tile, at its size.</p>
+          <p class="hd-muted">{{ open.rule ? 'Tile ' + open.label : 'The fallback' }} of the logic tile, at its size.</p>
           <hd-tile-panel
             nested
             [tile]="open.view"
@@ -183,7 +183,7 @@
           </hd-tile-panel>
         }
       } @else {
-        <h2>Dashboard</h2>
+        <h2 class="hd-section-title">Dashboard</h2>
         <div class="hd-field">
           <label class="hd-field__label" for="dashboard-name">Name</label>
           <input id="dashboard-name" class="hd-input" [value]="dashboard.name" (change)="rename($any($event.target).value)" />
@@ -197,7 +197,7 @@
           </select>
         </div>
         <hd-background-field [background]="layout().background ?? null" (previewed)="previewBackground.set($event)" (changed)="setBackground($event)" />
-        <p class="hint">Press an empty cell to add a tile. Drag a tile to move it, or its corner to resize it.</p>
+        <p class="hd-muted">Press an empty cell to add a tile. Drag a tile to move it, or its corner to resize it.</p>
         <button class="hd-btn hd-btn--danger delete" type="button" (click)="deleteDashboard()">Delete dashboard</button>
       }
     </aside>

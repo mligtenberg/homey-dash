@@ -19,7 +19,7 @@ import { clock, timeAgo } from '@homey-dash/design-system';
   imports: [RouterLink, PhotoSelectionForm, PhotoViewer],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header class="header">
+    <header class="hd-page__header">
       <a class="back" routerLink="/photo-sets">← Photo sets</a>
       @if (set(); as set) {
         <input
@@ -32,13 +32,13 @@ import { clock, timeAgo } from '@homey-dash/design-system';
         />
       }
     </header>
-    <div class="body">
+    <div class="hd-page__body">
       @if (set(); as set) {
         <section class="hd-panel panel" aria-label="Source">
           @if (set.selection; as selection) {
-            <p class="muted">{{ summary(selection) }}</p>
+            <p class="hd-muted">{{ summary(selection) }}</p>
           }
-          <p class="muted">
+          <p class="hd-muted">
             {{ set.photos.length }} {{ set.photos.length === 1 ? 'photo' : 'photos' }}
             @if (set.albumName) {
               from {{ set.albumName }}
@@ -53,7 +53,7 @@ import { clock, timeAgo } from '@homey-dash/design-system';
               · {{ set.skippedVideos }} {{ set.skippedVideos === 1 ? 'video' : 'videos' }} left out
             }
           </p>
-          <p class="muted">
+          <p class="hd-muted">
             @if (set.dashboards.length) {
               Shown on {{ set.dashboards.join(', ') }}
             } @else {
@@ -117,7 +117,7 @@ import { clock, timeAgo } from '@homey-dash/design-system';
           }
           <div class="actions">
             @if (removing()) {
-              <span class="muted">{{ set.dashboards.length ? 'Its tiles show as missing.' : 'The album stays in Immich.' }}</span>
+              <span class="hd-muted">{{ set.dashboards.length ? 'Its tiles show as missing.' : 'The album stays in Immich.' }}</span>
               <button class="hd-btn hd-btn--danger" type="button" (click)="remove(set)">Delete</button>
               <button class="hd-btn" type="button" (click)="removing.set(false)">Cancel</button>
             } @else {
@@ -144,7 +144,7 @@ import { clock, timeAgo } from '@homey-dash/design-system';
 
         @if (set.photos.length) {
           <section class="hd-panel panel" aria-label="Photos">
-            <h2>Photos</h2>
+            <h2 class="hd-section-title">Photos</h2>
             <ul class="photos">
               @for (photo of set.photos; track photo.id) {
                 <li>
@@ -160,8 +160,8 @@ import { clock, timeAgo } from '@homey-dash/design-system';
 
         @if (set.excluded.length) {
           <section class="hd-panel panel" [attr.aria-label]="'Excluded from ' + set.name">
-            <h2>Excluded</h2>
-            <p class="muted">
+            <h2 class="hd-section-title">Excluded</h2>
+            <p class="hd-muted">
               {{ set.excluded.length }} {{ set.excluded.length === 1 ? 'photo' : 'photos' }} excluded on a display, which no
               sync brings back
               @if (set.selection) {
@@ -173,7 +173,7 @@ import { clock, timeAgo } from '@homey-dash/design-system';
                 <li class="excluded">
                   <img [src]="url(set, { id })" alt="" loading="lazy" />
                   <button
-                    class="hd-btn"
+                    class="hd-btn hd-btn--sm"
                     type="button"
                     [attr.aria-label]="'Bring back excluded photo ' + (i + 1)"
                     [disabled]="restoring() === id"
@@ -188,11 +188,11 @@ import { clock, timeAgo } from '@homey-dash/design-system';
         }
       } @else if (data.photoSetsLoaded()) {
         <div class="hd-panel panel">
-          <p class="muted">This photo set no longer exists. <a routerLink="/photo-sets">Back to photo sets</a></p>
+          <p class="hd-muted">This photo set no longer exists. <a routerLink="/photo-sets">Back to photo sets</a></p>
         </div>
       }
       @if (error(); as error) {
-        <p class="error" role="alert">
+        <p class="hd-error" role="alert">
           {{ error }}
           @if (error.includes('Accounts')) {
             <a routerLink="/accounts">Go to Accounts</a>
@@ -202,24 +202,19 @@ import { clock, timeAgo } from '@homey-dash/design-system';
     </div>
   `,
   styles: `
-    .header { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line); }
+    .hd-page__header { gap: var(--space-4); }
     .back { color: var(--ink-muted); font-weight: 700; text-decoration: none; white-space: nowrap; }
     .name { font-size: 18px; font-weight: 800; max-width: 420px; }
-    h2 { font-size: 16px; font-weight: 800; margin: 0; }
-    .body { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); max-width: 900px; }
     .panel { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); }
     .album { max-width: 420px; }
     .rules { display: flex; flex-direction: column; gap: var(--space-4); max-width: 560px; }
-    .muted { color: var(--ink-muted); margin: 0; }
     .status { margin: 0; font-weight: 700; }
-    .status.failed, .error { color: var(--danger); }
-    .error { margin: 0; font-weight: 700; }
+    .status.failed { color: var(--danger); }
     .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
     .photos { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
     .photos img { display: block; width: 96px; height: 96px; object-fit: cover; border-radius: 6px; background: var(--tile-surface); }
     .photo { display: block; padding: 0; border: 0; background: none; border-radius: 6px; cursor: zoom-in; }
     .excluded { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-    .excluded .hd-btn { padding: 4px 8px; font-size: 12px; }
   `,
 })
 export class PhotoSetPage {

@@ -28,14 +28,14 @@ import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner
                     [attr.aria-invalid]="!!keyError()"
                     [attr.aria-describedby]="'partner-key-hint-' + partner.id"
                   />
-                  <span [id]="'partner-key-hint-' + partner.id" [class]="keyError() ? 'field-error' : 'hint'">
+                  <span [id]="'partner-key-hint-' + partner.id" [class]="keyError() ? 'hd-error hd-small' : 'hd-hint'">
                     {{
                       keyError() ??
                         'Make one in Immich while signed in as ' + partner.name + ', with user.read, asset.read, asset.edit.get, asset.edit.create and asset.edit.delete.'
                     }}
                   </span>
                 </div>
-                <div class="actions">
+                <div class="hd-actions">
                   <button class="hd-btn hd-btn--primary" type="submit" [disabled]="saving()">
                     {{ saving() ? 'Checking with Immich…' : 'Save key' }}
                   </button>
@@ -43,11 +43,11 @@ import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner
                 </div>
               </form>
             } @else {
-              <div class="partner__info">
+              <div class="hd-account__info">
                 <strong>{{ partner.name }}</strong>
-                <span class="muted">{{ partner.hasKey ? 'Displays can rotate their photos' : 'Their photos can\\'t be rotated without a key of theirs' }}</span>
+                <span class="hd-muted">{{ partner.hasKey ? 'Displays can rotate their photos' : 'Their photos can\\'t be rotated without a key of theirs' }}</span>
               </div>
-              <div class="actions">
+              <div class="hd-actions">
                 @if (partner.hasKey) {
                   <button class="hd-btn" type="button" (click)="add(partner.id)">Change key</button>
                   <button class="hd-btn hd-btn--danger" type="button" (click)="removeKey(partner)">Remove key</button>
@@ -61,20 +61,15 @@ import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner
       </div>
     }
     @if (error(); as error) {
-      <p class="muted" role="alert">{{ error }}</p>
+      <p class="hd-muted" role="alert">{{ error }}</p>
     }
   `,
   styles: `
     :host { display: contents; }
     .partners { display: flex; flex-direction: column; gap: var(--space-3); flex-basis: 100%; padding-left: var(--space-4); border-left: 2px solid var(--line); }
     .partner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
-    .partner__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .form { display: flex; flex-direction: column; gap: var(--space-3); flex: 1; }
-    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-    .muted, .hint { color: var(--ink-muted); margin: 0; }
-    .muted[role='alert'] { flex-basis: 100%; }
-    .hint, .field-error { font-size: 13px; }
-    .field-error { color: var(--danger); font-weight: 700; }
+    .hd-muted[role='alert'] { flex-basis: 100%; }
   `,
 })
 export class ImmichPartners {

@@ -14,20 +14,15 @@ import { PlexAccountPanel } from './plex-account-panel';
   imports: [AirPlayPanel, HomeyAccountPanel, ImmichAccountPanel, PlexAccountPanel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header class="header">
-      <h1>Accounts</h1>
+    <header class="hd-page__header">
+      <h1 class="hd-page__title">Accounts</h1>
     </header>
-    <div class="body">
+    <div class="hd-page__body hd-page__body--narrow">
       <hd-homey-account-panel />
       <hd-immich-account-panel />
       <hd-plex-account-panel />
       <hd-airplay-panel />
     </div>
-  `,
-  styles: `
-    .header { display: flex; align-items: center; padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line); }
-    h1 { font-size: 22px; font-weight: 800; margin: 0; }
-    .body { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); max-width: 640px; }
-  `,
+  `
 })
 export class AccountsPage {}

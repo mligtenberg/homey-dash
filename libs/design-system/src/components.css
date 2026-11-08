@@ -84,7 +84,7 @@
 
 .hd-tile {
   /* One soft lift; the controls inside a tile sit flat on it. */
-  --raised: 0 1px 2px color-mix(in oklab, var(--emboss-shade) 60%, transparent),
+  --tile-raised: 0 1px 2px color-mix(in oklab, var(--emboss-shade) 60%, transparent),
             0 calc(var(--cell) * .05) calc(var(--cell) * .14) calc(var(--cell) * -.04) var(--emboss-shade);
   position: relative;
   box-sizing: border-box;
@@ -96,7 +96,7 @@
   border-radius: calc(var(--cell) * var(--tile-radius));
   background: var(--tile-surface);
   color: var(--ink);
-  box-shadow: var(--raised);
+  box-shadow: var(--tile-raised);
   font-family: var(--font-sans);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -668,7 +668,9 @@
   cursor: pointer;
   transition: transform .1s;
 }
+a.hd-btn { text-decoration: none; }
 .hd-btn:active { transform: scale(.97); }
+.hd-btn--sm { padding: 4px 8px; font-size: 12px; }
 .hd-btn--primary { background: var(--brand); color: var(--on-brand); border-color: transparent; }
 .hd-btn--danger { background: none; border: 0; padding-inline: 0; color: var(--danger); }
 .hd-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
@@ -721,7 +723,6 @@
   background-size: 16px 16px;
 }
 .hd-stage .hd-tile { cursor: grab; }
-.hd-stage .hd-tile.is-selected { outline: 2.5px solid var(--brand); outline-offset: 4px; }
 .hd-slot {
   border: 1.5px dashed var(--line);
   border-radius: calc(var(--cell) * var(--tile-radius));
@@ -758,6 +759,32 @@
 .hd-nav__item:hover { color: var(--ink); }
 .hd-nav__item[aria-current="page"] { background: var(--panel); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
 .hd-dot-warn { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+
+/* Text roles: secondary text, a hint under a field, and what went wrong. .hd-small makes any of them 13px. */
+.hd-muted { margin: 0; color: var(--ink-muted); }
+.hd-hint { margin: 0; color: var(--ink-muted); font-size: 13px; }
+.hd-error { margin: 0; color: var(--danger); font-weight: 700; }
+.hd-small { font-size: 13px; }
+/* A row of buttons and the like that wraps. */
+.hd-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+/* A page: its header with the title, and its body. */
+.hd-page__header { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line); }
+.hd-page__title { font-size: 22px; font-weight: 800; margin: 0; }
+.hd-page__body { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); max-width: 900px; }
+.hd-page__body--narrow { max-width: 640px; }
+/* Headings below the page title: a panel's, and a section's within a panel. */
+.hd-panel__title { font-size: 18px; font-weight: 800; margin: 0; }
+.hd-section-title { font-size: 16px; font-weight: 800; margin: 0; }
+
+/* An account panel on the Accounts page: a head with its status, then one row per account. */
+.hd-account { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); }
+.hd-account__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.hd-account__item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--line); }
+.hd-account__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+/* A colour input beside a select; set its width where it is used. */
+.hd-color-input { flex: none; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--chrome); cursor: pointer; }
 
 /* ---------- Dashboard tape ---------- */
 /* Pills floating over the left edge of a display that offers more than one dashboard, main first. Frosted and
@@ -1094,7 +1121,7 @@
 .hd-plex-recent__now {
   position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: flex-end; gap: calc(var(--cell) * .1);
   margin-bottom: calc(var(--cell) * .12); padding: calc(var(--cell) * .1) calc(var(--cell) * .16);
-  border-radius: var(--radius-lg, 16px); background: rgb(31 35 38 / .92); box-shadow: inset 0 0 0 2px #e5a00d; backdrop-filter: blur(8px);
+  border-radius: var(--radius-lg); background: rgb(31 35 38 / .92); box-shadow: inset 0 0 0 2px #e5a00d; backdrop-filter: blur(8px);
 }
 /* A film or episode playing on this screen: over the whole dialog, the picture as large as fits with its title and Stop beneath. */
 .hd-plex-recent__player {
@@ -1117,7 +1144,7 @@
    Escape), the one in use filled, and a PIN for a protected one. Anchored under its button where the browser can; else centred. */
 .hd-plex-recent__profiles {
   box-sizing: border-box; min-width: 12em; max-width: min(92vw, 22em); margin: 0; padding: calc(var(--cell) * .08); border: 0;
-  border-radius: var(--radius-lg, 16px); background: #2a2d31; color: #fff; box-shadow: 0 calc(var(--cell) * .08) calc(var(--cell) * .3) rgb(0 0 0 / .55), inset 0 0 0 2px rgb(255 255 255 / .12);
+  border-radius: var(--radius-lg); background: #2a2d31; color: #fff; box-shadow: 0 calc(var(--cell) * .08) calc(var(--cell) * .3) rgb(0 0 0 / .55), inset 0 0 0 2px rgb(255 255 255 / .12);
   font: 700 calc(var(--cell) * .11)/1.2 var(--font-sans);
 }
 .hd-plex-recent__profiles:popover-open { display: flex; flex-direction: column; gap: calc(var(--cell) * .04); }

@@ -54,12 +54,12 @@ const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
       </div>
       @switch (background()?.kind) {
         @case ('color') {
-          <input type="color" class="color" aria-label="Background colour" [value]="colors().color" (change)="setColor('color', $any($event.target).value)" />
+          <input type="color" class="hd-color-input color" aria-label="Background colour" [value]="colors().color" (change)="setColor('color', $any($event.target).value)" />
         }
         @case ('gradient') {
           <div class="row">
-            <input type="color" class="color" aria-label="Gradient from" [value]="colors().color" (change)="setColor('color', $any($event.target).value)" />
-            <input type="color" class="color" aria-label="Gradient to" [value]="colors().to" (change)="setColor('to', $any($event.target).value)" />
+            <input type="color" class="hd-color-input color" aria-label="Gradient from" [value]="colors().color" (change)="setColor('color', $any($event.target).value)" />
+            <input type="color" class="hd-color-input color" aria-label="Gradient to" [value]="colors().to" (change)="setColor('to', $any($event.target).value)" />
             <select class="hd-select" aria-label="Gradient direction" (change)="setAngle(+$any($event.target).value)">
               @for (direction of angles; track direction.angle) {
                 <option [value]="direction.angle" [selected]="direction.angle === angle()">{{ direction.label }}</option>
@@ -101,24 +101,22 @@ const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
           {{ uploading() ? 'Uploading…' : background()?.kind === 'image' ? 'Choose another image' : 'Choose an image' }}
           <input type="file" accept="image/jpeg,image/png,image/webp" [disabled]="uploading()" (change)="upload($any($event.target))" />
         </label>
-        <p class="hint">JPEG, PNG or WebP, at most 15 MB. Tiles turn to glass over it.</p>
+        <p class="hd-hint">JPEG, PNG or WebP, at most 15 MB. Tiles turn to glass over it.</p>
       }
       @if (error(); as error) {
-        <p class="error" role="alert">{{ error }}</p>
+        <p class="hd-error hd-small" role="alert">{{ error }}</p>
       }
     </div>
   `,
   styles: `
+    .color { width: 48px; }
     .row { display: flex; align-items: center; gap: var(--space-2); }
     .row .hd-select { flex: 1; min-width: 0; }
     .swatch { flex: none; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--ground); }
-    .color { flex: none; width: 48px; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--chrome); cursor: pointer; }
     .hd-field { gap: var(--space-2); }
     .upload { position: relative; align-self: flex-start; cursor: pointer; }
     .upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
     .upload.is-busy { opacity: .6; cursor: progress; }
-    .hint { margin: 0; color: var(--ink-muted); font-size: 13px; }
-    .error { margin: 0; color: var(--danger); font-weight: 700; font-size: 13px; }
     .presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
     .preset { padding: 0; border: 2px solid transparent; border-radius: var(--radius-control); background: none; cursor: pointer; overflow: hidden; }
     .thumb { display: block; width: 100%; aspect-ratio: 16 / 10; }

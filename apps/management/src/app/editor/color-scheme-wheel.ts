@@ -43,7 +43,7 @@ const point = (hue: number, saturation: number, r = 50) => {
       }
     </div>
     <div class="row">
-      <input type="color" class="color" aria-label="First colour" [value]="colors()[0]" (change)="pick($any($event.target).value)" />
+      <input type="color" class="hd-color-input color" aria-label="First colour" [value]="colors()[0]" (change)="pick($any($event.target).value)" />
       @for (c of colors().slice(1); track $index) {
         <span class="swatch" [style.background]="c" aria-hidden="true"></span>
       }
@@ -53,6 +53,7 @@ const point = (hue: number, saturation: number, r = 50) => {
     </div>
   `,
   styles: `
+    .color { width: 36px; }
     :host { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
     .wheel { position: relative; width: 176px; aspect-ratio: 1; border-radius: 50%; touch-action: none; cursor: crosshair;
       background: radial-gradient(closest-side, oklch(.7 0 0), oklch(.7 0 0 / 0)),
@@ -66,7 +67,6 @@ const point = (hue: number, saturation: number, r = 50) => {
     .handle.opposite { width: 14px; height: 14px; margin: -7px 0 0 -7px; cursor: inherit; pointer-events: none; }
     .handle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
     .row { display: flex; align-items: center; gap: var(--space-2); max-width: 100%; }
-    .color { width: 36px; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--chrome); cursor: pointer; }
     .swatch { flex: none; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: var(--radius-control); }
     .angle { display: flex; flex: 1; min-width: 0; align-items: center; gap: 4px; }
     .angle input { width: 100%; min-width: 0; max-width: 72px; }
