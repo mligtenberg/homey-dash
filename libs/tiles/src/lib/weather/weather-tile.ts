@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { RainPoint, WEATHER_PLACE, WeatherDay, WeatherHour } from '@homey-dash/api-client';
-import { LucideCloudSun, LucideDynamicIcon } from '@lucide/angular';
+import { LucideCloudSun } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { clockTime, degrees, RAIN_FROM, rainSummary, WeatherData, weatherIdle, weatherLook, WeatherTileSettings } from './weather-data';

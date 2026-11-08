@@ -1,16 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { apiProblem, canRotate, Photo, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
-import {
-  LucideChevronLeft,
-  LucideChevronRight,
-  LucideDynamicIcon,
-  LucideImage,
-  LucideImageOff,
-  LucideMapPin,
-  LucideRotateCcw,
-  LucideRotateCw,
-  LucideUsers,
-} from '@lucide/angular';
+import { LucideChevronLeft, LucideChevronRight, LucideImage, LucideImageOff, LucideMapPin, LucideRotateCcw, LucideRotateCw, LucideUsers } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { TileDetails } from './tile-details';
 

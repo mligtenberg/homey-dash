@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, Directive, inject } from '@angular/core';
 import { Realtime } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucidePlay, LucideSparkles, LucideWorkflow } from '@lucide/angular';
+import { LucidePlay, LucideSparkles, LucideWorkflow } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { moodTint } from './mood-tint';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
 

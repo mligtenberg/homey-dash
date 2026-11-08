@@ -1,7 +1,8 @@
 import { SettingSelect } from './setting-select';
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, input, linkedSignal, output, signal, untracked, viewChild } from '@angular/core';
 import { Photo, photoUrl, Realtime } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucideImage } from '@lucide/angular';
+import { LucideImage } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { TileSettings } from '../tile-data';
 import { PhotoViewer, takenOn } from './photo-viewer';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';

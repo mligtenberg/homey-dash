@@ -1,6 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, output, signal, viewChild } from '@angular/core';
-import { LucideMonitorCog } from '@lucide/angular';
+import { LucideMonitorCog } from '@homey-dash/design-system';
 import { TileDetails } from '@homey-dash/tiles';
 import { Camera, LightMeter } from './light-meter';
 

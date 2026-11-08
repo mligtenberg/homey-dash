@@ -5,7 +5,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, resource, signal, viewChild } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { CapabilityValue, DeviceApp, HomeyApi, InsightResolution, Realtime } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucideIconInput, LucideLock, LucideLockOpen, LucideSpeaker, LucideVolume2, LucideVolumeX } from '@lucide/angular';
+import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import { TileData } from '../tile-data';
 import { DeviceApps } from './device-apps';
@@ -14,7 +14,7 @@ import { clamp, clockTime, describeDevice, deviceLogs, sameLogs } from './device
 import { StatisticHistory } from './statistic-history';
 import { TileDetails } from './tile-details';
 import { flasher } from './tile-view';
-import { clock } from '@homey-dash/design-system';
+import { LucideLock, LucideLockOpen, LucideSpeaker, LucideVolume2, LucideVolumeX, clock } from '@homey-dash/design-system';
 
 
 const ON_OFF_STATES = [

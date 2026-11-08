@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, input, linkedSignal, signal, viewChild } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { HomeyApi, HomeyInsightEntry, HomeyInsightLog, InsightResolution } from '@homey-dash/api-client';
-import { LucideChevronLeft, LucideChevronRight, LucideDynamicIcon } from '@lucide/angular';
+import { LucideChevronLeft, LucideChevronRight } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { STATISTIC_WINDOWS, statisticTone, WINDOW_TABS } from './statistic-chart';
 import { Segmented } from './segmented';
 import { StatisticReadings } from './statistic-readings';

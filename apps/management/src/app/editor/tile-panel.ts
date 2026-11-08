@@ -16,14 +16,13 @@ import {
 } from '@angular/core';
 import { Tile, WEATHER_PLACE } from '@homey-dash/api-client';
 import { TileSize } from '@homey-dash/layout';
-import { LucideChartLine, LucideSparkles, LucideWorkflow } from '@lucide/angular';
 import { deviceLook, deviceType, TileData, TileKind, TileSettings, usesHomeyAccount } from '@homey-dash/tiles';
 import { PhotoSetField } from './photo-set-field';
 import { PlexTargetField } from './plex-target-field';
 import { SizePicker } from './size-picker';
 import { TargetPicker } from './target-picker';
 import { allOptions, buildTree, TargetNode } from './target-tree';
-import { moved, removedAt, ReorderButtons } from '@homey-dash/design-system';
+import { LucideChartLine, LucideSparkles, LucideWorkflow, ReorderButtons, moved, removedAt } from '@homey-dash/design-system';
 
 /**
  * Settings of the selected tile: its target, its kind's own settings, label and size. A tile a logic tile holds is

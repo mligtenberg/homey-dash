@@ -1,20 +1,5 @@
-import {
-  LucideActivity,
-  LucideClapperboard,
-  LucideGamepad2,
-  LucideHouse,
-  LucideIconInput,
-  LucideImages,
-  LucideMic,
-  LucideMonitor,
-  LucideMusic,
-  LucidePodcast,
-  LucideSearch,
-  LucideSettings,
-  LucideStore,
-  LucideTv,
-  LucideVideo,
-} from '@lucide/angular';
+import { LucideActivity, LucideClapperboard, LucideGamepad2, LucideHouse, LucideImages, LucideMic, LucideMonitor, LucideMusic, LucidePodcast, LucideSearch, LucideSettings, LucideStore, LucideTv, LucideVideo } from '@homey-dash/design-system';
+import { LucideIconInput } from '@lucide/angular';
 import { DeviceApp } from '@homey-dash/api-client';
 
 /**

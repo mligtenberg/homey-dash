@@ -11,7 +11,8 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { LucideChevronLeft, LucideDynamicIcon, LucideLayers } from '@lucide/angular';
+import { LucideChevronLeft, LucideLayers } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { IdleRule, Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
 import { fittedCellSize } from '@homey-dash/layout';
 import { DashboardView, homeyLost, PhotoTile, ruleAnswersOf, TileData, TileKindRegistry } from '@homey-dash/tiles';

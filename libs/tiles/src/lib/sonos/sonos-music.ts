@@ -1,7 +1,8 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { Realtime, SpeakerMusic, SpeakerMusicKind } from '@homey-dash/api-client';
-import { LucideAudioLines, LucideDynamicIcon, LucideMusic, LucideSearch } from '@lucide/angular';
+import { LucideAudioLines, LucideMusic, LucideSearch } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { brokenImages } from '../core/loadable-art';
 
 /** What a result of the music picker plays as, with where it came from. */

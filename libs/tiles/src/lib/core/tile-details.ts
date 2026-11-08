@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
-import { LucideDynamicIcon, LucideIconInput, LucideX } from '@lucide/angular';
+import { LucideX } from '@homey-dash/design-system';
+import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 
 /** How long the detail view stays open untouched; nobody may be there to close it on a wall tablet. */
 export const DETAILS_IDLE_MS = 60_000;

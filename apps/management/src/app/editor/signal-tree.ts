@@ -1,6 +1,7 @@
 import { HomeyZone, SignalInfo } from '@homey-dash/api-client';
 import { deviceLook, deviceType, HomeyData, KindHue } from '@homey-dash/tiles';
-import { LucideBox, LucideClock, LucideIconInput, LucideMonitor, LucideTv, LucideVariable } from '@lucide/angular';
+import { LucideBox, LucideClock, LucideMonitor, LucideTv, LucideVariable } from '@homey-dash/design-system';
+import { LucideIconInput } from '@lucide/angular';
 import { SignalGroup } from './signal-catalogue';
 import { byName, findNode, matchesWords, searchWords } from './tree-utils';
 

@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { capabilitySignal, DashboardVersion, TrafficRoute, DisplayInfo, DisplaysApi, IdleRule, LockSpot, LockWidget, Realtime, Rule, SignalInfo, stopOnDestroy } from '@homey-dash/api-client';
-import { alwaysRule, TileData } from '@homey-dash/tiles';
+import { alwaysRule, TileData } from '@homey-dash/tiles/data';
 import { DashboardsStore } from '../dashboards-store';
 import { SignalCatalogue } from '../editor/signal-catalogue';
 import { changedAt, clock, moved, removedAt, timeAgo } from '@homey-dash/design-system';

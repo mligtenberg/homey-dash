@@ -1,22 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { CapabilityValue, HomeyCapability } from '@homey-dash/api-client';
-import {
-  LucideArrowLeft,
-  LucideChevronDown,
-  LucideChevronLeft,
-  LucideChevronRight,
-  LucideChevronsDown,
-  LucideChevronsUp,
-  LucideChevronUp,
-  LucideDynamicIcon,
-  LucideIconInput,
-  LucidePause,
-  LucidePlay,
-  LucideTv,
-  LucideVolume1,
-  LucideVolume2,
-  LucideVolumeX,
-} from '@lucide/angular';
+import { LucideArrowLeft, LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideChevronsDown, LucideChevronsUp, LucideChevronUp, LucidePause, LucidePlay, LucideTv, LucideVolume1, LucideVolume2, LucideVolumeX } from '@homey-dash/design-system';
+import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 import { ChannelKeys, clamp, RemoteKeys, VolumeKeys } from './device-view';
 import { SliderDrag } from './slider-drag';
 

@@ -1,28 +1,5 @@
-import {
-  LucideAirVent,
-  LucideBell,
-  LucideBlinds,
-  LucideBox,
-  LucideCamera,
-  LucideCar,
-  LucideCoffee,
-  LucideDoorOpen,
-  LucideFan,
-  LucideFlame,
-  LucideGamepad2,
-  LucideIconInput,
-  LucideLightbulb,
-  LucideLock,
-  LucidePlug,
-  LucideRadar,
-  LucideShield,
-  LucideSpeaker,
-  LucideSun,
-  LucideThermometer,
-  LucideTv,
-  LucideWashingMachine,
-  LucideZap,
-} from '@lucide/angular';
+import { LucideAirVent, LucideBell, LucideBlinds, LucideBox, LucideCamera, LucideCar, LucideCoffee, LucideDoorOpen, LucideFan, LucideFlame, LucideGamepad2, LucideLightbulb, LucideLock, LucidePlug, LucideRadar, LucideShield, LucideSpeaker, LucideSun, LucideThermometer, LucideTv, LucideWashingMachine, LucideZap } from '@homey-dash/design-system';
+import { LucideIconInput } from '@lucide/angular';
 import { HomeyCapability, HomeyDevice, homeyImageUrl } from '@homey-dash/api-client';
 import { KindHue } from '../tile-kind';
 

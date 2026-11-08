@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { samePlaces } from '@homey-dash/api-client';
-import { LucideCar, LucideDynamicIcon } from '@lucide/angular';
+import { LucideCar } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { KindHue } from '../tile-kind';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { timeOfDay, delayLevel, delayText, distance, duration, TrafficData, trafficIdle, TrafficTileSettings } from './traffic-data';

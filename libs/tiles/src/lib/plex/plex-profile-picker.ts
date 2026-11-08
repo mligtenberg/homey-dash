@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { PlexProfile, PlexProfileList, Realtime } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucideLock, LucideUser } from '@lucide/angular';
+import { LucideLock, LucideUser } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { reason } from './hub-reason';
 
 /** The next number for a picker's popover and its anchor. */

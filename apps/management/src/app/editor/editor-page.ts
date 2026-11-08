@@ -32,16 +32,8 @@ import {
   TileSettings,
 } from '@homey-dash/tiles';
 import { BackgroundField } from './background-field';
-import {
-  LucideChevronLeft,
-  LucideChevronRight,
-  LucideDynamicIcon,
-  LucideEye,
-  LucideEyeOff,
-  LucideScanEye,
-  LucidePlus,
-  LucideTrash,
-} from '@lucide/angular';
+import { LucideChevronLeft, LucideChevronRight, LucideEye, LucideEyeOff, LucideScanEye, LucidePlus, LucideTrash } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { AsDisplayPicker } from '../as-display-picker';
 import { DashboardsStore } from '../dashboards-store';

@@ -7,21 +7,8 @@ import { PlexTileView } from './plex-tile-view';
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
 import { AirPlayDevice, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
 import { cells } from '@homey-dash/layout';
-import {
-  LucideAirplay,
-  LucideCheck,
-  LucideChevronLeft,
-  LucideClapperboard,
-  LucideDynamicIcon,
-  LucideLibrary,
-  LucideLock,
-  LucidePause,
-  LucidePlay,
-  LucideSquare,
-  LucideTv,
-  LucideStar,
-  LucideVolume2,
-} from '@lucide/angular';
+import { LucideAirplay, LucideCheck, LucideChevronLeft, LucideClapperboard, LucideLibrary, LucideLock, LucidePause, LucidePlay, LucideSquare, LucideTv, LucideStar, LucideVolume2 } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace } from '../core/tile-view';
 import { AirPlayData } from './airplay-data';

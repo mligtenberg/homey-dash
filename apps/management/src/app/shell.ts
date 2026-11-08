@@ -2,9 +2,10 @@ import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, injec
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { DashboardsApi } from '@homey-dash/api-client';
-import { RealtimeTileData } from '@homey-dash/tiles';
+import { RealtimeTileData } from '@homey-dash/tiles/data';
 import { filter, map } from 'rxjs';
-import { LucideDynamicIcon, LucideImages, LucideKeyRound, LucideMonitor, LucidePlus } from '@lucide/angular';
+import { LucideImages, LucideKeyRound, LucideMonitor, LucidePlus } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { DashboardsStore } from './dashboards-store';
 import { DisplaysStore } from './displays/displays-store';
 

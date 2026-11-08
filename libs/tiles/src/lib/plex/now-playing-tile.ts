@@ -2,12 +2,12 @@ import { brokenImages } from '../core/loadable-art';
 import { Transport } from '../core/transport';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { ANY_PLEX_PLAYER, PlexCommand, plexImageUrl } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucideTv } from '@lucide/angular';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace } from '../core/tile-view';
 import { PlexTileView } from './plex-tile-view';
 import { LivePlexSession, plexIdle, plexPosition, plexTime } from './plex-data';
-import { clock } from '@homey-dash/design-system';
+import { LucideTv, clock } from '@homey-dash/design-system';
 import { isLandscape } from '@homey-dash/layout';
 
 /** How long a tile following any player shows one of several sessions before the next. */

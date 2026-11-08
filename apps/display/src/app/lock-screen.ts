@@ -1,20 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { capabilitySignal, HomeyWeather, LOCK_SPOTS, LockWidget, Rule } from '@homey-dash/api-client';
 import { capabilityText, delayLevel, delayText, duration, ruleAnswersOf, TileData, TrafficData } from '@homey-dash/tiles';
-import {
-  LucideCloud,
-  LucideCloudDrizzle,
-  LucideCloudFog,
-  LucideCloudLightning,
-  LucideCloudRain,
-  LucideCloudSnow,
-  LucideCar,
-  LucideCloudSun,
-  LucideDynamicIcon,
-  LucideIconInput,
-  LucideSun,
-} from '@lucide/angular';
-import { minuteClock } from '@homey-dash/design-system';
+import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
+import { LucideCar, LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideSun, minuteClock } from '@homey-dash/design-system';
 
 /** What a widget shows now; a weather Homey hasn't told, or a value whose device is gone, shows nothing. */
 type Shown =

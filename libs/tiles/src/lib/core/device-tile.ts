@@ -1,7 +1,8 @@
 import { SettingSelect } from './setting-select';
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, viewChild } from '@angular/core';
 import { CapabilityValue, HomeyCapability, HomeyDevice, Realtime } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucideIconInput, LucidePause, LucidePlay, LucidePower } from '@lucide/angular';
+import { LucidePause, LucidePlay, LucidePower } from '@homey-dash/design-system';
+import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 import { TileData, TileSettings } from '../tile-data';
 import { CapabilityDriver, COVER_STATES, DeviceSegments, DeviceSlider, DeviceStepper } from './device-controls';
 import { DeviceDetails } from './device-details';

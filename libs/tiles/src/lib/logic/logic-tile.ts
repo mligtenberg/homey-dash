@@ -50,20 +50,6 @@ export type LogicChoice = number | 'fallback' | null;
 /** Set to true where a logic tile should say which of its tiles it shows, and hint when it has none: the Editor. */
 export const LOGIC_TILE_BADGE = new InjectionToken<boolean>('LOGIC_TILE_BADGE', { factory: () => false });
 
-/** A rule that always holds, for a new entry or condition: the clock is on any day. */
-export function alwaysRule(): Rule {
-  return {
-    match: 'all',
-    conditions: [
-      {
-        signal: 'clock:now',
-        operator: 'onWeekdays',
-        value: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
-      },
-    ],
-  };
-}
-
 /** Whether a logic tile of this size can hold a kind: never another logic tile, and only one that has the size. */
 export function canHold(kind: TileKind, size: TileSize) {
   return kind.id !== LOGIC_KIND && kind.sizes.includes(size);

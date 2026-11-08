@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideArrowLeft, LucideDynamicIcon } from '@lucide/angular';
+import { LucideArrowLeft } from './icons';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 /** A link back to the list a page belongs to, such as "Displays". The page names the destination in the content. */
 @Component({

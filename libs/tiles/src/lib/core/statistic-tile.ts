@@ -14,7 +14,8 @@ import {
 } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { HomeyApi, HomeyInsightEntry, HomeyInsightLog, InsightResolution, Realtime } from '@homey-dash/api-client';
-import { LucideChartLine, LucideDynamicIcon } from '@lucide/angular';
+import { LucideChartLine } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { KindHue } from '../tile-kind';
 import { TileSettings } from '../tile-data';
 import { DeviceDetails } from './device-details';

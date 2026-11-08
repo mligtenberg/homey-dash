@@ -6,13 +6,13 @@ import { Shell } from './shell';
 
 export const appRoutes: Route[] = [
   // Preview fills the whole window, so it sits outside the shell with its sidebar.
-  { path: 'dashboards/:id/preview', loadComponent: () => import('./preview-page').then((m) => m.PreviewPage), title: 'Preview · HomeyDash' },
+  { path: 'dashboards/:id/preview', loadChildren: () => import('./preview.routes') },
   {
     path: '',
     component: Shell,
     children: [
       { path: '', component: HomePage, title: 'HomeyDash' },
-      { path: 'dashboards/:id', loadComponent: () => import('./editor/editor-page').then((m) => m.EditorPage), title: 'Dashboard · HomeyDash' },
+      { path: 'dashboards/:id', loadChildren: () => import('./editor/editor.routes') },
       { path: 'displays', component: DisplaysPage, title: 'Displays · HomeyDash' },
       {
         path: 'displays/:id',

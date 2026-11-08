@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { LucideDynamicIcon, LucidePause, LucidePlay, LucideSkipBack, LucideSkipForward } from '@lucide/angular';
+import { LucidePause, LucidePlay, LucideSkipBack, LucideSkipForward } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 /** The names of the transport's buttons, for assistive technology. */
 export interface TransportLabels {

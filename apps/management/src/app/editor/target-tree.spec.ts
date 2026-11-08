@@ -1,4 +1,4 @@
-import { LucideBox } from '@lucide/angular';
+import { LucideBox } from '@homey-dash/design-system';
 import { allOptions, buildTree, entries, filterTree, findGroup, TargetGroup, TargetOption } from './target-tree';
 
 const zones: TargetGroup[] = [

@@ -1,21 +1,7 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { Forecast, placeKey, RainPoint, Realtime, WEATHER_PLACE, WeatherPlace } from '@homey-dash/api-client';
-import {
-  LucideCloud,
-  LucideCloudDrizzle,
-  LucideCloudFog,
-  LucideCloudLightning,
-  LucideCloudMoon,
-  LucideCloudMoonRain,
-  LucideCloudRain,
-  LucideCloudSnow,
-  LucideCloudSun,
-  LucideCloudSunRain,
-  LucideIconInput,
-  LucideMoon,
-  LucideSnowflake,
-  LucideSun,
-} from '@lucide/angular';
+import { LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudMoon, LucideCloudMoonRain, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideCloudSunRain, LucideMoon, LucideSnowflake, LucideSun } from '@homey-dash/design-system';
+import { LucideIconInput } from '@lucide/angular';
 import { TileSettings } from '../tile-data';
 
 /** A weather tile's settings: where its Homey is (`weather:here`), or at `place` (`weather:place`). */

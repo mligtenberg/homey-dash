@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { AirPlayPlayback, PlexTracks, Realtime } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucidePause, LucidePlay, LucideSquare } from '@lucide/angular';
+import { LucidePause, LucidePlay, LucideSquare } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { reason } from './hub-reason';
 
 /**

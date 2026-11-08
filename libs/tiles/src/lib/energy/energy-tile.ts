@@ -1,7 +1,8 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
 import { HomeyInsightEntry } from '@homey-dash/api-client';
-import { LucideArrowDown, LucideArrowUp, LucideDynamicIcon, LucideEqual, LucideHouse, LucideSun, LucideZap } from '@lucide/angular';
+import { LucideArrowDown, LucideArrowUp, LucideEqual, LucideHouse, LucideSun, LucideZap } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { StatisticChart } from '../core/statistic-chart';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';

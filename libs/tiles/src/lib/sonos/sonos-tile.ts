@@ -9,13 +9,8 @@ import {
   signal,
 } from '@angular/core';
 import { HomeyDevice, Realtime, SpeakerMusicKind } from '@homey-dash/api-client';
-import {
-  LucideDynamicIcon,
-  LucideLink,
-  LucideLock,
-  LucideSpeaker,
-  LucideUnlink,
-} from '@lucide/angular';
+import { LucideLink, LucideLock, LucideSpeaker, LucideUnlink } from '@homey-dash/design-system';
+import { LucideDynamicIcon } from '@lucide/angular';
 import { albumArtUrl, isPlaying, nowPlaying } from '../core/device-look';
 import { loadableArt } from '../core/loadable-art';
 import { SliderDrag } from '../core/slider-drag';

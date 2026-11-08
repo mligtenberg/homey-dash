@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
-import { LucideArrowDown, LucideArrowUp, LucideDynamicIcon, LucideX } from '@lucide/angular';
+import { LucideArrowDown, LucideArrowUp, LucideX } from './icons';
+import { LucideDynamicIcon } from '@lucide/angular';
 
 /**
  * The buttons beside an item in an ordered list: move it up, move it down, and (when `removable`) remove it. Their
