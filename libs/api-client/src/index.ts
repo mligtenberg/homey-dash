@@ -7,3 +7,4 @@ export * from './lib/dashboards';
 export * from './lib/displays';
 export * from './lib/rules';
 export * from './lib/realtime';
+export * from './lib/problems';

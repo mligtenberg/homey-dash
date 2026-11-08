@@ -1,5 +1,5 @@
-import { DestroyRef, inject, Injectable, signal } from '@angular/core';
-import { HomeyApi, HomeyCatalog, HomeySnapshot, PhotoSet, Realtime } from '@homey-dash/api-client';
+import { inject, Injectable, signal } from '@angular/core';
+import { HomeyApi, HomeyCatalog, HomeySnapshot, PhotoSet, Realtime, stopOnDestroy } from '@homey-dash/api-client';
 import { HomeyData, TileData } from './tile-data';
 
 function byId<T extends { id: string }>(items: T[]): ReadonlyMap<string, T> {
@@ -27,7 +27,7 @@ export class RealtimeTileData extends TileData {
 
   constructor() {
     super();
-    const stops = [
+    stopOnDestroy(
       this.realtime.on('Homeys', (snapshots) => this.apply(() => this.setHomeys(snapshots))),
       this.realtime.on('DeviceChanged', ({ accountId, device }) =>
         this.apply(() => this.change(accountId, (h) => ({ ...h, devices: new Map(h.devices).set(device.id, device) }))),
@@ -55,8 +55,7 @@ export class RealtimeTileData extends TileData {
       this.realtime.on('PhotoSets', (sets) => this.setPhotoSets(sets)),
       this.realtime.whenConnected(() => this.load()),
       this.realtime.whenConnected(() => this.loadPhotoSets()),
-    ];
-    inject(DestroyRef).onDestroy(() => stops.forEach((stop) => stop()));
+    );
   }
 
   private apply(change: () => void) {

@@ -1,6 +1,6 @@
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
 import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, PlexProfile, PlexProfileList, PlexTracks, Realtime, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
-import { TileSize } from '@homey-dash/layout';
+import { cells } from '@homey-dash/layout';
 import {
   LucideAirplay,
   LucideCheck,
@@ -20,11 +20,8 @@ import {
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { AirPlayData } from './airplay-data';
-import { PlexData, plexTime } from './plex-data';
-import { plexIdle } from './now-playing-tile';
+import { PlexData, plexIdle, plexTime } from './plex-data';
 
-/** How many posters fit a tile: one per cell across, two rows on the large sizes. */
-export const RECENT_POSTERS: Record<TileSize, number> = { small: 1, wide: 2, full: 3, large: 4, 'full-large': 6, 'full-tall': 12 };
 
 /** How many items the detail view lists. */
 const DETAIL_COUNT = 24;
@@ -659,7 +656,7 @@ export class RecentlyAddedTile extends TileView {
   /** What the grid lists: what the search found, else the newest of the chosen tab. */
   protected readonly listed = computed<PlexItem[]>(() => this.results() ?? (this.browse ? (this.pageOf(this.shownLibrary())?.items ?? []) : this.detailItems()));
 
-  protected readonly shown = computed(() => (this.face().state === 'ok' ? this.items().slice(0, RECENT_POSTERS[this.size()]) : []));
+  protected readonly shown = computed(() => (this.face().state === 'ok' ? this.items().slice(0, cells(this.size())) : []));
 
   readonly face = computed<TileFace>(() => {
     const look = { icon: this.icon, hue: 'neutral' as const };

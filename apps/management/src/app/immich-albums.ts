@@ -1,5 +1,4 @@
-import { HttpErrorResponse } from '@angular/common/http';
-import { ImmichAccount, ImmichAccountApi, ImmichAlbum, PhotoSetsApi } from '@homey-dash/api-client';
+import { apiProblem, ImmichAccount, ImmichAccountApi, ImmichAlbum, PhotoSetsApi } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
 
 /** One Immich account's albums, for a photo set to follow. */
@@ -20,7 +19,7 @@ export async function loadAlbums(
   try {
     list = (await firstValueFrom(accounts.list())).accounts;
   } catch (e) {
-    return { groups: [], error: problem(e, 'Could not load the Immich accounts. Try again.') };
+    return { groups: [], error: apiProblem(e, 'Could not load the Immich accounts. Try again.') };
   }
   if (!list.length) return { groups: [], error: 'Set up Immich under Accounts first.' };
   const loaded = await Promise.all(
@@ -28,7 +27,7 @@ export async function loadAlbums(
       try {
         return { account, albums: await firstValueFrom(api.albums(account.id)) };
       } catch (e) {
-        return problem(e, `Could not load the albums from ${account.name}. Try again.`);
+        return apiProblem(e, `Could not load the albums from ${account.name}. Try again.`);
       }
     }),
   );
@@ -49,11 +48,4 @@ export function parseAlbumValue(value: string): { accountId: number; albumId: st
 /** An album as an option reads: "Summer (13)". */
 export function albumLabel(album: ImmichAlbum) {
   return `${album.name} (${album.assetCount})`;
-}
-
-/** The API's own explanation where it gave one, else the fallback. */
-export function problem(e: unknown, fallback: string): string {
-  if (!(e instanceof HttpErrorResponse)) return fallback;
-  const errors = e.error?.errors as Record<string, string[]> | undefined;
-  return (errors && Object.values(errors)[0]?.[0]) ?? (typeof e.error?.detail === 'string' ? e.error.detail : fallback);
 }

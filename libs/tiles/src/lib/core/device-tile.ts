@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, viewChild } from '@angular/core';
-import { CapabilityValue, HomeyCapability, HomeyDevice, homeyImageUrl, Realtime } from '@homey-dash/api-client';
+import { CapabilityValue, HomeyCapability, HomeyDevice, Realtime } from '@homey-dash/api-client';
 import { LucideDynamicIcon, LucideIconInput, LucidePause, LucidePlay, LucidePower } from '@lucide/angular';
 import { TileData, TileSettings } from '../tile-data';
-import { CapabilityDriver, DeviceSegments, DeviceSlider, DeviceStepper } from './device-controls';
+import { CapabilityDriver, COVER_STATES, DeviceSegments, DeviceSlider, DeviceStepper } from './device-controls';
 import { DeviceDetails } from './device-details';
 import { loadableArt } from './loadable-art';
-import { CONTROLS, deviceDetail, deviceLook, formatReading } from './device-look';
+import { albumArtUrl, CONTROLS, deviceDetail, deviceLook, formatReading, isPlaying } from './device-look';
 import { describeDevice, deviceLogs, sameLogs } from './device-view';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
 
@@ -14,11 +14,6 @@ export interface DeviceTileSettings extends TileSettings {
   capability?: string;
 }
 
-const COVER_STATES = [
-  { value: 'up', label: 'Up' },
-  { value: 'idle', label: 'Stop' },
-  { value: 'down', label: 'Down' },
-];
 
 /** The capability a device tile is about: the one picked, or the first it can operate, or its first reading. */
 export function primaryCapability(device: HomeyDevice, picked: string | undefined): HomeyCapability | null {
@@ -110,11 +105,7 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
   private readonly deviceDetails = viewChild(DeviceDetails);
 
   /** The album art of what the device plays, once it is known to load. */
-  private readonly art = loadableArt(() => {
-    const device = this.device();
-    const accountId = this.homey()?.accountId;
-    return device?.capabilities['speaker_playing']?.value === true && device.albumArt && accountId !== undefined ? homeyImageUrl(accountId, device.albumArt) : null;
-  });
+  private readonly art = loadableArt(() => (isPlaying(this.device()) ? albumArtUrl(this.device(), this.homey()?.accountId) : null));
 
   /** The insight logs of the device's readings that can be charted, which its detail view shows the history of. */
   private readonly logs = computed(() => deviceLogs(this.homey()?.insights, this.device()?.id ?? ''), { equal: sameLogs });

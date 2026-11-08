@@ -1,7 +1,6 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { HomeyAccount, HomeyAccountApi, HomeyAccounts, HomeyStatus } from '@homey-dash/api-client';
+import { fieldErrors, HomeyAccount, HomeyAccountApi, HomeyAccounts, HomeyStatus } from '@homey-dash/api-client';
 import { RealtimeTileData } from '@homey-dash/tiles';
 
 /** How HomeyDash's connection to a Homey reads in a status pill. */
@@ -202,11 +201,12 @@ export class HomeyAccountPanel {
       : this.api.add(name, address, apiKey.value);
     request.subscribe({
       next: (info) => this.done(info),
-      error: (e: HttpErrorResponse) => {
+      error: (e: unknown) => {
         this.saving.set(false);
-        if (e.status === 400 && e.error?.errors) {
+        const errors = fieldErrors(e);
+        if (errors) {
           this.error.set(null);
-          this.errors.set(Object.fromEntries(Object.entries(e.error.errors as Record<string, string[]>).map(([k, v]) => [k, v[0]])));
+          this.errors.set(errors);
         } else {
           this.fail('save');
         }

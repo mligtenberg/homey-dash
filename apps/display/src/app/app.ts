@@ -14,7 +14,7 @@ import {
 import { LucideChevronLeft, LucideDynamicIcon, LucideLayers } from '@lucide/angular';
 import { IdleRule, Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
 import { fittedCellSize } from '@homey-dash/layout';
-import { DashboardView, homeyLost, PhotoTile, RuleAnswers, TileData, TileKindRegistry } from '@homey-dash/tiles';
+import { DashboardView, homeyLost, PhotoTile, ruleAnswersOf, TileData, TileKindRegistry } from '@homey-dash/tiles';
 import { screenId, safeStorage } from './screen-id';
 import { BRIGHTNESS_MS, LightMeter } from './light-meter';
 import { KioskScreen } from './kiosk-screen';
@@ -163,6 +163,8 @@ export class App {
   protected readonly state = signal<ScreenState>({ kind: 'loading' }, {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
+  // Each idle rule's latest answer: undefined until it first arrives, null when HomeyDash refused the rule.
+  private readonly heard = ruleAnswersOf(() => this.idleRules().map((idle) => idle.rule));
   // Connection lost: HomeyDash cannot be reached, which locks every tile, or HomeyDash cannot reach a Homey the shown
   // dashboard has tiles of (or has no Homey account yet), which locks just those. What is shown stays.
   protected readonly lost = computed(
@@ -175,8 +177,6 @@ export class App {
     return state.kind === 'display' ? state.view : null;
   });
 
-  // Each idle rule's latest answer: undefined until it first arrives, null when HomeyDash refused the rule.
-  private readonly heard = signal<(boolean | null | undefined)[]>([]);
   // Compared by value, so joining again with the same rules doesn't subscribe again.
   private readonly idleRules = computed(() => this.view()?.display.idleRules ?? [], {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
@@ -233,21 +233,10 @@ export class App {
   protected readonly cell = computed(() => fittedCellSize(this.width(), this.height(), this.current()?.layout.rows));
 
   constructor() {
-    const answers = inject(RuleAnswers);
     // Fully Kiosk Browser turns its screen off while a rule says so, and on again when the rule lets go, a touch ends
     // it, or it sees motion (a touch can't reach a screen that is off).
     this.kiosk.onMotion(() => this.wake());
     effect(() => this.kiosk.setOff(!!this.playing()?.screenOff));
-    effect((onCleanup) => {
-      const rules = this.idleRules();
-      untracked(() => {
-        this.heard.set(rules.map(() => undefined));
-        const stops = rules.map(({ rule }, i) =>
-          answers.subscribe(rule, (holds) => this.heard.update((heard) => heard.map((h, j) => (j === i ? holds : h)))),
-        );
-        onCleanup(() => stops.forEach((stop) => stop()));
-      });
-    });
     effect(() => {
       const choice = this.idleChoice();
       if (!this.alone() || !choice) return;

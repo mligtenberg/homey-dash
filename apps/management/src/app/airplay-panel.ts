@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { AirPlayAccountApi, AirPlayDevice, AirPlayStatus } from '@homey-dash/api-client';
+import { AirPlayAccountApi, AirPlayDevice, AirPlayStatus, apiProblem } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
-import { problem } from './immich-albums';
 
 /**
  * The Apple TVs HomeyDash can play Plex covers on through AirPlay (ADR-0012), found on the network. Whether
@@ -142,7 +141,7 @@ export class AirPlayPanel {
       this.status.set(await firstValueFrom(this.api.status()));
       this.error.set(null);
     } catch (e) {
-      this.error.set(problem(e, 'Could not look for Apple TVs. Try again.'));
+      this.error.set(apiProblem(e, 'Could not look for Apple TVs. Try again.'));
     } finally {
       this.looking.set(false);
     }
@@ -156,7 +155,7 @@ export class AirPlayPanel {
       this.pairing.set({ id: device.id, step: 'pin' });
     } catch (e) {
       this.pairing.set(null);
-      this.error.set(problem(e, `Could not start pairing with ${device.name}.`));
+      this.error.set(apiProblem(e, `Could not start pairing with ${device.name}.`));
     }
   }
 
@@ -169,7 +168,7 @@ export class AirPlayPanel {
       await this.load();
     } catch (e) {
       // The receiver forgets the PIN it showed after a wrong try, so pairing starts over.
-      this.pairing.set({ id: device.id, step: 'pin', error: problem(e, 'Could not pair. Try again.') });
+      this.pairing.set({ id: device.id, step: 'pin', error: apiProblem(e, 'Could not pair. Try again.') });
     }
   }
 }

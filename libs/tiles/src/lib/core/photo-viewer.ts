@@ -1,6 +1,5 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
-import { canRotate, Photo, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
+import { apiProblem, canRotate, Photo, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
 import {
   LucideChevronLeft,
   LucideChevronRight,
@@ -200,8 +199,7 @@ export class PhotoViewer {
     try {
       await firstValueFrom(this.api.rotate(this.set(), photo, clockwise));
     } catch (e) {
-      const detail = e instanceof HttpErrorResponse && (e.status === 502 || e.status === 409) ? e.error?.detail : null;
-      this.failure.set(typeof detail === 'string' ? detail : 'Could not rotate the photo. Try again.');
+      this.failure.set(apiProblem(e, 'Could not rotate the photo. Try again.', 502, 409));
     } finally {
       this.busy.set(null);
     }

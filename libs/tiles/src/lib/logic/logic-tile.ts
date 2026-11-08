@@ -16,7 +16,7 @@ import { TileSettings } from '../tile-data';
 import { TileHost } from '../tile-host';
 import { TileKind, TileModule } from '../tile-kind';
 import { TileKindRegistry } from '../tile-kind-registry';
-import { RuleAnswers } from './rule-answers';
+import { ruleAnswersOf } from './rule-answers';
 
 export * from './rule-answers';
 
@@ -145,15 +145,10 @@ export class LogicTile {
   readonly settings = input.required<LogicTileSettings>();
   readonly size = input.required<TileSize>();
 
-  private readonly answers = inject(RuleAnswers);
   protected readonly badge = inject(LOGIC_TILE_BADGE);
 
-  // Each entry's latest answer: undefined until it first arrives, null when HomeyDash refused the rule.
-  private readonly heard = signal<(boolean | null | undefined)[]>([]);
-  // Compared by value, so editing a tile it holds doesn't subscribe again.
-  private readonly rules = computed(() => (this.settings().entries ?? []).map((e) => e.rule), {
-    equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
-  });
+  // Each entry's latest answer; editing a tile it holds doesn't subscribe again.
+  private readonly heard = ruleAnswersOf(() => (this.settings().entries ?? []).map((e) => e.rule));
 
   /** What the rules choose now; undefined while an entry before the first that holds has not answered yet. */
   readonly choice = computed<LogicChoice | undefined>(() => {
@@ -182,16 +177,6 @@ export class LogicTile {
   protected readonly badgeLabel = computed(() => choiceLabel(this.shown(), this.settings().entries?.length ?? 0));
 
   constructor() {
-    effect((onCleanup) => {
-      const rules = this.rules();
-      untracked(() => {
-        this.heard.set(rules.map(() => undefined));
-        const stops = rules.map((rule, i) =>
-          this.answers.subscribe(rule, (holds) => this.heard.update((heard) => heard.map((h, j) => (j === i ? holds : h)))),
-        );
-        onCleanup(() => stops.forEach((stop) => stop()));
-      });
-    });
     effect(() => {
       const choice = this.choice();
       const minMs = (this.settings().minShowSeconds ?? 0) * 1000;

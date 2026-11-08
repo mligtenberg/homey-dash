@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, signal } from '@angular/core';
-import { HomeyWeather, LOCK_SPOTS, LockWidget } from '@homey-dash/api-client';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { capabilitySignal, HomeyWeather, LOCK_SPOTS, LockWidget } from '@homey-dash/api-client';
 import { capabilityText, TileData } from '@homey-dash/tiles';
 import {
   LucideCloud,
@@ -13,6 +13,7 @@ import {
   LucideIconInput,
   LucideSun,
 } from '@lucide/angular';
+import { minuteClock } from '@homey-dash/design-system';
 
 /** What a widget shows now; a weather Homey hasn't told, or a value whose device is gone, shows nothing. */
 type Shown =
@@ -34,12 +35,6 @@ const WEATHER: [RegExp, LucideIconInput, string][] = [
 export function weatherLook(state: string | null): { icon: LucideIconInput; label: string } {
   const found = WEATHER.find(([match]) => state && match.test(state));
   return found ? { icon: found[1], label: found[2] } : { icon: LucideCloudSun, label: state ?? '' };
-}
-
-/** The device and capability a Homey capability signal names, `homey:<account>:capability:<device>:<capability>`. */
-export function capabilitySignal(signal: string): { account: number; device: string; capability: string } | null {
-  const [source, account, kind, device, capability] = signal.split(':');
-  return source === 'homey' && kind === 'capability' && device && capability ? { account: Number(account), device, capability } : null;
 }
 
 /**
@@ -113,7 +108,7 @@ export class LockScreen {
 
   private readonly data = inject(TileData);
   // Ticks on every minute, for the clock.
-  private readonly now = signal(new Date());
+  private readonly now = minuteClock();
 
   protected readonly spots = computed(() => {
     const widgets = this.widgets();
@@ -122,17 +117,6 @@ export class LockScreen {
       widgets: widgets.filter((w) => w.spot === spot).map((w) => this.show(w)).filter((s): s is Shown => !!s),
     })).filter((s) => s.widgets.length);
   });
-
-  constructor() {
-    let tick: ReturnType<typeof setTimeout>;
-    const next = () => {
-      const now = new Date();
-      this.now.set(now);
-      tick = setTimeout(next, 60_000 - (now.getSeconds() * 1000 + now.getMilliseconds()));
-    };
-    next();
-    inject(DestroyRef).onDestroy(() => clearTimeout(tick));
-  }
 
   private show(widget: LockWidget): Shown | null {
     switch (widget.kind) {

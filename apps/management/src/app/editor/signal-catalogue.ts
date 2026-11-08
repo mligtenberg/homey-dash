@@ -1,5 +1,5 @@
-import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
-import { Realtime, RulesApi, SignalInfo } from '@homey-dash/api-client';
+import { computed, inject, Injectable, signal } from '@angular/core';
+import { Realtime, RulesApi, SignalInfo, stopOnDestroy } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
 
 /** A source's signals that belong together, such as one device's capabilities, for the signal picker. */
@@ -51,13 +51,12 @@ export class SignalCatalogue {
   readonly groups = computed(() => groupSignals(this.signals() ?? []));
 
   constructor() {
-    const stops = [
+    stopOnDestroy(
       this.realtime.whenConnected(() => this.load()),
       this.realtime.on('Homeys', () => this.load()),
       this.realtime.on('Plex', () => this.load()),
       this.realtime.on('Displays', () => this.load()),
-    ];
-    inject(DestroyRef).onDestroy(() => stops.forEach((stop) => stop()));
+    );
   }
 
   // One load at a time; changes during one load once more after it.

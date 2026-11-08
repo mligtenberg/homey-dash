@@ -1,28 +1,11 @@
 import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { DisplayInfo } from '@homey-dash/api-client';
+import { DisplayInfo, FULLY_FUNCTIONS } from '@homey-dash/api-client';
 import { describeUserAgent } from './browser-text';
 import { DisplayContext } from './display-context';
 import { DisplayScreenshot } from './display-screenshot';
 import { DisplaysStore } from './displays-store';
-
-// What the Fully Kiosk Browser functions HomeyDash knows of allow.
-const FULLY_API: Record<string, string> = {
-  turnScreenOff: 'Turn the screen off',
-  turnScreenOn: 'Turn the screen on',
-  bind: 'Wake on motion',
-  getBatteryLevel: 'Read the battery',
-  getScreenBrightness: 'Read the screen brightness',
-  setScreenBrightness: 'Set the screen brightness',
-  isScreenOn: 'Know whether the screen is on',
-  startScreensaver: 'Start the screensaver',
-  stopScreensaver: 'Stop the screensaver',
-  getFullyVersion: 'Read its version',
-  getIp4Address: 'Read the IP address',
-  getWifiSignalLevel: 'Read the Wi-Fi signal',
-  getDeviceId: 'Read the device id',
-};
 
 /** A display's name, a screenshot of it and what its screen and browser say about themselves; removing it too. */
 @Component({
@@ -203,7 +186,7 @@ export class DisplayDetailsTab {
   // The functions of Fully's interface HomeyDash knows of, those it has first.
   protected readonly fullyApi = computed(() => {
     const has = this.context.display()?.status.details?.fully?.api ?? [];
-    const known = Object.keys(FULLY_API);
+    const known = Object.keys(FULLY_FUNCTIONS);
     return [...known.filter((n) => has.includes(n)), ...known.filter((n) => !has.includes(n))];
   });
 
@@ -236,6 +219,6 @@ export class DisplayDetailsTab {
   }
 
   protected fullyText(name: string) {
-    return FULLY_API[name];
+    return FULLY_FUNCTIONS[name];
   }
 }

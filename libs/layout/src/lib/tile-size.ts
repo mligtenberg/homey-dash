@@ -15,6 +15,16 @@ export const TILE_SIZES: Readonly<Record<TileSize, Span>> = {
   'full-tall': { columns: 3, rows: 4 },
 };
 
+/** How many cells a tile of this size covers. */
+export function cells(size: TileSize): number {
+  return TILE_SIZES[size].columns * TILE_SIZES[size].rows;
+}
+
+/** Whether a tile of this size is wider than it is tall. */
+export function isLandscape(size: TileSize): boolean {
+  return TILE_SIZES[size].columns > TILE_SIZES[size].rows;
+}
+
 export const TILE_SIZE_LABELS: Readonly<Record<TileSize, string>> = {
   small: 'Small',
   wide: 'Wide',

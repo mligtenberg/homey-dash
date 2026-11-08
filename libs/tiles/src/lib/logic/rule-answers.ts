@@ -1,5 +1,5 @@
-import { DestroyRef, inject, Injectable, signal } from '@angular/core';
-import { Realtime, Rule } from '@homey-dash/api-client';
+import { computed, effect, inject, Injectable, Signal, signal, untracked } from '@angular/core';
+import { Realtime, Rule, stopOnDestroy } from '@homey-dash/api-client';
 
 /**
  * Whether rules hold, as HomeyDash evaluates them (ADR-0010). A listener hears true or false whenever the answer
@@ -21,6 +21,28 @@ interface Subscription {
  * Rule answers over HomeyDash's realtime connection. HomeyDash drops a connection's subscriptions when it closes, so
  * they are made again on every reconnect. Management sees rules as on a display it picks with `seeAs`.
  */
+/**
+ * The latest answer to each of these rules, in order: undefined until it first arrives, null when HomeyDash refused
+ * the rule. Rules are compared by value, so a change that leaves them the same doesn't subscribe again. Call it in an
+ * injection context; it subscribes for as long as that lives.
+ */
+export function ruleAnswersOf(rules: () => readonly Rule[]): Signal<(boolean | null | undefined)[]> {
+  const answers = inject(RuleAnswers);
+  const heard = signal<(boolean | null | undefined)[]>([]);
+  const watched = computed(rules, { equal: (a, b) => JSON.stringify(a) === JSON.stringify(b) });
+  effect((onCleanup) => {
+    const list = watched();
+    untracked(() => {
+      heard.set(list.map(() => undefined));
+      const stops = list.map((rule, i) =>
+        answers.subscribe(rule, (holds) => heard.update((h) => h.map((was, j) => (j === i ? holds : was)))),
+      );
+      onCleanup(() => stops.forEach((stop) => stop()));
+    });
+  });
+  return heard.asReadonly();
+}
+
 @Injectable({ providedIn: 'root' })
 export class RealtimeRuleAnswers extends RuleAnswers {
   private readonly realtime = inject(Realtime);
@@ -31,7 +53,7 @@ export class RealtimeRuleAnswers extends RuleAnswers {
 
   constructor() {
     super();
-    const stops = [
+    stopOnDestroy(
       this.realtime.on('RuleAnswers', ({ seq, answers }) => {
         for (const [id, holds] of Object.entries(answers)) this.hear(this.subscriptions.get(id), seq, holds);
       }),
@@ -42,8 +64,7 @@ export class RealtimeRuleAnswers extends RuleAnswers {
           this.send(id);
         }),
       ),
-    ];
-    inject(DestroyRef).onDestroy(() => stops.forEach((stop) => stop()));
+    );
   }
 
   subscribe(rule: Rule, listener: (holds: boolean | null) => void): () => void {

@@ -3,26 +3,12 @@ import { ANY_PLEX_PLAYER, PlexCommand, plexImageUrl, Realtime } from '@homey-das
 import { LucideDynamicIcon, LucidePause, LucidePlay, LucideSkipBack, LucideSkipForward, LucideTv } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
-import { LivePlexSession, PlexData, plexPosition, plexTime } from './plex-data';
+import { LivePlexSession, PlexData, plexIdle, plexPosition, plexTime } from './plex-data';
+import { clock } from '@homey-dash/design-system';
+import { isLandscape } from '@homey-dash/layout';
 
 /** How long a tile following any player shows one of several sessions before the next. */
 export const NOW_PLAYING_CYCLE_MS = 12_000;
-
-/** What a tile says while it shows nothing, from Plex's status. */
-export function plexIdle(status: string | undefined, error: string | null | undefined): string {
-  switch (status) {
-    case 'notSetUp':
-      return 'Plex is not set up';
-    case 'choosingServer':
-      return 'Choose a Plex server';
-    case 'disconnected':
-      return error ?? 'Cannot reach Plex';
-    case 'connected':
-      return 'Nothing playing';
-    default:
-      return '…';
-  }
-}
 
 /**
  * What plays on a player of the tile's Plex account, or on any of them (`plex-player:any`), over its artwork: title, who watches where, progress, and
@@ -164,7 +150,7 @@ export class NowPlayingTile extends TileView {
   });
 
   /** Ticks every second while something plays, so progress moves. */
-  private readonly now = signal(Date.now());
+  private readonly now = clock(1000, () => this.sessions().some((s) => s.state === 'playing'));
 
   readonly face = computed<TileFace>(() => {
     const look = { icon: LucideTv, hue: 'neutral' as const };
@@ -190,16 +176,10 @@ export class NowPlayingTile extends TileView {
 
   constructor() {
     super();
-    const ticker = setInterval(() => {
-      if (this.sessions().some((s) => s.state === 'playing')) this.now.set(Date.now());
-    }, 1000);
     const cycler = setInterval(() => {
       if (this.sessions().length > 1) this.index.update((i) => i + 1);
     }, NOW_PLAYING_CYCLE_MS);
-    inject(DestroyRef).onDestroy(() => {
-      clearInterval(ticker);
-      clearInterval(cycler);
-    });
+    inject(DestroyRef).onDestroy(() => clearInterval(cycler));
     // Starts over with the first when sessions start or end, not when one pauses.
     const ids = computed(() => this.sessions().map((s) => s.id).join());
     effect(() => {
@@ -223,7 +203,7 @@ export class NowPlayingTile extends TileView {
 
   // Wide artwork for wide tiles, the poster for square ones; scaled to about the tile's size.
   protected artUrl(session: LivePlexSession) {
-    const wide = this.size() === 'wide' || this.size() === 'full' || this.size() === 'full-large';
+    const wide = isLandscape(this.size());
     const path = (wide ? session.art : null) ?? session.image ?? session.art;
     return path ? plexImageUrl(session.accountId, path, wide ? 1280 : 720, 720) : null;
   }

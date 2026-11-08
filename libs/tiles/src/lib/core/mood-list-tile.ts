@@ -4,6 +4,7 @@ import { TileSize } from '@homey-dash/layout';
 import { LucideSparkles } from '@lucide/angular';
 import { moodTint } from './mood-tint';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
+import { chunk } from '@homey-dash/design-system';
 
 /** One of the tile's moods; `found` is false for a mood Homey does not have (any more). */
 interface MoodButton {
@@ -106,10 +107,7 @@ export class MoodListTile extends TileView {
 
   protected readonly pages = computed(() => {
     const { columns, rows } = this.page();
-    const moods = this.moods();
-    const pages: MoodButton[][] = [];
-    for (let i = 0; i < moods.length; i += columns * rows) pages.push(moods.slice(i, i + columns * rows));
-    return pages;
+    return chunk(this.moods(), columns * rows);
   });
 
   readonly face = computed<TileFace>(() => {

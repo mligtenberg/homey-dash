@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { ImmichAccount, ImmichAccountApi, ImmichAlbum, PhotoSelection, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
+import { apiProblem, ImmichAccount, ImmichAccountApi, ImmichAlbum, PhotoSelection, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
 import { RealtimeTileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
-import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue, problem } from './immich-albums';
+import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue } from './immich-albums';
 import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
 
 /**
@@ -257,7 +257,7 @@ export class PhotoSetsPage {
       this.router.navigate(['/photo-sets', set.id]);
       this.error.set(null);
     } catch (e) {
-      this.error.set(problem(e, 'Could not add the photo set. Try again.'));
+      this.error.set(apiProblem(e, 'Could not add the photo set. Try again.'));
     } finally {
       this.busy.set(false);
     }
@@ -274,7 +274,7 @@ export class PhotoSetsPage {
       this.router.navigate(['/photo-sets', set.id]);
       this.error.set(null);
     } catch (e) {
-      this.error.set(problem(e, 'Could not add the photo set. Try again.'));
+      this.error.set(apiProblem(e, 'Could not add the photo set. Try again.'));
     } finally {
       this.busy.set(false);
     }
@@ -292,7 +292,7 @@ export class PhotoSetsPage {
         this.accounts.set(accounts);
         if (this.ruleAccount() === null) this.ruleAccount.set(accounts[0]?.id ?? null);
       },
-      error: (e) => this.error.set(problem(e, 'Could not load the Immich accounts. Try again.')),
+      error: (e) => this.error.set(apiProblem(e, 'Could not load the Immich accounts. Try again.')),
     });
   }
 }

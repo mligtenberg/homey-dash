@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { AirPlayInfo, AirPlayPlayback } from './airplay';
 import { DashboardSummary } from './dashboards';
@@ -62,6 +62,14 @@ export interface RealtimeMessages {
   AirPlayNow: AirPlayPlayback[];
   /** The answers to this connection's rule subscriptions that one change altered. */
   RuleAnswers: RuleAnswers;
+}
+
+/**
+ * Calls each of these stop functions, such as those `Realtime.on` and `Realtime.whenConnected` return, when the
+ * current injection context is destroyed.
+ */
+export function stopOnDestroy(...stops: (() => void)[]) {
+  inject(DestroyRef).onDestroy(() => stops.forEach((stop) => stop()));
 }
 
 // Displays run unattended, so reconnecting never gives up; it just slows down.

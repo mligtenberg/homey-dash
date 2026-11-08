@@ -6,17 +6,13 @@ import { LucideDynamicIcon, LucideIconInput, LucideLock, LucideLockOpen, LucideP
 import { catchError, forkJoin, map, of } from 'rxjs';
 import { TileData } from '../tile-data';
 import { DeviceApps } from './device-apps';
-import { CapabilityDriver, DeviceRemote, DeviceSegments, DeviceSlider, DeviceStepper } from './device-controls';
+import { CapabilityDriver, COVER_STATES, DeviceRemote, DeviceSegments, DeviceSlider, DeviceStepper } from './device-controls';
 import { clamp, clockTime, describeDevice, deviceLogs, sameLogs } from './device-view';
 import { StatisticHistory } from './statistic-history';
 import { TileDetails } from './tile-details';
-import { FLASH_MS } from './tile-view';
+import { flasher } from './tile-view';
+import { clock } from '@homey-dash/design-system';
 
-const COVER_STATES = [
-  { value: 'up', label: 'Up' },
-  { value: 'idle', label: 'Stop' },
-  { value: 'down', label: 'Down' },
-];
 
 const ON_OFF_STATES = [
   { value: false, label: 'Off' },
@@ -284,16 +280,15 @@ export class DeviceDetails {
   protected readonly ok = computed(() => this.device()?.available ?? false);
 
   /** Whether the last command went unanswered, for a moment. */
-  private readonly failed = signal(false);
-  private failedTimer?: ReturnType<typeof setTimeout>;
+  private readonly failure = flasher<true>();
 
   protected readonly view = computed(() => {
     const device = this.device();
-    return device ? describeDevice(device, this.homey()?.accountId, this.failed()) : null;
+    return device ? describeDevice(device, this.homey()?.accountId, !!this.failure.value()) : null;
   });
 
   /** The time now, ticking while the view is open, so that what plays moves on between the device's reports. */
-  private readonly clock = signal(Date.now());
+  private readonly clock = clock(1000, () => this.isOpen());
 
   /** How far what plays has come, moved on by the time since the device last said. */
   protected readonly progress = computed(() => {
@@ -335,12 +330,7 @@ export class DeviceDetails {
   protected readonly probing = computed(() => this.page() === 'history' && this.logs().length > 0 && !this.drawn.hasValue());
 
   constructor() {
-    const tick = setInterval(() => this.isOpen() && this.clock.set(Date.now()), 1000);
-    inject(DestroyRef).onDestroy(() => {
-      clearInterval(tick);
-      clearTimeout(this.failedTimer);
-      this.drive.holdEnd();
-    });
+    inject(DestroyRef).onDestroy(() => this.drive.holdEnd());
   }
 
   open(page: 'device' | 'history' = 'device') {
@@ -357,9 +347,7 @@ export class DeviceDetails {
     try {
       await this.realtime.setCapability(this.account(), this.deviceId(), capability, value);
     } catch {
-      clearTimeout(this.failedTimer);
-      this.failed.set(true);
-      this.failedTimer = setTimeout(() => this.failed.set(false), FLASH_MS);
+      this.failure.show(true);
     }
   }
 }

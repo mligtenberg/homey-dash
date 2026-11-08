@@ -10,9 +10,8 @@ import {
   viewChild,
   viewChildren,
 } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
-import { DashboardBackground, DashboardDetail, DashboardLayout, DashboardsApi, DisplaysApi, Rule, Tile } from '@homey-dash/api-client';
+import { apiProblems, DashboardBackground, DashboardDetail, DashboardLayout, DashboardsApi, DisplaysApi, Rule, Tile } from '@homey-dash/api-client';
 import { cellSize, TilePosition, TileSize } from '@homey-dash/layout';
 import {
   alwaysRule,
@@ -251,7 +250,7 @@ export class EditorPage {
       },
       (error: unknown) => {
         this.inFlight = false;
-        this.saveError.set(problem(error));
+        this.saveError.set(apiProblems(error));
         this.saveState.set('error');
       },
     );
@@ -521,11 +520,4 @@ export class EditorPage {
       this.select(null);
     }
   }
-}
-
-/** What the API said is wrong with a draft it refused, such as an invalid rule; null when it said nothing. */
-function problem(error: unknown): string | null {
-  if (!(error instanceof HttpErrorResponse)) return null;
-  const errors = error.error?.errors as Record<string, string[]> | undefined;
-  return errors ? Object.values(errors).flat().join(' ') : null;
 }

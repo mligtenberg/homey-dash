@@ -22,6 +22,7 @@ import { PlexTargetField } from './plex-target-field';
 import { SizePicker } from './size-picker';
 import { TargetPicker } from './target-picker';
 import { allOptions, buildTree, TargetNode } from './target-tree';
+import { moved, removedAt } from '@homey-dash/design-system';
 
 /**
  * Settings of the selected tile: its target, its kind's own settings, label and size. A tile a logic tile holds is
@@ -298,12 +299,11 @@ export class TilePanel {
   }
 
   protected removeTarget(index: number) {
-    this.setTargets((this.settings().targets ?? []).filter((_, i) => i !== index));
+    this.setTargets(removedAt((this.settings().targets ?? []), index));
   }
 
   protected moveTarget(index: number, by: -1 | 1) {
-    const targets = [...(this.settings().targets ?? [])];
-    [targets[index], targets[index + by]] = [targets[index + by], targets[index]];
+    const targets = moved((this.settings().targets ?? []), index, by);
     this.setTargets(targets);
   }
 

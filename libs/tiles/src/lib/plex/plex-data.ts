@@ -1,5 +1,6 @@
-import { DestroyRef, inject, Injectable, signal } from '@angular/core';
-import { PlexOverview, PlexSession, Realtime } from '@homey-dash/api-client';
+import { inject, Injectable, signal } from '@angular/core';
+import { PlexOverview, PlexSession, Realtime, stopOnDestroy } from '@homey-dash/api-client';
+import { clockTime } from '../core/device-view';
 
 /** A session as it arrived here: progress moves on from `receivedAt`, this browser's clock, while it plays. */
 export interface LivePlexSession extends PlexSession {
@@ -14,10 +15,23 @@ export function plexPosition(session: LivePlexSession, now: number): number {
 
 /** 1:05:09 or 4:07. */
 export function plexTime(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  const [h, m, s] = [Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60), seconds % 60];
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+  return clockTime(ms / 1000);
+}
+
+/** What a tile says while it shows nothing, from Plex's status. */
+export function plexIdle(status: string | undefined, error: string | null | undefined): string {
+  switch (status) {
+    case 'notSetUp':
+      return 'Plex is not set up';
+    case 'choosingServer':
+      return 'Choose a Plex server';
+    case 'disconnected':
+      return error ?? 'Cannot reach Plex';
+    case 'connected':
+      return 'Nothing playing';
+    default:
+      return '…';
+  }
 }
 
 /**
@@ -33,12 +47,11 @@ export class PlexData {
   readonly sessions = signal<LivePlexSession[]>([]);
 
   constructor() {
-    const stops = [
+    stopOnDestroy(
       this.realtime.on('Plex', (overviews) => this.overviews.set(overviews)),
       this.realtime.on('PlexSessions', (sessions) => this.setSessions(sessions)),
       this.realtime.whenConnected(() => this.load()),
-    ];
-    inject(DestroyRef).onDestroy(() => stops.forEach((stop) => stop()));
+    );
   }
 
   /** A tile's account (`settings.account`), or the oldest when it names none; undefined when there is no such account. */

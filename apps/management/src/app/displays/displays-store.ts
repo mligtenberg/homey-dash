@@ -1,35 +1,16 @@
-import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
-import {
-  DashboardVersion,
-  DisplayInfo,
-  DisplaysApi,
-  IdleRule,
-  LockSpot,
-  LockWidget,
-  Realtime,
-  Rule,
-  SignalInfo,
-} from '@homey-dash/api-client';
+import { computed, inject, Injectable, signal } from '@angular/core';
+import { capabilitySignal, DashboardVersion, DisplayInfo, DisplaysApi, IdleRule, LockSpot, LockWidget, Realtime, Rule, SignalInfo, stopOnDestroy } from '@homey-dash/api-client';
 import { alwaysRule, TileData } from '@homey-dash/tiles';
 import { DashboardsStore } from '../dashboards-store';
 import { SignalCatalogue } from '../editor/signal-catalogue';
+import { changedAt, clock, moved, removedAt, timeAgo } from '@homey-dash/design-system';
 
 /** How many widgets a lock screen shows at most. */
 export const MAX_LOCK_WIDGETS = 8;
 
 /** Whether a signal is a capability of a device in Homey, which a lock screen value shows. */
 export function isCapabilitySignal(signal: SignalInfo) {
-  return /^homey:\d+:capability:/.test(signal.id);
-}
-
-/** How long ago an ISO time was, roughly, as of `now` (ms). */
-export function timeAgo(iso: string, now: number): string {
-  const minutes = Math.floor((now - Date.parse(iso)) / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return capabilitySignal(signal.id) !== null;
 }
 
 /**
@@ -54,18 +35,13 @@ export class DisplaysStore {
   );
 
   // Ticks so "last seen" stays true while Management is open.
-  private readonly now = signal(Date.now());
+  private readonly now = clock(30_000);
 
   constructor() {
-    const ticker = setInterval(() => this.now.set(Date.now()), 30_000);
-    const stops = [
+    stopOnDestroy(
       this.realtime.on('Displays', (list) => this.list.set(list)),
       this.realtime.whenConnected(() => this.join()),
-    ];
-    inject(DestroyRef).onDestroy(() => {
-      clearInterval(ticker);
-      stops.forEach((stop) => stop());
-    });
+    );
   }
 
   get(id: string) {
@@ -109,9 +85,7 @@ export class DisplaysStore {
   }
 
   moveDashboard(display: DisplayInfo, index: number, by: -1 | 1) {
-    const ids = [...display.dashboardIds];
-    [ids[index], ids[index + by]] = [ids[index + by], ids[index]];
-    this.assign(display, ids);
+    this.assign(display, moved(display.dashboardIds, index, by));
   }
 
   // The published dashboards it doesn't offer yet.
@@ -152,29 +126,27 @@ export class DisplaysStore {
     const none = { dashboardId: null, photoSetId: null, color: null, screenOff: false, returnDashboardId: null };
     const change =
       kind === 'photos' ? { ...none, photoSetId: id } : kind === 'color' ? { ...none, color: '#000000' } : kind === 'screen-off' ? { ...none, screenOff: true } : { ...none, dashboardId: id };
-    this.saveIdle(display, display.idleRules.map((r, i) => (i === index ? { ...r, ...change } : r)));
+    this.saveIdle(display, changedAt(display.idleRules, index, (r) => ({ ...r, ...change })));
   }
 
   setIdleColor(display: DisplayInfo, index: number, color: string) {
-    this.saveIdle(display, display.idleRules.map((r, i) => (i === index ? { ...r, color } : r)));
+    this.saveIdle(display, changedAt(display.idleRules, index, (r) => ({ ...r, color })));
   }
 
   setIdleReturn(display: DisplayInfo, index: number, dashboardId: string) {
-    this.saveIdle(display, display.idleRules.map((r, i) => (i === index ? { ...r, returnDashboardId: dashboardId || null } : r)));
+    this.saveIdle(display, changedAt(display.idleRules, index, (r) => ({ ...r, returnDashboardId: dashboardId || null })));
   }
 
   setIdleRule(display: DisplayInfo, index: number, rule: Rule) {
-    this.saveIdle(display, display.idleRules.map((r, i) => (i === index ? { ...r, rule } : r)));
+    this.saveIdle(display, changedAt(display.idleRules, index, (r) => ({ ...r, rule })));
   }
 
   moveIdle(display: DisplayInfo, index: number, by: -1 | 1) {
-    const rules = [...display.idleRules];
-    [rules[index], rules[index + by]] = [rules[index + by], rules[index]];
-    this.saveIdle(display, rules);
+    this.saveIdle(display, moved(display.idleRules, index, by));
   }
 
   removeIdle(display: DisplayInfo, index: number) {
-    this.saveIdle(display, display.idleRules.filter((_, i) => i !== index));
+    this.saveIdle(display, removedAt(display.idleRules, index));
   }
 
   // Shown at once, so the rule editor keeps up with every change, and put right by what HomeyDash answers.
@@ -207,11 +179,11 @@ export class DisplaysStore {
       }
       widget = { kind, spot, signal: signal.id };
     }
-    this.saveLock(display, display.lockWidgets.map((w, i) => (i === index ? widget : w)));
+    this.saveLock(display, changedAt(display.lockWidgets, index, () => widget));
   }
 
   setLockSpot(display: DisplayInfo, index: number, spot: LockSpot) {
-    this.saveLock(display, display.lockWidgets.map((w, i) => (i === index ? { ...w, spot } : w)));
+    this.saveLock(display, changedAt(display.lockWidgets, index, (w) => ({ ...w, spot })));
   }
 
   // The oldest Homey is the one a weather without an account shows.
@@ -226,13 +198,11 @@ export class DisplaysStore {
   }
 
   moveLock(display: DisplayInfo, index: number, by: -1 | 1) {
-    const widgets = [...display.lockWidgets];
-    [widgets[index], widgets[index + by]] = [widgets[index + by], widgets[index]];
-    this.saveLock(display, widgets);
+    this.saveLock(display, moved(display.lockWidgets, index, by));
   }
 
   removeLock(display: DisplayInfo, index: number) {
-    this.saveLock(display, display.lockWidgets.filter((_, i) => i !== index));
+    this.saveLock(display, removedAt(display.lockWidgets, index));
   }
 
   private saveLock(display: DisplayInfo, lockWidgets: LockWidget[]) {

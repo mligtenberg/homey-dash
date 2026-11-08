@@ -1,5 +1,5 @@
-import { DestroyRef, inject, Injectable, signal } from '@angular/core';
-import { DashboardDetail, DashboardsApi, DashboardSummary, Realtime } from '@homey-dash/api-client';
+import { inject, Injectable, signal } from '@angular/core';
+import { DashboardDetail, DashboardsApi, DashboardSummary, Realtime, stopOnDestroy } from '@homey-dash/api-client';
 
 /**
  * The dashboard list in the sidebar. The editor updates it as it saves and publishes; changes made elsewhere,
@@ -14,14 +14,13 @@ export class DashboardsStore {
   readonly loaded = signal(false);
 
   constructor() {
-    const stops = [
+    stopOnDestroy(
       this.realtime.on('Dashboards', (list) => this.list.set(list)),
       // Joining again after a reconnect, and reloading what was missed while the connection was down.
       this.realtime.whenConnected(() => {
         this.realtime.joinManagement().then(() => this.load(), () => undefined);
       }),
-    ];
-    inject(DestroyRef).onDestroy(() => stops.forEach((stop) => stop()));
+    );
   }
 
   load() {

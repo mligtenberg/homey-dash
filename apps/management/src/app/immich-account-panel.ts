@@ -1,7 +1,6 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { ImmichAccount, ImmichAccountApi, ImmichAccounts } from '@homey-dash/api-client';
+import { fieldErrors, ImmichAccount, ImmichAccountApi, ImmichAccounts } from '@homey-dash/api-client';
 import { ImmichPartners } from './immich-partners';
 
 /**
@@ -186,11 +185,12 @@ export class ImmichAccountPanel {
       : this.api.add(name, address, apiKey.value);
     request.subscribe({
       next: (info) => this.done(info),
-      error: (e: HttpErrorResponse) => {
+      error: (e: unknown) => {
         this.saving.set(false);
-        if (e.status === 400 && e.error?.errors) {
+        const errors = fieldErrors(e);
+        if (errors) {
           this.error.set(null);
-          this.errors.set(Object.fromEntries(Object.entries(e.error.errors as Record<string, string[]>).map(([k, v]) => [k, v[0]])));
+          this.errors.set(errors);
         } else {
           this.fail('save');
         }

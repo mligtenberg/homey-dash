@@ -1,6 +1,5 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { afterNextRender, ChangeDetectionStrategy, Component, effect, ElementRef, inject, Injector, input, signal, untracked } from '@angular/core';
-import { ImmichAccount, ImmichAccountApi, ImmichPartner } from '@homey-dash/api-client';
+import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner } from '@homey-dash/api-client';
 
 /**
  * The people who share their photos with an Immich account through partner sharing, as Immich says when it opens.
@@ -98,7 +97,7 @@ export class ImmichPartners {
       untracked(() =>
         this.api.partners(id).subscribe({
           next: (partners) => this.done(partners),
-          error: (e: HttpErrorResponse) => this.fail(e, 'Could not ask Immich who shares photos with this account.'),
+          error: (e: unknown) => this.fail(e, 'Could not ask Immich who shares photos with this account.'),
         }),
       );
     });
@@ -117,9 +116,9 @@ export class ImmichPartners {
     this.saving.set(true);
     this.api.setPartnerKey(this.account().id, partner.id, apiKey).subscribe({
       next: (partners) => this.done(partners),
-      error: (e: HttpErrorResponse) => {
+      error: (e: unknown) => {
         this.saving.set(false);
-        const error = e.status === 400 ? e.error?.errors?.apiKey?.[0] : null;
+        const error = fieldErrors(e)?.['apiKey'];
         if (error) this.keyError.set(error);
         else this.fail(e, 'Could not save the key. Try again.');
       },
@@ -129,7 +128,7 @@ export class ImmichPartners {
   protected removeKey(partner: ImmichPartner) {
     this.api.removePartnerKey(this.account().id, partner.id).subscribe({
       next: (partners) => this.done(partners),
-      error: (e: HttpErrorResponse) => this.fail(e, 'Could not remove the key. Try again.'),
+      error: (e: unknown) => this.fail(e, 'Could not remove the key. Try again.'),
     });
   }
 
@@ -140,8 +139,7 @@ export class ImmichPartners {
   }
 
   // Immich's reason when it gave one, such as a key that may not see partners.
-  private fail(e: HttpErrorResponse, fallback: string) {
-    const detail = e.status === 502 ? e.error?.detail : null;
-    this.error.set(typeof detail === 'string' ? detail : fallback);
+  private fail(e: unknown, fallback: string) {
+    this.error.set(apiProblem(e, fallback, 502));
   }
 }

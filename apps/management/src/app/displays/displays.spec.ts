@@ -9,7 +9,7 @@ import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { alwaysRule, RealtimeTileData, TileData } from '@homey-dash/tiles';
 import { DashboardsStore } from '../dashboards-store';
 import { appRoutes } from '../app.routes';
-import { timeAgo } from './displays-store';
+import { timeAgo } from '@homey-dash/design-system';
 
 const status = (change: Partial<DisplayStatus>): DisplayStatus => ({
   connected: false,

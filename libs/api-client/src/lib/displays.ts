@@ -37,6 +37,32 @@ export type LockWidget =
   | { kind: 'weather'; spot: LockSpot; account?: number | null }
   | { kind: 'value'; spot: LockSpot; signal: string };
 
+/** The device and capability a Homey capability signal names, `homey:<account>:capability:<device>:<capability>`. */
+export function capabilitySignal(signal: string): { account: number; device: string; capability: string } | null {
+  const [source, account, kind, device, capability] = signal.split(':');
+  return source === 'homey' && kind === 'capability' && device && capability ? { account: Number(account), device, capability } : null;
+}
+
+/**
+ * The functions of Fully Kiosk Browser's JavaScript interface worth telling Management about, when they exist, and
+ * what each allows. Which of them exist depends on the Fully version and on its settings.
+ */
+export const FULLY_FUNCTIONS: Readonly<Record<string, string>> = {
+  turnScreenOff: 'Turn the screen off',
+  turnScreenOn: 'Turn the screen on',
+  bind: 'Wake on motion',
+  getBatteryLevel: 'Read the battery',
+  getScreenBrightness: 'Read the screen brightness',
+  setScreenBrightness: 'Set the screen brightness',
+  isScreenOn: 'Know whether the screen is on',
+  startScreensaver: 'Start the screensaver',
+  stopScreensaver: 'Stop the screensaver',
+  getFullyVersion: 'Read its version',
+  getIp4Address: 'Read the IP address',
+  getWifiSignalLevel: 'Read the Wi-Fi signal',
+  getDeviceId: 'Read the device id',
+};
+
 /**
  * A display, the dashboards it offers in that order, the rules that choose which it shows when left alone, and what
  * its lock screen shows.

@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ImmichAccountApi, ImmichAlbum, PhotoSetsApi } from '@homey-dash/api-client';
+import { apiProblem, ImmichAccountApi, ImmichAlbum, PhotoSetsApi } from '@homey-dash/api-client';
 import { TileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
-import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue, problem } from '../immich-albums';
+import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue } from '../immich-albums';
 
 /**
  * A photo tile's target: one of the photo sets, or a new one made here from an Immich album, so building a dashboard
@@ -114,7 +114,7 @@ export class PhotoSetField {
       this.groups.set(null);
       this.picked.emit(set.target);
     } catch (e) {
-      this.error.set(problem(e, 'Could not make the photo set. Try again.'));
+      this.error.set(apiProblem(e, 'Could not make the photo set. Try again.'));
     }
   }
 }

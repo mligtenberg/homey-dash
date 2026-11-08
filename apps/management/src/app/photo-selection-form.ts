@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, signal } from '@angular/core';
-import { PersonRef, PhotoSelection, PhotoSetsApi, SELECTION_MAX_COUNT, SELECTION_REFRESH } from '@homey-dash/api-client';
+import { apiProblem, PersonRef, PhotoSelection, PhotoSetsApi, SELECTION_MAX_COUNT, SELECTION_REFRESH } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
-import { problem } from './immich-albums';
 
 /** A new selection's rules: anyone, anything, 100 photos, drawn again every day. */
 export function defaultSelection(): PhotoSelection {
@@ -170,7 +169,7 @@ export class PhotoSelectionForm {
       if (accountId === this.accountId()) this.people.set(people);
       this.error.set(null);
     } catch (e) {
-      this.error.set(problem(e, 'Could not load the people from Immich. Try again.'));
+      this.error.set(apiProblem(e, 'Could not load the people from Immich. Try again.'));
     } finally {
       this.loading = false;
     }

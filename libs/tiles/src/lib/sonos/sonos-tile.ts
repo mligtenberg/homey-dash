@@ -9,13 +9,7 @@ import {
   output,
   signal,
 } from '@angular/core';
-import {
-  HomeyDevice,
-  homeyImageUrl,
-  Realtime,
-  SpeakerMusic,
-  SpeakerMusicKind,
-} from '@homey-dash/api-client';
+import { HomeyDevice, Realtime, SpeakerMusic, SpeakerMusicKind } from '@homey-dash/api-client';
 import {
   LucideAudioLines,
   LucideDynamicIcon,
@@ -30,6 +24,7 @@ import {
   LucideSpeaker,
   LucideUnlink,
 } from '@lucide/angular';
+import { albumArtUrl, isPlaying, nowPlaying } from '../core/device-look';
 import { loadableArt } from '../core/loadable-art';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
@@ -512,16 +507,12 @@ export class SonosTile extends TileView<SonosTileSettings> {
     const rooms = this.foundRooms();
     return (
       rooms.find((r) => r.id === this.picked()) ??
-      rooms.find(
-        (r) => r.device?.capabilities['speaker_playing']?.value === true,
-      ) ??
+      rooms.find((r) => isPlaying(r.device)) ??
       rooms[0]
     );
   });
 
-  protected readonly playing = computed(
-    () => this.lead()?.device?.capabilities['speaker_playing']?.value === true,
-  );
+  protected readonly playing = computed(() => isPlaying(this.lead()?.device));
 
   /** The rooms that play together with the lead, the lead included. */
   protected readonly grouped = computed(() => {
@@ -537,13 +528,9 @@ export class SonosTile extends TileView<SonosTileSettings> {
     () => !!this.lead()?.device?.capabilities['speaker_next']?.setable,
   );
 
-  protected readonly art = loadableArt(() => {
-    const device = this.lead()?.device;
-    const accountId = this.homey()?.accountId;
-    return this.playing() && device?.albumArt && accountId !== undefined
-      ? homeyImageUrl(accountId, device.albumArt)
-      : null;
-  });
+  protected readonly art = loadableArt(() =>
+    this.playing() ? albumArtUrl(this.lead()?.device, this.homey()?.accountId) : null,
+  );
 
   readonly face = computed<TileFace>(() => {
     const look = { icon: LucideSpeaker, hue: 'appliance' as const };
@@ -556,12 +543,7 @@ export class SonosTile extends TileView<SonosTileSettings> {
     const lead = this.lead();
     if (!lead)
       return { ...look, name, detail: 'Not found in Homey', state: 'missing' };
-    const caps = lead.device?.capabilities ?? {};
-    const text = (id: string) =>
-      typeof caps[id]?.value === 'string' ? (caps[id].value as string) : '';
-    const track = [text('speaker_track'), text('speaker_artist')]
-      .filter(Boolean)
-      .join(' · ');
+    const track = nowPlaying(lead.device);
     const together =
       this.grouped().length > 1 ? `${this.grouped().length} rooms · ` : '';
     const detail =

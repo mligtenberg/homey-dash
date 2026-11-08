@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, input, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
-import { ImmichAccount, ImmichAccountApi, ImmichAlbum, PhotoSelection, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
+import { apiProblem, ImmichAccount, ImmichAccountApi, ImmichAlbum, PhotoSelection, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
 import { PhotoViewer, RealtimeTileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
-import { timeAgo } from './displays/displays-store';
-import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue, problem } from './immich-albums';
+import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue } from './immich-albums';
 import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-selection-form';
+import { clock, timeAgo } from '@homey-dash/design-system';
 
 /**
  * One photo set (ADR-0008), kept current over the realtime connection: its name, the Immich album it follows or the
@@ -247,15 +247,13 @@ export class PhotoSetPage {
   protected readonly error = signal<string | null>(null);
 
   // Ticks so "synced … ago" stays true while the page is open.
-  private readonly now = signal(Date.now());
+  private readonly now = clock(30_000);
 
   constructor() {
     this.accountsApi.list().subscribe({
       next: ({ accounts }) => this.accounts.set(accounts),
-      error: (e) => this.error.set(problem(e, 'Could not load the Immich accounts. Try again.')),
+      error: (e) => this.error.set(apiProblem(e, 'Could not load the Immich accounts. Try again.')),
     });
-    const ticker = setInterval(() => this.now.set(Date.now()), 30_000);
-    effect((onCleanup) => onCleanup(() => clearInterval(ticker)));
     // A set that arrives syncing, such as one just added or changed, is polled until it is done.
     effect(() => {
       const set = this.set();
@@ -307,7 +305,7 @@ export class PhotoSetPage {
         this.error.set(null);
         if (changed.syncing) this.waitFor(changed.id);
       },
-      error: (e) => this.error.set(problem(e, 'Could not save the rules. Try again.')),
+      error: (e) => this.error.set(apiProblem(e, 'Could not save the rules. Try again.')),
     });
   }
 
@@ -326,7 +324,7 @@ export class PhotoSetPage {
       await this.poll(set.id);
       this.error.set(null);
     } catch (e) {
-      this.error.set(problem(e, 'Could not sync the photo set. Try again.'));
+      this.error.set(apiProblem(e, 'Could not sync the photo set. Try again.'));
     } finally {
       this.syncing.set(false);
     }
@@ -339,7 +337,7 @@ export class PhotoSetPage {
     try {
       await this.poll(id);
     } catch (e) {
-      this.error.set(problem(e, 'Could not sync the photo set. Try again.'));
+      this.error.set(apiProblem(e, 'Could not sync the photo set. Try again.'));
     } finally {
       this.syncing.set(false);
     }
@@ -356,7 +354,7 @@ export class PhotoSetPage {
       await firstValueFrom(this.api.restore(set, photoId));
       this.error.set(null);
     } catch (e) {
-      this.error.set(problem(e, 'Could not bring the photo back. Try again.'));
+      this.error.set(apiProblem(e, 'Could not bring the photo back. Try again.'));
     } finally {
       this.restoring.set(null);
     }
@@ -369,7 +367,7 @@ export class PhotoSetPage {
     this.changingAlbum.set(false);
     this.api.update(set.id, album).subscribe({
       next: (changed) => changed.syncing && this.waitFor(changed.id),
-      error: (e) => this.error.set(problem(e, 'Could not change the album. Try again.')),
+      error: (e) => this.error.set(apiProblem(e, 'Could not change the album. Try again.')),
     });
   }
 

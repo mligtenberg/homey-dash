@@ -1,8 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
-import { PlexAccount, PlexAccountApi, PlexAccounts, PlexServer } from '@homey-dash/api-client';
+import { apiProblem, PlexAccount, PlexAccountApi, PlexAccounts, PlexServer } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
-import { problem } from './immich-albums';
 
 /** How often the panel looks whether someone approved the sign-in on Plex's page. */
 const CHECK_MS = 2000;
@@ -227,8 +226,8 @@ export class PlexAccountPanel {
       await this.load();
     } catch (e) {
       tab?.close();
-      if (e instanceof HttpErrorResponse && e.status === 400) this.nameError.set(problem(e, 'Choose another name.'));
-      else this.error.set(problem(e, 'Could not start signing in with Plex. Try again.'));
+      if (e instanceof HttpErrorResponse && e.status === 400) this.nameError.set(apiProblem(e, 'Choose another name.'));
+      else this.error.set(apiProblem(e, 'Could not start signing in with Plex. Try again.'));
     } finally {
       this.busy.set(false);
     }
@@ -246,7 +245,7 @@ export class PlexAccountPanel {
       this.renaming.set(null);
       this.nameError.set(null);
     } catch (e) {
-      this.nameError.set(problem(e, 'Could not rename the account. Try again.'));
+      this.nameError.set(apiProblem(e, 'Could not rename the account. Try again.'));
     }
   }
 
@@ -259,7 +258,7 @@ export class PlexAccountPanel {
       if (!servers.length) this.error.set('This Plex account has no servers. Sign in with the account that owns or shares one.');
     } catch (e) {
       this.choosing.set(null);
-      this.error.set(problem(e, `Could not load the servers of ${account.name}. Try again.`));
+      this.error.set(apiProblem(e, `Could not load the servers of ${account.name}. Try again.`));
     }
   }
 
@@ -272,7 +271,7 @@ export class PlexAccountPanel {
       this.choosing.set(null);
       this.error.set(null);
     } catch (e) {
-      this.error.set(problem(e, 'Could not connect to that server. Try again.'));
+      this.error.set(apiProblem(e, 'Could not connect to that server. Try again.'));
     } finally {
       this.busy.set(false);
     }

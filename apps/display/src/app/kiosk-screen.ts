@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { FULLY_FUNCTIONS } from '@homey-dash/api-client';
 
 /** The slice of the Fully Kiosk Browser JavaScript interface used here (it needs "JavaScript Interface" on in Fully). */
 interface Fully {
@@ -8,24 +9,6 @@ interface Fully {
   getBatteryLevel?(): number;
   getFullyVersion?(): string;
 }
-
-// The functions of Fully's interface worth telling Management about, when they exist: what HomeyDash uses, then what
-// it could use. Which of them exist depends on the Fully version and on its settings.
-const KNOWN_API = [
-  'turnScreenOff',
-  'turnScreenOn',
-  'bind',
-  'isScreenOn',
-  'getScreenBrightness',
-  'setScreenBrightness',
-  'startScreensaver',
-  'stopScreensaver',
-  'getBatteryLevel',
-  'getFullyVersion',
-  'getIp4Address',
-  'getWifiSignalLevel',
-  'getDeviceId',
-];
 
 // Where Fully calls back into the page.
 const MOTION_CALLBACK = '__homeyDashMotion';
@@ -46,7 +29,7 @@ export class KioskScreen {
   details(): { version: string | null; api: string[] } | null {
     const fully = this.fully as unknown as Record<string, unknown> | undefined;
     if (!fully) return null;
-    const api = KNOWN_API.filter((name) => typeof fully[name] === 'function');
+    const api = Object.keys(FULLY_FUNCTIONS).filter((name) => typeof fully[name] === 'function');
     return { version: this.read(() => this.fully?.getFullyVersion?.()) ?? null, api };
   }
 

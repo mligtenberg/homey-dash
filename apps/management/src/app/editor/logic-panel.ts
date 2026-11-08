@@ -12,6 +12,7 @@ import {
 } from '@homey-dash/tiles';
 import { describeRule } from './rule-text';
 import { SignalCatalogue } from './signal-catalogue';
+import { moved, removedAt } from '@homey-dash/design-system';
 
 /** Which of a logic tile's tiles is open in the panel: an entry's index, or its fallback. */
 export type OpenEntry = number | 'fallback';
@@ -170,13 +171,12 @@ export class LogicPanel {
   }
 
   protected move(index: number, by: -1 | 1) {
-    const entries = [...this.settings().entries];
-    [entries[index], entries[index + by]] = [entries[index + by], entries[index]];
+    const entries = moved(this.settings().entries, index, by);
     this.patch({ entries });
   }
 
   protected remove(index: number) {
-    this.patch({ entries: this.settings().entries.filter((_, i) => i !== index) });
+    this.patch({ entries: removedAt(this.settings().entries, index) });
   }
 
   protected setMinShow(value: string) {

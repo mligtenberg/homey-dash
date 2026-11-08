@@ -41,6 +41,21 @@ export const TILE_FACE_HOST = {
 /** How long a tile shows the outcome of a press, such as "Started". */
 export const FLASH_MS = 1400;
 
+/** An outcome that shows for `FLASH_MS`, then clears; a new one starts the time again. Call it in an injection context. */
+export function flasher<T>() {
+  const value = signal<T | null>(null);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  inject(DestroyRef).onDestroy(() => clearTimeout(timer));
+  return {
+    value: value.asReadonly(),
+    show(outcome: T) {
+      clearTimeout(timer);
+      value.set(outcome);
+      timer = setTimeout(() => value.set(null), FLASH_MS);
+    },
+  };
+}
+
 @Directive()
 export abstract class TileView<TSettings extends TileSettings = TileSettings> {
   readonly settings = input.required<TSettings>();
@@ -54,19 +69,15 @@ export abstract class TileView<TSettings extends TileSettings = TileSettings> {
 
   abstract readonly face: Signal<TileFace>;
 
+  private readonly flasher = flasher<'ok' | 'error'>();
   /** The outcome of the last press while it shows: `.is-feedback` or `.is-error`. */
-  protected readonly flash = signal<'ok' | 'error' | null>(null);
-  private flashTimer?: ReturnType<typeof setTimeout>;
+  protected readonly flash = this.flasher.value;
 
   /** Whether a press on the tile opens its detail view. */
   protected readonly opensDetails = computed(() => this.detailView() && !!this.face().details);
 
   /** The component's `hd-tile-details`, if it has one. */
   protected readonly details = viewChild(TileDetails);
-
-  constructor() {
-    inject(DestroyRef).onDestroy(() => clearTimeout(this.flashTimer));
-  }
 
   /** What the corner button does. */
   protected act(): void {
@@ -78,19 +89,13 @@ export abstract class TileView<TSettings extends TileSettings = TileSettings> {
    * `early` on press, since Homey can take seconds to answer (a mood waits for all its devices).
    */
   protected async send(command: () => Promise<unknown>, success: 'answered' | 'early' | 'quiet' = 'answered') {
-    if (success === 'early') this.showFlash('ok');
+    if (success === 'early') this.flasher.show('ok');
     try {
       await command();
-      if (success === 'answered') this.showFlash('ok');
+      if (success === 'answered') this.flasher.show('ok');
     } catch {
-      this.showFlash('error');
+      this.flasher.show('error');
     }
-  }
-
-  private showFlash(outcome: 'ok' | 'error') {
-    clearTimeout(this.flashTimer);
-    this.flash.set(outcome);
-    this.flashTimer = setTimeout(() => this.flash.set(null), FLASH_MS);
   }
 
   protected onPress(event: Event) {

@@ -17,6 +17,7 @@ import { sectionsPerPage } from '@homey-dash/layout';
 import { backgroundStyle, hasImage, renderedBackgroundStyle } from './background';
 import { shownSections } from './logic/shown-sections';
 import { TileHost } from './tile-host';
+import { chunk } from '@homey-dash/design-system';
 
 /**
  * A dashboard version as displays show it: as many whole sections as fit the width, centered, on pages
@@ -84,10 +85,7 @@ export class DashboardView {
   protected readonly pages = computed(() => {
     const shown = this.shown();
     const sections = this.layout().sections.filter((s) => shown.has(s.id));
-    const perPage = this.perPage();
-    const pages = [];
-    for (let i = 0; i < sections.length; i += perPage) pages.push(sections.slice(i, i + perPage));
-    return pages;
+    return chunk(sections, this.perPage());
   });
 
   constructor() {

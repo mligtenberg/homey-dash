@@ -23,7 +23,7 @@ import {
   LucideWashingMachine,
   LucideZap,
 } from '@lucide/angular';
-import { HomeyCapability, HomeyDevice } from '@homey-dash/api-client';
+import { HomeyCapability, HomeyDevice, homeyImageUrl } from '@homey-dash/api-client';
 import { KindHue } from '../tile-kind';
 
 const HUES: Record<string, KindHue> = {
@@ -191,16 +191,34 @@ function formatNumber(capability: HomeyCapability): string {
   return units ? `${value}${units.startsWith('°') ? '' : ' '}${units}` : value;
 }
 
+/** A device's text capability, such as the track it plays; empty when it has none. */
+export function capText(device: HomeyDevice | undefined, id: string): string {
+  const value = device?.capabilities[id]?.value;
+  return typeof value === 'string' ? value : '';
+}
+
+/** Whether a speaker or player plays now. */
+export function isPlaying(device: HomeyDevice | undefined): boolean {
+  return device?.capabilities['speaker_playing']?.value === true;
+}
+
+/** What a speaker plays, such as `Song · Artist`; empty when it doesn't say. */
+export function nowPlaying(device: HomeyDevice | undefined): string {
+  return [capText(device, 'speaker_track'), capText(device, 'speaker_artist')].filter(Boolean).join(' · ');
+}
+
+/** The address of a device's album art, when it has any and its account is known. */
+export function albumArtUrl(device: HomeyDevice | undefined, accountId: number | undefined): string | null {
+  return device?.albumArt && accountId !== undefined ? homeyImageUrl(accountId, device.albumArt) : null;
+}
+
 /** A short state phrase for a device, such as `On · 80%`, `Closed` or `20.5°C`. */
 export function deviceDetail(device: HomeyDevice): { detail: string; active: boolean } {
   const caps = device.capabilities;
   const value = (id: string) => caps[id]?.value;
 
   // What plays says more than that the device is on.
-  if (value('speaker_playing') === true) {
-    const playing = [value('speaker_track'), value('speaker_artist')].filter((v) => typeof v === 'string' && v).join(' · ');
-    return { detail: playing || 'Playing', active: true };
-  }
+  if (isPlaying(device)) return { detail: nowPlaying(device) || 'Playing', active: true };
   if (typeof value('onoff') === 'boolean') {
     const on = value('onoff') as boolean;
     const dim = value('dim');

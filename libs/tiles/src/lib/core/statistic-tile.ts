@@ -30,11 +30,11 @@ export interface StatisticTileSettings extends TileSettings {
   window?: InsightResolution;
 }
 
+/** A log's hue: energy for power, climate for temperature, else its device's own (energy for a neutral one). */
 function logHue(log: HomeyInsightLog, ownerHue: KindHue): KindHue {
-  const units = log.units ?? '';
-  if (/power|meter|energy/.test(log.id) || /^(k?Wh?|A|V)$/.test(units))
-    return 'energy';
-  if (/temperature/.test(log.id) || units.startsWith('°')) return 'climate';
+  const tone = statisticTone(log);
+  if (tone === 'power') return 'energy';
+  if (tone === 'temperature') return 'climate';
   return ownerHue === 'neutral' ? 'energy' : ownerHue;
 }
 

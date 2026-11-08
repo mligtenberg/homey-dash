@@ -1,5 +1,5 @@
-import { HomeyCapability, HomeyDevice, HomeyInsightLog, homeyImageUrl } from '@homey-dash/api-client';
-import { capabilityText, CONTROLS, deviceDetail, deviceMode, formatReading } from './device-look';
+import { HomeyCapability, HomeyDevice, HomeyInsightLog } from '@homey-dash/api-client';
+import { albumArtUrl, capabilityText, capText, CONTROLS, deviceDetail, deviceMode, formatReading, isPlaying } from './device-look';
 
 export function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -53,7 +53,7 @@ export function describeDevice(device: HomeyDevice, accountId: number | undefine
   };
   const mode = deviceMode(device);
   const thermostat = control('target_temperature');
-  const on = caps['onoff']?.value === true || caps['speaker_playing']?.value === true || (mode === 'lock' && caps['locked']?.value === true);
+  const on = caps['onoff']?.value === true || isPlaying(device) || (mode === 'lock' && caps['locked']?.value === true);
   // A thermostat's dial says it all, so its state line only shows when something is wrong.
   const shown = new Set([
     ...CONTROLS,
@@ -64,7 +64,6 @@ export function describeDevice(device: HomeyDevice, accountId: number | undefine
     'speaker_duration',
     'speaker_position',
   ]);
-  const text = (id: string) => (typeof caps[id]?.value === 'string' ? (caps[id].value as string) : '');
   const closed = coverClosed(device);
   const dimValue = caps['dim']?.value;
   return {
@@ -112,11 +111,11 @@ export function describeDevice(device: HomeyDevice, accountId: number | undefine
     channel: keys({ up: 'channel_up', down: 'channel_down' }),
     // Beside a volume slider, mute is a button of its own.
     mute: control('volume_set') ? control('volume_mute') : undefined,
-    app: text('now_playing_app'),
+    app: capText(device, 'now_playing_app'),
     progress: playbackProgress(caps['speaker_position'], caps['speaker_duration'], on),
-    track: text('speaker_track'),
-    artist: text('speaker_artist'),
-    art: device.albumArt && accountId !== undefined ? homeyImageUrl(accountId, device.albumArt) : null,
+    track: capText(device, 'speaker_track'),
+    artist: capText(device, 'speaker_artist'),
+    art: albumArtUrl(device, accountId),
     alarms: Object.values(caps)
       .filter((c) => !c.setable && typeof c.value === 'boolean' && c.id.startsWith('alarm_'))
       .map((c) => ({ id: c.id, title: c.title, text: capabilityText(c)?.value ?? '', active: c.value === true })),

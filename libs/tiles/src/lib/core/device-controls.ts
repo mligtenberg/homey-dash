@@ -19,6 +19,13 @@ import {
 } from '@lucide/angular';
 import { ChannelKeys, clamp, RemoteKeys, VolumeKeys } from './device-view';
 
+/** The states a cover without a position moves between, as segments to press. */
+export const COVER_STATES = [
+  { value: 'up', label: 'Up' },
+  { value: 'idle', label: 'Stop' },
+  { value: 'down', label: 'Down' },
+];
+
 /** How far a thermostat's target moves when its own capability does not say. */
 const THERMOSTAT_STEP = 0.5;
 
