@@ -185,6 +185,14 @@ _Avoid_: New media tile
 A tile that shows the weather where a **Homey** is, or at a town chosen for the tile instead: now, and by its size the coming hours and days, and the rain of the next two hours where Buienradar knows it (ADR-0013). Without a town of its own the place is the location set in Homey, and the tile names its Homey like any Homey tile.
 _Avoid_: Forecast widget, weather card
 
+**Clock tile**:
+A tile that shows the time, digital or as an analog dial, with the date where its size has room. It points at nothing and uses the display's own clock.
+_Avoid_: Time tile
+
+**Date tile**:
+A tile that shows today's date, and on large sizes the month as a calendar with today marked, weeks starting on Monday. It points at nothing.
+_Avoid_: Calendar tile (that is for events, which HomeyDash does not show)
+
 **Energy tile**:
 A tile that shows the energy of a **Homey** from Homey's own energy report (ADR-0014): the grid power now, importing or exporting, and by its size the sun's production, the home's consumption, today's totals and the day by the hour. It names its Homey like any Homey tile. A Homey whose API key lacks the energy scope, or that has no energy, makes it unavailable rather than missing.
 _Avoid_: Power tile, solar tile
