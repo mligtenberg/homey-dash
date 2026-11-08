@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { CapabilityValue, HomeyCapability } from '@homey-dash/api-client';
 import {
   LucideArrowLeft,

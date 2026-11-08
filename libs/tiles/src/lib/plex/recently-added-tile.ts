@@ -4,7 +4,7 @@ import { PlexAirPlayControls } from './plex-airplay-controls';
 import { PlexLocalPlayer } from './plex-local-player';
 import { PlexProfilePicker } from './plex-profile-picker';
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
-import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, Realtime, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
+import { AirPlayDevice, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, Realtime, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
 import { cells } from '@homey-dash/layout';
 import {
   LucideAirplay,

@@ -6,29 +6,22 @@ import {
   computed,
   effect,
   inject,
-  input,
-  output,
   signal,
 } from '@angular/core';
-import { HomeyDevice, Realtime, SpeakerMusic, SpeakerMusicKind } from '@homey-dash/api-client';
+import { HomeyDevice, Realtime, SpeakerMusicKind } from '@homey-dash/api-client';
 import {
-  LucideAudioLines,
   LucideDynamicIcon,
   LucideLink,
   LucideLock,
-  LucideMusic,
-  LucideSearch,
   LucideSpeaker,
   LucideUnlink,
 } from '@lucide/angular';
 import { albumArtUrl, isPlaying, nowPlaying } from '../core/device-look';
-import { brokenImages, loadableArt } from '../core/loadable-art';
-import { SettingSelect } from '../core/setting-select';
+import { loadableArt } from '../core/loadable-art';
 import { SliderDrag } from '../core/slider-drag';
 import { Transport } from '../core/transport';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
-import { TileData } from '../tile-data';
 import { SonosMusic } from './sonos-music';
 import { SonosTileSettings } from './sonos-tile-settings';
 
