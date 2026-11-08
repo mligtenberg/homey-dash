@@ -26,7 +26,7 @@ import {
   LucideUnlink,
 } from '@lucide/angular';
 import { albumArtUrl, isPlaying, nowPlaying } from '../core/device-look';
-import { loadableArt } from '../core/loadable-art';
+import { brokenImages, loadableArt } from '../core/loadable-art';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { TileData, TileSettings } from '../tile-data';
@@ -79,13 +79,13 @@ interface MusicItem {
             (click)="play(item)"
           >
             <span class="hd-sonos__cover">
-              @if (item.music.image && !broken().has(item.music.image)) {
+              @if (item.music.image && !images.has(item.music.image)) {
                 <img
                   [src]="item.music.image"
                   alt=""
                   loading="lazy"
                   referrerpolicy="no-referrer"
-                  (error)="broke(item.music.image)"
+                  (error)="images.mark(item.music.image)"
                 />
               } @else {
                 <svg [lucideIcon]="noteIcon" />
@@ -138,7 +138,7 @@ export class SonosMusic {
   protected readonly error = signal('');
   protected readonly playing = signal('');
   /** Covers that did not load, so the note shows instead of a broken picture. */
-  protected readonly broken = signal<ReadonlySet<string>>(new Set());
+  protected readonly images = brokenImages();
 
   constructor() {
     effect((onCleanup) => {
@@ -158,10 +158,6 @@ export class SonosMusic {
 
   protected key(item: MusicItem) {
     return `${item.kind}:${item.music.name}`;
-  }
-
-  protected broke(image: string) {
-    this.broken.update((b) => new Set(b).add(image));
   }
 
   protected play(item: MusicItem) {

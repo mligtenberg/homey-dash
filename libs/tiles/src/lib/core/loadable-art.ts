@@ -19,3 +19,15 @@ export function loadableArt(url: () => string | null | undefined): Signal<string
     return src && src !== failed() ? src : null;
   });
 }
+
+/**
+ * The pictures of a view that did not load, so it shows an icon in their place instead of a broken picture. Test with
+ * `has(src)` before drawing one and `mark(src)` from its `error` event.
+ */
+export function brokenImages() {
+  const broken = signal<ReadonlySet<string>>(new Set());
+  return {
+    has: (src: string) => broken().has(src),
+    mark: (src: string) => broken.update((set) => new Set(set).add(src)),
+  };
+}

@@ -1,3 +1,4 @@
+import { brokenImages } from './loadable-art';
 import { Segmented } from './segmented';
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, resource, signal, viewChild } from '@angular/core';
@@ -80,8 +81,8 @@ const LOCK_STATES = [
               @case ('speaker') {
                 <div class="hd-dev__art">
                   @if (c.art; as art) {
-                    @if (brokenArt() !== art) {
-                      <img [src]="art" alt="" draggable="false" (error)="brokenArt.set(art)" />
+                    @if (!images.has(art)) {
+                      <img [src]="art" alt="" draggable="false" (error)="images.mark(art)" />
                     } @else {
                       <svg class="hd-dev__glyph" [lucideIcon]="speakerIcon" />
                     }
@@ -267,7 +268,7 @@ export class DeviceDetails {
   protected readonly muteIcon = LucideVolumeX;
   protected readonly speakerIcon = LucideSpeaker;
   /** The cover that did not load, so the speaker's icon shows instead of a broken picture. */
-  protected readonly brokenArt = signal<string | null>(null);
+  protected readonly images = brokenImages();
   protected readonly lockIcon = LucideLock;
   protected readonly unlockIcon = LucideLockOpen;
 

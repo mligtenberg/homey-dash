@@ -1,3 +1,4 @@
+import { brokenImages } from './loadable-art';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { DeviceApp, Realtime } from '@homey-dash/api-client';
 import { LucideDynamicIcon } from '@lucide/angular';
@@ -30,8 +31,8 @@ import { appIcon } from './app-icons';
               (click)="open(app)"
             >
               <span class="hd-apps__icon" aria-hidden="true">
-                @if (app.image && !broken().has(app.image)) {
-                  <img [src]="app.image" alt="" draggable="false" (error)="broke(app.image)" />
+                @if (app.image && !images.has(app.image)) {
+                  <img [src]="app.image" alt="" draggable="false" (error)="images.mark(app.image)" />
                 } @else if (icon(app); as symbol) {
                   <svg [lucideIcon]="symbol" />
                 } @else {
@@ -76,16 +77,12 @@ export class DeviceApps {
   /** The app being opened, until Homey answers. */
   protected readonly opening = signal<string | null>(null);
   protected readonly error = signal('');
-  protected readonly broken = signal<ReadonlySet<string>>(new Set());
+  protected readonly images = brokenImages();
 
   protected readonly icon = appIcon;
 
   protected isOpen(app: DeviceApp) {
     return !!this.current() && app.name.toLowerCase() === this.current().toLowerCase();
-  }
-
-  protected broke(image: string) {
-    this.broken.update((set) => new Set(set).add(image));
   }
 
   protected async open(app: DeviceApp) {
