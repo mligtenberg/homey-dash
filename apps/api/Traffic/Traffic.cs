@@ -12,7 +12,7 @@ public sealed class TrafficOptions
 }
 
 /// <summary>
-/// A TomTom account (ADR-0014): the API key of a TomTom developer account, under a name that tells a home's accounts apart.
+/// A TomTom account (ADR-0015): the API key of a TomTom developer account, under a name that tells a home's accounts apart.
 /// Set up in Management and kept in the database (ADR-0007). The key never leaves the backend.
 /// </summary>
 public sealed record TomTomAccount(string ApiKey)

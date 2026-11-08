@@ -8,7 +8,7 @@ import { PlexCommand, PlexItem, PlexOverview, PlexPage, PlexProfileList, PlexSes
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
 import { RouteTraffic } from './traffic';
 import { Forecast } from './weather';
-import { CapabilityValue, DeviceApp, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
+import { CapabilityValue, DeviceApp, HomeyDevice, HomeyEnergy, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
 
 // Mirrors apps/api/Realtime/RealtimeHub.cs.
 
@@ -27,6 +27,8 @@ export interface HomeySnapshot {
   loaded: boolean;
   /** Null until Homey first told it, or when Homey won't. */
   weather: HomeyWeather | null;
+  /** Null until HomeyDash first asked Homey for its energy report. */
+  energy: HomeyEnergy | null;
 }
 
 export interface HomeyCatalog {
@@ -46,6 +48,7 @@ export interface RealtimeMessages {
   Catalog: HomeyCatalog;
   HomeyStatus: HomeyStatus;
   Weather: { accountId: number; weather: HomeyWeather };
+  Energy: { accountId: number; energy: HomeyEnergy };
   /** What a joined screen now is and shows; null sends it to setup. */
   Screen: ScreenView | null;
   /** Asks a joined screen to take a screenshot and post it under this request id. */

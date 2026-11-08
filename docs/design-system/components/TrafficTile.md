@@ -1,6 +1,6 @@
 # Traffic tile
 
-The car travel time on one route now, from TomTom ([ADR-0014](../../adr/0014-traffic-from-tomtom.md)). The hue says the
+The car travel time on one route now, from TomTom ([ADR-0015](../../adr/0015-traffic-from-tomtom.md)). The hue says the
 delay over the usual time at this hour: `climate` (blue) on time, `light` (amber) from 2 minutes and 10% over, `heat` (red)
 from 5 minutes and 25% over.
 

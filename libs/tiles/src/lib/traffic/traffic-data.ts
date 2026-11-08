@@ -53,7 +53,7 @@ export function trafficIdle(traffic: RouteTraffic | undefined): string {
 }
 
 /**
- * The traffic of every route in use, from HomeyDash's realtime connection (ADR-0014): a snapshot on every (re)connect,
+ * The traffic of every route in use, from HomeyDash's realtime connection (ADR-0015): a snapshot on every (re)connect,
  * then `Traffic` whenever one changes.
  */
 @Injectable({ providedIn: 'root' })

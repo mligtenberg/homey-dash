@@ -8,7 +8,7 @@ export * from './traffic-route-field';
 export * from './traffic-settings';
 export * from './traffic-tile';
 
-// The traffic tile kind (ADR-0014). Mirrored for assistants in apps/api/Mcp/ManagementTools.cs.
+// The traffic tile kind (ADR-0015). Mirrored for assistants in apps/api/Mcp/ManagementTools.cs.
 
 export const TRAFFIC_TILES: TileModule = {
   name: 'Traffic',

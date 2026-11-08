@@ -21,7 +21,7 @@ export function matchDetail(match: PlaceMatch): string {
 
 /**
  * Finds a place by name with TomTom's search, in a popover of matches with their region and country; the chosen place is kept as
- * its name and coordinates (ADR-0014). `account` is the TomTom account that searches (the oldest without one).
+ * its name and coordinates (ADR-0015). `account` is the TomTom account that searches (the oldest without one).
  */
 @Component({
   selector: 'hd-traffic-place-field',

@@ -32,7 +32,7 @@ export const LOCK_SPOTS: readonly LockSpot[] = ['top-left', 'top-right', 'center
  * Something a display shows on its lock screen, over the photo set or colour an idle rule plays: the time and date,
  * the weather where a Homey is (of `account`, or the oldest), or the value of a device's capability, named by its
  * Homey signal (`homey:<account>:capability:<device>:<capability>`), or the car travel time on a route (of the TomTom
- * `account`, or the oldest; ADR-0014), which has nothing to show until a route is chosen. Widgets in the same spot stack in order.
+ * `account`, or the oldest; ADR-0015), which has nothing to show until a route is chosen. Widgets in the same spot stack in order.
  */
 export type LockWidget =
   | { kind: 'clock'; spot: LockSpot }

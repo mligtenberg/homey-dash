@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { PlaceMatch } from './weather';
 
-// Mirrors apps/api/Traffic (ADR-0014).
+// Mirrors apps/api/Traffic (ADR-0015).
 
 /** A place of a route: its name and where it is, in degrees. */
 export interface TrafficPlace {

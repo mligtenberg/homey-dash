@@ -3,7 +3,7 @@ import { TrafficPlace, TrafficRoute } from '@homey-dash/api-client';
 import { TrafficPlaceField } from './traffic-place-field';
 
 /**
- * Management's choice of a route (ADR-0014): a name, and an origin and destination found by name. Used by a traffic tile's
+ * Management's choice of a route (ADR-0015): a name, and an origin and destination found by name. Used by a traffic tile's
  * settings and by a lock screen's traffic widget. Emits the route once both places are chosen, and only then (a half chosen route is kept here, not in settings); it names itself
  * `Origin → Destination` until it has a name of its own.
  */

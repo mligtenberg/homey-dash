@@ -66,7 +66,7 @@ public sealed class RealtimeHub(
     // The weather where each Homey is, oldest account first (ADR-0013). Changes that follow arrive as Forecasts.
     public IReadOnlyList<Forecast> Forecasts() => weather.All;
 
-    // The traffic of every route in use (ADR-0014). Changes that follow arrive as Traffic.
+    // The traffic of every route in use (ADR-0015). Changes that follow arrive as Traffic.
     public IReadOnlyList<RouteTraffic> Traffic() => traffic.All;
 
     // Items of the account's Plex libraries (one, or every one when libraryId is null) whose title matches, not only the newest:
@@ -412,12 +412,14 @@ public sealed record HomeySnapshot(
     // False until the Homey's data first arrived; nothing is missing then.
     bool Loaded,
     // Null until Homey first told it, or when Homey won't.
-    HomeyWeather? Weather)
+    HomeyWeather? Weather,
+    // Null until HomeyDash first asked Homey for its energy report (ADR-0014).
+    HomeyEnergy? Energy)
 {
     public static List<HomeySnapshot> All(Homeys homeys) =>
         homeys.All.Select(e => new HomeySnapshot(e.AccountId, e.Name, e.State.Status, e.State.Devices.OrderBy(d => d.Name),
             e.State.Flows.OrderBy(f => f.Name), e.State.Moods.OrderBy(m => m.Name), e.State.Zones.OrderBy(z => z.Name),
-            e.State.FlowFolders.OrderBy(f => f.Name), e.State.Loaded, e.State.Weather)).ToList();
+            e.State.FlowFolders.OrderBy(f => f.Name), e.State.Loaded, e.State.Weather, e.State.Energy)).ToList();
 }
 
 public sealed record HomeyCatalog(
@@ -429,5 +431,8 @@ public sealed record HomeyDeviceChange(int AccountId, HomeyDevice Device);
 
 // The weather of the account's Homey changed.
 public sealed record HomeyWeatherChange(int AccountId, HomeyWeather Weather);
+
+// The energy report of the account's Homey changed.
+public sealed record HomeyEnergyChange(int AccountId, HomeyEnergy Energy);
 
 public sealed record HomeyDeviceRemoval(int AccountId, string DeviceId);

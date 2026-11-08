@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HomeyDash.Api.Traffic;
 
 /// <summary>
-/// Keeps the traffic of every route in use (ADR-0014): the routes of the traffic tiles in every dashboard's draft or
+/// Keeps the traffic of every route in use (ADR-0015): the routes of the traffic tiles in every dashboard's draft or
 /// published version, and of the traffic widgets on displays' lock screens. Asks TomTom for each route once every 5 minutes,
 /// however many tiles show it, and not at all for routes nobody uses any more. Pushes every <see cref="RouteTraffic"/> as
 /// <c>Traffic</c> when one changed. Displays never call TomTom.

@@ -7,7 +7,7 @@ import { timeOfDay, delayLevel, delayText, distance, duration, TrafficData, traf
 const HUES: Record<'none' | 'some' | 'heavy', KindHue> = { none: 'climate', some: 'light', heavy: 'heat' };
 
 /**
- * The car travel time on one route now, from TomTom (ADR-0014): the minutes it takes, and the delay over the usual time,
+ * The car travel time on one route now, from TomTom (ADR-0015): the minutes it takes, and the delay over the usual time,
  * which colours the tile (blue on time, amber a delay, red a heavy one). From wide up it adds the distance and the arrival
  * time when leaving now; large tiles add the usual time. Without a TomTom account it says so.
  */

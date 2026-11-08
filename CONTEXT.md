@@ -186,11 +186,22 @@ A tile that shows the weather where a **Homey** is, or at a town chosen for the 
 _Avoid_: Forecast widget, weather card
 
 **Traffic tile**:
-A tile that shows the car travel time now on one route, from TomTom (ADR-0014): the minutes, and the delay over the usual time at this hour, which colours the tile; by its size also the distance, the arrival time when leaving now, and the usual time. Its route is a name and an origin and destination found by name in **Management**, kept as names and coordinates in the tile's settings; it points at nothing in **Homey**, so it is never **Missing**. Without a **TomTom account** it says so. HomeyDash asks TomTom once every 5 minutes per route in use, however many tiles and **Lock screen widgets** show it.
+A tile that shows the car travel time now on one route, from TomTom (ADR-0015): the minutes, and the delay over the usual time at this hour, which colours the tile; by its size also the distance, the arrival time when leaving now, and the usual time. Its route is a name and an origin and destination found by name in **Management**, kept as names and coordinates in the tile's settings; it points at nothing in **Homey**, so it is never **Missing**. Without a **TomTom account** it says so. HomeyDash asks TomTom once every 5 minutes per route in use, however many tiles and **Lock screen widgets** show it.
 _Avoid_: Commute tile, route card, travel-time widget
 
 **TomTom account**:
 An **Account** holding the API key of a TomTom developer account, under a name; set up in **Management**, checked with TomTom, and never shown again or sent to a display. A **Traffic tile** or traffic **Lock screen widget** names one, or uses the oldest. Removing it leaves them without traffic until they are given another.
+**Clock tile**:
+A tile that shows the time, digital or as an analog dial, with the date where its size has room. It points at nothing and uses the display's own clock.
+_Avoid_: Time tile
+
+**Date tile**:
+A tile that shows today's date, and on large sizes the month as a calendar with today marked, weeks starting on Monday. It points at nothing.
+_Avoid_: Calendar tile (that is for events, which HomeyDash does not show)
+
+**Energy tile**:
+A tile that shows the energy of a **Homey** from Homey's own energy report (ADR-0014): the grid power now, importing or exporting, and by its size the sun's production, the home's consumption, today's totals and the day by the hour. It names its Homey like any Homey tile. A Homey whose API key lacks the energy scope, or that has no energy, makes it unavailable rather than missing.
+_Avoid_: Power tile, solar tile
 
 **Logic tile**:
 A tile that holds an ordered list of other tiles, each with a rule, and shows the first whose rule holds, or its fallback tile when none does; with no fallback it shows nothing, like empty cells. It holds tiles of any kind except another logic tile, and a tile it holds that points at a missing target is shown as **Missing** when chosen, not skipped. The tiles it holds take its size, so it only holds kinds that support that size. It fades from one tile to the next, and once switched it can stay on a tile for a chosen **Minimum show time**, after which it shows whatever its rules then choose.

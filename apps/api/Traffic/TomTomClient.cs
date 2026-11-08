@@ -7,7 +7,7 @@ namespace HomeyDash.Api.Traffic;
 
 /// <summary>
 /// Traffic from TomTom (tomtom.com/developers, a free tier with a key): the Routing API's live travel time with the
-/// history's usual one, and the Search API to find places by name. See ADR-0014.
+/// history's usual one, and the Search API to find places by name. See ADR-0015.
 /// </summary>
 public sealed class TomTomClient(IHttpClientFactory httpFactory) : ITraffic
 {

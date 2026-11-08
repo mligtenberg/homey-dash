@@ -5,7 +5,7 @@ import { TrafficTileSettings } from './traffic-data';
 import { TrafficRouteField } from './traffic-route-field';
 
 /**
- * Management's choice of a traffic tile's route (ADR-0014): a name and two places found by name with TomTom, and which TomTom
+ * Management's choice of a traffic tile's route (ADR-0015): a name and two places found by name with TomTom, and which TomTom
  * account asks once there are several.
  */
 @Component({

@@ -5,7 +5,7 @@ import { fieldErrors, TomTomAccount, TomTomAccountApi, TomTomAccounts } from '@h
 import { AccountPanel } from './account-panel';
 
 /**
- * The TomTom accounts, whose routing and search traffic tiles use (ADR-0014): each a name and an API key made in the TomTom
+ * The TomTom accounts, whose routing and search traffic tiles use (ADR-0015): each a name and an API key made in the TomTom
  * developer portal. HomeyDash checks a new key with TomTom before it keeps it, and never sends it back. Removing one leaves
  * the traffic tiles and widgets that name it without traffic until they are given another account.
  */
