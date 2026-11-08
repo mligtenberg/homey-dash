@@ -1,10 +1,11 @@
+import { Transport } from './transport';
 import { brokenImages } from './loadable-art';
 import { Segmented } from './segmented';
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, resource, signal, viewChild } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { CapabilityValue, DeviceApp, HomeyApi, InsightResolution, Realtime } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucideIconInput, LucideLock, LucideLockOpen, LucidePause, LucidePlay, LucideSkipBack, LucideSkipForward, LucideSpeaker, LucideVolume2, LucideVolumeX } from '@lucide/angular';
+import { LucideDynamicIcon, LucideIconInput, LucideLock, LucideLockOpen, LucideSpeaker, LucideVolume2, LucideVolumeX } from '@lucide/angular';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import { TileData } from '../tile-data';
 import { DeviceApps } from './device-apps';
@@ -33,7 +34,7 @@ const LOCK_STATES = [
  */
 @Component({
   selector: 'hd-device-details',
-  imports: [LucideDynamicIcon, NgTemplateOutlet, Segmented, DeviceApps, DeviceRemote, DeviceSegments, DeviceSlider, DeviceStepper, StatisticHistory, TileDetails],
+  imports: [LucideDynamicIcon, NgTemplateOutlet, Segmented, Transport, DeviceApps, DeviceRemote, DeviceSegments, DeviceSlider, DeviceStepper, StatisticHistory, TileDetails],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // Not a box of its own, so it does not take part in the tile's layout.
   host: { style: 'display: contents' },
@@ -113,27 +114,17 @@ const LOCK_STATES = [
               }
               @if (c.playback; as playing) {
                 @if (!c.remote || c.previous || c.next) {
-                  <div class="hd-dev__transport">
-                    @if (c.previous; as previous) {
-                      <button type="button" class="hd-round-btn" aria-label="Previous" [disabled]="!ok()" (click)="drive.set(previous.id, true)">
-                        <svg [lucideIcon]="previousIcon" />
-                      </button>
-                    }
-                    <button
-                      type="button"
-                      class="hd-round-btn hd-dev__play"
-                      [attr.aria-label]="playing.value ? 'Pause' : 'Play'"
-                      [disabled]="!ok()"
-                      (click)="drive.set(playing.id, !playing.value)"
-                    >
-                      <svg [lucideIcon]="playing.value ? pauseIcon : playIcon" />
-                    </button>
-                    @if (c.next; as next) {
-                      <button type="button" class="hd-round-btn" aria-label="Next" [disabled]="!ok()" (click)="drive.set(next.id, true)">
-                        <svg [lucideIcon]="nextIcon" />
-                      </button>
-                    }
-                  </div>
+                  <hd-transport
+                    class="hd-dev__transport"
+                    playClass="hd-dev__play"
+                    [playing]="!!playing.value"
+                    [previous]="!!c.previous"
+                    [next]="!!c.next"
+                    [disabled]="!ok()"
+                    (toggled)="drive.set(playing.id, !playing.value)"
+                    (skippedBack)="c.previous && drive.set(c.previous.id, true)"
+                    (skippedForward)="c.next && drive.set(c.next.id, true)"
+                  />
                 }
               }
             }
@@ -260,10 +251,6 @@ export class DeviceDetails {
   ]);
   /** Which page shows: the device's state and controls, its apps, or the history of its readings. */
   protected readonly page = signal<'device' | 'apps' | 'history'>('device');
-  protected readonly playIcon = LucidePlay;
-  protected readonly pauseIcon = LucidePause;
-  protected readonly previousIcon = LucideSkipBack;
-  protected readonly nextIcon = LucideSkipForward;
   protected readonly volumeIcon = LucideVolume2;
   protected readonly muteIcon = LucideVolumeX;
   protected readonly speakerIcon = LucideSpeaker;

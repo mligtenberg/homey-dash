@@ -17,10 +17,6 @@ import {
   LucideLink,
   LucideLock,
   LucideMusic,
-  LucidePause,
-  LucidePlay,
-  LucideSkipBack,
-  LucideSkipForward,
   LucideSearch,
   LucideSpeaker,
   LucideUnlink,
@@ -28,6 +24,7 @@ import {
 import { albumArtUrl, isPlaying, nowPlaying } from '../core/device-look';
 import { brokenImages, loadableArt } from '../core/loadable-art';
 import { SliderDrag } from '../core/slider-drag';
+import { Transport } from '../core/transport';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { TileData, TileSettings } from '../tile-data';
@@ -195,7 +192,7 @@ interface Room {
  */
 @Component({
   selector: 'hd-sonos-tile',
-  imports: [LucideDynamicIcon, NgTemplateOutlet, Segmented, SonosMusic, TileDetails],
+  imports: [LucideDynamicIcon, NgTemplateOutlet, Segmented, Transport, SonosMusic, TileDetails],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     ...TILE_FACE_HOST,
@@ -236,36 +233,15 @@ interface Room {
     </ng-template>
     <ng-template #transport let-all>
       @if (lead(); as lead) {
-        <div class="hd-round-btns">
-          @if (canSkip() && (all || size() !== 'small')) {
-            <button
-              type="button"
-              class="hd-round-btn"
-              aria-label="Previous"
-              (click)="press(lead, 'speaker_prev')"
-            >
-              <svg [lucideIcon]="backIcon" />
-            </button>
-          }
-          <button
-            type="button"
-            class="hd-round-btn"
-            [attr.aria-label]="playing() ? 'Pause' : 'Play'"
-            (click)="toggle(lead)"
-          >
-            <svg [lucideIcon]="playing() ? pauseIcon : playIcon" />
-          </button>
-          @if (canSkip() && (all || size() !== 'small')) {
-            <button
-              type="button"
-              class="hd-round-btn"
-              aria-label="Next"
-              (click)="press(lead, 'speaker_next')"
-            >
-              <svg [lucideIcon]="forwardIcon" />
-            </button>
-          }
-        </div>
+        <hd-transport
+          class="hd-round-btns"
+          [playing]="playing()"
+          [previous]="canSkip() && (all || size() !== 'small')"
+          [next]="canSkip() && (all || size() !== 'small')"
+          (toggled)="toggle(lead)"
+          (skippedBack)="press(lead, 'speaker_prev')"
+          (skippedForward)="press(lead, 'speaker_next')"
+        />
       }
     </ng-template>
     <ng-template #groupRow>
@@ -405,10 +381,6 @@ export class SonosTile extends TileView<SonosTileSettings> {
   private readonly realtime = inject(Realtime);
 
   protected readonly speakerIcon = LucideSpeaker;
-  protected readonly backIcon = LucideSkipBack;
-  protected readonly forwardIcon = LucideSkipForward;
-  protected readonly playIcon = LucidePlay;
-  protected readonly pauseIcon = LucidePause;
   protected readonly lockIcon = LucideLock;
   protected readonly linkIcon = LucideLink;
   protected readonly unlinkIcon = LucideUnlink;

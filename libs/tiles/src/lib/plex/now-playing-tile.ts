@@ -1,7 +1,8 @@
 import { brokenImages } from '../core/loadable-art';
+import { Transport } from '../core/transport';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { ANY_PLEX_PLAYER, PlexCommand, plexImageUrl, Realtime } from '@homey-dash/api-client';
-import { LucideDynamicIcon, LucidePause, LucidePlay, LucideSkipBack, LucideSkipForward, LucideTv } from '@lucide/angular';
+import { LucideDynamicIcon, LucideTv } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { LivePlexSession, PlexData, plexIdle, plexPosition, plexTime } from './plex-data';
@@ -19,7 +20,7 @@ export const NOW_PLAYING_CYCLE_MS = 12_000;
  */
 @Component({
   selector: 'hd-plex-now-playing-tile',
-  imports: [TileDetails, LucideDynamicIcon],
+  imports: [TileDetails, LucideDynamicIcon, Transport],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex', '[class.has-art]': '!!session()' },
   template: `
@@ -41,26 +42,16 @@ export const NOW_PLAYING_CYCLE_MS = 12_000;
           @if (size() !== 'small') {
             <span class="hd-plex__time">{{ time(session) }}</span>
           }
-          <div class="hd-round-btns">
-            @if (size() !== 'small') {
-              <button type="button" class="hd-round-btn" aria-label="Skip back" (click)="control(session, 'skipPrevious')">
-                <svg [lucideIcon]="backIcon" />
-              </button>
-            }
-            <button
-              type="button"
-              class="hd-round-btn"
-              [attr.aria-label]="session.state === 'playing' ? 'Pause' : 'Play'"
-              (click)="control(session, session.state === 'playing' ? 'pause' : 'play')"
-            >
-              <svg [lucideIcon]="session.state === 'playing' ? pauseIcon : playIcon" />
-            </button>
-            @if (size() !== 'small') {
-              <button type="button" class="hd-round-btn" aria-label="Skip forward" (click)="control(session, 'skipNext')">
-                <svg [lucideIcon]="forwardIcon" />
-              </button>
-            }
-          </div>
+          <hd-transport
+            class="hd-round-btns"
+            [labels]="skipLabels"
+            [playing]="session.state === 'playing'"
+            [previous]="size() !== 'small'"
+            [next]="size() !== 'small'"
+            (toggled)="control(session, session.state === 'playing' ? 'pause' : 'play')"
+            (skippedBack)="control(session, 'skipPrevious')"
+            (skippedForward)="control(session, 'skipNext')"
+          />
         </div>
       </div>
       <div class="hd-plex__progress" role="progressbar" [attr.aria-valuenow]="percent(session)" aria-valuemin="0" aria-valuemax="100">
@@ -92,22 +83,15 @@ export const NOW_PLAYING_CYCLE_MS = 12_000;
                 <div class="hd-plex__progress-fill" [style.width.%]="percent(item)"></div>
               </div>
               <span class="hd-plex__time">{{ time(item) }}</span>
-              <div class="hd-plex-now__controls">
-                <button type="button" class="hd-round-btn" [attr.aria-label]="'Skip back on ' + item.playerName" (click)="control(item, 'skipPrevious')">
-                  <svg [lucideIcon]="backIcon" />
-                </button>
-                <button
-                  type="button"
-                  class="hd-round-btn hd-plex-now__play"
-                  [attr.aria-label]="(item.state === 'playing' ? 'Pause ' : 'Play ') + item.playerName"
-                  (click)="control(item, item.state === 'playing' ? 'pause' : 'play')"
-                >
-                  <svg [lucideIcon]="item.state === 'playing' ? pauseIcon : playIcon" />
-                </button>
-                <button type="button" class="hd-round-btn" [attr.aria-label]="'Skip forward on ' + item.playerName" (click)="control(item, 'skipNext')">
-                  <svg [lucideIcon]="forwardIcon" />
-                </button>
-              </div>
+              <hd-transport
+                class="hd-plex-now__controls"
+                playClass="hd-plex-now__play"
+                [labels]="playerLabels(item)"
+                [playing]="item.state === 'playing'"
+                (toggled)="control(item, item.state === 'playing' ? 'pause' : 'play')"
+                (skippedBack)="control(item, 'skipPrevious')"
+                (skippedForward)="control(item, 'skipNext')"
+              />
             </div>
           </article>
         } @empty {
@@ -125,10 +109,12 @@ export class NowPlayingTile extends TileView {
   private readonly realtime = inject(Realtime);
 
   protected readonly tvIcon = LucideTv;
-  protected readonly playIcon = LucidePlay;
-  protected readonly pauseIcon = LucidePause;
-  protected readonly backIcon = LucideSkipBack;
-  protected readonly forwardIcon = LucideSkipForward;
+  protected readonly skipLabels = { previous: 'Skip back', next: 'Skip forward', play: 'Play', pause: 'Pause' };
+
+  protected playerLabels(item: LivePlexSession) {
+    const on = item.playerName;
+    return { previous: `Skip back on ${on}`, next: `Skip forward on ${on}`, play: `Play ${on}`, pause: `Pause ${on}` };
+  }
 
   private readonly overview = computed(() => this.plex.overview(this.settings().account));
 
