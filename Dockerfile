@@ -39,7 +39,8 @@ RUN rm -r /rootfs/app/frontends/admin/backgrounds /rootfs/app/frontends/display/
     && ln -s /app/backgrounds /rootfs/app/frontends/display/backgrounds
 
 # --- Runtime: chiseled (distroless, non-root) --------------------------------
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled AS final
+# The -extra variant carries tzdata (and ICU); plain chiseled has no /usr/share/zoneinfo, so Europe/Amsterdam is missing.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra AS final
 COPY --from=rootfs /rootfs /
 WORKDIR /app
 
