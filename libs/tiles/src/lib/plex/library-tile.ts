@@ -1,4 +1,5 @@
 import { Segmented } from '../core/segmented';
+import { PlexAirPlayControls } from './plex-airplay-controls';
 import { PlexProfilePicker } from './plex-profile-picker';
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { LucideDynamicIcon, LucideLibrary } from '@lucide/angular';
@@ -14,7 +15,7 @@ import { PLEX_BROWSER_TEMPLATE, RecentlyAddedTile } from './recently-added-tile'
  */
 @Component({
   selector: 'hd-plex-library-tile',
-  imports: [TileDetails, LucideDynamicIcon, PlexProfilePicker, Segmented],
+  imports: [TileDetails, LucideDynamicIcon, PlexAirPlayControls, PlexProfilePicker, Segmented],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex-recent', '[class.has-art]': 'shown().length > 0' },
   template: PLEX_BROWSER_TEMPLATE,

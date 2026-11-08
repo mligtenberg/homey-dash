@@ -1,9 +1,10 @@
 import { Segmented } from '../core/segmented';
 import { reason } from './hub-reason';
+import { PlexAirPlayControls } from './plex-airplay-controls';
 import { PlexLocalPlayer } from './plex-local-player';
 import { PlexProfilePicker } from './plex-profile-picker';
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
-import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, PlexTracks, Realtime, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
+import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, Realtime, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
 import { cells } from '@homey-dash/layout';
 import {
   LucideAirplay,
@@ -149,45 +150,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
         </div>
       }
       @for (p of casting(); track p.deviceId) {
-        <div class="hd-plex-recent__now" role="group" [attr.aria-label]="'Playing on ' + p.deviceName">
-          <div class="hd-plex-recent__now-text">
-            <strong>{{ p.title }}</strong>
-            @if (p.detail) {
-              <span>{{ p.detail }}</span>
-            }
-            <span>{{ busy().includes(p.deviceId) ? 'Starting on' : p.paused ? 'Paused on' : 'Playing on' }} {{ p.deviceName }}</span>
-          </div>
-          <button type="button" class="hd-plex-recent__receiver" [disabled]="busy().includes(p.deviceId)" (click)="togglePause(p)">
-            <svg [lucideIcon]="p.paused ? playIcon : pauseIcon" />{{ p.paused ? 'Resume' : 'Pause' }}
-          </button>
-          <button type="button" class="hd-plex-recent__receiver" (click)="stop(p)"><svg [lucideIcon]="stopIcon" />Stop</button>
-          @if (tracksFor(p); as t) {
-            @if (t.audio.length > 1) {
-              <label class="hd-plex-recent__track">
-                <span>Audio</span>
-                <select [disabled]="busy().includes(p.deviceId)" (change)="pickAudio(p, $any($event.target).value)">
-                  @for (a of t.audio; track a.id) {
-                    <option [value]="a.id" [selected]="a.id === audioOf(p, t)">{{ a.label }}</option>
-                  }
-                </select>
-              </label>
-            }
-            @if (t.subtitles.length) {
-              <label class="hd-plex-recent__track">
-                <span>Subtitles</span>
-                <select [disabled]="busy().includes(p.deviceId)" (change)="pickSubtitle(p, $any($event.target).value)">
-                  <option value="" [selected]="!p.subtitleStreamId">Off</option>
-                  @for (sub of t.subtitles; track sub.id) {
-                    <option [value]="sub.id" [selected]="sub.id === p.subtitleStreamId">{{ sub.label }}</option>
-                  }
-                </select>
-              </label>
-            }
-          }
-          @if (errors()[p.deviceId]; as error) {
-            <div class="hd-plex-recent__cast-error" role="alert">{{ error }}</div>
-          }
-        </div>
+        <hd-plex-airplay-controls [playing]="p" />
       }
       @if (selected(); as item) {
         <div class="hd-plex-recent__detail">
@@ -385,7 +348,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
  */
 @Component({
   selector: 'hd-plex-recent-tile',
-  imports: [TileDetails, LucideDynamicIcon, PlexProfilePicker, Segmented],
+  imports: [TileDetails, LucideDynamicIcon, PlexAirPlayControls, PlexProfilePicker, Segmented],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex-recent', '[class.has-art]': 'shown().length > 0' },
   template: PLEX_BROWSER_TEMPLATE,
@@ -458,10 +421,6 @@ export class RecentlyAddedTile extends TileView {
   protected readonly casting = computed(() => this.airPlay.playing().filter((p) => p.accountId === (this.overview()?.accountId ?? 0)));
   protected readonly allPaused = computed(() => this.casting().every((p) => p.paused));
   /** Receivers whose stream is being started over with another track. */
-  protected readonly busy = signal<string[]>([]);
-  protected readonly errors = signal<Record<string, string>>({});
-  private readonly tracks = signal<Record<string, PlexTracks>>({});
-  private readonly tracksLoading = new Set<string>();
 
   protected readonly query = signal('');
   /** What the search found; null when nothing is being searched for. */
@@ -573,8 +532,6 @@ export class RecentlyAddedTile extends TileView {
       this.player.stop();
       this.stopVideo();
     });
-    // Each thing that plays gets its tracks, to choose between.
-    effect(() => this.casting().forEach((p) => void this.loadTracks(p)));
   }
 
   /** What the detail view lists: the newest of the chosen tab. */
@@ -856,65 +813,6 @@ export class RecentlyAddedTile extends TileView {
     if (!tracks.length) return this.player.error.set('That album has no tracks.');
     const index = item.kind === 'track' ? Math.max(0, tracks.findIndex((t) => t.id === item.id)) : 0;
     this.player.start({ queue: tracks, index, paused: false, album });
-  }
-
-  protected async togglePause(playing: AirPlayPlayback) {
-    await this.attempt(playing, () => this.realtime.setAirPlayPaused(playing.deviceId, !playing.paused),
-      `Could not ${playing.paused ? 'resume' : 'pause'} ${playing.deviceName}.`);
-  }
-
-  protected async stop(playing: AirPlayPlayback) {
-    await this.attempt(playing, () => this.realtime.stopAirPlay(playing.deviceId), `Could not stop ${playing.deviceName}.`);
-  }
-
-  protected tracksFor(playing: AirPlayPlayback): PlexTracks | undefined {
-    return this.tracks()[`${playing.accountId}:${playing.itemId}`];
-  }
-
-  /** The audio track in use: the choice made, else the one Plex plays by default. */
-  protected audioOf(playing: AirPlayPlayback, tracks: PlexTracks) {
-    return playing.audioStreamId ?? tracks.audio.find((t) => t.selected)?.id ?? tracks.audio[0]?.id;
-  }
-
-  protected async pickAudio(playing: AirPlayPlayback, audioStreamId: string) {
-    await this.changeTracks(playing, audioStreamId, playing.subtitleStreamId);
-  }
-
-  protected async pickSubtitle(playing: AirPlayPlayback, subtitleStreamId: string) {
-    const tracks = this.tracksFor(playing);
-    await this.changeTracks(playing, tracks ? this.audioOf(playing, tracks) ?? null : playing.audioStreamId, subtitleStreamId || null);
-  }
-
-  private async changeTracks(playing: AirPlayPlayback, audio: string | null, subtitle: string | null) {
-    this.busy.update((b) => [...b, playing.deviceId]);
-    try {
-      await this.attempt(playing, () => this.realtime.changeAirPlayTracks(playing.deviceId, audio, subtitle), `Could not change the tracks on ${playing.deviceName}.`);
-    } finally {
-      this.busy.update((b) => b.filter((id) => id !== playing.deviceId));
-    }
-  }
-
-  private async attempt(playing: AirPlayPlayback, action: () => Promise<void>, fallback: string) {
-    try {
-      await action();
-      this.errors.update(({ [playing.deviceId]: _, ...others }) => others);
-    } catch (error) {
-      this.errors.update((errors) => ({ ...errors, [playing.deviceId]: reason(error, fallback) }));
-    }
-  }
-
-  private async loadTracks(playing: AirPlayPlayback) {
-    const key = `${playing.accountId}:${playing.itemId}`;
-    if (this.tracks()[key] || this.tracksLoading.has(key)) return;
-    this.tracksLoading.add(key);
-    try {
-      const tracks = await this.realtime.plexTracks(playing.accountId, playing.itemId);
-      this.tracks.update((all) => ({ ...all, [key]: tracks }));
-    } catch {
-      // Without its tracks there is nothing to choose; pausing and stopping still work.
-    } finally {
-      this.tracksLoading.delete(key);
-    }
   }
 
   protected selectTab(id: string) {
