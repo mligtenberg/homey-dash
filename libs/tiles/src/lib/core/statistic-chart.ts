@@ -42,6 +42,9 @@ export const STATISTIC_WINDOWS: Record<
   },
 };
 
+/** The windows as the tabs that pick between them show. */
+export const WINDOW_TABS = Object.entries(STATISTIC_WINDOWS).map(([id, { tab }]) => ({ id: id as InsightResolution, label: tab }));
+
 /**
  * What a log measures, for the colour of its full-screen view: power and energy are amber like a lit lamp,
  * temperature warm, humidity cool. Anything else keeps the tile's own hue.

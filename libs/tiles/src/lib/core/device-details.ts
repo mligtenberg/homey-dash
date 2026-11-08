@@ -1,3 +1,4 @@
+import { Segmented } from './segmented';
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, resource, signal, viewChild } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
@@ -31,18 +32,14 @@ const LOCK_STATES = [
  */
 @Component({
   selector: 'hd-device-details',
-  imports: [LucideDynamicIcon, NgTemplateOutlet, DeviceApps, DeviceRemote, DeviceSegments, DeviceSlider, DeviceStepper, StatisticHistory, TileDetails],
+  imports: [LucideDynamicIcon, NgTemplateOutlet, Segmented, DeviceApps, DeviceRemote, DeviceSegments, DeviceSlider, DeviceStepper, StatisticHistory, TileDetails],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // Not a box of its own, so it does not take part in the tile's layout.
   host: { style: 'display: contents' },
   template: `
     <hd-tile-details #dialog [screen]="true" [name]="name()" [icon]="icon()" [subtitle]="view()?.room ?? ''" (closed)="page.set('device')">
       @if (pages().length > 1) {
-        <div class="hd-segmented" hdDetailsHead role="group" aria-label="Show">
-          @for (p of pages(); track p.id) {
-            <button type="button" [attr.aria-pressed]="page() === p.id" (click)="page.set(p.id)">{{ p.label }}</button>
-          }
-        </div>
+        <hd-segmented hdDetailsHead label="Show" [options]="pages()" [value]="page()" (picked)="page.set($event)" />
       }
       @if (probing()) {
         <div class="hd-details__label">Loading…</div>

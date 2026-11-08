@@ -2,10 +2,10 @@ import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, injec
 import { rxResource } from '@angular/core/rxjs-interop';
 import { HomeyApi, HomeyInsightEntry, HomeyInsightLog, InsightResolution } from '@homey-dash/api-client';
 import { LucideChevronLeft, LucideChevronRight, LucideDynamicIcon } from '@lucide/angular';
-import { STATISTIC_WINDOWS, statisticTone } from './statistic-chart';
+import { STATISTIC_WINDOWS, statisticTone, WINDOW_TABS } from './statistic-chart';
+import { Segmented } from './segmented';
 import { StatisticReadings } from './statistic-readings';
 
-const WINDOWS = Object.entries(STATISTIC_WINDOWS).map(([id, { tab }]) => ({ id: id as InsightResolution, tab }));
 
 /**
  * Where a strip of items scrolls to when an arrow is tapped, so the item cut off on that side comes fully into view
@@ -38,7 +38,7 @@ export function stripTarget(
  */
 @Component({
   selector: 'hd-statistic-history',
-  imports: [StatisticReadings, LucideDynamicIcon],
+  imports: [StatisticReadings, Segmented, LucideDynamicIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-stat__pane hd-hist', '[attr.data-tone]': 'tone()' },
   template: `
@@ -70,11 +70,7 @@ export function stripTarget(
       </div>
     }
     <div class="hd-hist__bar">
-      <div class="hd-segmented" role="group" aria-label="Time window">
-        @for (w of windows; track w.id) {
-          <button type="button" [attr.aria-pressed]="window() === w.id" (click)="window.set(w.id)">{{ w.tab }}</button>
-        }
-      </div>
+      <hd-segmented label="Time window" [options]="windows" [value]="window()" (picked)="window.set($event)" />
     </div>
     <hd-statistic-readings [entries]="entries()" [window]="windowInfo()" [units]="log().units">
       @if (!history.isLoading() && entries().length === 0) {
@@ -94,7 +90,7 @@ export class StatisticHistory {
   /** The time window it opens on. */
   readonly initialWindow = input<InsightResolution>('last24Hours');
 
-  protected readonly windows = WINDOWS;
+  protected readonly windows = WINDOW_TABS;
   protected readonly previousIcon = LucideChevronLeft;
   protected readonly nextIcon = LucideChevronRight;
   private readonly strip = viewChild<ElementRef<HTMLElement>>('strip');

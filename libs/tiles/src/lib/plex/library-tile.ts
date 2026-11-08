@@ -1,3 +1,4 @@
+import { Segmented } from '../core/segmented';
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { LucideDynamicIcon, LucideLibrary } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
@@ -12,7 +13,7 @@ import { PLEX_BROWSER_TEMPLATE, RecentlyAddedTile } from './recently-added-tile'
  */
 @Component({
   selector: 'hd-plex-library-tile',
-  imports: [TileDetails, LucideDynamicIcon],
+  imports: [TileDetails, LucideDynamicIcon, Segmented],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex-recent', '[class.has-art]': 'shown().length > 0' },
   template: PLEX_BROWSER_TEMPLATE,

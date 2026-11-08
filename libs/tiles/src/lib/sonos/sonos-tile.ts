@@ -1,3 +1,4 @@
+import { Segmented } from '../core/segmented';
 import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -203,7 +204,7 @@ interface Drag {
  */
 @Component({
   selector: 'hd-sonos-tile',
-  imports: [LucideDynamicIcon, NgTemplateOutlet, SonosMusic, TileDetails],
+  imports: [LucideDynamicIcon, NgTemplateOutlet, Segmented, SonosMusic, TileDetails],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     ...TILE_FACE_HOST,
@@ -381,17 +382,7 @@ interface Drag {
       [icon]="speakerIcon"
       [subtitle]="face().detail"
     >
-      <div class="hd-segmented" hdDetailsHead role="group" aria-label="Show">
-        @for (t of tabs; track t.id) {
-          <button
-            type="button"
-            [attr.aria-pressed]="tab() === t.id"
-            (click)="tab.set(t.id)"
-          >
-            {{ t.label }}
-          </button>
-        }
-      </div>
+      <hd-segmented hdDetailsHead label="Show" [options]="tabs" [value]="tab()" (picked)="tab.set($event)" />
       <div class="hd-sonos__pane">
         @if (lead(); as lead) {
           <div class="hd-sonos__now">

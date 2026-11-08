@@ -18,7 +18,8 @@ import { KindHue } from '../tile-kind';
 import { TileSettings } from '../tile-data';
 import { DeviceDetails } from './device-details';
 import { deviceLook, formatReading } from './device-look';
-import { STATISTIC_WINDOWS, StatisticChart, statisticTone, logOwner } from './statistic-chart';
+import { STATISTIC_WINDOWS, StatisticChart, statisticTone, logOwner, WINDOW_TABS } from './statistic-chart';
+import { Segmented } from './segmented';
 import { StatisticReadings } from './statistic-readings';
 import { TileDetails } from './tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
@@ -41,7 +42,7 @@ function logHue(log: HomeyInsightLog, ownerHue: KindHue): KindHue {
 
 @Component({
   selector: 'hd-statistic-tile',
-  imports: [LucideDynamicIcon, StatisticChart, StatisticReadings, TileDetails, DeviceDetails],
+  imports: [LucideDynamicIcon, Segmented, StatisticChart, StatisticReadings, TileDetails, DeviceDetails],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     ...TILE_FACE_HOST,
@@ -88,22 +89,7 @@ function logHue(log: HomeyInsightLog, ownerHue: KindHue): KindHue {
         [icon]="face().icon"
         [subtitle]="face().detail"
       >
-        <div
-          class="hd-segmented"
-          hdDetailsHead
-          role="group"
-          aria-label="Time window"
-        >
-          @for (w of windows; track w.id) {
-            <button
-              type="button"
-              [attr.aria-pressed]="shownWindow() === w.id"
-              (click)="viewWindow.set(w.id)"
-            >
-              {{ w.tab }}
-            </button>
-          }
-        </div>
+        <hd-segmented hdDetailsHead label="Time window" [options]="windows" [value]="shownWindow()" (picked)="viewWindow.set($event)" />
         <div class="hd-stat__pane" [attr.data-tone]="tone()">
           <hd-statistic-readings [entries]="shownEntries()" [window]="shownWindowInfo()" [units]="log()?.units ?? null" />
         </div>
@@ -157,9 +143,7 @@ export class StatisticTile extends TileView<StatisticTileSettings> {
 
   /** The window the detail view shows: the tile's own until another tab is pressed, and again once it is closed. */
   protected readonly viewWindow = signal<InsightResolution | null>(null);
-  protected readonly windows = Object.entries(STATISTIC_WINDOWS).map(
-    ([id, { tab }]) => ({ id: id as InsightResolution, tab }),
-  );
+  protected readonly windows = WINDOW_TABS;
   protected readonly shownWindow = computed(
     () => this.viewWindow() ?? this.windowId(),
   );

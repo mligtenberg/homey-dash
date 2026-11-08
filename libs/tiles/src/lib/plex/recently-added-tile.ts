@@ -1,3 +1,4 @@
+import { Segmented } from '../core/segmented';
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
 import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, PlexProfile, PlexProfileList, PlexTracks, Realtime, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
 import { cells } from '@homey-dash/layout';
@@ -145,11 +146,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
         </div>
       }
       @if (!selected() && tabs().length > (browse ? 1 : 2)) {
-        <div class="hd-segmented" hdDetailsHead role="group" aria-label="Show">
-          @for (t of tabs(); track t.id) {
-            <button type="button" [attr.aria-pressed]="activeTab() === t.id" (click)="selectTab(t.id)">{{ t.label }}</button>
-          }
-        </div>
+        <hd-segmented hdDetailsHead label="Show" [options]="tabs()" [value]="activeTab()" (picked)="selectTab($event)" />
       }
       @if (local(); as l) {
         <div class="hd-plex-recent__now" role="group" aria-label="Playing here">
@@ -447,7 +444,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
  */
 @Component({
   selector: 'hd-plex-recent-tile',
-  imports: [TileDetails, LucideDynamicIcon],
+  imports: [TileDetails, LucideDynamicIcon, Segmented],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex-recent', '[class.has-art]': 'shown().length > 0' },
   template: PLEX_BROWSER_TEMPLATE,
