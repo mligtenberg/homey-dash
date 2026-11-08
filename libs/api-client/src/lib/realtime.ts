@@ -6,6 +6,7 @@ import { DisplayInfo, ScreenDetails, ScreenView } from './displays';
 import { PhotoSet } from './photos';
 import { PlexCommand, PlexItem, PlexOverview, PlexPage, PlexProfileList, PlexSession, PlexSnapshot, PlexTracks } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
+import { Forecast } from './weather';
 import { CapabilityValue, DeviceApp, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
 
 // Mirrors apps/api/Realtime/RealtimeHub.cs.
@@ -58,6 +59,8 @@ export interface RealtimeMessages {
   Plex: PlexOverview[];
   /** What plays on Plex, whenever more than its progress changed. */
   PlexSessions: PlexSession[];
+  /** The weather where each Homey is, oldest account first, whenever one changes. */
+  Forecasts: Forecast[];
   /** What plays on AirPlay receivers, whenever it changes: started, paused, changed or ended. */
   AirPlayNow: AirPlayPlayback[];
   /** The answers to this connection's rule subscriptions that one change altered. */
@@ -131,6 +134,11 @@ export class Realtime {
   /** Plex's libraries and what plays now; changes that follow arrive as `Plex` and `PlexSessions`. */
   plex() {
     return this.hub.invoke<PlexSnapshot>('Plex');
+  }
+
+  /** The weather where each Homey is, oldest account first; changes that follow arrive as `Forecasts`. */
+  forecasts() {
+    return this.hub.invoke<Forecast[]>('Forecasts');
   }
 
   /** Plays, pauses or skips on a player of a Plex account; fails when the player takes no remote control. */

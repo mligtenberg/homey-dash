@@ -27,6 +27,12 @@ public sealed class HomeyState(TimeProvider time, int accountId)
     // Null until Homey first told it, or when Homey won't.
     public HomeyWeather? Weather { get; private set; }
 
+    // Null until Homey first told it, or when Homey won't (LocationRefused).
+    public HomeyLocation? Location { get; private set; }
+
+    // Homey won't tell where it is: the API key lacks the geolocation scope, or no location is set.
+    public bool LocationRefused { get; private set; }
+
     // False until the first snapshot of Homey has arrived.
     public bool Loaded { get; private set; }
 
@@ -171,6 +177,16 @@ public sealed class HomeyState(TimeProvider time, int accountId)
             Weather = weather;
         }
         Changed?.Invoke(new WeatherChanged(weather));
+    }
+
+    // Raises nothing: the weather watcher looks every while, and a Homey hardly ever moves.
+    public void SetLocation(HomeyLocation? location)
+    {
+        lock (_lock)
+        {
+            Location = location;
+            LocationRefused = location is null;
+        }
     }
 
     public void UpsertFlow(HomeyFlow flow) => UpdateCatalog(() => _flows = _flows.SetItem(flow.Id, flow));

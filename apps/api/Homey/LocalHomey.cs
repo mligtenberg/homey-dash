@@ -187,6 +187,7 @@ public sealed class LocalHomey(
     // (it needs the geolocation scope) leaves it out rather than failing; so does a Homey that can't tell.
     private async Task FollowWeatherAsync(CancellationToken ct)
     {
+        await ReadLocationAsync(ct);
         while (!ct.IsCancellationRequested)
         {
             try
@@ -210,6 +211,25 @@ public sealed class LocalHomey(
             {
                 return;
             }
+        }
+    }
+
+    // Where Homey is, for the weather tile's forecast; once a session, as it hardly ever changes. Needs the geolocation scope.
+    private async Task ReadLocationAsync(CancellationToken ct)
+    {
+        try
+        {
+            state.SetLocation(HomeyMapper.Location(await GetJsonAsync("api/manager/geolocation/option/location", ct)));
+            if (state.LocationRefused) logger.LogWarning("Homey {Account} has no location set, so the weather tile has no forecast", account.Name);
+        }
+        catch (HttpRequestException e) when (e.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized or HttpStatusCode.NotFound)
+        {
+            logger.LogWarning("Homey {Account} won't tell where it is: {Error}", account.Name, e.Message);
+            state.SetLocation(null);
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException || e is OperationCanceledException && !ct.IsCancellationRequested)
+        {
+            logger.LogDebug("Could not read the location of Homey {Account}: {Error}", account.Name, e.Message);
         }
     }
 

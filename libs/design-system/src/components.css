@@ -1356,3 +1356,64 @@ a.hd-btn { text-decoration: none; }
   animation: hd-spin 1s linear infinite;
 }
 .hd-sonos .hd-round-btn.is-busy:disabled { opacity: 1; }
+
+/*
+ * Weather (ADR-0013): the weather now beside or above what comes, by size. Small: an icon and the temperature over the
+ * place. Wide and full: the coming hours to the right. Large: the hours (or, while rain comes, the rain) and the coming days
+ * under it; full large puts them beside it. The hue is climate's.
+ */
+.hd-weather { display: grid; gap: calc(var(--cell) * .06) calc(var(--cell) * .16); grid-template: "now" auto "titles" 1fr / minmax(0, 1fr); }
+.hd-weather:not(.has-forecast) { display: flex; }
+.hd-weather__now { grid-area: now; }
+.hd-weather__titles { grid-area: titles; align-self: end; min-width: 0; }
+.hd-weather__ahead { grid-area: ahead; min-width: 0; }
+.hd-weather__days { grid-area: days; min-width: 0; }
+.hd-weather[data-size="wide"] { grid-template: "now ahead" auto "titles ahead" 1fr / minmax(0, 1fr) minmax(0, 1fr); }
+.hd-weather[data-size="full"] { grid-template: "now ahead" auto "titles ahead" 1fr / minmax(0, 1fr) minmax(0, 2fr); }
+.hd-weather[data-size="large"] { grid-template: "now" auto "titles" auto "ahead" 1fr "days" 1fr / minmax(0, 1fr); }
+.hd-weather[data-size="full-large"] { grid-template: "now ahead" 1fr "titles days" 1fr / minmax(0, 1fr) minmax(0, 2fr); }
+.hd-weather[data-size="full-large"] .hd-weather__now { align-self: start; }
+.hd-weather__now .hd-value { font-weight: 700; }
+.hd-weather[data-size="large"] .hd-weather__now .hd-value, .hd-weather[data-size="full-large"] .hd-weather__now .hd-value { font-size: calc(var(--cell) * .5); }
+/* Hours or days side by side, each a time over an icon over a temperature. */
+.hd-weather__strip { display: flex; justify-content: space-between; align-items: center; gap: calc(var(--cell) * .08); margin: 0; padding: 0; list-style: none; }
+.hd-weather__strip li { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: calc(var(--cell) * .03); }
+.hd-weather__strip .hd-icon { width: calc(var(--cell) * .2); height: calc(var(--cell) * .2); }
+.hd-weather__when { font-size: calc(var(--cell) * .08); font-weight: 600; color: var(--ink-muted); white-space: nowrap; }
+.hd-weather__temp { font-size: calc(var(--cell) * .1); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hd-weather__low { margin-left: .3em; font-size: .8em; font-weight: 600; color: var(--ink-muted); }
+.hd-weather__chance { min-height: 1.2em; font-size: calc(var(--cell) * .075); font-weight: 600; color: var(--kind-cover-ink); font-variant-numeric: tabular-nums; }
+.hd-weather__strip--scroll { justify-content: flex-start; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; padding-bottom: 2px; }
+.hd-weather__strip--scroll::-webkit-scrollbar { display: none; }
+.hd-weather__strip--scroll li { flex: none; width: calc(var(--cell) * .42); }
+/* The next two hours of rain in five-minute bars, in the cool hue of water, whatever the tile's. */
+.hd-weather__rain { display: flex; flex-direction: column; justify-content: flex-end; gap: calc(var(--cell) * .03); min-height: 0; }
+.hd-weather__bars { width: 100%; flex: 1; min-height: calc(var(--cell) * .2); fill: var(--kind-cover-ink); }
+.hd-weather__axis { display: flex; justify-content: space-between; font-size: calc(var(--cell) * .075); font-weight: 600; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+/* The full forecast. */
+.hd-details--screen:has(.hd-weather__pane) {
+  background:
+    radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, var(--k-ink) 26%, transparent), transparent 70%),
+    color-mix(in oklab, var(--k-ink) 10%, var(--ground));
+}
+.hd-details--screen .hd-details__panel > .hd-weather__pane { flex: 1; min-height: 0; }
+.hd-weather__pane { display: flex; flex-direction: column; gap: calc(var(--cell) * .2); overflow-y: auto; scrollbar-width: none; }
+.hd-weather__pane::-webkit-scrollbar { display: none; }
+.hd-weather__hero { display: flex; align-items: center; gap: calc(var(--cell) * .2); }
+.hd-weather__hero > .hd-icon { width: calc(var(--cell) * .8); height: calc(var(--cell) * .8); }
+.hd-weather__section { display: flex; flex-direction: column; gap: calc(var(--cell) * .08); }
+.hd-weather__section h3 { margin: 0; }
+.hd-weather__section .hd-weather__rain { height: calc(var(--cell) * .9); }
+.hd-weather__week { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.hd-weather__week li {
+  display: grid; grid-template-columns: calc(var(--cell) * .6) calc(var(--cell) * .24) 1fr auto calc(var(--cell) * .8); align-items: center;
+  gap: calc(var(--cell) * .1); padding-block: calc(var(--cell) * .06); border-top: 1px solid var(--line);
+}
+.hd-weather__week li:first-child { border-top: 0; }
+.hd-weather__week .hd-weather__when, .hd-weather__week .hd-weather__temp, .hd-weather__week .hd-weather__what { font-size: calc(var(--cell) * .11); }
+.hd-weather__week .hd-weather__chance { font-size: calc(var(--cell) * .09); }
+.hd-weather__week .hd-weather__when { color: var(--ink); font-weight: 700; }
+.hd-weather__week .hd-icon { width: calc(var(--cell) * .24); height: calc(var(--cell) * .24); }
+.hd-weather__week .hd-weather__temp { text-align: end; }
+.hd-weather__week .hd-weather__what { color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-weather__credit { margin: 0; font-size: calc(var(--cell) * .075); color: var(--ink-muted); }

@@ -146,6 +146,18 @@ public static class HomeyMapper
             City: String(json, "city"));
     }
 
+    // Homey's location option, { value: { latitude, longitude, ... } } or the location itself; null when it has none.
+    public static HomeyLocation? Location(JsonElement json)
+    {
+        if (json.TryGetProperty("value", out var value) && value.ValueKind == JsonValueKind.Object) json = value;
+        if (json.ValueKind != JsonValueKind.Object) return null;
+        var latitude = Number(json, "latitude") ?? Number(json, "lat");
+        var longitude = Number(json, "longitude") ?? Number(json, "lng") ?? Number(json, "lon");
+        return latitude is >= -90 and <= 90 && longitude is >= -180 and <= 180 && (latitude, longitude) != (0, 0)
+            ? new HomeyLocation(latitude.Value, longitude.Value)
+            : null;
+    }
+
     // Homey returns collections as objects keyed by id.
     public static IEnumerable<JsonElement> Values(JsonElement json) => json.ValueKind switch
     {

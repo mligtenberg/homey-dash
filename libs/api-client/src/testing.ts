@@ -6,6 +6,7 @@ import {
   CapabilityValue,
   DeviceApp,
   DisplayInfo,
+  Forecast,
   HomeySnapshot,
   PhotoSet,
   PlexCommand,
@@ -103,6 +104,13 @@ export class FakeRealtime implements Partial<Realtime> {
 
   async plex() {
     return this.plexSnapshot;
+  }
+
+  /** What `forecasts()` answers: the weather where each Homey is. */
+  forecastList: Forecast[] = [];
+
+  async forecasts() {
+    return this.forecastList;
   }
 
   controlPlex(accountId: number, playerId: string, command: PlexCommand) {

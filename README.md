@@ -66,6 +66,14 @@ found and pairs one that asks for a PIN; pairings are kept in `airplay-credentia
 
 `AirPlay:Fake=true` runs against two made-up Apple TVs.
 
+
+## Weather
+
+The weather tile shows the weather where your Homey is, with the coming hours and days, and in the Netherlands and Belgium
+the rain of the next two hours. There is nothing to set up: HomeyDash reads the location set in Homey (its API key needs
+the geolocation scope), or a tile can be given a town of its own under Place in the editor. It asks [Open-Meteo](https://open-meteo.com) for the forecast and
+[Buienradar](https://www.buienradar.nl) for the rain (see [ADR-0013](docs/adr/0013-weather-from-open-meteo-and-buienradar.md)).
+`Weather:Fake=true` runs against a made-up forecast (`npx nx serve api -c simulator` sets it).
 ## Brightness
 
 Displays measure how much light falls on them, in lux, once a minute, for rules on the **Brightness** signal (see
