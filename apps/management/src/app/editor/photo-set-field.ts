@@ -1,9 +1,22 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { apiProblem, ImmichAccountApi, ImmichAlbum, PhotoSetsApi } from '@homey-dash/api-client';
+import {
+  apiProblem,
+  ImmichAccountApi,
+  PhotoSetsApi,
+} from '@homey-dash/api-client';
 import { TileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
-import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue } from '../immich-albums';
+import { AlbumSelect } from '../album-select';
+import { loadAlbums, AlbumGroup, parseAlbumValue } from '../immich-albums';
 
 /**
  * A photo tile's target: one of the photo sets, or a new one made here from an Immich album, so building a dashboard
@@ -11,31 +24,26 @@ import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue } from 
  */
 @Component({
   selector: 'hd-photo-set-field',
-  imports: [RouterLink],
+  imports: [RouterLink, AlbumSelect],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="hd-field">
       <label class="hd-field__label" for="tile-target">Photo set</label>
       @if (groups(); as groups) {
-        <select id="tile-target" class="hd-select" (change)="create($any($event.target).value)" (keydown.escape)="cancel()">
-          <option value="" selected>Choose an Immich album</option>
-          @for (group of groups; track group.account.id) {
-            @if (groups.length > 1) {
-              <optgroup [label]="group.account.name">
-                @for (album of group.albums; track album.id) {
-                  <option [value]="optionValue(group, album)">{{ label(album) }}</option>
-                }
-              </optgroup>
-            } @else {
-              @for (album of group.albums; track album.id) {
-                <option [value]="optionValue(group, album)">{{ label(album) }}</option>
-              }
-            }
-          }
-        </select>
+        <hd-album-select
+          selectId="tile-target"
+          placeholder="Choose an Immich album"
+          [groups]="groups"
+          (picked)="create($event)"
+          (cancelled)="cancel()"
+        />
         <button class="hd-btn" type="button" (click)="cancel()">Cancel</button>
       } @else {
-        <select id="tile-target" class="hd-select" (change)="choose($any($event.target).value)">
+        <select
+          id="tile-target"
+          class="hd-select"
+          (change)="choose($any($event.target).value)"
+        >
           @if (!value()) {
             <option value="" selected>Pick a photo set</option>
           } @else if (!selected()) {
@@ -43,7 +51,8 @@ import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue } from 
           }
           @for (set of sets(); track set.id) {
             <option [value]="set.target" [selected]="set.target === value()">
-              {{ set.name }} ({{ set.photos.length }} {{ set.photos.length === 1 ? 'photo' : 'photos' }})
+              {{ set.name }} ({{ set.photos.length }}
+              {{ set.photos.length === 1 ? 'photo' : 'photos' }})
             </option>
           }
           <option value="new">New photo set from an album…</option>
@@ -59,7 +68,10 @@ import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue } from 
     </div>
   `,
   styles: `
-    .hint { font-size: 13px; color: var(--brand); }
+    .hint {
+      font-size: 13px;
+      color: var(--brand);
+    }
   `,
 })
 export class PhotoSetField {
@@ -74,20 +86,14 @@ export class PhotoSetField {
   protected readonly groups = signal<AlbumGroup[] | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly sets = computed(() =>
-    [...this.data.photoSets().values()].sort((a, b) => a.name.localeCompare(b.name)),
+    [...this.data.photoSets().values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    ),
   );
   protected readonly selected = computed(() => {
     const value = this.value();
     return value ? this.data.photoSets().get(value) : undefined;
   });
-
-  protected label(album: ImmichAlbum) {
-    return albumLabel(album);
-  }
-
-  protected optionValue(group: AlbumGroup, album: ImmichAlbum) {
-    return albumValue(group.account.id, album.id);
-  }
 
   protected async choose(value: string) {
     this.error.set(null);
@@ -109,7 +115,9 @@ export class PhotoSetField {
     const album = parseAlbumValue(value);
     if (!album) return;
     try {
-      const set = await firstValueFrom(this.api.create(album.accountId, album.albumId));
+      const set = await firstValueFrom(
+        this.api.create(album.accountId, album.albumId),
+      );
       this.groups.set(null);
       this.picked.emit(set.target);
     } catch (e) {
