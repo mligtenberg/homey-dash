@@ -1,7 +1,19 @@
 {
   "name": "design-system",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "projectType": "library",
   "sourceRoot": "libs/design-system/src",
-  "tags": ["type:ui"]
+  "prefix": "hd",
+  "projectType": "library",
+  "tags": ["type:ui"],
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "buildTarget": "display:build:development",
+        "tsConfig": "libs/design-system/tsconfig.spec.json",
+        "runner": "vitest",
+        "watch": false
+      }
+    }
+  }
 }
