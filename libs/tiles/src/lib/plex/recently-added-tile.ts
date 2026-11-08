@@ -3,8 +3,9 @@ import { reason } from './hub-reason';
 import { PlexAirPlayControls } from './plex-airplay-controls';
 import { PlexLocalPlayer } from './plex-local-player';
 import { PlexProfilePicker } from './plex-profile-picker';
+import { PlexTileView } from './plex-tile-view';
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
-import { AirPlayDevice, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, Realtime, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
+import { AirPlayDevice, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
 import { cells } from '@homey-dash/layout';
 import {
   LucideAirplay,
@@ -22,9 +23,9 @@ import {
   LucideVolume2,
 } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
-import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
+import { TILE_FACE_HOST, TileFace } from '../core/tile-view';
 import { AirPlayData } from './airplay-data';
-import { PlexData, plexIdle, plexTime } from './plex-data';
+import { plexIdle, plexTime } from './plex-data';
 
 
 /** How many items the detail view lists. */
@@ -353,11 +354,9 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex-recent', '[class.has-art]': 'shown().length > 0' },
   template: PLEX_BROWSER_TEMPLATE,
 })
-export class RecentlyAddedTile extends TileView {
+export class RecentlyAddedTile extends PlexTileView {
   /** Whether this lists everything a library holds, a page at a time (the library tile), instead of the newest. */
   protected readonly browse: boolean = false;
-  private readonly plex = inject(PlexData);
-  private readonly realtime = inject(Realtime);
   private readonly airPlay = inject(AirPlayData);
 
   protected readonly icon: typeof LucideClapperboard | typeof LucideLibrary = LucideClapperboard;
@@ -371,8 +370,6 @@ export class RecentlyAddedTile extends TileView {
   protected readonly tvIcon = LucideTv;
   protected readonly seenIcon = LucideCheck;
   protected readonly lockIcon = LucideLock;
-
-  private readonly overview = computed(() => this.plex.overview(this.settings().account));
 
   private readonly library = computed(() => {
     const target = this.settings().target;
@@ -418,7 +415,7 @@ export class RecentlyAddedTile extends TileView {
   private readonly cast = signal<Cast>(IDLE);
 
   /** What plays on AirPlay now for this account, wherever it was started: its controls stay on show. */
-  protected readonly casting = computed(() => this.airPlay.playing().filter((p) => p.accountId === (this.overview()?.accountId ?? 0)));
+  protected readonly casting = computed(() => this.airPlay.playing().filter((p) => p.accountId === this.accountId()));
   protected readonly allPaused = computed(() => this.casting().every((p) => p.paused));
   /** Receivers whose stream is being started over with another track. */
 
@@ -431,7 +428,7 @@ export class RecentlyAddedTile extends TileView {
 
   /** Music playing on this screen, which goes on when the cover is closed. */
   protected readonly player = new PlexLocalPlayer(
-    () => this.overview()?.accountId ?? 0,
+    () => this.accountId(),
     (track, state, timeMs) => this.report(track, state, timeMs),
     () => this.stopTheme(),
   );
@@ -498,7 +495,7 @@ export class RecentlyAddedTile extends TileView {
     const have = current?.items ?? [];
     this.pages.update((all) => ({ ...all, [id]: { items: have, total: current?.total ?? 0, loading: true } }));
     try {
-      const page = await this.realtime.plexLibraryItems(this.overview()?.accountId ?? 0, id, have.length, PAGE);
+      const page = await this.realtime.plexLibraryItems(this.accountId(), id, have.length, PAGE);
       this.pages.update((all) => ({ ...all, [id]: { items: [...have, ...page.items], total: page.total, loading: false } }));
     } catch (error) {
       this.pages.update((all) => ({ ...all, [id]: { items: have, total: current?.total ?? 0, loading: false, error: reason(error, 'Could not load the library.') } }));
@@ -568,7 +565,7 @@ export class RecentlyAddedTile extends TileView {
   });
 
   protected posterUrl(path: string) {
-    return plexImageUrl(this.overview()?.accountId ?? 0, path, 400, 600);
+    return plexImageUrl(this.accountId(), path, 400, 600);
   }
 
   /** When it was added; nothing when the server didn't say (a search result without a date). */
@@ -577,7 +574,7 @@ export class RecentlyAddedTile extends TileView {
   }
 
   protected artUrl(path: string) {
-    return plexImageUrl(this.overview()?.accountId ?? 0, path, 1280, 720);
+    return plexImageUrl(this.accountId(), path, 1280, 720);
   }
 
   /** The subtitle, unless it only repeats the year the facts already show. */
@@ -633,8 +630,6 @@ export class RecentlyAddedTile extends TileView {
     void this.loadChildren(item);
   }
 
-  protected readonly accountId = computed(() => this.overview()?.accountId ?? 0);
-
   /** What was loaded was the other profile's: what it has watched, and what it may see. */
   protected onProfileSwitched() {
     this.pages.set({});
@@ -665,7 +660,7 @@ export class RecentlyAddedTile extends TileView {
     if (!this.hasChildren(item) || this.under()[item.id]?.items) return;
     this.under.update((all) => ({ ...all, [item.id]: {} }));
     try {
-      const items = await this.realtime.plexChildren(this.overview()?.accountId ?? 0, item.id);
+      const items = await this.realtime.plexChildren(this.accountId(), item.id);
       this.under.update((all) => ({ ...all, [item.id]: { items } }));
     } catch (error) {
       this.under.update((all) => ({ ...all, [item.id]: { error: reason(error, 'Could not load what is in it.') } }));
@@ -692,7 +687,7 @@ export class RecentlyAddedTile extends TileView {
   protected async playOn(item: PlexItem, device: AirPlayDevice) {
     this.cast.set({ step: 'starting', itemId: item.id, devices: [], device });
     try {
-      const account = this.overview()?.accountId ?? 0;
+      const account = this.accountId();
       // A track chosen from its album goes on with the album's next tracks, an episode with the season's next episodes.
       const trail = this.trail();
       const parent = item.kind === 'track' || item.kind === 'episode' ? trail[trail.length - 2] : undefined;
@@ -713,7 +708,7 @@ export class RecentlyAddedTile extends TileView {
     // Nothing talks over music that already plays.
     if (!show || this.player.play() || this.casting().length) return;
     this.themeOf = show.id;
-    this.theme = new Audio(plexAudioUrl(this.overview()?.accountId ?? 0, show.id, true));
+    this.theme = new Audio(plexAudioUrl(this.accountId(), show.id, true));
     this.theme.volume = 0.6;
     // A show without a theme, or a browser that wants a press first, is silent.
     this.theme.play()?.catch(() => undefined);
@@ -732,7 +727,7 @@ export class RecentlyAddedTile extends TileView {
   }
 
   protected videoUrl(item: PlexItem) {
-    return plexVideoUrl(this.overview()?.accountId ?? 0, item.id);
+    return plexVideoUrl(this.accountId(), item.id);
   }
 
   /** Plays a film or episode in this screen's own picture, over the dialog. */
@@ -762,7 +757,7 @@ export class RecentlyAddedTile extends TileView {
 
   /** Tells Plex where this screen's own player is, which is how it keeps what was watched. A failed report is no reason to stop. */
   private report(item: PlexItem, state: 'playing' | 'paused' | 'stopped', timeMs: number) {
-    this.realtime.plexProgress(this.overview()?.accountId ?? 0, item.id, state, Math.round(timeMs), item.durationMs ?? 0).catch(() => undefined);
+    this.realtime.plexProgress(this.accountId(), item.id, state, Math.round(timeMs), item.durationMs ?? 0).catch(() => undefined);
   }
 
   protected onVideo(item: PlexItem, state: 'playing' | 'paused', seconds: number) {
@@ -840,7 +835,7 @@ export class RecentlyAddedTile extends TileView {
     const library =
       target === ALL_PLEX_LIBRARIES ? (tab !== 'all' && this.tabs().some((t) => t.id === tab) ? tab : null) : (this.library()?.id ?? null);
     try {
-      const found = await this.realtime.searchPlex(this.overview()?.accountId ?? 0, query, library);
+      const found = await this.realtime.searchPlex(this.accountId(), query, library);
       if (this.query().trim() === query) this.results.set(found);
     } catch (error) {
       if (this.query().trim() !== query) return;

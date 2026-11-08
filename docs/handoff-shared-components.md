@@ -144,7 +144,9 @@ Lint, tests and builds were green for design-system, tiles, layout, api-client, 
 - `rxResource` in `editor-page.ts`: its load effect also flushes the old draft on cleanup.
 - `hd-device-segments` stays as it is: it has no group label to give `hd-segmented`.
 - `hd-tile-titles`, `hd-reading`, `hd-note`, `hd-art`, `hd-playbar`, `hd-level-row`, `hdHold`, `hd-statistic-pane`: not started. The tile titles sit in CSS selectors such as `.hd-row:has(+ …)`, so wrapping them would change the layout.
-- Phase 6 not done: the `keyedLoader`, `PlexTileView` base class and `<hd-plex-item-detail>` / `<hd-plex-card>` parts.
+- Phase 6, third pass: `PlexTileView` (`plex/plex-tile-view.ts`) holds `plex`, `realtime`, `overview` and `accountId` for the recently-added, library and now-playing tiles. It replaced eleven copies of `overview()?.accountId ?? 0`.
+- Phase 6, skipped on purpose: `keyedLoader` (`pages` and `under` load differently, so a helper would add code), and `<hd-plex-item-detail>` / `<hd-plex-card>` (the detail view needs about fifteen inputs and outputs from the tile, and the cards differ per use, so it would add code and change the DOM).
+- Browser check done in the preview (api-fake, management, display): Sonos tile, details, favorites and slider drag; Plex recently-added tile, profile picker, item view and AirPlay picker; account panels; photo-set album select; display lock tab and back link. No console errors. The style-diff against the baseline was not run.
 
 **Formatting note.** Early in this pass, `prettier --write` reflowed whole files that were never prettier-formatted, so four commits carry big noisy diffs. A later commit ("Restore the original formatting…") puts those files back. Only run prettier on files you created.
 

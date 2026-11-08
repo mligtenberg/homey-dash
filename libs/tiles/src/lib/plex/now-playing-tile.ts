@@ -1,11 +1,12 @@
 import { brokenImages } from '../core/loadable-art';
 import { Transport } from '../core/transport';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
-import { ANY_PLEX_PLAYER, PlexCommand, plexImageUrl, Realtime } from '@homey-dash/api-client';
+import { ANY_PLEX_PLAYER, PlexCommand, plexImageUrl } from '@homey-dash/api-client';
 import { LucideDynamicIcon, LucideTv } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
-import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
-import { LivePlexSession, PlexData, plexIdle, plexPosition, plexTime } from './plex-data';
+import { TILE_FACE_HOST, TileFace } from '../core/tile-view';
+import { PlexTileView } from './plex-tile-view';
+import { LivePlexSession, plexIdle, plexPosition, plexTime } from './plex-data';
 import { clock } from '@homey-dash/design-system';
 import { isLandscape } from '@homey-dash/layout';
 
@@ -104,10 +105,7 @@ export const NOW_PLAYING_CYCLE_MS = 12_000;
     </hd-tile-details>
   `,
 })
-export class NowPlayingTile extends TileView {
-  private readonly plex = inject(PlexData);
-  private readonly realtime = inject(Realtime);
-
+export class NowPlayingTile extends PlexTileView {
   protected readonly tvIcon = LucideTv;
   protected readonly skipLabels = { previous: 'Skip back', next: 'Skip forward', play: 'Play', pause: 'Pause' };
 
@@ -115,8 +113,6 @@ export class NowPlayingTile extends TileView {
     const on = item.playerName;
     return { previous: `Skip back on ${on}`, next: `Skip forward on ${on}`, play: `Play ${on}`, pause: `Pause ${on}` };
   }
-
-  private readonly overview = computed(() => this.plex.overview(this.settings().account));
 
   /** The sessions this tile follows on its account: one player's, or every one. */
   protected readonly sessions = computed(() => {
