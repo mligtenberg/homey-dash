@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { fieldErrors, ImmichAccount, ImmichAccountApi, ImmichAccounts } from '@homey-dash/api-client';
+import { ImmichAccountApi } from '@homey-dash/api-client';
+import { AddressKeyForm, addressKeyAccounts } from './address-key-accounts';
 import { ImmichPartners } from './immich-partners';
 
 /**
@@ -11,7 +12,7 @@ import { ImmichPartners } from './immich-partners';
  */
 @Component({
   selector: 'hd-immich-account-panel',
-  imports: [NgTemplateOutlet, ImmichPartners],
+  imports: [NgTemplateOutlet, AddressKeyForm, ImmichPartners],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="hd-account hd-panel" aria-labelledby="immich-title">
@@ -80,125 +81,32 @@ import { ImmichPartners } from './immich-partners';
     </section>
 
     <ng-template #form let-account>
-      <form class="form" (submit)="save($event, account, name.value, address.value, apiKey)">
-        <div class="hd-field">
-          <label class="hd-field__label" for="immich-name">Name</label>
-          <input
-            #name
-            id="immich-name"
-            class="hd-input"
-            autocomplete="off"
-            placeholder="Such as Home or Anna's photos"
-            [value]="account?.name ?? ''"
-            [attr.aria-invalid]="!!errors()['name']"
-            aria-describedby="immich-name-error"
-          />
-          @if (errors()['name']; as error) {
-            <span id="immich-name-error" class="hd-error hd-small">{{ error }}</span>
-          }
-        </div>
-        <div class="hd-field">
-          <label class="hd-field__label" for="immich-address">Address</label>
-          <input
-            #address
-            id="immich-address"
-            class="hd-input"
-            autocomplete="off"
-            placeholder="192.168.1.20:2283 or https://photos.example.com"
-            [value]="account?.address ?? ''"
-            [attr.aria-invalid]="!!errors()['address']"
-            aria-describedby="immich-address-error"
-          />
-          @if (errors()['address']; as error) {
-            <span id="immich-address-error" class="hd-error hd-small">{{ error }}</span>
-          }
-        </div>
-        <div class="hd-field">
-          <label class="hd-field__label" for="immich-key">API key</label>
-          <input
-            #apiKey
-            id="immich-key"
-            class="hd-input"
-            type="password"
-            autocomplete="off"
-            [placeholder]="account ? 'Leave empty to keep the current key' : ''"
-            [attr.aria-invalid]="!!errors()['apiKey']"
-            aria-describedby="immich-key-hint"
-          />
-          <span id="immich-key-hint" [class]="errors()['apiKey'] ? 'hd-error hd-small' : 'hd-hint'">
-            {{
-              errors()['apiKey'] ??
-                'Make one in Immich under Account Settings → API Keys, with at least album.read, asset.read, asset.view, face.read and person.read.'
-            }}
-          </span>
-        </div>
-        <div class="hd-actions">
-          <button class="hd-btn hd-btn--primary" type="submit" [disabled]="saving()">
-            {{ saving() ? 'Checking with Immich…' : account ? 'Save' : 'Add account' }}
-          </button>
-          <button class="hd-btn" type="button" (click)="edit(null)">Cancel</button>
-        </div>
-      </form>
+      <hd-address-key-form
+        idPrefix="immich"
+        [account]="account"
+        namePlaceholder="Such as Home or Anna's photos"
+        addressPlaceholder="192.168.1.20:2283 or https://photos.example.com"
+        keyHint="Make one in Immich under Account Settings → API Keys, with at least album.read, asset.read, asset.view, face.read and person.read."
+        addLabel="Add account"
+        checkingLabel="Checking with Immich…"
+        [saving]="saving()"
+        [errors]="errors()"
+        (saved)="save(account, $event)"
+        (cancelled)="edit(null)"
+      />
     </ng-template>
-  `,
-  styles: `
-    .form { display: flex; flex-direction: column; gap: var(--space-4); flex: 1; }
   `,
 })
 export class ImmichAccountPanel {
-  private readonly api = inject(ImmichAccountApi);
-
-  protected readonly info = signal<ImmichAccounts | null>(null);
+  private readonly accounts = addressKeyAccounts(inject(ImmichAccountApi), 'Immich');
+  protected readonly info = this.accounts.info;
   /** The account whose form is open, 'new' while adding one. */
-  protected readonly editing = signal<number | 'new' | null>(null);
-  protected readonly removing = signal<number | null>(null);
-  protected readonly errors = signal<Record<string, string>>({});
-  protected readonly error = signal<string | null>(null);
-  protected readonly saving = signal(false);
-
-  constructor() {
-    this.api.list().subscribe({ next: (info) => this.done(info), error: () => this.fail('load') });
-  }
-
-  protected edit(which: number | 'new' | null) {
-    this.editing.set(which);
-    this.removing.set(null);
-    this.errors.set({});
-    this.error.set(null);
-  }
-
-  protected save(event: Event, account: ImmichAccount | null, name: string, address: string, apiKey: HTMLInputElement) {
-    event.preventDefault();
-    this.saving.set(true);
-    const request = account
-      ? this.api.update(account.id, name, address, apiKey.value)
-      : this.api.add(name, address, apiKey.value);
-    request.subscribe({
-      next: (info) => this.done(info),
-      error: (e: unknown) => {
-        this.saving.set(false);
-        const errors = fieldErrors(e);
-        if (errors) {
-          this.error.set(null);
-          this.errors.set(errors);
-        } else {
-          this.fail('save');
-        }
-      },
-    });
-  }
-
-  protected remove(account: ImmichAccount) {
-    this.api.remove(account.id).subscribe({ next: (info) => this.done(info), error: () => this.fail('remove') });
-  }
-
-  private done(info: ImmichAccounts) {
-    this.info.set(info);
-    this.saving.set(false);
-    this.edit(null);
-  }
-
-  private fail(what: string) {
-    this.error.set(`Could not ${what} the Immich account. Try again.`);
-  }
+  protected readonly editing = this.accounts.editing;
+  protected readonly removing = this.accounts.removing;
+  protected readonly errors = this.accounts.errors;
+  protected readonly error = this.accounts.error;
+  protected readonly saving = this.accounts.saving;
+  protected readonly edit = this.accounts.edit;
+  protected readonly save = this.accounts.save;
+  protected readonly remove = this.accounts.remove;
 }

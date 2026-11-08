@@ -1,6 +1,7 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { fieldErrors, HomeyAccount, HomeyAccountApi, HomeyAccounts, HomeyStatus } from '@homey-dash/api-client';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { HomeyAccountApi, HomeyStatus } from '@homey-dash/api-client';
+import { AddressKeyForm, addressKeyAccounts } from './address-key-accounts';
 import { RealtimeTileData } from '@homey-dash/tiles';
 
 /** How HomeyDash's connection to a Homey reads in a status pill. */
@@ -24,7 +25,7 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
  */
 @Component({
   selector: 'hd-homey-account-panel',
-  imports: [NgTemplateOutlet],
+  imports: [NgTemplateOutlet, AddressKeyForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="hd-account hd-panel" aria-labelledby="homey-title">
@@ -97,124 +98,36 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
     </section>
 
     <ng-template #form let-account>
-      <form class="form" (submit)="save($event, account, name.value, address.value, apiKey)">
-        <div class="hd-field">
-          <label class="hd-field__label" for="homey-name">Name</label>
-          <input
-            #name
-            id="homey-name"
-            class="hd-input"
-            autocomplete="off"
-            placeholder="Such as Home or Holiday home"
-            [value]="account?.name ?? ''"
-            [attr.aria-invalid]="!!errors()['name']"
-            aria-describedby="homey-name-error"
-          />
-          @if (errors()['name']; as error) {
-            <span id="homey-name-error" class="hd-error hd-small">{{ error }}</span>
-          }
-        </div>
-        <div class="hd-field">
-          <label class="hd-field__label" for="homey-address">Address</label>
-          <input
-            #address
-            id="homey-address"
-            class="hd-input"
-            autocomplete="off"
-            placeholder="192.168.1.10 or homey-….local"
-            [value]="account?.address ?? ''"
-            [attr.aria-invalid]="!!errors()['address']"
-            aria-describedby="homey-address-error"
-          />
-          @if (errors()['address']; as error) {
-            <span id="homey-address-error" class="hd-error hd-small">{{ error }}</span>
-          }
-        </div>
-        <div class="hd-field">
-          <label class="hd-field__label" for="homey-key">Local API key</label>
-          <input
-            #apiKey
-            id="homey-key"
-            class="hd-input"
-            type="password"
-            autocomplete="off"
-            [placeholder]="account ? 'Leave empty to keep the current key' : ''"
-            [attr.aria-invalid]="!!errors()['apiKey']"
-            aria-describedby="homey-key-hint"
-          />
-          <span id="homey-key-hint" [class]="errors()['apiKey'] ? 'hd-error hd-small' : 'hd-hint'">
-            {{ errors()['apiKey'] ?? 'Make one in the Homey web app under Settings → API keys.' }}
-          </span>
-        </div>
-        <div class="hd-actions">
-          <button class="hd-btn hd-btn--primary" type="submit" [disabled]="saving()">{{ account ? 'Save' : 'Add Homey' }}</button>
-          <button class="hd-btn" type="button" (click)="edit(null)">Cancel</button>
-        </div>
-      </form>
+      <hd-address-key-form
+        idPrefix="homey"
+        [account]="account"
+        namePlaceholder="Such as Home or Holiday home"
+        addressPlaceholder="192.168.1.10 or homey-….local"
+        keyLabel="Local API key"
+        keyHint="Make one in the Homey web app under Settings → API keys."
+        addLabel="Add Homey"
+        [saving]="saving()"
+        [errors]="errors()"
+        (saved)="save(account, $event)"
+        (cancelled)="edit(null)"
+      />
     </ng-template>
-  `,
-  styles: `
-    .form { display: flex; flex-direction: column; gap: var(--space-4); flex: 1; }
   `,
 })
 export class HomeyAccountPanel {
-  private readonly api = inject(HomeyAccountApi);
   private readonly homeys = inject(RealtimeTileData).homeys;
-
-  protected readonly info = signal<HomeyAccounts | null>(null);
+  private readonly accounts = addressKeyAccounts(inject(HomeyAccountApi), 'Homey');
+  protected readonly info = this.accounts.info;
   /** Each Homey's connection, by account. */
   protected readonly statuses = computed(() => new Map((this.homeys() ?? []).map((h) => [h.accountId, h.status])));
   protected readonly statusPill = homeyStatusPill;
   /** The account whose form is open, 'new' while adding one. */
-  protected readonly editing = signal<number | 'new' | null>(null);
-  protected readonly removing = signal<number | null>(null);
-  protected readonly errors = signal<Record<string, string>>({});
-  protected readonly error = signal<string | null>(null);
-  protected readonly saving = signal(false);
-
-  constructor() {
-    this.api.list().subscribe({ next: (info) => this.done(info), error: () => this.fail('load') });
-  }
-
-  protected edit(which: number | 'new' | null) {
-    this.editing.set(which);
-    this.removing.set(null);
-    this.errors.set({});
-    this.error.set(null);
-  }
-
-  protected save(event: Event, account: HomeyAccount | null, name: string, address: string, apiKey: HTMLInputElement) {
-    event.preventDefault();
-    this.saving.set(true);
-    const request = account
-      ? this.api.update(account.id, name, address, apiKey.value)
-      : this.api.add(name, address, apiKey.value);
-    request.subscribe({
-      next: (info) => this.done(info),
-      error: (e: unknown) => {
-        this.saving.set(false);
-        const errors = fieldErrors(e);
-        if (errors) {
-          this.error.set(null);
-          this.errors.set(errors);
-        } else {
-          this.fail('save');
-        }
-      },
-    });
-  }
-
-  protected remove(account: HomeyAccount) {
-    this.api.remove(account.id).subscribe({ next: (info) => this.done(info), error: () => this.fail('remove') });
-  }
-
-  private done(info: HomeyAccounts) {
-    this.info.set(info);
-    this.saving.set(false);
-    this.edit(null);
-  }
-
-  private fail(what: string) {
-    this.error.set(`Could not ${what} the Homey account. Try again.`);
-  }
+  protected readonly editing = this.accounts.editing;
+  protected readonly removing = this.accounts.removing;
+  protected readonly errors = this.accounts.errors;
+  protected readonly error = this.accounts.error;
+  protected readonly saving = this.accounts.saving;
+  protected readonly edit = this.accounts.edit;
+  protected readonly save = this.accounts.save;
+  protected readonly remove = this.accounts.remove;
 }
