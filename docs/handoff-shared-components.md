@@ -21,7 +21,7 @@ Decisions already made:
 | 0. design-system becomes an Angular lib | done | `1bb0f9b` |
 | 1. Shared pure helpers | done (see "Skipped" below) | `3d37357` |
 | 2. Tokens and CSS | done for Management; display-side CSS cleanup deferred (see below) | see git log |
-| 3. design-system Angular primitives | todo | — |
+| 3. design-system Angular primitives | partly done: `hd-reorder-buttons`, shared picker | see git log |
 | 4. Management domain components | todo | — |
 | 5. Shared tile controls | todo | — |
 | 6. Split the big tile files | todo | — |
@@ -79,6 +79,19 @@ Each of these would have added code rather than removed it:
   - The 21 ellipsis and 11 hidden-scrollbar blocks.
   - Motion and z-index tokens.
   - Collapsing the duplicated dark-theme block in `tokens.css`. This needs `light-dark()`, which old Fully Kiosk WebViews may lack, so it may be better left as it is.
+
+### Phase 3 (partly done)
+- **`<hd-reorder-buttons>` and `<hd-remove-button>`** (`libs/design-system/src/lib/reorder-buttons.ts`, with a spec).
+  - They replace the ↑ ↓ ✕ text buttons in the dashboards, idle and lock tabs, `tile-panel` and `logic-panel`.
+  - The icons are now Lucide, which is an intended visual change.
+  - `.hd-btn--icon` keeps them 40×40, the same height as the text buttons.
+- **Shared picker shell** in `apps/management/src/app/editor/picker-dialog.ts`:
+  - `<hd-picker-dialog>`: trigger, search, nav slot `[pickerNav]`, list, `open()` / `close()`, and scrolls the current item into view.
+  - `<hd-picker-row>`.
+  - Global `.hd-picker*` CSS in `components.css`.
+  - `signal-picker.ts` and `target-picker.ts` now hold only their tree logic.
+  - Checked by hand in the browser: open, search, close, and the current item scrolled into view.
+- **Still to do:** `hdIcon`, `<hd-page-header>` (back links still use "←"), `<hd-empty-state>`, `<hd-confirm-inline>`, `hdRenameInput`, `hdAutofocus`, `<hd-error-line>`.
 
 ## Next steps
 
