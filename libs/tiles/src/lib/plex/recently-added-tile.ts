@@ -1,6 +1,8 @@
 import { Segmented } from '../core/segmented';
+import { reason } from './hub-reason';
+import { PlexProfilePicker } from './plex-profile-picker';
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
-import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, PlexProfile, PlexProfileList, PlexTracks, Realtime, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
+import { AirPlayDevice, AirPlayPlayback, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, PlexTracks, Realtime, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
 import { cells } from '@homey-dash/layout';
 import {
   LucideAirplay,
@@ -15,7 +17,6 @@ import {
   LucideSquare,
   LucideTv,
   LucideStar,
-  LucideUser,
   LucideVolume2,
 } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
@@ -26,9 +27,6 @@ import { PlexData, plexIdle, plexTime } from './plex-data';
 
 /** How many items the detail view lists. */
 const DETAIL_COUNT = 24;
-
-/** The next number for a tile's profile popover. */
-let nextProfilesId = 0;
 
 /** How often Plex is told where a playing video is (ms). */
 const VIDEO_REPORT_EVERY = 10_000;
@@ -69,12 +67,6 @@ interface LocalPlay {
 interface Under {
   items?: PlexItem[];
   error?: string;
-}
-
-/** What the backend says went wrong (a hub error carries its message after the method), else a fallback. */
-function reason(error: unknown, fallback: string): string {
-  const message = error instanceof Error ? error.message.replace(/^.*HubException:\s*/, '') : '';
-  return message && !message.startsWith('An unexpected error') ? message : fallback;
 }
 
 /** How long it runs, as people say it: 2h 46m, 33m. */
@@ -354,51 +346,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
             [value]="query()"
             (input)="onSearch($any($event.target).value)"
           />
-          @if (profileName(); as name) {
-            <button
-              type="button"
-              class="hd-plex-recent__receiver hd-plex-recent__profile"
-              [attr.popovertarget]="profilesId"
-              [style.anchor-name]="'--' + profilesId"
-              aria-haspopup="true"
-            >
-              <svg [lucideIcon]="profileIcon" />{{ name }}
-            </button>
-            <div
-              #profilesPanel
-              class="hd-plex-recent__profiles"
-              popover
-              role="group"
-              aria-label="Profile"
-              [id]="profilesId"
-              [style.position-anchor]="'--' + profilesId"
-              (toggle)="onProfilesToggle($any($event).newState)"
-            >
-              @for (p of profiles()?.profiles ?? []; track p.id) {
-                <button
-                  type="button"
-                  class="hd-plex-recent__profile-option"
-                  [attr.aria-pressed]="p.id === profiles()?.currentId"
-                  [disabled]="switching()"
-                  (click)="chooseProfile(p)"
-                >
-                  {{ p.name }}
-                  @if (p.protected) {
-                    <svg role="img" aria-label="PIN" [lucideIcon]="lockIcon" />
-                  }
-                </button>
-              }
-              @if (pinFor(); as p) {
-                <form class="hd-plex-recent__pin" (submit)="$event.preventDefault(); switchProfile(p, pin.value)">
-                  <input #pin type="password" inputmode="numeric" autocomplete="off" [placeholder]="'PIN for ' + p.name" [attr.aria-label]="'PIN for ' + p.name" />
-                  <button type="submit" class="hd-plex-recent__play" [disabled]="switching()">Switch</button>
-                </form>
-              }
-              @if (profileError(); as error) {
-                <div class="hd-plex-recent__cast-error" role="alert">{{ error }}</div>
-              }
-            </div>
-          }
+          <hd-plex-profile-picker [accountId]="accountId()" [current]="overview()?.profile" [active]="!!details()?.isOpen()" (switched)="onProfileSwitched()" />
         </div>
         <div #pane class="hd-plex-recent__pane" (scroll)="onPaneScroll($any($event.target))">
           @for (item of listed(); track item.id) {
@@ -444,7 +392,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
  */
 @Component({
   selector: 'hd-plex-recent-tile',
-  imports: [TileDetails, LucideDynamicIcon, Segmented],
+  imports: [TileDetails, LucideDynamicIcon, PlexProfilePicker, Segmented],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex-recent', '[class.has-art]': 'shown().length > 0' },
   template: PLEX_BROWSER_TEMPLATE,
@@ -466,7 +414,6 @@ export class RecentlyAddedTile extends TileView {
   protected readonly speakerIcon = LucideVolume2;
   protected readonly tvIcon = LucideTv;
   protected readonly seenIcon = LucideCheck;
-  protected readonly profileIcon = LucideUser;
   protected readonly lockIcon = LucideLock;
 
   private readonly overview = computed(() => this.plex.overview(this.settings().account));
@@ -617,10 +564,6 @@ export class RecentlyAddedTile extends TileView {
       const id = this.shownLibrary();
       if (this.browse && this.details()?.isOpen()) untracked(() => (this.pageOf(id) ? undefined : void this.loadPage(id)));
     });
-    // The profiles are asked for each time the dialog opens, so a change made elsewhere shows.
-    effect(() => {
-      if (this.details()?.isOpen()) untracked(() => void this.loadProfiles());
-    });
     // A show's theme plays from opening the show and goes on through its seasons and episodes; it stops when the show is left.
     effect(() => {
       const root = this.trail()[0];
@@ -738,69 +681,14 @@ export class RecentlyAddedTile extends TileView {
     void this.loadChildren(item);
   }
 
-  /** The Plex Home's profiles, once the dialog has asked; empty for an account with no home. */
-  protected readonly profiles = signal<PlexProfileList | null>(null);
-  /** Gives each tile's popover and its anchor a name of their own. */
-  protected readonly profilesId = `hd-plex-profiles-${nextProfilesId++}`;
-  private readonly profilesPanel = viewChild<ElementRef<HTMLElement>>('profilesPanel');
-  /** The profile with a PIN that is being switched to, until the PIN is given. */
-  protected readonly pinFor = signal<PlexProfile | null>(null);
-  protected readonly switching = signal(false);
-  protected readonly profileError = signal('');
+  protected readonly accountId = computed(() => this.overview()?.accountId ?? 0);
 
-  /** Whose watching it is: the profile in use, named on the button that chooses another; nothing when the account has only one. */
-  protected readonly profileName = computed(() => {
-    const { profiles = [], currentId = null } = this.profiles() ?? {};
-    if (profiles.length < 2) return '';
-    return this.overview()?.profile ?? profiles.find((p) => p.id === currentId)?.name ?? profiles[0].name;
-  });
-
-  private async loadProfiles() {
-    try {
-      this.profiles.set(await this.realtime.plexProfiles(this.overview()?.accountId ?? 0));
-    } catch {
-      // No home, or Plex can't be reached: there is nothing to choose.
-      this.profiles.set(null);
-    }
-  }
-
-  /** Closed, by choosing, a press outside or Escape (the popover does that itself): the next opening starts clean. */
-  protected onProfilesToggle(state: string) {
-    if (state === 'open') return;
-    this.pinFor.set(null);
-    this.profileError.set('');
-  }
-
-  private closeProfiles() {
-    this.profilesPanel()?.nativeElement.hidePopover?.();
-  }
-
-  /** A profile with a PIN asks for it first. */
-  protected chooseProfile(profile: PlexProfile) {
-    this.profileError.set('');
-    if (profile.id === this.profiles()?.currentId) return this.closeProfiles();
-    if (profile.protected) return this.pinFor.set(profile);
-    void this.switchProfile(profile, null);
-  }
-
-  protected async switchProfile(profile: PlexProfile, pin: string | null) {
-    this.switching.set(true);
-    this.profileError.set('');
-    try {
-      await this.realtime.plexSelectProfile(this.overview()?.accountId ?? 0, profile.id, pin || null);
-      this.closeProfiles();
-      this.pinFor.set(null);
-      // What was loaded was the other profile's: what it has watched, and what it may see.
-      this.pages.set({});
-      this.under.set({});
-      this.onSearch(this.query());
-      if (this.browse) void this.loadPage(this.shownLibrary());
-      await this.loadProfiles();
-    } catch (error) {
-      this.profileError.set(reason(error, `Could not switch to ${profile.name}.`));
-    } finally {
-      this.switching.set(false);
-    }
+  /** What was loaded was the other profile's: what it has watched, and what it may see. */
+  protected onProfileSwitched() {
+    this.pages.set({});
+    this.under.set({});
+    this.onSearch(this.query());
+    if (this.browse) void this.loadPage(this.shownLibrary());
   }
 
   /** The grid of covers, which is gone while one is open. */
@@ -1126,9 +1014,6 @@ export class RecentlyAddedTile extends TileView {
 
   protected closeScreen() {
     this.stopVideo();
-    this.closeProfiles();
-    this.pinFor.set(null);
-    this.profileError.set('');
     this.paneScroll = 0;
     this.trail.set([]);
     // Opened again, a listing is of what the library holds then.
