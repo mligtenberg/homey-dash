@@ -1417,3 +1417,48 @@ a.hd-btn { text-decoration: none; }
 .hd-weather__week .hd-weather__temp { text-align: end; }
 .hd-weather__week .hd-weather__what { color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-weather__credit { margin: 0; font-size: calc(var(--cell) * .075); color: var(--ink-muted); }
+
+/*
+ * Clock and date: tiles that point at nothing, in the neutral hue. The clock centres the time, digital at a size that fits
+ * the cell (smaller while the seconds show) or an analog dial, with the date under it, or beside the dial on the wide sizes.
+ */
+.hd-clock { --clock-size: .3; align-items: center; justify-content: center; gap: calc(var(--cell) * .04); text-align: center; }
+.hd-clock[data-size="small"].has-seconds { --clock-size: .2; }
+.hd-clock[data-size="wide"] { --clock-size: .52; }
+.hd-clock[data-size="wide"].has-seconds { --clock-size: .4; }
+.hd-clock[data-size="full"] { --clock-size: .6; }
+.hd-clock[data-size="large"] { --clock-size: .5; }
+.hd-clock[data-size="large"].has-seconds { --clock-size: .38; }
+.hd-clock[data-size="full-large"] { --clock-size: .9; }
+.hd-clock[data-size="full-large"].has-seconds { --clock-size: .7; }
+.hd-clock__time { display: flex; align-items: baseline; justify-content: center; gap: .1em; max-width: 100%; }
+.hd-clock__digits { font-size: calc(var(--cell) * var(--clock-size)); font-weight: 800; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hd-clock__time .hd-unit { font-size: calc(var(--cell) * var(--clock-size) * .3); }
+.hd-clock__date { font-size: calc(var(--cell) * .11); font-weight: 600; color: var(--ink-muted); white-space: nowrap; }
+.hd-clock[data-size="large"] .hd-clock__date, .hd-clock[data-size="full-large"] .hd-clock__date { font-size: calc(var(--cell) * .16); }
+.hd-clock__dial { flex: 1 1 0; min-height: 0; max-width: 100%; aspect-ratio: 1; }
+.hd-clock[data-style="analog"][data-size="wide"], .hd-clock[data-style="analog"][data-size="full"] { flex-direction: row; justify-content: space-evenly; }
+.hd-clock[data-style="analog"][data-size="wide"] .hd-clock__dial, .hd-clock[data-style="analog"][data-size="full"] .hd-clock__dial { flex: none; height: 100%; width: auto; }
+.hd-clock__rim { fill: color-mix(in oklab, var(--tile-surface) 70%, transparent); stroke: var(--ink-muted); stroke-width: 1.5; }
+.hd-clock__tick { stroke: var(--ink-muted); stroke-width: 1.5; stroke-linecap: round; }
+.hd-clock__tick.is-quarter { stroke: var(--ink); stroke-width: 2.5; }
+.hd-clock__hand { stroke: var(--ink); stroke-linecap: round; }
+.hd-clock__hand--hour { stroke-width: 4.5; }
+.hd-clock__hand--minute { stroke-width: 3; }
+.hd-clock__hand--second { stroke: var(--kind-heat-ink); stroke-width: 1.4; }
+.hd-clock__pin { fill: var(--ink); }
+
+.hd-date { gap: calc(var(--cell) * .04); }
+.hd-date__weekday { font-size: calc(var(--cell) * .12); font-weight: 700; color: var(--k-ink); text-transform: capitalize; }
+.hd-date__day { display: flex; flex-direction: column; gap: calc(var(--cell) * .02); min-width: 0; }
+.hd-date__number { font-size: calc(var(--cell) * .5); font-weight: 800; }
+.hd-date__month-name { font-size: calc(var(--cell) * .12); font-weight: 600; color: var(--ink-muted); text-transform: capitalize; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-date[data-size="wide"] .hd-date__day, .hd-date[data-size="full"] .hd-date__day { flex-direction: row; align-items: baseline; gap: calc(var(--cell) * .12); }
+.hd-date__head { display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--cell) * .1); }
+.hd-date__head .hd-tile__name { text-transform: capitalize; }
+.hd-date__month { flex: 1; width: 100%; border-collapse: collapse; table-layout: fixed; text-align: center; font-variant-numeric: tabular-nums; }
+.hd-date__month th { font-size: calc(var(--cell) * .075); font-weight: 600; color: var(--ink-muted); padding: 0 0 calc(var(--cell) * .03); text-transform: capitalize; }
+.hd-date__month td { font-size: calc(var(--cell) * .11); font-weight: 600; padding: 0; }
+.hd-date__month td.is-outside { color: var(--ink-muted); opacity: .5; }
+.hd-date__month td.is-today { background: var(--k-ink); color: var(--tile-surface); font-weight: 800; border-radius: 30%; }
+.hd-date__week { font-size: calc(var(--cell) * .07) !important; width: 10%; color: var(--ink-muted); font-weight: 500 !important; }
