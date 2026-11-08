@@ -203,13 +203,15 @@ describe('Weather tile', () => {
 });
 
 describe('Weather tile settings', () => {
+  let realtime: FakeRealtime;
   beforeEach(() => {
     vi.useFakeTimers();
+    realtime = new FakeRealtime();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: Realtime, useValue: new FakeRealtime() },
+        { provide: Realtime, useValue: realtime },
         { provide: TileData, useExisting: RealtimeTileData },
       ],
     });
@@ -229,7 +231,8 @@ describe('Weather tile settings', () => {
 
   it('searches a town and sets it as the place, which needs no Homey', async () => {
     const { fixture, root, changes } = await render({ target: WEATHER_HERE, account: 1 });
-    expect(root.textContent).toContain('Where Homey is, as set in Homey');
+    expect(root.textContent).toContain('Homey location');
+    expect(root.textContent).not.toContain('Homey location:');
 
     const input = root.querySelector('input') as HTMLInputElement;
     input.value = 'Amers';
@@ -254,6 +257,15 @@ describe('Weather tile settings', () => {
     expect(changes).toEqual([
       { target: WEATHER_PLACE, place: { name: 'Amersfoort', latitude: 52.155, longitude: 5.388 }, account: undefined },
     ]);
+  });
+
+  it('names the town Homey is in once its forecast has come', async () => {
+    realtime.forecastList = [forecast()];
+    TestBed.inject(WeatherData);
+    await vi.runAllTimersAsync();
+    const { root } = await render({ target: WEATHER_HERE, account: 1 });
+
+    expect(root.querySelector('.current span')?.textContent).toBe('Homey location: Utrecht');
   });
 
   it('goes back to where Homey is', async () => {

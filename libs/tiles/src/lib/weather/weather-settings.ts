@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input
 import { PlaceMatch, WEATHER_HERE, WEATHER_PLACE, WeatherApi } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
 import { TileData } from '../tile-data';
-import { WeatherTileSettings } from './weather-data';
+import { WeatherData, WeatherTileSettings } from './weather-data';
 
 /** How long typing rests before it searches. */
 const SEARCH_AFTER_MS = 300;
@@ -27,7 +27,7 @@ export function placeDetail(match: PlaceMatch): string {
           <span>{{ place.name }}</span>
           <button type="button" class="hd-btn" (click)="useHomey()">Use where {{ homeyName() }} is</button>
         } @else {
-          <span>Where {{ homeyName() }} is, as set in Homey</span>
+          <span>Homey location{{ town() ? ': ' + town() : '' }}</span>
         }
       </p>
       <input
@@ -79,6 +79,7 @@ export class WeatherTileSettingsEditor {
 
   private readonly api = inject(WeatherApi);
   private readonly data = inject(TileData);
+  private readonly weather = inject(WeatherData);
 
   protected readonly query = signal('');
   protected readonly matches = signal<PlaceMatch[]>([]);
@@ -86,6 +87,8 @@ export class WeatherTileSettingsEditor {
   protected readonly error = signal<string | null>(null);
   protected readonly detail = placeDetail;
 
+  /** The town Homey's own weather names, once its forecast has come. */
+  protected readonly town = computed(() => this.weather.forecast({ ...this.settings(), place: undefined, target: WEATHER_HERE })?.place ?? null);
   protected readonly homeyName = computed(() => this.data.homey(this.settings().account)?.accountName ?? 'Homey');
 
   private timer?: ReturnType<typeof setTimeout>;
