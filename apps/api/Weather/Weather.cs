@@ -42,7 +42,11 @@ public sealed record WeatherForecast(WeatherNow Now, IReadOnlyList<WeatherHour> 
 /// </summary>
 public sealed record Forecast(
     int? AccountId, string? AccountName, string? PlaceKey, string Status, string? Error, string? Place, WeatherNow? Now,
-    IReadOnlyList<WeatherHour> Hours, IReadOnlyList<WeatherDay> Days, IReadOnlyList<RainPoint>? Rain, DateTimeOffset? UpdatedAt);
+    IReadOnlyList<WeatherHour> Hours, IReadOnlyList<WeatherDay> Days, IReadOnlyList<RainPoint>? Rain, DateTimeOffset? UpdatedAt)
+{
+    // Where the forecast is for, in degrees; null until Homey says where it is.
+    public HomeyLocation? Location { get; init; }
+}
 
 /// <summary>
 /// A place a weather tile shows the weather of instead of where its Homey is: <c>settings.place</c> of a tile whose target is

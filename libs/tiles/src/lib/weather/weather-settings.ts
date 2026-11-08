@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { PlaceMatch, WEATHER_HERE, WEATHER_PLACE, WeatherApi } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
 import { TileData } from '../tile-data';
@@ -6,6 +6,24 @@ import { WeatherData, WeatherTileSettings } from './weather-data';
 
 /** How long typing rests before it searches. */
 const SEARCH_AFTER_MS = 300;
+
+/** How far apart two places are, in kilometres, along the earth's surface. */
+export function distanceKm(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }): number {
+  const rad = Math.PI / 180;
+  const dLat = (b.latitude - a.latitude) * rad;
+  const dLon = (b.longitude - a.longitude) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.latitude * rad) * Math.cos(b.latitude * rad) * Math.sin(dLon / 2) ** 2;
+  return 12_742 * Math.asin(Math.sqrt(h));
+}
+
+/** Whether a popover is showing; false where there are no popovers. */
+function popoverOpen(element: HTMLElement): boolean {
+  try {
+    return element.matches(':popover-open');
+  } catch {
+    return false;
+  }
+}
 
 /** Region and country, to tell namesakes apart: `Utrecht, Netherlands`. */
 export function placeDetail(match: PlaceMatch): string {
@@ -25,12 +43,13 @@ export function placeDetail(match: PlaceMatch): string {
       <p class="current">
         @if (settings().place; as place) {
           <span>{{ place.name }}</span>
-          <button type="button" class="hd-btn" (click)="useHomey()">Use where {{ homeyName() }} is</button>
+          <button type="button" class="hd-btn" (click)="useHomey()">Use Homey's location</button>
         } @else {
           <span>Homey location{{ town() ? ': ' + town() : '' }}</span>
         }
       </p>
       <input
+        #input
         id="weather-place"
         class="hd-input"
         type="search"
@@ -39,24 +58,25 @@ export function placeDetail(match: PlaceMatch): string {
         [value]="query()"
         (input)="search($any($event.target).value)"
         (keydown.escape)="search('')"
+        (focus)="open.set(true)"
+        (blur)="closeUnlessInList($event)"
       />
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
       } @else if (query().trim().length >= 2 && searched() && !matches().length) {
         <p class="muted">No town found</p>
       }
-      @if (matches().length) {
-        <ul class="matches" aria-label="Towns">
-          @for (match of matches(); track $index) {
-            <li>
-              <button type="button" class="match" (click)="choose(match)">
-                <span class="match__name">{{ match.name }}</span>
-                <span class="match__detail">{{ detail(match) }}</span>
-              </button>
-            </li>
-          }
-        </ul>
-      }
+      <!-- A popover, so it floats over the settings under it instead of pushing them down; the press stays on the input. -->
+      <ul #list class="matches" popover="manual" aria-label="Towns" (pointerdown)="$event.preventDefault()">
+        @for (match of matches(); track $index) {
+          <li>
+            <button type="button" class="match" (click)="choose(match)">
+              <span class="match__name">{{ match.name }}</span>
+              <span class="match__detail">{{ detail(match) }}</span>
+            </button>
+          </li>
+        }
+      </ul>
     </div>
   `,
   styles: `
@@ -65,7 +85,7 @@ export function placeDetail(match: PlaceMatch): string {
     .current .hd-btn { flex: none; padding-inline: 10px; }
     .muted { color: var(--ink-muted); margin: var(--space-1) 0 0; }
     .error { color: var(--danger); margin: var(--space-1) 0 0; }
-    .matches { list-style: none; margin: var(--space-1) 0 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-control); overflow: hidden; }
+    .matches { position: fixed; inset: auto; margin: 0; padding: 0; list-style: none; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-control); box-shadow: 0 8px 24px rgb(0 0 0 / .18); overflow: hidden auto; }
     .matches li + li { border-top: 1px solid var(--line); }
     .match { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: var(--space-2) var(--space-3); border: 0; background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
     .match:hover, .match:focus-visible { background: color-mix(in oklab, var(--brand) 12%, transparent); outline: none; }
@@ -86,16 +106,54 @@ export class WeatherTileSettingsEditor {
   protected readonly searched = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly detail = placeDetail;
+  /** Whether the towns are shown: while the search has the focus, or something in them does. */
+  protected readonly open = signal(true);
+  private readonly list = viewChild<ElementRef<HTMLElement>>('list');
+  private readonly input = viewChild<ElementRef<HTMLElement>>('input');
 
   /** The town Homey's own weather names, once its forecast has come. */
-  protected readonly town = computed(() => this.weather.forecast({ ...this.settings(), place: undefined, target: WEATHER_HERE })?.place ?? null);
+  private readonly homeForecast = computed(() => this.weather.forecast({ ...this.settings(), place: undefined, target: WEATHER_HERE }));
+  protected readonly town = computed(() => this.homeForecast()?.place ?? null);
   protected readonly homeyName = computed(() => this.data.homey(this.settings().account)?.accountName ?? 'Homey');
 
   private timer?: ReturnType<typeof setTimeout>;
   private seq = 0;
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => clearTimeout(this.timer));
+    const reposition = () => this.place();
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    inject(DestroyRef).onDestroy(() => {
+      clearTimeout(this.timer);
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    });
+    effect(() => {
+      const list = this.list()?.nativeElement;
+      if (!list) return;
+      const show = this.matches().length > 0 && this.open();
+      const shown = popoverOpen(list);
+      if (show) {
+        this.place();
+        if (!shown) list.showPopover?.();
+      } else if (shown) list.hidePopover?.();
+    });
+  }
+
+  /** Puts the towns under the search, as wide as it. */
+  private place() {
+    const list = this.list()?.nativeElement;
+    const box = this.input()?.nativeElement.getBoundingClientRect();
+    if (!list || !box) return;
+    const top = box.bottom + 4;
+    list.style.top = `${top}px`;
+    list.style.left = `${box.left}px`;
+    list.style.width = `${box.width}px`;
+    list.style.maxHeight = `${Math.max(120, window.innerHeight - top - 12)}px`;
+  }
+
+  protected closeUnlessInList(event: FocusEvent) {
+    if (!this.list()?.nativeElement.contains(event.relatedTarget as Node | null)) this.open.set(false);
   }
 
   protected search(query: string) {
@@ -118,7 +176,9 @@ export class WeatherTileSettingsEditor {
     try {
       const matches = await firstValueFrom(this.api.places(query, language));
       if (seq !== this.seq) return;
-      this.matches.set(matches);
+      const here = this.homeForecast()?.location;
+      // The towns nearest Homey first, which are the ones people mean.
+      this.matches.set(here ? [...matches].sort((a, b) => distanceKm(here, a) - distanceKm(here, b)) : matches);
       this.searched.set(true);
     } catch {
       if (seq !== this.seq) return;

@@ -133,6 +133,7 @@ public sealed class WeatherWatcher(Homeys homeys, IWeatherSource source, IHubCon
             watch.ForecastAt = watch.RainAt = DateTimeOffset.MinValue;
             watch.Failed = false;
         }
+        forecast = forecast with { Location = location };
         var now = time.GetUtcNow();
 
         if (now - watch.ForecastAt >= (watch.Failed ? RetryEvery : ForecastEvery))

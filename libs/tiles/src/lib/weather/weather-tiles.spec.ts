@@ -8,7 +8,7 @@ import { TileSize } from '@homey-dash/layout';
 import { RealtimeTileData } from '../realtime-tile-data';
 import { TileData } from '../tile-data';
 import { clockTime, rainSummary, WeatherData, weatherLook } from './weather-data';
-import { WeatherTileSettingsEditor } from './weather-settings';
+import { WeatherTileSettingsEditor, distanceKm } from './weather-settings';
 import { WeatherTile } from './weather-tile';
 import { WEATHER_TILES } from './weather-tiles';
 
@@ -268,10 +268,33 @@ describe('Weather tile settings', () => {
     expect(root.querySelector('.current span')?.textContent).toBe('Homey location: Utrecht');
   });
 
+  it('lists the towns nearest Homey first', async () => {
+    realtime.forecastList = [forecast({ location: { latitude: 52.09, longitude: 5.12 } })];
+    TestBed.inject(WeatherData);
+    await vi.runAllTimersAsync();
+    const { fixture, root } = await render({ target: WEATHER_HERE, account: 1 });
+
+    const input = root.querySelector('input') as HTMLInputElement;
+    input.value = 'Amers';
+    input.dispatchEvent(new Event('input'));
+    await vi.advanceTimersByTimeAsync(300);
+    TestBed.inject(HttpTestingController)
+      .expectOne((r) => r.url === '/api/weather/places')
+      .flush([
+        { name: 'Amersfoort', region: 'Mpumalanga', country: 'South Africa', latitude: -27.009, longitude: 29.866 },
+        { name: 'Amersfoort', region: 'Utrecht', country: 'Netherlands', latitude: 52.155, longitude: 5.388 },
+      ]);
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+
+    expect([...root.querySelectorAll('.match__detail')].map((e) => e.textContent)).toEqual(['Utrecht, Netherlands', 'Mpumalanga, South Africa']);
+  });
+
   it('goes back to where Homey is', async () => {
     const { root, changes } = await render({ target: WEATHER_PLACE, place: { name: 'Barcelona', latitude: 41.389, longitude: 2.159 } });
 
     expect(root.textContent).toContain('Barcelona');
+    expect(root.querySelector('.current button')?.textContent?.trim()).toBe("Use Homey's location");
     (root.querySelector('.current button') as HTMLButtonElement).click();
 
     expect(changes).toEqual([{ target: WEATHER_HERE, place: undefined }]);
@@ -279,6 +302,13 @@ describe('Weather tile settings', () => {
 });
 
 describe('weather helpers', () => {
+  it('measures the distance between two places in kilometres', () => {
+    const utrecht = { latitude: 52.09, longitude: 5.12 };
+    expect(distanceKm(utrecht, utrecht)).toBe(0);
+    expect(distanceKm(utrecht, { latitude: 52.37, longitude: 4.9 })).toBeGreaterThan(33);
+    expect(distanceKm(utrecht, { latitude: 52.37, longitude: 4.9 })).toBeLessThan(37);
+  });
+
   it('reads WMO codes by day and night', () => {
     expect(weatherLook(0, true).text).toBe('Clear');
     expect(weatherLook(0, false).icon).not.toBe(weatherLook(0, true).icon);

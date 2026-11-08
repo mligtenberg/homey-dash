@@ -95,6 +95,8 @@ export interface Forecast {
   error: string | null;
   /** The town Homey's own weather names, or the place's name. */
   place: string | null;
+  /** Where the forecast is for, in degrees; absent until Homey says where it is. */
+  location?: { latitude: number; longitude: number } | null;
   now: WeatherNow | null;
   /** The next 24 hours, from the current one. */
   hours: WeatherHour[];

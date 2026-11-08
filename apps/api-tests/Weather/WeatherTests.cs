@@ -52,6 +52,8 @@ public sealed class WeatherApiTests(ApiFactory factory) : IClassFixture<ApiFacto
 
         Assert.Equal(1, forecast.GetProperty("accountId").GetInt32());
         Assert.Equal("Utrecht", forecast.GetProperty("place").GetString());
+        Assert.Equal(52.09, forecast.GetProperty("location").GetProperty("latitude").GetDouble());
+        Assert.Equal(5.12, forecast.GetProperty("location").GetProperty("longitude").GetDouble());
         Assert.Equal(3, forecast.GetProperty("now").GetProperty("code").GetInt32());
         Assert.Equal(24, forecast.GetProperty("hours").GetArrayLength());
         Assert.Equal(7, forecast.GetProperty("days").GetArrayLength());

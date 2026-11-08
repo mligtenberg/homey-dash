@@ -23,5 +23,6 @@ sunrise and sunset; the rain chart, headed by when it rains or `Dry for the next
 24 hours as a strip that scrolls sideways, with the chance of rain from 20%; the 7 days as rows; and who the forecast is by.
 
 In Management the tile's settings have a **Place** field: `Homey location: {town}` (just `Homey location` until the forecast names the town), or the chosen town with a
-`Use where … is` button. A search field under it lists towns from two letters, each with its region and country to tell
-namesakes apart; picking one sets it. A tile with a town of its own has no Homey picker.
+`Use Homey's location` button. A search field under it lists towns from two letters in a popover over the settings, each
+with its region and country to tell namesakes apart, nearest Homey first (the forecast carries Homey's coordinates as
+`location`); picking one sets it. A tile with a town of its own has no Homey picker.
