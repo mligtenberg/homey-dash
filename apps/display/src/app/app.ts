@@ -136,7 +136,7 @@ const TAPE_KEY = 'homeydash.tape';
     <hd-screen-settings (cameraChanged)="remeasure()" />
   `,
   styles: `
-    :host { display: block; height: 100dvh; overflow: hidden; position: relative; }
+    :host { display: block; height: 100dvh; overflow: hidden; position: relative; --lock-edge: clamp(20px, 5vh, 56px); }
     hd-dashboard-view { height: 100%; box-sizing: border-box; }
     /* A gutter for the dashboard tape's toggle, so it floats beside the tiles rather than over them. */
     hd-dashboard-view.has-tape { padding-left: calc(44px + var(--space-3) * 2); }
@@ -148,6 +148,13 @@ const TAPE_KEY = 'homeydash.tape';
     @keyframes slideshow-out { to { opacity: 0; } }
     @media (prefers-reduced-motion: reduce) { .is-leaving { animation: none; } }
     .slideshow hd-photo-tile { width: 100%; height: 100%; border-radius: 0; box-shadow: none; --cell: calc(100dvh / 3); }
+    /* The photo's caption is part of the lock screen's layer: its margins, its type and shadow, no bar of its own. */
+    .slideshow ::ng-deep .hd-photo__caption {
+      padding: 0 var(--lock-edge) var(--lock-edge); background: none; gap: 2vh;
+      text-shadow: 0 1px 2px rgb(0 0 0 / .55), 0 0 14px rgb(0 0 0 / .45), 0 0 36px rgb(0 0 0 / .35);
+    }
+    .slideshow ::ng-deep .hd-photo__label { font-size: 2.3vh; font-weight: 500; }
+    .slideshow ::ng-deep .hd-photo__about, .slideshow ::ng-deep .hd-photo__people { font-size: 1.9vh; font-weight: 500; opacity: .82; }
     .reconnecting { position: fixed; z-index: 11; left: 50%; bottom: var(--space-5); translate: -50% 0; }
     .corner { position: fixed; z-index: 12; top: 0; right: 0; width: 40px; height: 40px; }
   `,

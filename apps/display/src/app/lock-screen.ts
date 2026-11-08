@@ -72,40 +72,49 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
     }
   `,
   styles: `
+    /*
+     * The content is the subject; the widgets are a quiet layer on it. Nothing covers the photo as a whole: each spot
+     * darkens only its own corner, softly, so white type holds on any picture while the middle stays untouched.
+     */
     :host {
       position: fixed; inset: 0; z-index: 10; pointer-events: none; box-sizing: border-box;
       display: grid; grid-template: 'tl . tr' auto '. c .' 1fr 'bl . br' auto / 1fr auto 1fr;
-      padding: clamp(16px, 4vh, 48px); color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / .5), 0 0 24px rgb(0 0 0 / .35);
-      --u: 1vh;
+      --edge: var(--lock-edge, clamp(20px, 5vh, 56px));
+      padding: var(--edge); color: #fff; --u: 1vh;
+      text-shadow: 0 1px 2px rgb(0 0 0 / .55), 0 0 14px rgb(0 0 0 / .45), 0 0 36px rgb(0 0 0 / .35);
     }
-    /* Over a photo, the bottom spots stay above the caption along its bottom (see .hd-photo__caption): when and where it was taken, and who. */
-    :host(.over-photo) { padding-bottom: calc(clamp(16px, 4vh, 48px) + 100dvh / 3 * .45); }
-    .spot { display: flex; flex-direction: column; gap: calc(2 * var(--u)); }
-    .spot--top-left { grid-area: tl; align-items: flex-start; }
-    .spot--top-right { grid-area: tr; align-items: flex-end; text-align: right; }
-    .spot--center { grid-area: c; align-self: center; align-items: center; text-align: center; --u: 1.8vh; }
-    .spot--bottom-left { grid-area: bl; align-items: flex-start; justify-content: flex-end; }
-    .spot--bottom-right { grid-area: br; align-items: flex-end; justify-content: flex-end; text-align: right; }
-    .clock__time { font-size: calc(10 * var(--u)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-    .clock__date { font-size: calc(2.6 * var(--u)); font-weight: 600; margin-top: var(--u); }
-    .weather { display: grid; grid-template-columns: auto auto; column-gap: var(--u); align-items: center; }
-    .spot--center .weather { justify-content: center; }
-    .weather__icon { width: calc(5 * var(--u)); height: calc(5 * var(--u)); filter: drop-shadow(0 1px 2px rgb(0 0 0 / .5)); }
-    .weather__temperature { font-size: calc(5 * var(--u)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-    .weather__state { grid-column: 1 / -1; font-size: calc(2.2 * var(--u)); font-weight: 600; }
-    .traffic { display: grid; grid-template-columns: auto auto; column-gap: var(--u); align-items: center; }
-    .spot--center .traffic { justify-content: center; }
-    .traffic__icon { width: calc(4 * var(--u)); height: calc(4 * var(--u)); filter: drop-shadow(0 1px 2px rgb(0 0 0 / .5)); }
-    .traffic__time { font-size: calc(4.5 * var(--u)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-    .traffic__name { grid-column: 1 / -1; font-size: calc(2 * var(--u)); font-weight: 600; opacity: .9; white-space: nowrap; }
+    /* Over a photo, the bottom spots stay above the caption line along its bottom (styled in the app, to the same margins): when and where it was taken, and who. */
+    :host(.over-photo) { padding-bottom: calc(var(--edge) + 7vh); }
+    /* Each spot is only as wide as its widgets, so its shade is too, not the whole column's. */
+    .spot { position: relative; display: flex; flex-direction: column; gap: calc(3 * var(--u)); animation: spot-in .9s cubic-bezier(.2, .7, .2, 1) backwards; }
+    .spot::before {
+      content: ''; position: absolute; z-index: -1; inset: calc(-5 * var(--u)) calc(-9 * var(--u));
+      background: radial-gradient(closest-side, rgb(0 0 0 / .5), rgb(0 0 0 / .22) 55%, transparent);
+    }
+    .spot--top-left { grid-area: tl; justify-self: start; align-items: flex-start; }
+    .spot--top-right { grid-area: tr; justify-self: end; align-items: flex-end; text-align: right; animation-delay: .08s; }
+    .spot--center { grid-area: c; justify-self: center; align-self: center; align-items: center; text-align: center; --u: 1.8vh; animation-delay: .04s; }
+    .spot--bottom-left { grid-area: bl; justify-self: start; align-items: flex-start; justify-content: flex-end; animation-delay: .12s; }
+    .spot--bottom-right { grid-area: br; justify-self: end; align-items: flex-end; justify-content: flex-end; text-align: right; animation-delay: .16s; }
+    @keyframes spot-in { from { opacity: 0; translate: 0 calc(2 * var(--u)); } }
+    @media (prefers-reduced-motion: reduce) { .spot { animation: none; } }
+
+    /* The time is the one large thing: light and tight, with the date set small beneath it. */
+    .clock__time { font-size: calc(13 * var(--u)); font-weight: 300; line-height: .9; font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
+    .clock__date { font-size: calc(2.3 * var(--u)); font-weight: 500; letter-spacing: .01em; margin-top: calc(1.4 * var(--u)); opacity: .9; }
+
+    /* Everything else is a reading over its label, the same shape whatever it measures. */
+    .weather, .traffic { display: grid; grid-template-columns: auto auto; column-gap: calc(1.2 * var(--u)); align-items: center; }
+    .spot--center .weather, .spot--center .traffic { justify-content: center; }
+    .weather__icon, .traffic__icon { width: calc(4 * var(--u)); height: calc(4 * var(--u)); stroke-width: 1.6; }
+    .weather__temperature, .traffic__time, .value__reading { font-size: calc(4.6 * var(--u)); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+    .weather__state, .traffic__name, .value__name { grid-column: 1 / -1; font-size: calc(1.9 * var(--u)); font-weight: 500; opacity: .82; white-space: nowrap; margin-top: calc(.7 * var(--u)); }
     .traffic[data-delay='some'] .traffic__time, .traffic[data-delay='some'] .traffic__icon { color: #ffd166; }
-    .traffic[data-delay='heavy'] .traffic__time, .traffic[data-delay='heavy'] .traffic__icon { color: #ff8a73; }
-    .traffic.is-unavailable { opacity: .55; }
+    .traffic[data-delay='heavy'] .traffic__time, .traffic[data-delay='heavy'] .traffic__icon { color: #ff9b85; }
     .value { display: flex; flex-direction: column; }
-    .value__reading { font-size: calc(4.5 * var(--u)); font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
-    .value__units { font-size: .55em; font-weight: 700; margin-left: .1em; }
-    .value__name { font-size: calc(2 * var(--u)); font-weight: 600; opacity: .85; white-space: nowrap; }
-    .value.is-unavailable { opacity: .55; }
+    .value__units { font-size: .5em; font-weight: 500; margin-left: .15em; opacity: .85; }
+    .value__name { margin-top: calc(.7 * var(--u)); }
+    .is-unavailable { opacity: .5; }
   `,
 })
 export class LockScreen {
