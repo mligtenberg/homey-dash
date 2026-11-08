@@ -1,19 +1,7 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  output,
-} from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { AccountSelect } from '../account-select';
-import {
-  ALL_PLEX_LIBRARIES,
-  ANY_PLEX_PLAYER,
-  plexLibraryTarget,
-  plexPlayerTarget,
-} from '@homey-dash/api-client';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { ALL_PLEX_LIBRARIES, ANY_PLEX_PLAYER, plexLibraryTarget, plexPlayerTarget } from '@homey-dash/api-client';
 import { PlexData } from '@homey-dash/tiles';
 
 /**
@@ -29,62 +17,30 @@ import { PlexData } from '@homey-dash/tiles';
     @if (accounts().length > 1) {
       <div class="hd-field">
         <label class="hd-field__label" for="tile-account">Plex account</label>
-        <hd-account-select
-          selectId="tile-account"
-          [accounts]="accounts()"
-          [selected]="overview()?.accountId"
-          (picked)="accountPicked.emit($event)"
-        />
+        <hd-account-select selectId="tile-account" [accounts]="accounts()" [selected]="overview()?.accountId" (picked)="accountPicked.emit($event)" />
       </div>
     }
     <div class="hd-field">
-      <label class="hd-field__label" for="tile-target">{{
-        type() === 'plexPlayer' ? 'Player' : 'Library'
-      }}</label>
-      <select
-        id="tile-target"
-        class="hd-select"
-        (change)="picked.emit($any($event.target).value)"
-      >
+      <label class="hd-field__label" for="tile-target">{{ type() === 'plexPlayer' ? 'Player' : 'Library' }}</label>
+      <select id="tile-target" class="hd-select" (change)="picked.emit($any($event.target).value)">
         @for (option of options(); track option.target) {
-          <option
-            [value]="option.target"
-            [selected]="option.target === value()"
-          >
-            {{ option.label }}
-          </option>
+          <option [value]="option.target" [selected]="option.target === value()">{{ option.label }}</option>
         }
         @if (value() && !known()) {
-          <option [value]="value()" selected>
-            {{
-              type() === 'plexPlayer'
-                ? 'A player not seen lately'
-                : 'Library not found in Plex'
-            }}
-          </option>
+          <option [value]="value()" selected>{{ type() === 'plexPlayer' ? 'A player not seen lately' : 'Library not found in Plex' }}</option>
         }
       </select>
       @if (type() === 'plexPlayer') {
-        <span class="hd-hint"
-          >Players show up here once they played something.</span
-        >
+        <span class="hd-hint">Players show up here once they played something.</span>
       }
       @if (status(); as status) {
-        <span class="hd-hint"
-          >{{ status }} <a routerLink="/accounts">Go to Accounts</a></span
-        >
+        <span class="hd-hint">{{ status }} <a routerLink="/accounts">Go to Accounts</a></span>
       }
     </div>
   `,
   styles: `
-    :host {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-4);
-    }
-    a {
-      color: var(--brand);
-    }
+    :host { display: flex; flex-direction: column; gap: var(--space-4); }
+    a { color: var(--brand); }
   `,
 })
 export class PlexTargetField {
@@ -98,32 +54,19 @@ export class PlexTargetField {
   private readonly plex = inject(PlexData);
 
   protected readonly accounts = computed(() => this.plex.overviews() ?? []);
-  protected readonly overview = computed(() =>
-    this.plex.overview(this.account()),
-  );
+  protected readonly overview = computed(() => this.plex.overview(this.account()));
 
   protected readonly options = computed(() => {
     const overview = this.overview();
     return this.type() === 'plexPlayer'
-      ? [
-          { target: ANY_PLEX_PLAYER, label: 'Any player' },
-          ...(overview?.players ?? []).map((p) => ({
-            target: plexPlayerTarget(p),
-            label: p.name,
-          })),
-        ]
+      ? [{ target: ANY_PLEX_PLAYER, label: 'Any player' }, ...(overview?.players ?? []).map((p) => ({ target: plexPlayerTarget(p), label: p.name }))]
       : [
           { target: ALL_PLEX_LIBRARIES, label: 'All libraries' },
-          ...(overview?.libraries ?? []).map((l) => ({
-            target: plexLibraryTarget(l),
-            label: l.title,
-          })),
+          ...(overview?.libraries ?? []).map((l) => ({ target: plexLibraryTarget(l), label: l.title })),
         ];
   });
 
-  protected readonly known = computed(() =>
-    this.options().some((o) => o.target === this.value()),
-  );
+  protected readonly known = computed(() => this.options().some((o) => o.target === this.value()));
 
   protected readonly status = computed(() => {
     switch (this.plex.status(this.account())) {

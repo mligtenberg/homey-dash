@@ -1,11 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { DashboardsApi } from '@homey-dash/api-client';
@@ -18,11 +11,7 @@ import { AsDisplayPicker } from './as-display-picker';
   selector: 'hd-preview-page',
   imports: [AsDisplayPicker, DashboardView, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: {
-    class: 'hd-display',
-    '[style.--cell.px]': 'cell()',
-    '(window:resize)': 'onResize()',
-  },
+  host: { class: 'hd-display', '[style.--cell.px]': 'cell()', '(window:resize)': 'onResize()' },
   template: `
     @if (dashboard(); as dashboard) {
       <hd-dashboard-view [layout]="dashboard.draft" />
@@ -33,42 +22,21 @@ import { AsDisplayPicker } from './as-display-picker';
     </div>
   `,
   styles: `
-    :host {
-      display: block;
-      height: 100dvh;
-      overflow: hidden;
-      position: relative;
-    }
-    hd-dashboard-view {
-      height: 100%;
-      box-sizing: border-box;
-    }
-    .tools {
-      position: fixed;
-      right: var(--space-4);
-      bottom: var(--space-4);
-      display: flex;
-      gap: var(--space-2);
-    }
-    .tools .hd-btn {
-      text-decoration: none;
-    }
+    :host { display: block; height: 100dvh; overflow: hidden; position: relative; }
+    hd-dashboard-view { height: 100%; box-sizing: border-box; }
+    .tools { position: fixed; right: var(--space-4); bottom: var(--space-4); display: flex; gap: var(--space-2); }
+    .tools .hd-btn { text-decoration: none; }
   `,
 })
 export class PreviewPage {
   readonly id = input.required<string>();
 
   private readonly api = inject(DashboardsApi);
-  private readonly loaded = rxResource({
-    params: () => this.id(),
-    stream: ({ params }) => this.api.get(params),
-  });
+  private readonly loaded = rxResource({ params: () => this.id(), stream: ({ params }) => this.api.get(params) });
   protected readonly dashboard = this.loaded.value;
   protected readonly height = signal(window.innerHeight);
   protected readonly width = signal(window.innerWidth);
-  protected readonly cell = computed(() =>
-    fittedCellSize(this.width(), this.height(), this.dashboard()?.draft.rows),
-  );
+  protected readonly cell = computed(() => fittedCellSize(this.width(), this.height(), this.dashboard()?.draft.rows));
 
   protected onResize() {
     this.height.set(window.innerHeight);

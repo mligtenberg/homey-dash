@@ -47,31 +47,21 @@ describe('PhotoSetsPage', () => {
   }
 
   it('lists each set as a link to its own page, with only an overview of it', async () => {
-    const page = await render([
-      photoSet({ excluded: ['x1'], dashboards: ['Hall'] }),
-    ]);
+    const page = await render([photoSet({ excluded: ['x1'], dashboards: ['Hall'] })]);
 
     const link = page.querySelector('a.set');
     expect(link?.getAttribute('href')).toBe('/photo-sets/s1');
     expect(link?.textContent).toContain('Summer');
-    expect(link?.textContent?.replace(/\s+/g, ' ')).toContain(
-      '1 photo from Summer',
-    );
+    expect(link?.textContent?.replace(/\s+/g, ' ')).toContain('1 photo from Summer');
     expect(link?.textContent).toContain('1 excluded');
     expect(link?.textContent).toContain('Shown on Hall');
-    expect(page.querySelector('button')?.textContent).toContain(
-      'New photo set',
-    );
+    expect(page.querySelector('button')?.textContent).toContain('New photo set');
     expect(page.querySelectorAll('button')).toHaveLength(1);
   });
 
   it('says when a set failed to sync', async () => {
-    const page = await render([
-      photoSet({ syncError: 'Immich is out of reach.' }),
-    ]);
+    const page = await render([photoSet({ syncError: 'Immich is out of reach.' })]);
 
-    expect(page.querySelector('a.set .failed')?.textContent).toContain(
-      'Syncing failed',
-    );
+    expect(page.querySelector('a.set .failed')?.textContent).toContain('Syncing failed');
   });
 });
