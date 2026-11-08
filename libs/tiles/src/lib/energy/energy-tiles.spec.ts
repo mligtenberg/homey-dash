@@ -19,6 +19,10 @@ const energy = (change: Partial<HomeyEnergy> = {}): HomeyEnergy => ({
     exported: 3.1,
     solar: 9.8,
     home: 10.9,
+    cost: 0.82,
+    currency: 'EUR',
+    power: Array.from({ length: 12 }, (_, i) => ({ t: new Date(2026, 10, 8, i).toISOString(), v: 300 + i * 50 })),
+    devices: [{ name: 'Dryer', kwh: 1.2 }, { name: 'Fridge', kwh: 0.6 }],
     history: Array.from({ length: 6 }, (_, h) => ({ t: new Date(2026, 10, 8, h).toISOString(), home: 0.4, solar: h > 3 ? 0.8 : 0 })),
   },
   ...change,
@@ -124,18 +128,21 @@ describe('Energy tile', () => {
 
   it('adds the day by the hour on large, and today totals on full large', async () => {
     const large = (await render(energy(), 'large')).nativeElement as HTMLElement;
-    expect(large.querySelectorAll('.hd-energy__bar-solar')).toHaveLength(6);
+    expect(large.querySelectorAll('.hd-energy__bar-home')).toHaveLength(6);
+    expect(large.querySelectorAll('.hd-energy__bar-solar')).toHaveLength(2);
     expect(large.querySelector('.hd-energy__today')).toBeNull();
 
     const full = (await render(energy(), 'full-large')).nativeElement as HTMLElement;
-    expect(text(full.querySelector('.hd-energy__today')!)).toBe('Imported 4.2 kWh Exported 3.1 kWh Solar 9.8 kWh Home 10.9 kWh');
+    expect(text(full.querySelector('.hd-energy__today')!)).toContain('Used 10.9 kWh Imported 4.2 kWh Solar 9.8 kWh Exported 3.1 kWh Cost');
   });
 
-  it('says importing when the home takes from the grid', async () => {
-    const el = (await render(energy({ live: { grid: 1200, solar: null, home: 1200 } }), 'wide')).nativeElement as HTMLElement;
+  it('says importing when the home takes from the grid, without a flow bar when there is no sun', async () => {
+    const day = { ...energy().day!, solar: null, exported: 0 };
+    const el = (await render(energy({ live: { grid: 1200, solar: null, home: 1200 }, day }), 'wide')).nativeElement as HTMLElement;
 
     expect(text(el.querySelector('.hd-tile__detail')!)).toBe('Importing');
     expect(el.querySelector('.hd-energy__figures')!.textContent).not.toContain('Solar');
+    expect(el.querySelector('.hd-energy__flow')).toBeNull();
   });
 
   it('is unavailable, not missing, when Homey does not share its energy', async () => {
@@ -160,5 +167,10 @@ describe('Energy tile', () => {
     const pane = (fixture.nativeElement as HTMLElement).querySelector('.hd-energy__pane') as HTMLElement;
     expect(text(pane.querySelector('dl')!)).toContain('Solar now 1.8 kW');
     expect(text(pane.querySelector('dl')!)).toContain('Imported today 4.2 kWh');
+    expect(text(pane.querySelector('dl')!)).toContain('Used today 10.9 kWh');
+    expect(text(pane.querySelector('dl')!)).toContain('Cost today');
+    expect(text(pane.querySelector('dl')!)).toContain('Peak today 850 W');
+    expect(pane.querySelector('hd-statistic-chart')).not.toBeNull();
+    expect([...pane.querySelectorAll('.hd-energy__device-name')].map((e) => e.textContent)).toEqual(['Dryer', 'Fridge']);
   });
 });

@@ -36,23 +36,39 @@ export interface HomeyEnergy {
   day: EnergyDay | null;
 }
 
-/** Power now, in watts: `grid` is positive while importing and negative while exporting; `solar` is null without solar. */
+/**
+ * Power now, in watts: `grid` is the energy meter's, positive while importing and negative while exporting (null without a
+ * meter); `solar` is null without solar.
+ */
 export interface EnergyLive {
   grid: number | null;
   solar: number | null;
   home: number | null;
 }
 
-/** Today's totals in kWh, and the day by the hour. */
+/**
+ * Today: totals in kWh, what the grid cost (imported less exported, in `currency`; null without a price), the day by the hour,
+ * the meter's power through the day in watts, and the devices that used the most.
+ */
 export interface EnergyDay {
   imported: number | null;
   exported: number | null;
   solar: number | null;
   home: number | null;
+  cost: number | null;
+  currency: string | null;
   history: EnergyPoint[];
+  power: HomeyInsightEntry[];
+  devices: EnergyUse[];
 }
 
-/** One step of today's history, in kWh over the step; `t` is where it starts. */
+/** What one device used today, in kWh. */
+export interface EnergyUse {
+  name: string;
+  kwh: number;
+}
+
+/** One hour of today, in kWh; `t` is where it starts. */
 export interface EnergyPoint {
   t: string;
   home: number | null;

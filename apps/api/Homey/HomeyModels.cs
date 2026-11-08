@@ -81,15 +81,31 @@ public sealed record HomeyEnergy(string Status, EnergyLive? Live, EnergyDay? Day
     public static readonly HomeyEnergy Unavailable = new("unavailable", null, null);
 }
 
-// Power now, in watts. Grid is positive while importing and negative while exporting; Solar is what is produced (null without
-// solar) and Home what the home consumes.
+// Power now, in watts. Grid is what the energy meter measures, positive while importing and negative while exporting (null
+// without a meter); Solar is what is produced (null without solar) and Home what the home consumes.
 public sealed record EnergyLive(double? Grid, double? Solar, double? Home);
 
-// Today's totals in kWh, and the day by the hour.
-public sealed record EnergyDay(double? Imported, double? Exported, double? Solar, double? Home, IReadOnlyList<EnergyPoint> History);
+// Today: totals in kWh, what the grid cost (imported minus exported, in Currency, null without a price), the day by the hour,
+// the meter's power through the day, and the devices that used the most.
+public sealed record EnergyDay(
+    double? Imported,
+    double? Exported,
+    double? Solar,
+    double? Home,
+    double? Cost,
+    string? Currency,
+    IReadOnlyList<EnergyPoint> History,
+    IReadOnlyList<EnergyReading> Power,
+    IReadOnlyList<EnergyUse> Devices);
 
-// One step of today's history, in kWh over the step; T is where it starts.
+// One hour of today, in kWh; T is where it starts.
 public sealed record EnergyPoint(DateTimeOffset T, double? Home, double? Solar);
+
+// The meter's power at T, in watts.
+public sealed record EnergyReading(DateTimeOffset T, double? V);
+
+// What one device used today, in kWh.
+public sealed record EnergyUse(string Name, double Kwh);
 
 // Something a Sonos speaker can play, as its flow card offers it. Item is the card's own answer, handed back to play it.
 public sealed record SpeakerMusic(string Name, string? Description, string? Image, JsonElement Item);

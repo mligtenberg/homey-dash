@@ -259,7 +259,7 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         return Task.CompletedTask;
     }
 
-    // Today by the hour so far: the home uses a morning and evening peak, the sun a bell around noon.
+    // Today so far: the home uses a morning and evening peak, the sun a bell around noon; the meter's power every 5 minutes.
     private EnergyDay FakeEnergyDay()
     {
         var now = time.GetLocalNow();
@@ -269,7 +269,17 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
                 Home: Math.Round(.35 + (h is >= 7 and <= 9 or >= 17 and <= 21 ? .9 : .2) + h % 3 * .05, 2),
                 Solar: Math.Round(Math.Max(0, 1.6 - Math.Abs(h - 13) * .28), 2)))
             .ToList();
-        return new EnergyDay(Imported: 4.2, Exported: 3.1, Solar: 9.8, Home: 10.9, history);
+        var power = Enumerable.Range(0, (int)((now - midnight).TotalMinutes / 5))
+            .Select(i =>
+            {
+                var hour = i / 12.0;
+                var use = 350 + (hour is >= 7 and <= 9 or >= 17 and <= 21 ? 900 : 200) + 150 * Math.Sin(i * .7);
+                var sun = Math.Max(0, 1600 - Math.Abs(hour - 13) * 280) * 1.1;
+                return new EnergyReading(midnight.AddMinutes(i * 5), Math.Round(use - sun));
+            })
+            .ToList();
+        List<EnergyUse> devices = [new("Washing machine", 1.42), new("Dryer", 1.18), new("Fridge", .64), new("TV", .31), new("Kitchen lights", .12)];
+        return new EnergyDay(Imported: 4.2, Exported: 3.1, Solar: 9.8, Home: 10.9, Cost: .82, Currency: "EUR", history, power, devices);
     }
 
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;

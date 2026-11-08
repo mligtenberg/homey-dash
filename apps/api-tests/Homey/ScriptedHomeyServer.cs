@@ -64,7 +64,7 @@ public sealed class ScriptedHomeyServer : IAsyncDisposable
         {
             Requests.Enqueue((request.Method, request.Path + request.QueryString, ""));
             return request.Path.Value!.EndsWith("/live")
-                ? Results.Content("""{"totalConsumed":{"W":900},"totalGenerated":{"W":300}}""", "application/json")
+                ? Results.Content("""{"totalConsumed":{"W":120},"totalCumulative":{"W":600},"totalGenerated":{"W":300}}""", "application/json")
                 : Results.StatusCode(StatusCodes.Status403Forbidden);
         });
         // An Apple TV's cards: one opens an app (its argument is an autocomplete), one opens an address.

@@ -21,6 +21,21 @@ export function formatEnergy(kwh: number): string {
   return `${kwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh`;
 }
 
+/** € 2.98, or 2.98 where Homey tells no currency. */
+export function formatCost(cost: number, currency: string | null): string {
+  if (!currency) return cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  try {
+    return cost.toLocaleString(undefined, { style: 'currency', currency });
+  } catch {
+    return `${currency} ${cost.toFixed(2)}`;
+  }
+}
+
+/** What the grid does, as the full view says it: `Importing from the grid`. */
+export function gridSentence(flow: GridFlow): string {
+  return flow === 'import' ? 'Importing from the grid' : flow === 'export' ? 'Exporting to the grid' : 'Balanced with the grid';
+}
+
 export type GridFlow = 'import' | 'export' | 'balanced';
 
 /** Whether the home takes from the grid, gives to it, or neither. */

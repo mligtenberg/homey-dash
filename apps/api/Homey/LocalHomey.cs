@@ -294,7 +294,9 @@ public sealed class LocalHomey(
     {
         try
         {
-            state.SetEnergyDay(HomeyMapper.EnergyDay(await GetJsonAsync($"api/manager/energy/report/day?date={date}", ct)));
+            var report = await GetJsonAsync($"api/manager/energy/report/day?date={date}", ct);
+            energyCurrency ??= await ReadEnergyCurrencyAsync(ct);
+            state.SetEnergyDay(HomeyMapper.EnergyDay(report, energyCurrency));
             return true;
         }
         catch (HttpRequestException e) when (e.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound)
@@ -306,6 +308,23 @@ public sealed class LocalHomey(
         catch (Exception e) when (e is HttpRequestException or JsonException || e is OperationCanceledException && !ct.IsCancellationRequested)
         {
             logger.LogDebug("Could not read the energy of the day of Homey {Account}: {Error}", account.Name, e.Message);
+            return null;
+        }
+    }
+
+    // The currency Homey prices energy in ("EUR"), for the cost of the day; null when it won't tell.
+    private string? energyCurrency;
+
+    private async Task<string?> ReadEnergyCurrencyAsync(CancellationToken ct)
+    {
+        try
+        {
+            var currency = await GetJsonAsync("api/manager/energy/currency", ct);
+            return currency.ValueKind == JsonValueKind.String ? currency.GetString() : null;
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException)
+        {
+            logger.LogDebug("Could not read the energy currency of Homey {Account}: {Error}", account.Name, e.Message);
             return null;
         }
     }

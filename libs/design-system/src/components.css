@@ -1371,8 +1371,9 @@ a.hd-btn { text-decoration: none; }
 .hd-weather[data-size="wide"] { grid-template: "now ahead" auto "titles ahead" 1fr / minmax(0, 1fr) minmax(0, 1fr); }
 .hd-weather[data-size="full"] { grid-template: "now ahead" auto "titles ahead" 1fr / minmax(0, 1fr) minmax(0, 2fr); }
 .hd-weather[data-size="large"] { grid-template: "now" auto "titles" auto "ahead" 1fr "days" 1fr / minmax(0, 1fr); }
-.hd-weather[data-size="full-large"] { grid-template: "now ahead" 1fr "titles days" 1fr / minmax(0, 1fr) minmax(0, 2fr); }
+.hd-weather[data-size="full-large"] { grid-template: "now ahead" auto "titles ahead" 1fr ". days" 1fr / minmax(0, 1fr) minmax(0, 2fr); }
 .hd-weather[data-size="full-large"] .hd-weather__now { align-self: start; }
+.hd-weather[data-size="full-large"] .hd-weather__titles { align-self: start; }
 .hd-weather__now .hd-value { font-weight: 700; }
 .hd-weather[data-size="large"] .hd-weather__now .hd-value, .hd-weather[data-size="full-large"] .hd-weather__now .hd-value { font-size: calc(var(--cell) * .5); }
 /* Hours or days side by side, each a time over an icon over a temperature. */
@@ -1514,10 +1515,10 @@ a.hd-btn { text-decoration: none; }
 .hd-energy__today dd { margin: 0; font-size: calc(var(--cell) * .12); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .hd-energy__day { grid-area: day; display: flex; flex-direction: column; justify-content: flex-end; gap: calc(var(--cell) * .03); min-height: 0; }
 .hd-energy__day svg { width: 100%; flex: 1; min-height: 0; }
-.hd-energy__bar-solar { fill: var(--k-ink); }
-.hd-energy__bar-home { fill: var(--ink); }
+.hd-energy__bar-home { fill: var(--k-ink); }
+.hd-energy__bar-solar { fill: var(--kind-light-ink); }
 .hd-energy__axis { display: flex; justify-content: space-between; font-size: calc(var(--cell) * .075); font-weight: 600; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
-/* The day in full. */
+/* The day in full: the grid now, the figures of the day, then the power, the hours and the devices, two abreast when wide. */
 .hd-details--screen:has(.hd-energy__pane) {
   background:
     radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, var(--k-ink) 26%, transparent), transparent 70%),
@@ -1526,15 +1527,36 @@ a.hd-btn { text-decoration: none; }
 .hd-details--screen .hd-details__panel > .hd-energy__pane { flex: 1; min-height: 0; }
 .hd-energy__pane { display: flex; flex-direction: column; gap: calc(var(--cell) * .2); overflow-y: auto; scrollbar-width: none; }
 .hd-energy__pane::-webkit-scrollbar { display: none; }
-.hd-energy__pane .hd-energy__flow { height: calc(var(--cell) * .1); }
-.hd-energy__hero { display: flex; align-items: center; gap: calc(var(--cell) * .2); }
-.hd-energy__hero > .hd-icon { width: calc(var(--cell) * .6); height: calc(var(--cell) * .6); }
-.hd-energy__section { display: flex; flex-direction: column; gap: calc(var(--cell) * .08); }
+.hd-energy__pane .hd-energy__flow { height: calc(var(--cell) * .1); margin-top: calc(var(--cell) * .1); max-width: calc(var(--cell) * 4); }
+.hd-energy__hero { flex: none; display: flex; align-items: center; gap: calc(var(--cell) * .2); }
+.hd-energy__hero > .hd-icon { flex: none; width: calc(var(--cell) * .6); height: calc(var(--cell) * .6); color: var(--k-ink); }
+.hd-energy__hero-text { flex: 1; min-width: 0; }
+.hd-energy__sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--cell) * 3.6)), 1fr)); gap: calc(var(--cell) * .14); }
+.hd-energy__section {
+  display: flex; flex-direction: column; gap: calc(var(--cell) * .08); min-width: 0;
+  padding: calc(var(--cell) * .14) calc(var(--cell) * .16);
+  border-radius: calc(var(--cell) * var(--tile-radius) * .75);
+  background: color-mix(in oklab, var(--k-ink) 8%, var(--tile-surface));
+}
+.hd-energy__section--power { grid-column: 1 / -1; }
+.hd-energy__section-head { display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--cell) * .1); }
 .hd-energy__section h3 { margin: 0; }
-.hd-energy__section .hd-energy__day { height: calc(var(--cell) * 1.2); }
+.hd-energy__readout { font-size: calc(var(--cell) * .09); font-weight: 600; color: var(--ink-muted); font-variant-numeric: tabular-nums; text-align: end; }
+.hd-energy__chart { display: flex; height: calc(var(--cell) * 1.4); }
+.hd-energy__chart .hd-chart { height: 100%; }
+.hd-energy__chart .hd-chart__area { opacity: .22; }
+.hd-energy__section .hd-energy__day { height: calc(var(--cell) * 1.1); }
 .hd-energy__legend { display: flex; align-items: center; gap: calc(var(--cell) * .06); margin: 0; font-size: calc(var(--cell) * .09); color: var(--ink-muted); }
 .hd-energy__key { width: calc(var(--cell) * .1); height: calc(var(--cell) * .1); border-radius: 2px; margin-left: calc(var(--cell) * .1); }
 .hd-energy__key:first-child { margin-left: 0; }
-.hd-energy__key--solar { background: var(--k-ink); }
-.hd-energy__key--home { background: var(--ink); }
+.hd-energy__key--solar { background: var(--kind-light-ink); }
+.hd-energy__key--home { background: var(--k-ink); }
+.hd-energy__devices { display: flex; flex-direction: column; gap: calc(var(--cell) * .07); margin: 0; padding: 0; list-style: none; }
+.hd-energy__devices li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: calc(var(--cell) * .03) calc(var(--cell) * .1); align-items: baseline; }
+.hd-energy__device-name { font-size: calc(var(--cell) * .1); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-energy__device-kwh { font-size: calc(var(--cell) * .1); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--k-ink); }
+.hd-energy__device-bar {
+  grid-column: 1 / -1; height: calc(var(--cell) * .04); border-radius: var(--radius-pill);
+  background: linear-gradient(to right, var(--k-ink) calc(var(--share, 0) * 100%), color-mix(in oklab, var(--k-ink) 14%, transparent) 0);
+}
 .hd-energy__credit { margin: 0; font-size: calc(var(--cell) * .075); color: var(--ink-muted); }

@@ -148,108 +148,85 @@ public static class HomeyMapper
     }
 
     // ---- Homey's energy report (ADR-0014). ----
-    // Homey does not document the shape of GET api/manager/energy/live and report/day, and this was written without seeing
-    // one: both are read leniently, every figure under any of the names it plausibly has, as a number or as an object holding
-    // one ({ W: 1450 }, { kWh: 8.2 }). Check it against a real response, and fix only here.
+    // As a Homey Pro (2023) answers GET api/manager/energy/live and report/day; Homey does not document them.
 
-    private static readonly string[] ConsumedNames = ["totalConsumed", "consumed", "consumption", "homeConsumption", "home"];
-    private static readonly string[] GeneratedNames = ["totalGenerated", "generated", "solar", "production", "produced"];
-
-    // The live report: power now, in watts. Null when it holds none of it, as for a Homey without energy.
+    // The live report: { totalCumulative: { W }, totalGenerated: { W }, totalConsumed: { W }, items: [...] }. The cumulative
+    // figure is the energy meter's (a P1 meter): the grid, negative while exporting. Consumed only adds up the devices that
+    // measure or estimate their own power, so it is the home's use only without a meter. Null when it holds no power at all.
     public static EnergyLive? EnergyLive(JsonElement json)
     {
-        json = EnergyBody(json);
-        var home = Quantity(json, ConsumedNames);
-        var solar = Quantity(json, GeneratedNames);
-        // Positive imports. Homey reports no grid figure of its own that we know of: it is what the home uses beyond what it makes.
-        var grid = Quantity(json, "grid", "gridPower", "net", "netPower") ?? (home is null ? null : home - (solar ?? 0));
+        if (json.ValueKind != JsonValueKind.Object) return null;
+        var grid = Watts(json, "totalCumulative");
+        var solar = Watts(json, "totalGenerated");
+        var home = grid is null ? Watts(json, "totalConsumed") : grid + (solar ?? 0);
         return home is null && solar is null && grid is null ? null : new EnergyLive(grid, solar, home);
     }
 
-    // The day report: totals in kWh, and the day by the step it gives. Null when it holds none of it. A bare list is taken
-    // as the history alone.
-    public static EnergyDay? EnergyDay(JsonElement json)
+    // The day report: { electricity: { importedPeriod, exportedPeriod, generatedPeriod, consumedPeriod, importedPrice,
+    // exportedPrice, cumulativeMeasurePower: [{ t, v }], devices: { consumed: { id: { name, period } } } }, subReports: {
+    // "<hour start>": { electricity: {...Period} } } }, in kWh and the currency Homey is set to. The home's use is what came in
+    // from the grid, less what went out, plus what the sun made; without a meter, what the devices add up to. Null when it
+    // holds none of it.
+    public static EnergyDay? EnergyDay(JsonElement json, string? currency = null)
     {
-        json = EnergyBody(json);
-        if (json.ValueKind == JsonValueKind.Array)
-        {
-            var points = History(json);
-            return points.Count == 0 ? null : new EnergyDay(null, null, null, null, points);
-        }
-        if (json.ValueKind != JsonValueKind.Object) return null;
-        var totals = json;
-        foreach (var name in new[] { "totals", "total", "cumulative", "cumulatives" })
-            if (json.TryGetProperty(name, out var inner) && inner.ValueKind == JsonValueKind.Object) totals = inner;
-        var home = Quantity(totals, ConsumedNames);
-        var solar = Quantity(totals, GeneratedNames);
-        var imported = Quantity(totals, "totalImported", "imported", "import");
-        var exported = Quantity(totals, "totalExported", "exported", "export");
-        List<EnergyPoint> history = [];
-        foreach (var name in new[] { "history", "values", "data", "series", "hours", "items", "entries" })
-        {
-            if (!json.TryGetProperty(name, out var list) || list.ValueKind != JsonValueKind.Array) continue;
-            history = History(list);
-            if (history.Count > 0) break;
-        }
-        return home is null && solar is null && imported is null && exported is null && history.Count == 0
-            ? null
-            : new EnergyDay(imported, exported, solar, home, history);
-    }
+        if (json.ValueKind != JsonValueKind.Object || !json.TryGetProperty("electricity", out var power) || power.ValueKind != JsonValueKind.Object)
+            return null;
+        var (imported, exported, solar, home) = Periods(power);
+        var importedCost = Number(power, "importedPrice");
+        var cost = importedCost is null ? null : importedCost - (Number(power, "exportedPrice") ?? 0);
 
-    // The day by the step it gives, oldest first; entries without a moment are left out.
-    private static List<EnergyPoint> History(JsonElement list)
-    {
         var history = new List<EnergyPoint>();
-        foreach (var entry in list.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Object))
-        {
-            var at = new[] { "t", "time", "from", "start", "date", "timestamp" }.Select(n => Moment(entry, n)).FirstOrDefault(d => d is not null);
-            if (at is null) continue;
-            history.Add(new EnergyPoint(at.Value, Quantity(entry, ConsumedNames), Quantity(entry, GeneratedNames)));
-        }
-        history.Sort((a, b) => a.T.CompareTo(b.T));
-        return history;
+        if (json.TryGetProperty("subReports", out var hours) && hours.ValueKind == JsonValueKind.Object)
+            foreach (var hour in hours.EnumerateObject())
+            {
+                if (!TryMoment(hour.Name, out var at) || !hour.Value.TryGetProperty("electricity", out var inHour)) continue;
+                var (_, _, hourSolar, hourHome) = Periods(inHour);
+                history.Add(new EnergyPoint(at, hourHome, hourSolar));
+            }
+        history.Sort((x, y) => x.T.CompareTo(y.T));
+
+        var readings = new List<EnergyReading>();
+        if (power.TryGetProperty("cumulativeMeasurePower", out var curve) && curve.ValueKind == JsonValueKind.Array)
+            foreach (var reading in curve.EnumerateArray())
+                if (reading.ValueKind == JsonValueKind.Object && String(reading, "t") is { } t && TryMoment(t, out var at))
+                    readings.Add(new EnergyReading(at, Number(reading, "v")));
+        readings.Sort((x, y) => x.T.CompareTo(y.T));
+
+        var devices = new List<EnergyUse>();
+        if (power.TryGetProperty("devices", out var byKind) && byKind.ValueKind == JsonValueKind.Object
+            && byKind.TryGetProperty("consumed", out var consumed) && consumed.ValueKind == JsonValueKind.Object)
+            devices = consumed.EnumerateObject()
+                .Select(d => (Name: String(d.Value, "name"), Kwh: Number(d.Value, "period")))
+                .Where(d => d.Name is not null && d.Kwh > 0)
+                .OrderByDescending(d => d.Kwh)
+                .Take(EnergyDevices)
+                .Select(d => new EnergyUse(d.Name!, d.Kwh!.Value))
+                .ToList();
+
+        return imported is null && exported is null && solar is null && home is null && history.Count == 0
+            ? null
+            : new EnergyDay(imported, exported, solar, home, cost, currency, history, readings, devices);
     }
 
-    // The report itself, which may come wrapped as { report: {...} } or { data: {...} }.
-    private static JsonElement EnergyBody(JsonElement json)
+    // How many of the devices that used the most today the report keeps.
+    public const int EnergyDevices = 8;
+
+    // A period's imported, exported and generated kWh, and the home's use from them.
+    private static (double? Imported, double? Exported, double? Solar, double? Home) Periods(JsonElement power)
     {
-        foreach (var name in new[] { "report", "data", "result" })
-            if (json.ValueKind == JsonValueKind.Object && json.TryGetProperty(name, out var inner) && inner.ValueKind == JsonValueKind.Object) return inner;
-        return json;
+        var imported = Number(power, "importedPeriod");
+        var exported = Number(power, "exportedPeriod");
+        var solar = Number(power, "generatedPeriod");
+        var home = imported is null ? Number(power, "consumedPeriod") : imported - (exported ?? 0) + (solar ?? 0);
+        return (imported, exported, solar, home is < 0 ? 0 : home);
     }
 
-    // A figure under the first of these names that has one: a number, or an object holding one as W, kWh, value or total.
-    private static double? Quantity(JsonElement json, params string[] names)
-    {
-        if (json.ValueKind != JsonValueKind.Object) return null;
-        foreach (var name in names)
-        {
-            if (!json.TryGetProperty(name, out var v)) continue;
-            if (v.ValueKind == JsonValueKind.Number) return v.GetDouble();
-            if (v.ValueKind != JsonValueKind.Object) continue;
-            foreach (var unit in new[] { "W", "kWh", "value", "total", "power" })
-                if (v.TryGetProperty(unit, out var n) && n.ValueKind == JsonValueKind.Number) return n.GetDouble();
-        }
-        return null;
-    }
+    // The watts of { W: 1362 }, null when Homey has none.
+    private static double? Watts(JsonElement json, string name) =>
+        json.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Object ? Number(v, "W") : null;
 
-    // A moment as an ISO date-time (UTC when it names no zone) or as epoch seconds, milliseconds, microseconds or nanoseconds.
-    private static DateTimeOffset? Moment(JsonElement json, string name)
-    {
-        if (!json.TryGetProperty(name, out var v)) return null;
-        if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var epoch))
-        {
-            // Scaled down to milliseconds: anything beyond them is more precision than the tile shows.
-            if (epoch < 0) return null;
-            if (epoch < 100_000_000_000) epoch *= 1000;
-            while (epoch > 100_000_000_000_000) epoch /= 1000;
-            return DateTimeOffset.FromUnixTimeMilliseconds(epoch);
-        }
-        return v.ValueKind == JsonValueKind.String
-            && DateTimeOffset.TryParse(v.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d)
-                ? d
-                : null;
-    }
+    private static bool TryMoment(string text, out DateTimeOffset at) =>
+        DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out at);
 
     // Homey's location option, { value: { latitude, longitude, ... } } or the location itself; null when it has none.
     public static HomeyLocation? Location(JsonElement json)

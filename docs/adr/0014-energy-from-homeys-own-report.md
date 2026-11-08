@@ -7,9 +7,13 @@ and the day by the hour. HomeyDash reads them from the local Homey API like ever
 with the `Homey` snapshot), and displays never call Homey. An API key without the scope, or a Homey without energy, gives
 an `unavailable` report, which the tile shows as an unavailable face, not a missing one.
 
-Homey doesn't document the JSON of these two endpoints, so `HomeyMapper.EnergyLive` and `EnergyDay` read them leniently
-(each figure under any plausible name, as a number or as `{ W }` / `{ kWh }`), and the grid power, if Homey gives none, is
-the home's consumption minus the production. The shape was written without a real response; check it and fix only the mapper.
+Homey doesn't document the JSON of these two endpoints; `HomeyMapper.EnergyLive` and `EnergyDay` read them as a Homey Pro
+(2023) answers. In the live report `totalCumulative.W` is the energy meter's power (a P1 meter): the grid, negative while
+exporting. `totalConsumed.W` only adds up the devices that measure or estimate their own power, so it is the home's use only
+when there is no meter; with one, the home uses the grid plus the sun (`totalGenerated.W`). The day report holds today under
+`electricity`: `importedPeriod`, `exportedPeriod` and `generatedPeriod` in kWh, the cost as `importedPrice` less
+`exportedPrice`, the meter's power every 5 minutes as `cumulativeMeasurePower`, and what each device used as
+`devices.consumed`; `subReports` holds the same per hour. The currency comes from `GET api/manager/energy/currency`, once.
 
 ## Considered Options
 
