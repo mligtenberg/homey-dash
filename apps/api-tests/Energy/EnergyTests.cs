@@ -83,7 +83,37 @@ public sealed class EnergyMapperTests
     }
 
     [Fact]
-    public void Day_HoldingNothing_IsNull() => Assert.Null(HomeyMapper.EnergyDay(Json("""{ "foo": 1 }""")));
+    public void Day_TakesEpochMicrosecondsAndNanoseconds()
+    {
+        var day = HomeyMapper.EnergyDay(Json("""{ "history": [{ "t": 1794096000000000, "consumed": 1 }, { "t": 1794099600000000000, "consumed": 2 }] }"""))!;
+
+        Assert.Equal([DateTimeOffset.FromUnixTimeSeconds(1794096000), DateTimeOffset.FromUnixTimeSeconds(1794099600)], day.History.Select(p => p.T));
+    }
+
+    [Fact]
+    public void Day_ADateWithoutAZone_IsUtc()
+    {
+        var day = HomeyMapper.EnergyDay(Json("""{ "history": [{ "t": "2026-11-08T01:00:00", "consumed": 1 }] }"""))!;
+
+        Assert.Equal(new DateTimeOffset(2026, 11, 8, 1, 0, 0, TimeSpan.Zero), day.History[0].T);
+    }
+
+    [Fact]
+    public void Day_ABareList_IsTheHistory()
+    {
+        var day = HomeyMapper.EnergyDay(Json("""[{ "t": 1794096000, "consumed": 1 }]"""))!;
+
+        Assert.Equal([1.0], day.History.Select(p => p.Home));
+        Assert.Null(day.Home);
+    }
+
+    [Theory]
+    [InlineData("""{ "foo": 1 }""")]
+    [InlineData("[]")]
+    [InlineData("42")]
+    [InlineData("null")]
+    [InlineData("""{ "history": [{ "t": -5, "consumed": 1 }] }""")]
+    public void Day_HoldingNothing_IsNull(string json) => Assert.Null(HomeyMapper.EnergyDay(Json(json)));
 }
 
 // Against FakeHomey.

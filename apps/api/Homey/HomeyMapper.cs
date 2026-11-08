@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace HomeyDash.Api.Homey;
@@ -165,10 +166,17 @@ public static class HomeyMapper
         return home is null && solar is null && grid is null ? null : new EnergyLive(grid, solar, home);
     }
 
-    // The day report: totals in kWh, and the day by the step it gives. Null when it holds none of it.
+    // The day report: totals in kWh, and the day by the step it gives. Null when it holds none of it. A bare list is taken
+    // as the history alone.
     public static EnergyDay? EnergyDay(JsonElement json)
     {
         json = EnergyBody(json);
+        if (json.ValueKind == JsonValueKind.Array)
+        {
+            var points = History(json);
+            return points.Count == 0 ? null : new EnergyDay(null, null, null, null, points);
+        }
+        if (json.ValueKind != JsonValueKind.Object) return null;
         var totals = json;
         foreach (var name in new[] { "totals", "total", "cumulative", "cumulatives" })
             if (json.TryGetProperty(name, out var inner) && inner.ValueKind == JsonValueKind.Object) totals = inner;
@@ -176,22 +184,30 @@ public static class HomeyMapper
         var solar = Quantity(totals, GeneratedNames);
         var imported = Quantity(totals, "totalImported", "imported", "import");
         var exported = Quantity(totals, "totalExported", "exported", "export");
-        var history = new List<EnergyPoint>();
+        List<EnergyPoint> history = [];
         foreach (var name in new[] { "history", "values", "data", "series", "hours", "items", "entries" })
         {
             if (!json.TryGetProperty(name, out var list) || list.ValueKind != JsonValueKind.Array) continue;
-            foreach (var entry in list.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Object))
-            {
-                var at = new[] { "t", "time", "from", "start", "date", "timestamp" }.Select(n => Moment(entry, n)).FirstOrDefault(d => d is not null);
-                if (at is null) continue;
-                history.Add(new EnergyPoint(at.Value, Quantity(entry, ConsumedNames), Quantity(entry, GeneratedNames)));
-            }
+            history = History(list);
             if (history.Count > 0) break;
         }
-        history.Sort((a, b) => a.T.CompareTo(b.T));
         return home is null && solar is null && imported is null && exported is null && history.Count == 0
             ? null
             : new EnergyDay(imported, exported, solar, home, history);
+    }
+
+    // The day by the step it gives, oldest first; entries without a moment are left out.
+    private static List<EnergyPoint> History(JsonElement list)
+    {
+        var history = new List<EnergyPoint>();
+        foreach (var entry in list.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Object))
+        {
+            var at = new[] { "t", "time", "from", "start", "date", "timestamp" }.Select(n => Moment(entry, n)).FirstOrDefault(d => d is not null);
+            if (at is null) continue;
+            history.Add(new EnergyPoint(at.Value, Quantity(entry, ConsumedNames), Quantity(entry, GeneratedNames)));
+        }
+        history.Sort((a, b) => a.T.CompareTo(b.T));
+        return history;
     }
 
     // The report itself, which may come wrapped as { report: {...} } or { data: {...} }.
@@ -217,13 +233,22 @@ public static class HomeyMapper
         return null;
     }
 
-    // A moment as an ISO date-time or as epoch milliseconds or seconds.
+    // A moment as an ISO date-time (UTC when it names no zone) or as epoch seconds, milliseconds, microseconds or nanoseconds.
     private static DateTimeOffset? Moment(JsonElement json, string name)
     {
         if (!json.TryGetProperty(name, out var v)) return null;
         if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var epoch))
-            return epoch > 100_000_000_000 ? DateTimeOffset.FromUnixTimeMilliseconds(epoch) : DateTimeOffset.FromUnixTimeSeconds(epoch);
-        return v.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(v.GetString(), out var d) ? d : null;
+        {
+            // Scaled down to milliseconds: anything beyond them is more precision than the tile shows.
+            if (epoch < 0) return null;
+            if (epoch < 100_000_000_000) epoch *= 1000;
+            while (epoch > 100_000_000_000_000) epoch /= 1000;
+            return DateTimeOffset.FromUnixTimeMilliseconds(epoch);
+        }
+        return v.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(v.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d)
+                ? d
+                : null;
     }
 
     // Homey's location option, { value: { latitude, longitude, ... } } or the location itself; null when it has none.

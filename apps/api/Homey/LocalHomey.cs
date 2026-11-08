@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -15,6 +16,7 @@ public sealed class LocalHomey(
     IHttpClientFactory httpFactory,
     HomeyAccount account,
     HomeyState state,
+    TimeProvider time,
     ILogger<LocalHomey> logger) : IHomey
 {
     public const string HttpClientName = "Homey";
@@ -218,37 +220,39 @@ public sealed class LocalHomey(
     }
 
     // Reads Homey's own energy report for the energy tile (ADR-0014): the live power every 10 seconds, today's report every 5
-    // minutes. An API key without the homey.energy.readonly scope, or a Homey with no energy, makes it unavailable rather than failing.
+    // minutes and as soon as the day turns. An API key without the homey.energy.readonly scope, or a Homey with no energy,
+    // makes it unavailable rather than failing; anything else is tried again on the next round.
     private async Task FollowEnergyAsync(CancellationToken ct)
     {
+        var readDay = true;
+        string? dayRead = null;
         var nextDay = DateTimeOffset.MinValue;
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                var live = HomeyMapper.EnergyLive(await GetJsonAsync("api/manager/energy/live", ct));
-                if (live is null)
+                if (!await ReadEnergyLiveAsync(ct)) return;
+                // The day only goes with a live report: without one the report is unavailable, and the day with it, so it
+                // is read again once the live report is back.
+                if (state.Energy?.Live is null) dayRead = null;
+                else if (readDay)
                 {
-                    state.SetEnergyUnavailable();
-                    return;
-                }
-                state.SetEnergyLive(live);
-                if (DateTimeOffset.UtcNow >= nextDay)
-                {
-                    var date = DateTimeOffset.Now.ToString("yyyy-MM-dd");
-                    state.SetEnergyDay(HomeyMapper.EnergyDay(await GetJsonAsync($"api/manager/energy/report/day?date={date}", ct)));
-                    nextDay = DateTimeOffset.UtcNow + EnergyDayInterval;
+                    var today = time.GetLocalNow().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                    if (today != dayRead || time.GetUtcNow() >= nextDay)
+                    {
+                        var read = await ReadEnergyDayAsync(today, ct);
+                        readDay = read is not false;
+                        if (read is not null) (dayRead, nextDay) = (today, time.GetUtcNow() + EnergyDayInterval);
+                    }
                 }
             }
-            catch (HttpRequestException e) when (e.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized or HttpStatusCode.NotFound)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                logger.LogWarning("Homey {Account} won't tell its energy (it needs the homey.energy.readonly scope): {Error}", account.Name, e.Message);
-                state.SetEnergyUnavailable();
                 return;
             }
-            catch (Exception e) when (e is HttpRequestException or JsonException || e is OperationCanceledException && !ct.IsCancellationRequested)
+            catch (Exception e)
             {
-                logger.LogDebug("Could not read the energy of Homey {Account}: {Error}", account.Name, e.Message);
+                logger.LogWarning(e, "Could not read the energy of Homey {Account}", account.Name);
             }
             try
             {
@@ -258,6 +262,51 @@ public sealed class LocalHomey(
             {
                 return;
             }
+        }
+    }
+
+    // False when Homey won't ever tell, so following its energy stops for the session. A report holding no power shows as
+    // unavailable but is asked for again, as one odd answer doesn't mean there is no energy.
+    private async Task<bool> ReadEnergyLiveAsync(CancellationToken ct)
+    {
+        try
+        {
+            var live = HomeyMapper.EnergyLive(await GetJsonAsync("api/manager/energy/live", ct));
+            if (live is null) state.SetEnergyUnavailable();
+            else state.SetEnergyLive(live);
+        }
+        catch (HttpRequestException e) when (e.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized or HttpStatusCode.NotFound)
+        {
+            logger.LogWarning("Homey {Account} won't tell its energy (it needs the homey.energy.readonly scope): {Error}", account.Name, e.Message);
+            state.SetEnergyUnavailable();
+            return false;
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException || e is OperationCanceledException && !ct.IsCancellationRequested)
+        {
+            logger.LogDebug("Could not read the energy of Homey {Account}: {Error}", account.Name, e.Message);
+        }
+        return true;
+    }
+
+    // Today's report, apart from the live power: a Homey that won't give it leaves the tile without the day, not unavailable.
+    // True when read; false when Homey won't ever, so the day isn't asked for again this session; null to try again next round.
+    private async Task<bool?> ReadEnergyDayAsync(string date, CancellationToken ct)
+    {
+        try
+        {
+            state.SetEnergyDay(HomeyMapper.EnergyDay(await GetJsonAsync($"api/manager/energy/report/day?date={date}", ct)));
+            return true;
+        }
+        catch (HttpRequestException e) when (e.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound)
+        {
+            logger.LogWarning("Homey {Account} won't tell its energy of the day: {Error}", account.Name, e.Message);
+            state.SetEnergyDay(null);
+            return false;
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException || e is OperationCanceledException && !ct.IsCancellationRequested)
+        {
+            logger.LogDebug("Could not read the energy of the day of Homey {Account}: {Error}", account.Name, e.Message);
+            return null;
         }
     }
 
