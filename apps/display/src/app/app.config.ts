@@ -6,6 +6,7 @@ import {
   PLEX_TILES,
   TIME_TILES,
   WEATHER_TILES,
+  TRAFFIC_TILES,
   ENERGY_TILES,
   SONOS_TILES,
   provideTileModules,
@@ -19,7 +20,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideHttpClient(),
-    provideTileModules(CORE_TILES, PLEX_TILES, WEATHER_TILES, TIME_TILES, ENERGY_TILES, SONOS_TILES, LOGIC_TILES),
+    provideTileModules(CORE_TILES, PLEX_TILES, WEATHER_TILES, TRAFFIC_TILES, TIME_TILES, ENERGY_TILES, SONOS_TILES, LOGIC_TILES),
     { provide: TileData, useExisting: RealtimeTileData },
     { provide: RuleAnswers, useExisting: RealtimeRuleAnswers },
   ],

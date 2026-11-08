@@ -9,6 +9,11 @@ import { CORE_TILES, provideTileModules, RealtimeRuleAnswers, RealtimeTileData, 
 import { App, IDLE_MS, SETTINGS_TAPS, SETTINGS_TAPS_MS, TOUCH_REPORT_MS } from './app';
 import { BRIGHTNESS_MS, LightMeter } from './light-meter';
 
+const homeToWork = {
+  name: 'Home to work',
+  origin: { name: 'Home', latitude: 52.089, longitude: 5.11 },
+  destination: { name: 'Work', latitude: 52.379, longitude: 4.9 },
+};
 const hallway = { id: 'd1', name: 'Hallway', dashboardIds: [], idleRules: [], lockWidgets: [] };
 const dashboard = (id: string, name: string, version = 1, rows = 4) => ({ id, name, version, layout: { rows, sections: [] } });
 const published = (version: number): ScreenView => ({
@@ -343,13 +348,24 @@ describe('App', () => {
             { kind: 'weather', spot: 'top-right' },
             { kind: 'value', spot: 'bottom-left', signal: 'homey:1:capability:th:measure_temperature' },
             { kind: 'value', spot: 'bottom-left', signal: 'homey:1:capability:gone:onoff' },
+            { kind: 'traffic', spot: 'top-left', route: homeToWork },
+            { kind: 'traffic', spot: 'top-left', route: { ...homeToWork, destination: { name: 'Elsewhere', latitude: 1, longitude: 1 } } },
+            { kind: 'traffic', spot: 'top-left' },
           ];
+          realtime.trafficList = [{
+            routeKey: '52.089,5.110>52.379,4.900', status: 'connected', error: null, travelSeconds: 1500, usualSeconds: 1080, delaySeconds: 420,
+            distanceMeters: 21_400, arrival: '2026-11-08T17:55:00+01:00', updatedAt: '2026-11-08T17:30:00+01:00',
+          }];
           holding = { night: true };
           const root = await startOpen({ ...fills(), display: { ...fills().display, lockWidgets } });
 
           expect(root.querySelector('.spot--center .clock__time')?.textContent).toMatch(/\d/);
           expect(root.querySelector('.spot--top-right .weather')?.textContent).toContain('13°');
           expect(root.querySelector('.spot--top-right .weather')?.textContent).toContain('Rain');
+          // Traffic shows the time and delay, but not for a route nobody asked TomTom about, nor before a route is chosen.
+          expect([...root.querySelectorAll('.spot--top-left .traffic')].map((t) => t.textContent?.replace(/\s+/g, ' ').trim()))
+            .toEqual(['25 minHome to work · +7 min']);
+          expect(root.querySelector('.spot--top-left .traffic')?.getAttribute('data-delay')).toBe('heavy');
           // A device that is gone shows nothing.
           expect([...root.querySelectorAll('.spot--bottom-left .value')].map((v) => v.textContent?.replace(/\s+/g, ' ').trim()))
             .toEqual(['20.1°CThermostat · Temperature']);

@@ -256,6 +256,41 @@ describe('Displays', () => {
       expect(lockRequest().body.widgets).toEqual([{ kind: 'weather', spot: 'bottom-left' }]);
     });
 
+    it('adds a traffic widget that has nothing to show until a route is chosen', async () => {
+      const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'bottom-right' }] }], [], '/displays/1/lock');
+      const kind = root.querySelector('[aria-label="What widget 1 shows"]') as HTMLSelectElement;
+
+      kind.value = 'traffic';
+      kind.dispatchEvent(new Event('change'));
+
+      expect(lockRequest().body.widgets).toEqual([{ kind: 'traffic', spot: 'bottom-right' }]);
+      await stable();
+      expect(root.querySelector('.lock hd-traffic-route-field')).not.toBeNull();
+    });
+
+    it('lets a traffic widget pick its TomTom account once there are several, and searches with it', async () => {
+      const lockWidgets: LockWidget[] = [{ kind: 'traffic', spot: 'center' }];
+      const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets }], [], '/displays/1/lock');
+      const http = TestBed.inject(HttpTestingController);
+      http.expectOne('/api/accounts/tomtom').flush({ fake: false, accounts: [{ id: 1, name: 'Home' }, { id: 4, name: 'Work' }] });
+      await stable();
+      const account = root.querySelector('[aria-label="Which TomTom account widget 1 asks"]') as HTMLSelectElement;
+
+      expect([...account.options].map((o) => o.textContent?.trim())).toEqual(['Home', 'Work']);
+      account.value = '4';
+      account.dispatchEvent(new Event('change'));
+      expect(lockRequest().body.widgets).toEqual([{ kind: 'traffic', spot: 'center', account: 4 }]);
+      await stable();
+
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      const from = root.querySelector('#lock-traffic-0-origin') as HTMLInputElement;
+      from.value = 'Utr';
+      from.dispatchEvent(new Event('input'));
+      await vi.advanceTimersByTimeAsync(400);
+      expect(http.expectOne((r) => r.url === '/api/traffic/places').request.params.get('account')).toBe('4');
+      vi.useRealTimers();
+    });
+
     it('shows a device value, starting on a temperature, picked from capability signals', async () => {
       const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'bottom-right' }] }], [], '/displays/1/lock');
       const signal = (id: string, name: string) => ({ id, source: 'homey', type: 'number', name, group: 'Thermostat', account: 1 });

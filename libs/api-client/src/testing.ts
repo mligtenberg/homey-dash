@@ -7,6 +7,7 @@ import {
   DeviceApp,
   DisplayInfo,
   Forecast,
+  RouteTraffic,
   HomeySnapshot,
   PhotoSet,
   PlexCommand,
@@ -112,6 +113,13 @@ export class FakeRealtime implements Partial<Realtime> {
 
   async forecasts() {
     return this.forecastList;
+  }
+
+  /** What `traffic()` answers: the traffic of every route in use. */
+  trafficList: RouteTraffic[] = [];
+
+  async traffic() {
+    return this.trafficList;
   }
 
   controlPlex(accountId: number, playerId: string, command: PlexCommand) {

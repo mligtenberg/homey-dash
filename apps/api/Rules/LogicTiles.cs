@@ -19,14 +19,17 @@ public static class LogicTiles
             entry.ValueKind == JsonValueKind.Object && entry.TryGetProperty("rule", out var rule) ? rule : default));
 
     // The settings of every tile it holds, the fallback last.
-    public static IEnumerable<JsonElement> Held(JsonElement settings)
+    public static IEnumerable<JsonElement> Held(JsonElement settings) => HeldTiles(settings).Select(t => t.Settings);
+
+    // The kind and settings of every tile it holds, the fallback last.
+    public static IEnumerable<(string? Kind, JsonElement Settings)> HeldTiles(JsonElement settings)
     {
         foreach (var entry in Entries(settings))
             if (entry.ValueKind == JsonValueKind.Object && entry.TryGetProperty("tile", out var tile) && TileSettings(tile) is { } held)
-                yield return held;
+                yield return (KindOf(tile), held);
         if (settings.ValueKind == JsonValueKind.Object && settings.TryGetProperty("fallback", out var fallback)
             && TileSettings(fallback) is { } fallbackSettings)
-            yield return fallbackSettings;
+            yield return (KindOf(fallback), fallbackSettings);
     }
 
     // Every signal its rules use.
@@ -74,6 +77,9 @@ public static class LogicTiles
         settings.ValueKind == JsonValueKind.Object && settings.TryGetProperty("entries", out var entries) && entries.ValueKind == JsonValueKind.Array
             ? entries.EnumerateArray()
             : [];
+
+    private static string? KindOf(JsonElement tile) =>
+        tile.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String ? kind.GetString() : null;
 
     private static JsonElement? TileSettings(JsonElement tile) =>
         tile.ValueKind == JsonValueKind.Object && tile.TryGetProperty("settings", out var settings) && settings.ValueKind == JsonValueKind.Object
