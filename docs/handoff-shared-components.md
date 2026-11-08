@@ -91,7 +91,8 @@ Each of these would have added code rather than removed it:
   - Global `.hd-picker*` CSS in `components.css`.
   - `signal-picker.ts` and `target-picker.ts` now hold only their tree logic.
   - Checked by hand in the browser: open, search, close, and the current item scrolled into view.
-- **Still to do:** `hdIcon`, `<hd-page-header>` (back links still use "←"), `<hd-empty-state>`, `<hd-confirm-inline>`, `hdRenameInput`, `hdAutofocus`, `<hd-error-line>`.
+- **`<hd-back-link>`** (`libs/design-system/src/lib/back-link.ts`, with a spec): the Lucide-arrow back link on the display and photo-set pages. It replaces the "←" glyph, an intended visual change. The pages keep their own font size and weight on the host.
+- **Still to do:** `hdIcon`, `<hd-page-header>` (the title/header frame; back links are done), `<hd-empty-state>`, `<hd-confirm-inline>`, `hdRenameInput`, `hdAutofocus`, `<hd-error-line>`.
 
 ### Phase 4 (partly done)
 - **`apps/management/src/app/address-key-accounts.ts`:**

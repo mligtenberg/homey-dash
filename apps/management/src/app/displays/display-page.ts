@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { BackLink } from '@homey-dash/design-system';
 import { DisplayContext } from './display-context';
 import { DisplayStatus } from './display-status';
 import { DisplaysStore } from './displays-store';
@@ -7,13 +8,13 @@ import { DisplaysStore } from './displays-store';
 /** One display: its name and status, and its details, and a page for each part of its setup. */
 @Component({
   selector: 'hd-display-page',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, DisplayStatus],
+  imports: [BackLink, RouterLink, RouterLinkActive, RouterOutlet, DisplayStatus],
   providers: [DisplayContext],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
       <header class="header">
-        <a class="back" routerLink="/displays">← Displays</a>
+        <hd-back-link class="back" link="/displays">Displays</hd-back-link>
         <h1 class="hd-page__title">{{ display.name }}</h1>
         <hd-display-status [display]="display" />
       </header>
@@ -30,15 +31,14 @@ import { DisplaysStore } from './displays-store';
       </div>
     } @else if (store.loaded()) {
       <header class="header">
-        <a class="back" routerLink="/displays">← Displays</a>
+        <hd-back-link class="back" link="/displays">Displays</hd-back-link>
         <h1 class="hd-page__title">Display not found</h1>
       </header>
     }
   `,
   styles: `
     .header { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-4); row-gap: var(--space-1); padding: var(--space-4) var(--space-6) var(--space-3); }
-    .back { flex-basis: 100%; color: var(--ink-muted); font-size: 13px; text-decoration: none; }
-    .back:hover { color: var(--brand); }
+    .back { flex-basis: 100%; font-size: 13px; }
     .tabs { display: flex; gap: var(--space-1); padding: 0 var(--space-6); border-bottom: 1px solid var(--line); overflow-x: auto; }
     .tab { padding: 10px 14px; color: var(--ink-muted); font-weight: 700; text-decoration: none; white-space: nowrap; border-bottom: 3px solid transparent; margin-bottom: -1px; }
     .tab:hover { color: var(--ink); }

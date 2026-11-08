@@ -6,7 +6,7 @@ import { PhotoViewer, RealtimeTileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
 import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue } from './immich-albums';
 import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-selection-form';
-import { clock, timeAgo } from '@homey-dash/design-system';
+import { BackLink, clock, timeAgo } from '@homey-dash/design-system';
 
 /**
  * One photo set (ADR-0008), kept current over the realtime connection: its name, the Immich album it follows or the
@@ -16,11 +16,11 @@ import { clock, timeAgo } from '@homey-dash/design-system';
  */
 @Component({
   selector: 'hd-photo-set-page',
-  imports: [RouterLink, PhotoSelectionForm, PhotoViewer],
+  imports: [BackLink, RouterLink, PhotoSelectionForm, PhotoViewer],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="hd-page__header">
-      <a class="back" routerLink="/photo-sets">← Photo sets</a>
+      <hd-back-link class="back" link="/photo-sets">Photo sets</hd-back-link>
       @if (set(); as set) {
         <input
           class="hd-input name"
@@ -203,7 +203,7 @@ import { clock, timeAgo } from '@homey-dash/design-system';
   `,
   styles: `
     .hd-page__header { gap: var(--space-4); }
-    .back { color: var(--ink-muted); font-weight: 700; text-decoration: none; white-space: nowrap; }
+    .back { font-weight: 700; }
     .name { font-size: 18px; font-weight: 800; max-width: 420px; }
     .panel { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); }
     .album { max-width: 420px; }
