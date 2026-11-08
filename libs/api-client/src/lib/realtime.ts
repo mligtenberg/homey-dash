@@ -6,8 +6,9 @@ import { DisplayInfo, ScreenDetails, ScreenView } from './displays';
 import { PhotoSet } from './photos';
 import { PlexCommand, PlexItem, PlexOverview, PlexPage, PlexProfileList, PlexSession, PlexSnapshot, PlexTracks } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
+import { RouteTraffic } from './traffic';
 import { Forecast } from './weather';
-import { CapabilityValue, DeviceApp, HomeyDevice, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
+import { CapabilityValue, DeviceApp, HomeyDevice, HomeyEnergy, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
 
 // Mirrors apps/api/Realtime/RealtimeHub.cs.
 
@@ -26,6 +27,8 @@ export interface HomeySnapshot {
   loaded: boolean;
   /** Null until Homey first told it, or when Homey won't. */
   weather: HomeyWeather | null;
+  /** Null until HomeyDash first asked Homey for its energy report. */
+  energy: HomeyEnergy | null;
 }
 
 export interface HomeyCatalog {
@@ -45,6 +48,7 @@ export interface RealtimeMessages {
   Catalog: HomeyCatalog;
   HomeyStatus: HomeyStatus;
   Weather: { accountId: number; weather: HomeyWeather };
+  Energy: { accountId: number; energy: HomeyEnergy };
   /** What a joined screen now is and shows; null sends it to setup. */
   Screen: ScreenView | null;
   /** Asks a joined screen to take a screenshot and post it under this request id. */
@@ -61,6 +65,8 @@ export interface RealtimeMessages {
   PlexSessions: PlexSession[];
   /** The weather where each Homey is, oldest account first, whenever one changes. */
   Forecasts: Forecast[];
+  /** The traffic of every route in use, whenever one changes. */
+  Traffic: RouteTraffic[];
   /** What plays on AirPlay receivers, whenever it changes: started, paused, changed or ended. */
   AirPlayNow: AirPlayPlayback[];
   /** The answers to this connection's rule subscriptions that one change altered. */
@@ -139,6 +145,11 @@ export class Realtime {
   /** The weather where each Homey is, oldest account first; changes that follow arrive as `Forecasts`. */
   forecasts() {
     return this.hub.invoke<Forecast[]>('Forecasts');
+  }
+
+  /** The traffic of every route in use; changes that follow arrive as `Traffic`. */
+  traffic() {
+    return this.hub.invoke<RouteTraffic[]>('Traffic');
   }
 
   /** Plays, pauses or skips on a player of a Plex account; fails when the player takes no remote control. */

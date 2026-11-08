@@ -19,6 +19,8 @@ public class ApiFactory : WebApplicationFactory<Program>
 
     protected virtual bool FakeAirPlay => true;
 
+    protected virtual bool FakeTraffic => true;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("ConnectionStrings:HomeyDash", $"Data Source={_dbPath};Pooling=False");
@@ -28,6 +30,8 @@ public class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("AirPlay:Fake", FakeAirPlay ? "true" : "false");
         // Tests never ask Open-Meteo or Buienradar.
         builder.UseSetting("Weather:Fake", "true");
+        // Nor TomTom.
+        builder.UseSetting("Traffic:Fake", FakeTraffic ? "true" : "false");
         // Without the fake, AirPlay is off: tests don't look for receivers on the network.
         builder.UseSetting("AirPlay:Enabled", FakeAirPlay ? "true" : "false");
     }

@@ -29,7 +29,7 @@ public sealed class ManagementTools(
     // Arguments and results read and write dashboards as the API does. The SDK needs a resolver set explicitly.
     public static JsonSerializerOptions Json { get; } = new(Dashboard.Json) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() };
 
-    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts, PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts, WEATHER_TILES in libs/tiles/src/lib/weather/weather-tiles.ts, SONOS_TILES in libs/tiles/src/lib/sonos/sonos-tiles.ts and
+    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts, PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts, WEATHER_TILES in libs/tiles/src/lib/weather/weather-tiles.ts, TRAFFIC_TILES in libs/tiles/src/lib/traffic/traffic-tiles.ts, TIME_TILES in libs/tiles/src/lib/time/time-tiles.ts, SONOS_TILES in libs/tiles/src/lib/sonos/sonos-tiles.ts and
     // LOGIC_TILES in libs/tiles/src/lib/logic/logic-tile.ts; the API only looks inside a logic tile's rules (ADR-0003, ADR-0010).
     private const string TileKinds = """
         Tile kinds, with the sizes each supports and the target type its settings.target takes:
@@ -53,6 +53,20 @@ public sealed class ManagementTools(
           full-large the coming days. A press opens the full forecast. settings.target is "weather:here" for where a Homey is
           (settings.account picks which), or "weather:place" for a place of its own in settings.place,
           { "name", "latitude", "longitude" } in degrees.
+        - "traffic" (small, wide, full, large, full-large): the car travel time now on one route from TomTom, with the delay over
+          the usual time; wide and up add the distance, arrival time and usual time. It points at nothing in Homey:
+          settings.target is null and settings.route is { "name", "origin": { "name", "latitude", "longitude" },
+          "destination": { same } } in degrees (places are found by name in Management). settings.account picks the TomTom
+          account (the oldest without it). Needs a TomTom account set up in Management.
+        - "clock" (small, wide, full, large, full-large): the time, with the date from wide up; settings.target is null.
+          Optional settings.style is digital (default) or analog, settings.hours 12 or 24 (absent: the display's language),
+          settings.seconds true to show seconds, settings.showDate false to hide the date.
+        - "date" (small, wide, full, large, full-large): today's date, and from large the month as a calendar with today
+          marked; settings.target is null; optional settings.weekNumbers true numbers the weeks of the calendar.
+        - "energy" (small, wide, full, large, full-large): Homey's own energy report; small shows the grid power now (import or
+          export), wide and full add solar, home consumption and a flow bar, large and full-large add today's totals and a
+          small history of the day. A press opens today in full. settings.target is "energy:home" (settings.account picks
+          which Homey). It shows as unavailable when the Homey's API key lacks the homey.energy.readonly scope.
         - "sonos" (small, wide, full, large, full-large, full-tall): Sonos multiroom; settings.targets lists the ids of the speaker
           devices in order and settings.target is null. The tile shows what the first room that plays is playing with play/pause
           (and skip, from wide up) and one volume for its group; a press opens every room with its own volume and a button that
@@ -66,7 +80,7 @@ public sealed class ManagementTools(
           take its size, so hold only kinds that support that size, and never another logic tile. Keep a dashboard's
           existing logic tiles as they are when changing other parts of the draft.
         Every tile's settings may have a "label" that overrides its target's name. A home can have several Homey and Plex
-        accounts: a Homey, weather or Plex tile's settings.account is the account of its target (list_targets gives it); left out, the
+        accounts: a Homey, weather, energy or Plex tile's settings.account is the account of its target (list_targets gives it); left out, the
         oldest account. A mood-list tile's moods are all in its one account.
         """;
 
@@ -222,8 +236,11 @@ public sealed class ManagementTools(
         date, { "kind": "clock", "spot" }, the weather where a Homey is, { "kind": "weather", "spot", "account"? } (the
         Homey account's id, or the oldest without it), or the value of a device's capability, { "kind": "value", "spot",
         "signal" }, whose signal is a Homey capability signal (homey:<account>:capability:<device>:<capability>, see
-        list_signals). A widget with "hidden": true stays configured but is left out; one with a "rule" is shown only
-        while it holds. Replaces the display's lock screen as a whole.
+        list_signals), or the car travel time on a route from TomTom, { "kind": "traffic", "spot", "route": { "name",
+        "origin": { "name", "latitude", "longitude" }, "destination": { same } }, "account"? } (the TomTom account's id,
+        or the oldest without it; needs a TomTom account set up in Management). A widget of any kind with "hidden": true
+        stays configured but is left out; one with a "rule" is shown only while it holds. Replaces the display's lock
+        screen as a whole.
         {{RuleSchema}}
         """)]
     public async Task<DisplayInfo> SetLockScreen(Guid displayId, LockWidget[] widgets, CancellationToken ct = default)
@@ -257,7 +274,7 @@ public sealed class ManagementTools(
         album and are made in Management, so assistants can only use the ones that exist.
         """)]
     public async Task<IEnumerable<Target>> ListTargets(
-        [Description("device, flow, mood, insight, photoSet, plexPlayer, plexLibrary or weather")] string type, CancellationToken ct) =>
+        [Description("device, flow, mood, insight, photoSet, plexPlayer, plexLibrary, weather or energy")] string type, CancellationToken ct) =>
         type switch
         {
             "device" => homeys.All.SelectMany(h => h.State.Devices.OrderBy(d => d.Name).Select(d =>
@@ -274,9 +291,10 @@ public sealed class ManagementTools(
             "plexLibrary" => plex.Overviews.SelectMany(o => (IEnumerable<Target>)[
                 new Target(TargetCatalog.AllPlexLibraries, "All libraries", $"on {o.AccountName}", o.AccountId),
                 .. o.Libraries.Select(l => new Target(TargetCatalog.PlexLibraryPrefix + l.Id, l.Title, $"{l.Type} on {o.AccountName}", o.AccountId))]),
+            "energy" => homeys.All.Select(h => new Target(TargetCatalog.EnergyHome, "Energy", $"of {h.Name}", h.AccountId)),
             "weather" => homeys.All.Select(h => new Target(TargetCatalog.WeatherHere, "Weather", $"where {h.Name} is", h.AccountId))
                 .Append(new Target(TargetCatalog.WeatherPlace, "Weather at a place", "the place in settings.place")),
-            _ => throw new McpException($"Unknown target type {type}; use device, flow, mood, insight, photoSet, plexPlayer, plexLibrary or weather."),
+            _ => throw new McpException($"Unknown target type {type}; use device, flow, mood, insight, photoSet, plexPlayer, plexLibrary, weather or energy."),
         };
 
     public sealed record ZoneInfo(string Id, string Name, string Path, string? ParentId, string Homey, int Account, int Devices, int Moods);

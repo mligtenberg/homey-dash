@@ -179,7 +179,7 @@ public static partial class DisplayEndpoints
 
     /// <summary>
     /// Gives a display what its lock screen shows; answers what is wrong, by widget, when it can't. Each widget is a
-    /// clock, the weather (of a Homey account, or the oldest) or a value, which names a capability of a device in Homey
+    /// clock, the weather (of a Homey account, or the oldest), the traffic on a route (with a TomTom account, or the oldest) or a value, which names a capability of a device in Homey
     /// as a signal (<c>homey:&lt;account&gt;:capability:&lt;device&gt;:&lt;capability&gt;</c>), in one of the spots. A widget can be
     /// hidden, or shown only while a valid rule holds.
     /// </summary>
@@ -200,8 +200,16 @@ public static partial class DisplayEndpoints
             }
             else if (widget.Signal is not null)
                 errors[$"widgets[{i}].signal"] = ["Only a value shows a signal."];
-            if (widget.Account is not null && widget.Kind != "weather")
-                errors[$"widgets[{i}].account"] = ["Only the weather names a Homey account."];
+            if (widget.Account is not null && widget.Kind is not ("weather" or "traffic"))
+                errors[$"widgets[{i}].account"] = ["Only the weather and traffic name an account."];
+            if (widget.Kind == "traffic")
+            {
+                // Without a route yet it has nothing to show, and so is left out of the lock screen.
+                if (widget.Route is not null && (!widget.Route.IsValid || string.IsNullOrWhiteSpace(widget.Route.Name)))
+                    errors[$"widgets[{i}].route"] = ["Traffic shows a route with a name and two different places."];
+            }
+            else if (widget.Route is not null)
+                errors[$"widgets[{i}].route"] = ["Only traffic shows a route."];
             if (widget.Rule is { ValueKind: not JsonValueKind.Null } rule && RuleSetup.Check(rule, engine).Error is { } error)
                 errors[$"widgets[{i}].rule"] = [error];
         }

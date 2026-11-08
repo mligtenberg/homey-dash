@@ -20,6 +20,7 @@ public sealed class LocalHomeyTests : IAsyncLifetime
     {
         await _server.StartAsync();
         LocalHomey.FirstRetryDelay = TimeSpan.FromMilliseconds(50);
+        LocalHomey.EnergyInterval = TimeSpan.FromMilliseconds(50);
         _accounts.Set([Account(1, ScriptedHomeyServer.ApiKey)]);
         _connections = Create(_accounts, _homeys);
         await _connections.StartAsync(CancellationToken.None);
@@ -229,6 +230,16 @@ public sealed class LocalHomeyTests : IAsyncLifetime
         await Eventually(() => _homeys.All is [{ AccountId: 2 }]);
         Assert.Throws<HomeyNotFoundException>(() => _homeys.Require(1));
         Assert.Equal(2, _homeys.For(null)!.AccountId);
+    }
+
+    [Fact]
+    public async Task ADayReportHomeyRefuses_KeepsTheLivePower_AndIsNotAskedForAgain()
+    {
+        await Eventually(() => _server.Requests.Count(r => r.Path == "/api/manager/energy/live") >= 3);
+
+        Assert.Equal(new HomeyEnergy("ok", new EnergyLive(600, 300, 900), null), _state.Energy);
+        Assert.Single(_server.Requests, r => r.Path.StartsWith("/api/manager/energy/report/day?date="));
+        Assert.Matches(@"date=\d{4}-\d{2}-\d{2}$", _server.Requests.First(r => r.Path.Contains("report/day")).Path);
     }
 
     private HomeyAccount Account(int id, string apiKey) =>

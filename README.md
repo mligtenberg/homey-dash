@@ -74,6 +74,12 @@ the rain of the next two hours. There is nothing to set up: HomeyDash reads the 
 the geolocation scope), or a tile can be given a town of its own under Place in the editor. It asks [Open-Meteo](https://open-meteo.com) for the forecast and
 [Buienradar](https://www.buienradar.nl) for the rain (see [ADR-0013](docs/adr/0013-weather-from-open-meteo-and-buienradar.md)).
 `Weather:Fake=true` runs against a made-up forecast (`npx nx serve api -c simulator` sets it).
+## Energy
+
+The energy tile shows Homey's own energy report: the grid power now (import or export), solar production, the home's
+consumption, today's totals and the day by the hour. Create the Homey API key with the `homey.energy.readonly` scope; without
+it, or on a Homey with no energy, the tile says it is unavailable (see [ADR-0014](docs/adr/0014-energy-from-homeys-own-report.md)).
+
 ## Brightness
 
 Displays measure how much light falls on them, in lux, once a minute, for rules on the **Brightness** signal (see

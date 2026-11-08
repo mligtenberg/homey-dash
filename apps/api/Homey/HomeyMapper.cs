@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace HomeyDash.Api.Homey;
@@ -144,6 +145,110 @@ public static class HomeyMapper
             State: String(json, "state") ?? String(json, "condition"),
             Humidity: humidity > 1 ? humidity / 100 : humidity,
             City: String(json, "city"));
+    }
+
+    // ---- Homey's energy report (ADR-0014). ----
+    // Homey does not document the shape of GET api/manager/energy/live and report/day, and this was written without seeing
+    // one: both are read leniently, every figure under any of the names it plausibly has, as a number or as an object holding
+    // one ({ W: 1450 }, { kWh: 8.2 }). Check it against a real response, and fix only here.
+
+    private static readonly string[] ConsumedNames = ["totalConsumed", "consumed", "consumption", "homeConsumption", "home"];
+    private static readonly string[] GeneratedNames = ["totalGenerated", "generated", "solar", "production", "produced"];
+
+    // The live report: power now, in watts. Null when it holds none of it, as for a Homey without energy.
+    public static EnergyLive? EnergyLive(JsonElement json)
+    {
+        json = EnergyBody(json);
+        var home = Quantity(json, ConsumedNames);
+        var solar = Quantity(json, GeneratedNames);
+        // Positive imports. Homey reports no grid figure of its own that we know of: it is what the home uses beyond what it makes.
+        var grid = Quantity(json, "grid", "gridPower", "net", "netPower") ?? (home is null ? null : home - (solar ?? 0));
+        return home is null && solar is null && grid is null ? null : new EnergyLive(grid, solar, home);
+    }
+
+    // The day report: totals in kWh, and the day by the step it gives. Null when it holds none of it. A bare list is taken
+    // as the history alone.
+    public static EnergyDay? EnergyDay(JsonElement json)
+    {
+        json = EnergyBody(json);
+        if (json.ValueKind == JsonValueKind.Array)
+        {
+            var points = History(json);
+            return points.Count == 0 ? null : new EnergyDay(null, null, null, null, points);
+        }
+        if (json.ValueKind != JsonValueKind.Object) return null;
+        var totals = json;
+        foreach (var name in new[] { "totals", "total", "cumulative", "cumulatives" })
+            if (json.TryGetProperty(name, out var inner) && inner.ValueKind == JsonValueKind.Object) totals = inner;
+        var home = Quantity(totals, ConsumedNames);
+        var solar = Quantity(totals, GeneratedNames);
+        var imported = Quantity(totals, "totalImported", "imported", "import");
+        var exported = Quantity(totals, "totalExported", "exported", "export");
+        List<EnergyPoint> history = [];
+        foreach (var name in new[] { "history", "values", "data", "series", "hours", "items", "entries" })
+        {
+            if (!json.TryGetProperty(name, out var list) || list.ValueKind != JsonValueKind.Array) continue;
+            history = History(list);
+            if (history.Count > 0) break;
+        }
+        return home is null && solar is null && imported is null && exported is null && history.Count == 0
+            ? null
+            : new EnergyDay(imported, exported, solar, home, history);
+    }
+
+    // The day by the step it gives, oldest first; entries without a moment are left out.
+    private static List<EnergyPoint> History(JsonElement list)
+    {
+        var history = new List<EnergyPoint>();
+        foreach (var entry in list.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Object))
+        {
+            var at = new[] { "t", "time", "from", "start", "date", "timestamp" }.Select(n => Moment(entry, n)).FirstOrDefault(d => d is not null);
+            if (at is null) continue;
+            history.Add(new EnergyPoint(at.Value, Quantity(entry, ConsumedNames), Quantity(entry, GeneratedNames)));
+        }
+        history.Sort((a, b) => a.T.CompareTo(b.T));
+        return history;
+    }
+
+    // The report itself, which may come wrapped as { report: {...} } or { data: {...} }.
+    private static JsonElement EnergyBody(JsonElement json)
+    {
+        foreach (var name in new[] { "report", "data", "result" })
+            if (json.ValueKind == JsonValueKind.Object && json.TryGetProperty(name, out var inner) && inner.ValueKind == JsonValueKind.Object) return inner;
+        return json;
+    }
+
+    // A figure under the first of these names that has one: a number, or an object holding one as W, kWh, value or total.
+    private static double? Quantity(JsonElement json, params string[] names)
+    {
+        if (json.ValueKind != JsonValueKind.Object) return null;
+        foreach (var name in names)
+        {
+            if (!json.TryGetProperty(name, out var v)) continue;
+            if (v.ValueKind == JsonValueKind.Number) return v.GetDouble();
+            if (v.ValueKind != JsonValueKind.Object) continue;
+            foreach (var unit in new[] { "W", "kWh", "value", "total", "power" })
+                if (v.TryGetProperty(unit, out var n) && n.ValueKind == JsonValueKind.Number) return n.GetDouble();
+        }
+        return null;
+    }
+
+    // A moment as an ISO date-time (UTC when it names no zone) or as epoch seconds, milliseconds, microseconds or nanoseconds.
+    private static DateTimeOffset? Moment(JsonElement json, string name)
+    {
+        if (!json.TryGetProperty(name, out var v)) return null;
+        if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var epoch))
+        {
+            // Scaled down to milliseconds: anything beyond them is more precision than the tile shows.
+            if (epoch < 0) return null;
+            if (epoch < 100_000_000_000) epoch *= 1000;
+            while (epoch > 100_000_000_000_000) epoch /= 1000;
+            return DateTimeOffset.FromUnixTimeMilliseconds(epoch);
+        }
+        return v.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(v.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d)
+                ? d
+                : null;
     }
 
     // Homey's location option, { value: { latitude, longitude, ... } } or the location itself; null when it has none.

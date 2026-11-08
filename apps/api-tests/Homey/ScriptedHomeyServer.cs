@@ -59,6 +59,14 @@ public sealed class ScriptedHomeyServer : IAsyncDisposable
             Requests.Enqueue((request.Method, request.Path + request.QueryString, ""));
             return Results.Content("""{"step":300000,"values":[{"t":"2026-10-25T12:05:00.000Z","v":5},{"t":"2026-10-25T12:00:00.000Z","v":4.5},{"t":"2026-10-25T12:10:00.000Z","v":null}]}""", "application/json");
         });
+        // Energy: live power, but an API key that may not read the day's report.
+        _app.MapGet("/api/manager/energy/{**rest}", (HttpRequest request) =>
+        {
+            Requests.Enqueue((request.Method, request.Path + request.QueryString, ""));
+            return request.Path.Value!.EndsWith("/live")
+                ? Results.Content("""{"totalConsumed":{"W":900},"totalGenerated":{"W":300}}""", "application/json")
+                : Results.StatusCode(StatusCodes.Status403Forbidden);
+        });
         // An Apple TV's cards: one opens an app (its argument is an autocomplete), one opens an address.
         MapJson("/api/manager/flow/flowcardaction", """
             {

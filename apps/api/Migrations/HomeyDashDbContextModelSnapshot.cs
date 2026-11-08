@@ -262,6 +262,26 @@ namespace HomeyDash.Api.Migrations
                     b.ToTable("PlexAccounts");
                 });
 
+            modelBuilder.Entity("HomeyDash.Api.Traffic.TomTomAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ApiKey")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TomTomAccounts");
+                });
+
             modelBuilder.Entity("HomeyDash.Api.Displays.DisplayDashboard", b =>
                 {
                     b.HasOne("HomeyDash.Api.Dashboards.Dashboard", null)

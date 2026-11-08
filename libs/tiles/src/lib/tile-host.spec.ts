@@ -5,10 +5,12 @@ import { TestBed } from '@angular/core/testing';
 import { Realtime, Tile } from '@homey-dash/api-client';
 import { FakeRealtime } from '@homey-dash/api-client/testing';
 import { CORE_TILES } from './core/core-tiles';
+import { ENERGY_TILES } from './energy/energy-tiles';
 import { RealtimeTileData } from './realtime-tile-data';
 import { TileData } from './tile-data';
 import { provideTileModules } from './tile-kind';
 import { TileHost } from './tile-host';
+import { WEATHER_TILES } from './weather/weather-tiles';
 
 describe('TileHost', () => {
   let realtime: FakeRealtime;
@@ -19,7 +21,7 @@ describe('TileHost', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        provideTileModules(CORE_TILES),
+        provideTileModules(CORE_TILES, ENERGY_TILES, WEATHER_TILES),
         { provide: Realtime, useValue: realtime },
         { provide: TileData, useExisting: RealtimeTileData },
       ],
@@ -42,6 +44,20 @@ describe('TileHost', () => {
     await TestBed.inject(ApplicationRef).whenStable();
 
     expect(host.classList).toContain('is-homey-lost');
+  });
+
+  it.each([
+    ['energy', true],
+    ['weather', false],
+  ])("while HomeyDash can't reach the Homey, a %s tile is lost: %s", async (kind, lost) => {
+    TestBed.inject(TileData);
+    await TestBed.inject(ApplicationRef).whenStable();
+    const host = render({ kind, settings: { account: 1 } });
+
+    realtime.push('HomeyStatus', { accountId: 1, connection: 'disconnected', lastError: null, since: '', fake: false });
+    await TestBed.inject(ApplicationRef).whenStable();
+
+    expect(host.classList.contains('is-homey-lost')).toBe(lost);
   });
 
   it('places the tile on its grid cell', () => {

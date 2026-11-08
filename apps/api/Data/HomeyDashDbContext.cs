@@ -4,6 +4,7 @@ using HomeyDash.Api.Dashboards;
 using HomeyDash.Api.Displays;
 using HomeyDash.Api.Photos;
 using HomeyDash.Api.Plex;
+using HomeyDash.Api.Traffic;
 using Microsoft.EntityFrameworkCore;
 
 namespace HomeyDash.Api.Data;
@@ -16,6 +17,7 @@ public class HomeyDashDbContext(DbContextOptions<HomeyDashDbContext> options) : 
     public DbSet<HomeyAccount> HomeyAccounts => Set<HomeyAccount>();
     public DbSet<ImmichAccount> ImmichAccounts => Set<ImmichAccount>();
     public DbSet<PlexAccount> PlexAccounts => Set<PlexAccount>();
+    public DbSet<TomTomAccount> TomTomAccounts => Set<TomTomAccount>();
     public DbSet<PhotoSet> PhotoSets => Set<PhotoSet>();
 
     protected override void OnModelCreating(ModelBuilder model)
@@ -70,6 +72,7 @@ public class HomeyDashDbContext(DbContextOptions<HomeyDashDbContext> options) : 
                 new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<IReadOnlyList<ImmichPartner>>(
                     (a, b) => ReferenceEquals(a, b), partners => partners.Count, partners => partners));
         });
+        model.Entity<TomTomAccount>(account => account.Property(a => a.Name).HasMaxLength(AccountEndpoints.MaxNameLength));
         model.Entity<PlexAccount>(account =>
         {
             account.Property(a => a.Name).HasMaxLength(AccountEndpoints.MaxNameLength);

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { capabilitySignal, HomeyWeather, LOCK_SPOTS, LockWidget, Rule } from '@homey-dash/api-client';
-import { capabilityText, ruleAnswersOf, TileData } from '@homey-dash/tiles';
+import { capabilityText, delayLevel, delayText, duration, ruleAnswersOf, TileData, TrafficData } from '@homey-dash/tiles';
 import {
   LucideCloud,
   LucideCloudDrizzle,
@@ -8,6 +8,7 @@ import {
   LucideCloudLightning,
   LucideCloudRain,
   LucideCloudSnow,
+  LucideCar,
   LucideCloudSun,
   LucideDynamicIcon,
   LucideIconInput,
@@ -19,7 +20,8 @@ import { minuteClock } from '@homey-dash/design-system';
 type Shown =
   | { kind: 'clock'; time: string; date: string }
   | { kind: 'weather'; temperature: string; state: string; icon: LucideIconInput }
-  | { kind: 'value'; name: string; value: string; units: string; unavailable: boolean };
+  | { kind: 'value'; name: string; value: string; units: string; unavailable: boolean }
+  | { kind: 'traffic'; name: string; time: string; delay: string; level: 'none' | 'some' | 'heavy'; unavailable: boolean };
 
 // Homey's conditions, after OpenWeatherMap's main groups, by the start of the word.
 const WEATHER: [RegExp, LucideIconInput, string][] = [
@@ -63,6 +65,13 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
                 <span class="weather__state">{{ widget.state }}</span>
               </div>
             }
+            @case ('traffic') {
+              <div class="traffic" [class.is-unavailable]="widget.unavailable" [attr.data-delay]="widget.level" [attr.aria-label]="widget.name + ', ' + widget.time + ', ' + widget.delay">
+                <svg class="traffic__icon" [lucideIcon]="car" />
+                <span class="traffic__time">{{ widget.time }}</span>
+                <span class="traffic__name">{{ widget.name }} · {{ widget.delay }}</span>
+              </div>
+            }
             @case ('value') {
               <div class="value" [class.is-unavailable]="widget.unavailable">
                 <span class="value__reading">{{ widget.value }}<span class="value__units">{{ widget.units }}</span></span>
@@ -96,6 +105,14 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
     .weather__icon { width: calc(5 * var(--u)); height: calc(5 * var(--u)); filter: drop-shadow(0 1px 2px rgb(0 0 0 / .5)); }
     .weather__temperature { font-size: calc(5 * var(--u)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
     .weather__state { grid-column: 1 / -1; font-size: calc(2.2 * var(--u)); font-weight: 600; }
+    .traffic { display: grid; grid-template-columns: auto auto; column-gap: var(--u); align-items: center; }
+    .spot--center .traffic { justify-content: center; }
+    .traffic__icon { width: calc(4 * var(--u)); height: calc(4 * var(--u)); filter: drop-shadow(0 1px 2px rgb(0 0 0 / .5)); }
+    .traffic__time { font-size: calc(4.5 * var(--u)); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+    .traffic__name { grid-column: 1 / -1; font-size: calc(2 * var(--u)); font-weight: 600; opacity: .9; white-space: nowrap; }
+    .traffic[data-delay='some'] .traffic__time, .traffic[data-delay='some'] .traffic__icon { color: #ffd166; }
+    .traffic[data-delay='heavy'] .traffic__time, .traffic[data-delay='heavy'] .traffic__icon { color: #ff8a73; }
+    .traffic.is-unavailable { opacity: .55; }
     .value { display: flex; flex-direction: column; }
     .value__reading { font-size: calc(4.5 * var(--u)); font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
     .value__units { font-size: .55em; font-weight: 700; margin-left: .1em; }
@@ -107,6 +124,8 @@ export class LockScreen {
   readonly widgets = input.required<readonly LockWidget[]>();
 
   private readonly data = inject(TileData);
+  private readonly traffic = inject(TrafficData);
+  protected readonly car = LucideCar;
   // Ticks on every minute, for the clock.
   private readonly now = minuteClock();
 
@@ -139,6 +158,19 @@ export class LockScreen {
       }
       case 'weather':
         return this.weather(this.data.homey(widget.account ?? undefined)?.weather ?? null);
+      case 'traffic': {
+        // Nothing to show until a route is chosen and TomTom has answered once.
+        const result = this.traffic.traffic(widget.route);
+        if (!widget.route || !this.traffic.hasResult(result)) return null;
+        return {
+          kind: 'traffic',
+          name: widget.route.name,
+          time: duration(result.travelSeconds),
+          delay: delayText(result.delaySeconds, result.usualSeconds),
+          level: delayLevel(result.delaySeconds, result.usualSeconds),
+          unavailable: result.status === 'disconnected',
+        };
+      }
       case 'value': {
         const named = capabilitySignal(widget.signal);
         if (!named) return null;

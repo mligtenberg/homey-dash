@@ -2,6 +2,7 @@ using HomeyDash.Api.Dashboards;
 using HomeyDash.Api.Data;
 using HomeyDash.Api.Displays;
 using HomeyDash.Api.Photos;
+using HomeyDash.Api.Traffic;
 using HomeyDash.Api.Weather;
 using Microsoft.AspNetCore.SignalR;
 
@@ -9,7 +10,7 @@ namespace HomeyDash.Api.Realtime;
 
 /// <summary>Tells screens and Management that displays, dashboards or photo sets changed.</summary>
 public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresence presence, TargetCatalog targets, PhotoSync sync,
-    ImmichAccounts immich, DisplayDirectory directory, WeatherWatcher weather)
+    ImmichAccounts immich, DisplayDirectory directory, WeatherWatcher weather, TrafficWatcher traffic)
 {
     public const string ManagementGroup = "management";
 
@@ -18,6 +19,8 @@ public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresen
     // Sends each screen what it now is and shows (null: back to setup), then Management the new display list.
     public async Task ScreensChangedAsync(HomeyDashDbContext db, IEnumerable<Guid?> screenIds, CancellationToken ct)
     {
+        // A lock screen may have been given a traffic widget.
+        traffic.Wake();
         foreach (var screenId in screenIds.OfType<Guid>().Distinct())
             await hub.Clients.Group(ScreenGroup(screenId))
                 .SendAsync("Screen", await DisplayQueries.ScreenViewAsync(db, screenId, ct), ct);
@@ -36,6 +39,7 @@ public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresen
     public async Task DashboardsChangedAsync(HomeyDashDbContext db, CancellationToken ct)
     {
         weather.Wake();
+        traffic.Wake();
         await hub.Clients.Group(ManagementGroup).SendAsync("Dashboards", await DashboardEndpoints.ListAsync(db, targets, ct), ct);
     }
 

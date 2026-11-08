@@ -45,6 +45,8 @@ import { moved, removedAt, ReorderButtons } from '@homey-dash/design-system';
       }
       @if (kind.target === 'none') {
         <!-- Points at nothing itself, such as a logic tile. -->
+      } @else if (kind.target === 'energy') {
+        <!-- Always the energy of its Homey. -->
       } @else if (kind.target === 'weather') {
         <!-- Where its Homey is, or a place of its own: the kind's own settings choose. -->
       } @else if (kind.target === 'photoSet') {
@@ -158,7 +160,7 @@ export class TilePanel {
 
   protected readonly targetNoun = computed(
     () =>
-      ({ device: 'device', flow: 'flow', mood: 'mood', insight: 'recorded value', photoSet: 'photo set', plexPlayer: 'player', plexLibrary: 'library', weather: 'place', none: 'target' })[this.kind()?.target ?? 'device'],
+      ({ device: 'device', flow: 'flow', mood: 'mood', insight: 'recorded value', photoSet: 'photo set', plexPlayer: 'player', plexLibrary: 'library', weather: 'place', energy: 'energy', none: 'target' })[this.kind()?.target ?? 'device'],
   );
 
   /** What a kind that takes several targets calls them: `Moods`. */
