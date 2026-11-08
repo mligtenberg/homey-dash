@@ -13,10 +13,10 @@ import {
   viewChild,
   ViewContainerRef,
 } from '@angular/core';
-import { Tile } from '@homey-dash/api-client';
+import { Tile, WEATHER_PLACE } from '@homey-dash/api-client';
 import { TileSize } from '@homey-dash/layout';
 import { LucideChartLine, LucideSparkles, LucideWorkflow } from '@lucide/angular';
-import { deviceLook, deviceType, isHomeyTarget, TileData, TileKind, TileSettings } from '@homey-dash/tiles';
+import { deviceLook, deviceType, TileData, TileKind, TileSettings, usesHomeyAccount } from '@homey-dash/tiles';
 import { PhotoSetField } from './photo-set-field';
 import { PlexTargetField } from './plex-target-field';
 import { SizePicker } from './size-picker';
@@ -50,6 +50,8 @@ import { allOptions, buildTree, TargetNode } from './target-tree';
       }
       @if (kind.target === 'none') {
         <!-- Points at nothing itself, such as a logic tile. -->
+      } @else if (kind.target === 'weather') {
+        <!-- Where its Homey is, or a place of its own: the kind's own settings choose. -->
       } @else if (kind.target === 'photoSet') {
         <hd-photo-set-field [value]="settings().target" (picked)="setTarget($event)" />
       } @else if (kind.target === 'plexPlayer' || kind.target === 'plexLibrary') {
@@ -155,21 +157,25 @@ export class TilePanel {
 
   /** The Homey of the tile's account, whose devices, flows, moods and recorded values it can point at. */
   protected readonly homey = computed(() => this.data.homey(this.settings().account));
-  /** Every Homey, for a Homey kind to pick from once there is more than one. */
+  /** Every Homey, for a Homey or weather kind to pick from once there is more than one. */
   protected readonly homeyAccounts = computed(() => {
     const kind = this.kind();
     const homeys = this.data.homeys() ?? [];
-    return kind && isHomeyTarget(kind.target) && homeys.length > 1 ? homeys : null;
+    // A weather tile at a place of its own needs no Homey.
+    const placed = this.settings().target === WEATHER_PLACE;
+    return kind && usesHomeyAccount(kind.target) && !placed && homeys.length > 1 ? homeys : null;
   });
 
   protected readonly targetNoun = computed(
     () =>
-      ({ device: 'device', flow: 'flow', mood: 'mood', insight: 'recorded value', photoSet: 'photo set', plexPlayer: 'player', plexLibrary: 'library', none: 'target' })[this.kind()?.target ?? 'device'],
+      ({ device: 'device', flow: 'flow', mood: 'mood', insight: 'recorded value', photoSet: 'photo set', plexPlayer: 'player', plexLibrary: 'library', weather: 'place', none: 'target' })[this.kind()?.target ?? 'device'],
   );
 
   /** What a kind that takes several targets calls them: `Moods`. */
   protected readonly targetsLabel = computed(() => `${this.targetNoun().replace(/^./, (c) => c.toUpperCase())}s`);
-  protected readonly labelPlaceholder = computed(() => (this.kind()?.multiple ? this.targetsLabel() : "The target's name"));
+  protected readonly labelPlaceholder = computed(() =>
+    this.kind()?.multiple ? this.targetsLabel() : this.kind()?.target === 'weather' ? 'The place' : "The target's name",
+  );
 
   // Devices, moods and recorded values sit in Homey's zones; flows in its flow folders.
   protected readonly targets = computed<TargetNode>(() => {

@@ -26,6 +26,8 @@ public class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Immich:Fake", FakeImmich ? "true" : "false");
         builder.UseSetting("Plex:Fake", FakePlex ? "true" : "false");
         builder.UseSetting("AirPlay:Fake", FakeAirPlay ? "true" : "false");
+        // Tests never ask Open-Meteo or Buienradar.
+        builder.UseSetting("Weather:Fake", "true");
         // Without the fake, AirPlay is off: tests don't look for receivers on the network.
         builder.UseSetting("AirPlay:Enabled", FakeAirPlay ? "true" : "false");
     }

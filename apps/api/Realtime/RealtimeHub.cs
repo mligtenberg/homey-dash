@@ -7,6 +7,7 @@ using HomeyDash.Api.Homey;
 using HomeyDash.Api.Photos;
 using HomeyDash.Api.Plex;
 using HomeyDash.Api.Rules;
+using HomeyDash.Api.Weather;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,7 +19,8 @@ namespace HomeyDash.Api.Realtime;
 /// again when a Homey account is added, removed or renamed. A screen joins with its screen id and is told which
 /// display it is with <c>Screen</c>; Management joins to receive <c>Displays</c> with every display's status and
 /// <c>Dashboards</c> with the dashboard list. Every connection also receives <c>PhotoSets</c> whenever a photo set changes,
-/// and <c>Plex</c> and <c>PlexSessions</c> as Plex's libraries and what plays change. A connection can subscribe to rules
+/// <c>Plex</c> and <c>PlexSessions</c> as Plex's libraries and what plays change, and <c>Forecasts</c> as the weather where
+/// each Homey is changes. A connection can subscribe to rules
 /// (ADR-0010), whose changed answers arrive as <c>RuleAnswers</c>.
 /// Mirrored in libs/api-client/src/lib/realtime.ts.
 /// </summary>
@@ -44,6 +46,7 @@ public sealed class RealtimeHub(
     DisplayTouches touches,
     DisplayBrightness brightness,
     AppCatalog appCatalog,
+    WeatherWatcher weather,
     TimeProvider time) : Hub
 {
     public const string Path = "/api/realtime";
@@ -57,6 +60,9 @@ public sealed class RealtimeHub(
 
     // Every Plex account's libraries, and what plays now. Changes that follow arrive as Plex and PlexSessions.
     public PlexSnapshot Plex() => plexWatcher.Snapshot;
+
+    // The weather where each Homey is, oldest account first (ADR-0013). Changes that follow arrive as Forecasts.
+    public IReadOnlyList<Forecast> Forecasts() => weather.All;
 
     // Items of the account's Plex libraries (one, or every one when libraryId is null) whose title matches, not only the newest:
     // movies, shows and albums, and episodes and tracks by their own title.

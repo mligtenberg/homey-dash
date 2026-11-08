@@ -71,6 +71,9 @@ public sealed record HomeyVariable(string Id, string Name, string Type, JsonElem
 // humidity as a fraction 0–1, and the place it is for. Any part Homey leaves out is null.
 public sealed record HomeyWeather(double? Temperature, string? State, double? Humidity, string? City);
 
+// Where Homey is, in degrees, as set in its own settings; the weather tile's forecast is for here.
+public sealed record HomeyLocation(double Latitude, double Longitude);
+
 // Something a Sonos speaker can play, as its flow card offers it. Item is the card's own answer, handed back to play it.
 public sealed record SpeakerMusic(string Name, string? Description, string? Image, JsonElement Item);
 

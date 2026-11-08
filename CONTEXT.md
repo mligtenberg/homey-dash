@@ -181,6 +181,10 @@ _Avoid_: Media tile, player tile
 A Plex tile that shows the newest posters of one Plex library, or every library.
 _Avoid_: New media tile
 
+**Weather tile**:
+A tile that shows the weather where a **Homey** is, or at a town chosen for the tile instead: now, and by its size the coming hours and days, and the rain of the next two hours where Buienradar knows it (ADR-0013). Without a town of its own the place is the location set in Homey, and the tile names its Homey like any Homey tile.
+_Avoid_: Forecast widget, weather card
+
 **Logic tile**:
 A tile that holds an ordered list of other tiles, each with a rule, and shows the first whose rule holds, or its fallback tile when none does; with no fallback it shows nothing, like empty cells. It holds tiles of any kind except another logic tile, and a tile it holds that points at a missing target is shown as **Missing** when chosen, not skipped. The tiles it holds take its size, so it only holds kinds that support that size. It fades from one tile to the next, and once switched it can stay on a tile for a chosen **Minimum show time**, after which it shows whatever its rules then choose.
 _Avoid_: Logic card, conditional tile, switch tile

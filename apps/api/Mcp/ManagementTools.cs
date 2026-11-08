@@ -29,7 +29,7 @@ public sealed class ManagementTools(
     // Arguments and results read and write dashboards as the API does. The SDK needs a resolver set explicitly.
     public static JsonSerializerOptions Json { get; } = new(Dashboard.Json) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() };
 
-    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts, PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts, SONOS_TILES in libs/tiles/src/lib/sonos/sonos-tiles.ts and
+    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts, PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts, WEATHER_TILES in libs/tiles/src/lib/weather/weather-tiles.ts, SONOS_TILES in libs/tiles/src/lib/sonos/sonos-tiles.ts and
     // LOGIC_TILES in libs/tiles/src/lib/logic/logic-tile.ts; the API only looks inside a logic tile's rules (ADR-0003, ADR-0010).
     private const string TileKinds = """
         Tile kinds, with the sizes each supports and the target type its settings.target takes:
@@ -48,6 +48,11 @@ public sealed class ManagementTools(
         - "plex-library" (small, wide, full, large, full-large): a Plex library; its posters on the tile, and a press opens everything
           in it, films, series or albums, alphabetically; settings.target is "plex-library:all" (every library, as tabs) or a
           library's target.
+        - "weather" (small, wide, full, large, full-large): the weather where a Homey is, from Open-Meteo, with Buienradar's rain
+          for the next two hours in the Netherlands and Belgium; small shows now, wide adds the next hours or rain, large and
+          full-large the coming days. A press opens the full forecast. settings.target is "weather:here" for where a Homey is
+          (settings.account picks which), or "weather:place" for a place of its own in settings.place,
+          { "name", "latitude", "longitude" } in degrees.
         - "sonos" (small, wide, full, large, full-large, full-tall): Sonos multiroom; settings.targets lists the ids of the speaker
           devices in order and settings.target is null. The tile shows what the first room that plays is playing with play/pause
           (and skip, from wide up) and one volume for its group; a press opens every room with its own volume and a button that
@@ -61,7 +66,7 @@ public sealed class ManagementTools(
           take its size, so hold only kinds that support that size, and never another logic tile. Keep a dashboard's
           existing logic tiles as they are when changing other parts of the draft.
         Every tile's settings may have a "label" that overrides its target's name. A home can have several Homey and Plex
-        accounts: a Homey or Plex tile's settings.account is the account of its target (list_targets gives it); left out, the
+        accounts: a Homey, weather or Plex tile's settings.account is the account of its target (list_targets gives it); left out, the
         oldest account. A mood-list tile's moods are all in its one account.
         """;
 
@@ -250,7 +255,7 @@ public sealed class ManagementTools(
         album and are made in Management, so assistants can only use the ones that exist.
         """)]
     public async Task<IEnumerable<Target>> ListTargets(
-        [Description("device, flow, mood, insight, photoSet, plexPlayer or plexLibrary")] string type, CancellationToken ct) =>
+        [Description("device, flow, mood, insight, photoSet, plexPlayer, plexLibrary or weather")] string type, CancellationToken ct) =>
         type switch
         {
             "device" => homeys.All.SelectMany(h => h.State.Devices.OrderBy(d => d.Name).Select(d =>
@@ -267,7 +272,9 @@ public sealed class ManagementTools(
             "plexLibrary" => plex.Overviews.SelectMany(o => (IEnumerable<Target>)[
                 new Target(TargetCatalog.AllPlexLibraries, "All libraries", $"on {o.AccountName}", o.AccountId),
                 .. o.Libraries.Select(l => new Target(TargetCatalog.PlexLibraryPrefix + l.Id, l.Title, $"{l.Type} on {o.AccountName}", o.AccountId))]),
-            _ => throw new McpException($"Unknown target type {type}; use device, flow, mood, insight, photoSet, plexPlayer or plexLibrary."),
+            "weather" => homeys.All.Select(h => new Target(TargetCatalog.WeatherHere, "Weather", $"where {h.Name} is", h.AccountId))
+                .Append(new Target(TargetCatalog.WeatherPlace, "Weather at a place", "the place in settings.place")),
+            _ => throw new McpException($"Unknown target type {type}; use device, flow, mood, insight, photoSet, plexPlayer, plexLibrary or weather."),
         };
 
     public sealed record ZoneInfo(string Id, string Name, string Path, string? ParentId, string Homey, int Account, int Devices, int Moods);
