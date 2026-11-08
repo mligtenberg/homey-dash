@@ -150,6 +150,13 @@ Lint, tests and builds were green for design-system, tiles, layout, api-client, 
 
 **Formatting note.** Early in this pass, `prettier --write` reflowed whole files that were never prettier-formatted, so four commits carry big noisy diffs. A later commit ("Restore the original formatting…") puts those files back. Only run prettier on files you created.
 
+## Next: type tokens (agreed, not started)
+The display's text sizes are about 25 different `calc(var(--cell) * x)` multiples (`.085`, `.09`, `.095`, `.1` and so on), and Management uses fixed pixels (12, 13, 16, 18, 22, 28). Weights are 500, 600, 700 and 800 as literals. `tokens.css` only defines `--font-sans`. Plan:
+1. **Weights:** `--weight-regular/medium/bold/heavy` (500, 600, 700, 800). No pixel change, so do it first.
+2. **Management sizes:** `--text-small/body/section/panel/page` as fixed pixels (the sizes Phase 2 planned).
+3. **Display scale:** `--tile-text-xs/s/m/l/xl/xxl` as `--cell` multiples, with `--value-xl/l/m` for the big values. First write a table mapping every current multiple to its nearest step and get it approved, because merging near-duplicates changes some sizes slightly.
+4. Replace the literals in the CSS and component `styles:`, then run the style diff.
+
 ## Next steps (original plan, partly done; see the update above)
 
 ### Phase 2: tokens and CSS (`libs/design-system/src/tokens.css`, `components.css`)
