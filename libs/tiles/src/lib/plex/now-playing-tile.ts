@@ -90,8 +90,10 @@ export function plexIdle(status: string | undefined, error: string | null | unde
       <div class="hd-plex-now__pane" [attr.data-count]="sessions().length">
         @for (item of sessions(); track item.id) {
           <article class="hd-plex-now__session">
-            @if (item.image) {
-              <img class="hd-plex-now__poster" [src]="posterUrl(item, item.image)" alt="" draggable="false" />
+            @if (item.image && !broken().has(item.image)) {
+              <img class="hd-plex-now__poster" [src]="posterUrl(item, item.image)" alt="" draggable="false" (error)="broke(item.image)" />
+            } @else {
+              <div class="hd-plex-now__poster hd-plex-now__poster--none"><svg [lucideIcon]="tvIcon" /></div>
             }
             <div class="hd-plex-now__info">
               <h3 class="hd-plex-now__title">{{ item.title }}</h3>
@@ -153,6 +155,9 @@ export class NowPlayingTile extends TileView {
   });
 
   private readonly index = signal(0);
+
+  /** Posters that did not load, so an icon shows instead of a broken picture. */
+  protected readonly broken = signal<ReadonlySet<string>>(new Set());
   protected readonly session = computed<LivePlexSession | undefined>(() => {
     const sessions = this.sessions();
     return sessions.length ? sessions[this.index() % sessions.length] : undefined;
@@ -221,6 +226,10 @@ export class NowPlayingTile extends TileView {
     const wide = this.size() === 'wide' || this.size() === 'full' || this.size() === 'full-large';
     const path = (wide ? session.art : null) ?? session.image ?? session.art;
     return path ? plexImageUrl(session.accountId, path, wide ? 1280 : 720, 720) : null;
+  }
+
+  protected broke(image: string) {
+    this.broken.update((b) => new Set(b).add(image));
   }
 
   protected posterUrl(session: LivePlexSession, path: string) {

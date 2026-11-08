@@ -1172,6 +1172,8 @@
   flex: none; width: min(calc(var(--cell) * 1.8), 30vmin); aspect-ratio: 2 / 3; object-fit: cover;
   border-radius: calc(var(--cell) * .08); box-shadow: 0 calc(var(--cell) * .1) calc(var(--cell) * .35) rgb(0 0 0 / .5);
 }
+.hd-plex-now__poster--none { display: grid; place-items: center; background: rgb(255 255 255 / .1); box-shadow: none; }
+.hd-plex-now__poster--none svg { width: 40%; height: 40%; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; fill: none; opacity: .7; }
 .hd-plex-now__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: calc(var(--cell) * .06); }
 .hd-plex-now__title { margin: 0; font: 800 calc(var(--cell) * .26)/1.1 var(--font-sans); overflow-wrap: anywhere; }
 .hd-plex-now__sub { font-size: calc(var(--cell) * .14); color: rgb(255 255 255 / .85); }

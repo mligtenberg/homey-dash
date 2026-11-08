@@ -87,7 +87,11 @@ const LOCK_STATES = [
               @case ('speaker') {
                 <div class="hd-dev__art">
                   @if (c.art; as art) {
-                    <img [src]="art" alt="" draggable="false" />
+                    @if (brokenArt() !== art) {
+                      <img [src]="art" alt="" draggable="false" (error)="brokenArt.set(art)" />
+                    } @else {
+                      <svg class="hd-dev__glyph" [lucideIcon]="speakerIcon" />
+                    }
                   } @else {
                     <svg class="hd-dev__glyph" [lucideIcon]="speakerIcon" />
                   }
@@ -269,6 +273,8 @@ export class DeviceDetails {
   protected readonly volumeIcon = LucideVolume2;
   protected readonly muteIcon = LucideVolumeX;
   protected readonly speakerIcon = LucideSpeaker;
+  /** The cover that did not load, so the speaker's icon shows instead of a broken picture. */
+  protected readonly brokenArt = signal<string | null>(null);
   protected readonly lockIcon = LucideLock;
   protected readonly unlockIcon = LucideLockOpen;
 

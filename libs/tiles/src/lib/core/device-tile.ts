@@ -4,6 +4,7 @@ import { LucideDynamicIcon, LucideIconInput, LucidePause, LucidePlay, LucidePowe
 import { TileData, TileSettings } from '../tile-data';
 import { CapabilityDriver, DeviceSegments, DeviceSlider, DeviceStepper } from './device-controls';
 import { DeviceDetails } from './device-details';
+import { loadableArt } from './loadable-art';
 import { CONTROLS, deviceDetail, deviceLook, formatReading } from './device-look';
 import { describeDevice, deviceLogs, sameLogs } from './device-view';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
@@ -108,6 +109,13 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
   protected readonly device = computed(() => this.homey()?.devices.get(this.settings().target ?? ''));
   private readonly deviceDetails = viewChild(DeviceDetails);
 
+  /** The album art of what the device plays, once it is known to load. */
+  private readonly art = loadableArt(() => {
+    const device = this.device();
+    const accountId = this.homey()?.accountId;
+    return device?.capabilities['speaker_playing']?.value === true && device.albumArt && accountId !== undefined ? homeyImageUrl(accountId, device.albumArt) : null;
+  });
+
   /** The insight logs of the device's readings that can be charted, which its detail view shows the history of. */
   private readonly logs = computed(() => deviceLogs(this.homey()?.insights, this.device()?.id ?? ''), { equal: sameLogs });
 
@@ -153,8 +161,8 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
           face.detail = primary.title;
         }
     }
-    const accountId = this.homey()?.accountId;
-    if (caps['speaker_playing']?.value === true && device.albumArt && accountId !== undefined) face.art = homeyImageUrl(accountId, device.albumArt);
+    const art = this.art();
+    if (art) face.art = art;
     if (this.flash() === 'error') face.detail = 'Did not respond';
     face.details = this.addsToFace(face, face.reading && (primary?.id === 'target_temperature' ? 'measure_temperature' : primary?.id));
     return face;

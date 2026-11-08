@@ -30,6 +30,7 @@ import {
   LucideSpeaker,
   LucideUnlink,
 } from '@lucide/angular';
+import { loadableArt } from '../core/loadable-art';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { TileData, TileSettings } from '../tile-data';
@@ -536,7 +537,7 @@ export class SonosTile extends TileView<SonosTileSettings> {
     () => !!this.lead()?.device?.capabilities['speaker_next']?.setable,
   );
 
-  protected readonly art = computed(() => {
+  protected readonly art = loadableArt(() => {
     const device = this.lead()?.device;
     const accountId = this.homey()?.accountId;
     return this.playing() && device?.albumArt && accountId !== undefined
