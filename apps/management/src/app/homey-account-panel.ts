@@ -1,11 +1,20 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { AccountPanel } from './account-panel';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+} from '@angular/core';
 import { HomeyAccountApi, HomeyStatus } from '@homey-dash/api-client';
 import { AddressKeyForm, addressKeyAccounts } from './address-key-accounts';
 import { RealtimeTileData } from '@homey-dash/tiles';
 
 /** How HomeyDash's connection to a Homey reads in a status pill. */
-export function homeyStatusPill(status: HomeyStatus | undefined): { label: string; tone: 'ok' | 'warn' | 'danger' | '' } {
+export function homeyStatusPill(status: HomeyStatus | undefined): {
+  label: string;
+  tone: 'ok' | 'warn' | 'danger' | '';
+} {
   switch (status?.connection) {
     case 'connected':
       return { label: status.fake ? 'Fake Homey' : 'Connected', tone: 'ok' };
@@ -25,25 +34,28 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
  */
 @Component({
   selector: 'hd-homey-account-panel',
-  imports: [NgTemplateOutlet, AddressKeyForm],
+  imports: [AccountPanel, NgTemplateOutlet, AddressKeyForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="hd-account hd-panel" aria-labelledby="homey-title">
-      <div class="hd-account__head">
-        <h2 class="hd-panel__title" id="homey-title">Homey</h2>
+    <hd-account-panel key="homey" title="Homey" [error]="error()">
+      <ng-container ngProjectAs="[status]">
         @if (info(); as info) {
           @if (!info.accounts.length) {
             <span class="hd-pill hd-pill--warn hd-pill--dot">Not set up</span>
           }
         }
-      </div>
+      </ng-container>
       @if (info(); as info) {
         @if (info.fake) {
-          <p class="hd-muted">HomeyDash runs against a fake Homey with sample devices, set in its configuration.</p>
+          <p class="hd-muted">
+            HomeyDash runs against a fake Homey with sample devices, set in its
+            configuration.
+          </p>
         } @else {
           <p class="hd-muted">
-            Add each Homey Pro HomeyDash should control, such as one per house. Displays reach Homey through HomeyDash, so
-            only HomeyDash needs to be on Homey's network.
+            Add each Homey Pro HomeyDash should control, such as one per house.
+            Displays reach Homey through HomeyDash, so only HomeyDash needs to
+            be on Homey's network.
           </p>
         }
         @for (account of info.accounts; track account.id) {
@@ -51,27 +63,65 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
           @let pill = statusPill(status);
           <div class="hd-account__item">
             @if (editing() === account.id) {
-              <ng-container *ngTemplateOutlet="form; context: { $implicit: account }" />
+              <ng-container
+                *ngTemplateOutlet="form; context: { $implicit: account }"
+              />
             } @else {
               <div class="hd-account__info">
                 <strong>{{ account.name }}</strong>
                 @if (!info.fake) {
                   <span class="hd-muted">{{ account.address }}</span>
                 }
-                @if (status?.connection === 'disconnected' && status?.lastError; as error) {
-                  <span class="hd-muted hd-small" role="status">{{ error }}</span>
+                @if (
+                  status?.connection === 'disconnected' && status?.lastError;
+                  as error
+                ) {
+                  <span class="hd-muted hd-small" role="status">{{
+                    error
+                  }}</span>
                 }
               </div>
               <div class="hd-actions">
-                <span class="hd-pill hd-pill--dot" [class]="pill.tone ? 'hd-pill--' + pill.tone : ''">{{ pill.label }}</span>
+                <span
+                  class="hd-pill hd-pill--dot"
+                  [class]="pill.tone ? 'hd-pill--' + pill.tone : ''"
+                  >{{ pill.label }}</span
+                >
                 @if (!info.fake) {
                   @if (removing() === account.id) {
-                    <span class="hd-muted">Its tiles show as missing until you give them another Homey.</span>
-                    <button class="hd-btn hd-btn--danger" type="button" (click)="remove(account)">Remove</button>
-                    <button class="hd-btn" type="button" (click)="removing.set(null)">Cancel</button>
+                    <span class="hd-muted"
+                      >Its tiles show as missing until you give them another
+                      Homey.</span
+                    >
+                    <button
+                      class="hd-btn hd-btn--danger"
+                      type="button"
+                      (click)="remove(account)"
+                    >
+                      Remove
+                    </button>
+                    <button
+                      class="hd-btn"
+                      type="button"
+                      (click)="removing.set(null)"
+                    >
+                      Cancel
+                    </button>
                   } @else {
-                    <button class="hd-btn" type="button" (click)="edit(account.id)">Edit</button>
-                    <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(account.id)">Remove</button>
+                    <button
+                      class="hd-btn"
+                      type="button"
+                      (click)="edit(account.id)"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      class="hd-btn hd-btn--danger"
+                      type="button"
+                      (click)="removing.set(account.id)"
+                    >
+                      Remove
+                    </button>
                   }
                 }
               </div>
@@ -81,21 +131,27 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
         @if (!info.fake) {
           @if (editing() === 'new') {
             <div class="hd-account__item">
-              <ng-container *ngTemplateOutlet="form; context: { $implicit: null }" />
+              <ng-container
+                *ngTemplateOutlet="form; context: { $implicit: null }"
+              />
             </div>
           } @else if (editing() === null) {
             <div class="hd-actions">
-              <button class="hd-btn" [class.hd-btn--primary]="!info.accounts.length" type="button" (click)="edit('new')">
-                {{ info.accounts.length ? 'Add another Homey' : 'Set up Homey' }}
+              <button
+                class="hd-btn"
+                [class.hd-btn--primary]="!info.accounts.length"
+                type="button"
+                (click)="edit('new')"
+              >
+                {{
+                  info.accounts.length ? 'Add another Homey' : 'Set up Homey'
+                }}
               </button>
             </div>
           }
         }
       }
-      @if (error(); as error) {
-        <p class="hd-error" role="alert">{{ error }}</p>
-      }
-    </section>
+    </hd-account-panel>
 
     <ng-template #form let-account>
       <hd-address-key-form
@@ -116,10 +172,15 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
 })
 export class HomeyAccountPanel {
   private readonly homeys = inject(RealtimeTileData).homeys;
-  private readonly accounts = addressKeyAccounts(inject(HomeyAccountApi), 'Homey');
+  private readonly accounts = addressKeyAccounts(
+    inject(HomeyAccountApi),
+    'Homey',
+  );
   protected readonly info = this.accounts.info;
   /** Each Homey's connection, by account. */
-  protected readonly statuses = computed(() => new Map((this.homeys() ?? []).map((h) => [h.accountId, h.status])));
+  protected readonly statuses = computed(
+    () => new Map((this.homeys() ?? []).map((h) => [h.accountId, h.status])),
+  );
   protected readonly statusPill = homeyStatusPill;
   /** The account whose form is open, 'new' while adding one. */
   protected readonly editing = this.accounts.editing;

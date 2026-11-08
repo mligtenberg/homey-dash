@@ -1,5 +1,6 @@
 import { LucideIconInput } from '@lucide/angular';
 import { KindHue } from '@homey-dash/tiles';
+import { byName, findNode, matchesWords, searchWords } from './tree-utils';
 
 /** Something a tile can target, in the group (zone or flow folder) Homey keeps it in. */
 export interface TargetOption {
@@ -30,19 +31,30 @@ export interface TargetNode {
   options: TargetOption[];
 }
 
-const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
-const byLabel = (a: TargetOption, b: TargetOption) => a.label.localeCompare(b.label);
+const byLabel = (a: TargetOption, b: TargetOption) =>
+  a.label.localeCompare(b.label);
 
 /** Puts the options in their groups, as Homey nests them; groups without options anywhere below are left out. */
-export function buildTree(groupList: Iterable<TargetGroup>, options: Iterable<TargetOption>): TargetNode {
+export function buildTree(
+  groupList: Iterable<TargetGroup>,
+  options: Iterable<TargetOption>,
+): TargetNode {
   const groups = [...groupList];
   const root: TargetNode = { id: '', name: '', groups: [], options: [] };
-  const nodes = new Map(groups.map((g): [string, TargetNode] => [g.id, { id: g.id, name: g.name, groups: [], options: [] }]));
+  const nodes = new Map(
+    groups.map((g): [string, TargetNode] => [
+      g.id,
+      { id: g.id, name: g.name, groups: [], options: [] },
+    ]),
+  );
   for (const [id, node] of nodes) {
     const parentId = groups.find((g) => g.id === id)?.parentId;
     ((parentId && nodes.get(parentId)) || root).groups.push(node);
   }
-  for (const option of options) ((option.groupId && nodes.get(option.groupId)) || root).options.push(option);
+  for (const option of options)
+    ((option.groupId && nodes.get(option.groupId)) || root).options.push(
+      option,
+    );
   return prune(root) ?? root;
 }
 
@@ -51,23 +63,29 @@ export function buildTree(groupList: Iterable<TargetGroup>, options: Iterable<Ta
  * group it sits in, so "living light" finds the lights in the living room.
  */
 export function filterTree(node: TargetNode, query: string): TargetNode {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = searchWords(query);
   if (!words.length) return node;
   const filter = (node: TargetNode, path: string): TargetNode | null =>
     prune({
       ...node,
-      groups: node.groups.map((group) => filter(group, `${path} ${group.name}`)).filter((g) => g !== null),
-      options: node.options.filter((o) => {
-        const text = `${path} ${o.label} ${o.type}`.toLowerCase();
-        return words.every((word) => text.includes(word));
-      }),
+      groups: node.groups
+        .map((group) => filter(group, `${path} ${group.name}`))
+        .filter((g) => g !== null),
+      options: node.options.filter((o) =>
+        matchesWords(`${path} ${o.label} ${o.type}`, words),
+      ),
     });
   return filter(node, '') ?? { ...node, groups: [], options: [] };
 }
 
 /** Every option in the tree with the group it sits in, in the order the picker lists them. */
-export function entries(node: TargetNode): { option: TargetOption; group: TargetNode }[] {
-  return [...node.options.map((option) => ({ option, group: node })), ...node.groups.flatMap(entries)];
+export function entries(
+  node: TargetNode,
+): { option: TargetOption; group: TargetNode }[] {
+  return [
+    ...node.options.map((option) => ({ option, group: node })),
+    ...node.groups.flatMap(entries),
+  ];
 }
 
 export function allOptions(node: TargetNode): TargetOption[] {
@@ -75,17 +93,16 @@ export function allOptions(node: TargetNode): TargetOption[] {
 }
 
 /** The group with this id anywhere in the tree. */
-export function findGroup(node: TargetNode, id: string | null): TargetNode | undefined {
-  if (node.id === id) return node;
-  for (const group of node.groups) {
-    const found = findGroup(group, id);
-    if (found) return found;
-  }
-  return undefined;
-}
+export const findGroup = (node: TargetNode, id: string | null) =>
+  findNode([node], id, (n) => n.groups);
 
 function prune(node: TargetNode): TargetNode | null {
-  const groups = node.groups.map(prune).filter((g) => g !== null).sort(byName);
+  const groups = node.groups
+    .map(prune)
+    .filter((g) => g !== null)
+    .sort(byName);
   const sorted = [...node.options].sort(byLabel);
-  return groups.length || sorted.length ? { ...node, groups, options: sorted } : null;
+  return groups.length || sorted.length
+    ? { ...node, groups, options: sorted }
+    : null;
 }
