@@ -60,7 +60,7 @@ public sealed class LocalHomeys(
             if (_connections.ContainsKey(account.Id)) continue;
             // Connecting again to the same account keeps what is known of its Homey until the new snapshot arrives.
             var state = homeys.Find(account.Id)?.State ?? new HomeyState(time, account.Id);
-            var homey = new LocalHomey(httpFactory, account, state, loggers.CreateLogger<LocalHomey>());
+            var homey = new LocalHomey(httpFactory, account, state, time, loggers.CreateLogger<LocalHomey>());
             var stop = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             _connections[account.Id] = new Connection(homey, stop, homey.RunAsync(stop.Token));
         }

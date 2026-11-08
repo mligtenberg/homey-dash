@@ -33,6 +33,12 @@ public sealed class HomeyState(TimeProvider time, int accountId)
     // Homey won't tell where it is: the API key lacks the geolocation scope, or no location is set.
     public bool LocationRefused { get; private set; }
 
+    // Null until HomeyDash first asked Homey for its energy report.
+    public HomeyEnergy? Energy { get; private set; }
+
+    private EnergyLive? _energyLive;
+    private EnergyDay? _energyDay;
+
     // False until the first snapshot of Homey has arrived.
     public bool Loaded { get; private set; }
 
@@ -177,6 +183,38 @@ public sealed class HomeyState(TimeProvider time, int accountId)
             Weather = weather;
         }
         Changed?.Invoke(new WeatherChanged(weather));
+    }
+
+    // The live part of the energy report; null when Homey left it out.
+    public void SetEnergyLive(EnergyLive? live) => UpdateEnergy(() => _energyLive = live);
+
+    // Today's part of the energy report; null when Homey left it out.
+    public void SetEnergyDay(EnergyDay? day) => UpdateEnergy(() => _energyDay = day);
+
+    // Homey won't tell its energy: the API key lacks the scope, or there is none.
+    public void SetEnergyUnavailable()
+    {
+        lock (_lock)
+        {
+            if (Energy == HomeyEnergy.Unavailable) return;
+            _energyLive = null;
+            _energyDay = null;
+            Energy = HomeyEnergy.Unavailable;
+        }
+        Changed?.Invoke(new EnergyChanged(HomeyEnergy.Unavailable));
+    }
+
+    private void UpdateEnergy(Action update)
+    {
+        HomeyEnergy energy;
+        lock (_lock)
+        {
+            update();
+            energy = new HomeyEnergy("ok", _energyLive, _energyDay);
+            if (Energy is { } before && before.Live == energy.Live && ReferenceEquals(before.Day, energy.Day)) return;
+            Energy = energy;
+        }
+        Changed?.Invoke(new EnergyChanged(energy));
     }
 
     // Raises nothing: the weather watcher looks every while, and a Homey hardly ever moves.
