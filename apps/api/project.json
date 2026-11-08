@@ -29,7 +29,7 @@
       },
       "configurations": {
         "simulator": {
-          "command": "dotnet watch --non-interactive run -- --Homey:Fake=true --Immich:Fake=true --Plex:Fake=true --Weather:Fake=true"
+          "command": "dotnet watch --non-interactive run -- --Homey:Fake=true --Immich:Fake=true --Plex:Fake=true --Weather:Fake=true --Traffic:Fake=true"
         }
       }
     },

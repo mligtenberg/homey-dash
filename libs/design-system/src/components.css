@@ -1417,3 +1417,24 @@ a.hd-btn { text-decoration: none; }
 .hd-weather__week .hd-weather__temp { text-align: end; }
 .hd-weather__week .hd-weather__what { color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-weather__credit { margin: 0; font-size: calc(var(--cell) * .075); color: var(--ink-muted); }
+
+/* Traffic tile (ADR-0014): the car travel time on a route. The hue says the delay: climate on time, light a delay, heat a heavy one. */
+.hd-traffic { display: grid; gap: calc(var(--cell) * .06) calc(var(--cell) * .16); grid-template: "now" auto "titles" 1fr / minmax(0, 1fr); }
+.hd-traffic:not(.has-traffic) { display: flex; }
+.hd-traffic__now { grid-area: now; }
+.hd-traffic__now .hd-value { font-weight: 700; }
+.hd-traffic__titles { grid-area: titles; align-self: end; min-width: 0; }
+.hd-traffic__figures { grid-area: figures; align-self: end; display: flex; flex-direction: column; gap: calc(var(--cell) * .05); min-width: 0; margin: 0; }
+.hd-traffic__figure { display: flex; justify-content: space-between; align-items: baseline; gap: calc(var(--cell) * .1); }
+.hd-traffic__label { font-size: calc(var(--cell) * .08); font-weight: 600; color: var(--ink-muted); white-space: nowrap; }
+.hd-traffic__value { margin: 0; font-size: calc(var(--cell) * .11); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hd-traffic[data-size="wide"], .hd-traffic[data-size="full"] { grid-template: "now figures" auto "titles figures" 1fr / minmax(0, 1fr) minmax(0, 1fr); }
+.hd-traffic[data-size="large"] { grid-template: "now" auto "titles" 1fr "figures" auto / minmax(0, 1fr); }
+.hd-traffic[data-size="full-large"] { grid-template: "now figures" auto "titles figures" 1fr / minmax(0, 1fr) minmax(0, 1fr); }
+/* "25 min" is wider than a temperature, so the times run smaller than the value sizes. */
+.hd-traffic__now .hd-value { font-size: calc(var(--cell) * .24); white-space: nowrap; }
+/* A small tile has no room for the chip too: the hue says it is traffic, and the delay how it is. */
+.hd-traffic[data-size="small"] .hd-traffic__now .hd-icon { display: none; }
+.hd-traffic[data-size="wide"] .hd-traffic__now .hd-value, .hd-traffic[data-size="full"] .hd-traffic__now .hd-value { font-size: calc(var(--cell) * .28); }
+.hd-traffic[data-size="large"] .hd-traffic__now .hd-value, .hd-traffic[data-size="full-large"] .hd-traffic__now .hd-value { font-size: calc(var(--cell) * .5); }
+.hd-traffic[data-size="large"] .hd-traffic__value, .hd-traffic[data-size="full-large"] .hd-traffic__value { font-size: calc(var(--cell) * .14); }

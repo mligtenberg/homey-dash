@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { capabilitySignal, DashboardVersion, DisplayInfo, DisplaysApi, IdleRule, LockSpot, LockWidget, Realtime, Rule, SignalInfo, stopOnDestroy } from '@homey-dash/api-client';
+import { capabilitySignal, DashboardVersion, TrafficRoute, DisplayInfo, DisplaysApi, IdleRule, LockSpot, LockWidget, Realtime, Rule, SignalInfo, stopOnDestroy } from '@homey-dash/api-client';
 import { alwaysRule, TileData } from '@homey-dash/tiles';
 import { DashboardsStore } from '../dashboards-store';
 import { SignalCatalogue } from '../editor/signal-catalogue';
@@ -169,7 +169,7 @@ export class DisplaysStore {
   setLockKind(display: DisplayInfo, index: number, kind: LockWidget['kind']) {
     const spot = display.lockWidgets[index].spot;
     let widget: LockWidget = { kind: 'clock', spot };
-    if (kind === 'weather') widget = { kind, spot };
+    if (kind === 'weather' || kind === 'traffic') widget = { kind, spot };
     if (kind === 'value') {
       const signals = (this.catalogue.signals() ?? []).filter(isCapabilitySignal);
       const signal = signals.find((s) => s.id.endsWith(':measure_temperature')) ?? signals[0];
@@ -191,6 +191,11 @@ export class DisplaysStore {
     const id = Number(account);
     const chosen = id === this.homeys()[0]?.accountId ? null : id;
     this.saveLock(display, display.lockWidgets.map((w, i) => (i === index && w.kind === 'weather' ? { ...w, account: chosen } : w)));
+  }
+
+  // Traffic shows nothing until its route is chosen.
+  setLockRoute(display: DisplayInfo, index: number, route: TrafficRoute) {
+    this.saveLock(display, display.lockWidgets.map((w, i) => (i === index && w.kind === 'traffic' ? { ...w, route } : w)));
   }
 
   setLockSignal(display: DisplayInfo, index: number, signal: string) {

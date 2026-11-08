@@ -256,6 +256,18 @@ describe('Displays', () => {
       expect(lockRequest().body.widgets).toEqual([{ kind: 'weather', spot: 'bottom-left' }]);
     });
 
+    it('adds a traffic widget that has nothing to show until a route is chosen', async () => {
+      const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'bottom-right' }] }], [], '/displays/1/lock');
+      const kind = root.querySelector('[aria-label="What widget 1 shows"]') as HTMLSelectElement;
+
+      kind.value = 'traffic';
+      kind.dispatchEvent(new Event('change'));
+
+      expect(lockRequest().body.widgets).toEqual([{ kind: 'traffic', spot: 'bottom-right' }]);
+      await stable();
+      expect(root.querySelector('.lock hd-traffic-route-field')).not.toBeNull();
+    });
+
     it('shows a device value, starting on a temperature, picked from capability signals', async () => {
       const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'bottom-right' }] }], [], '/displays/1/lock');
       const signal = (id: string, name: string) => ({ id, source: 'homey', type: 'number', name, group: 'Thermostat', account: 1 });

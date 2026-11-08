@@ -75,8 +75,8 @@ public sealed class WeatherApiTests(ApiFactory factory) : IClassFixture<ApiFacto
 
         (await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft", Draft(barcelona))).EnsureSuccessStatusCode();
 
-        var forecast = await EventuallyAsync(hub, all => all.FirstOrDefault(f =>
-            f.GetProperty("placeKey").GetString() == "41.39,2.16" && f.GetProperty("status").GetString() == "connected"));
+        var forecast = await EventuallyAsync(hub, all => all.Cast<JsonElement?>().FirstOrDefault(f => f is { } e &&
+            e.GetProperty("placeKey").GetString() == "41.39,2.16" && e.GetProperty("status").GetString() == "connected"));
         Assert.Equal("Barcelona", forecast.GetProperty("place").GetString());
         Assert.Equal(JsonValueKind.Null, forecast.GetProperty("accountId").ValueKind);
         // Buienradar doesn't know Spain.

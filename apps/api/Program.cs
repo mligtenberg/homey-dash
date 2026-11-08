@@ -12,6 +12,7 @@ using HomeyDash.Api.Photos;
 using HomeyDash.Api.Plex;
 using HomeyDash.Api.Realtime;
 using HomeyDash.Api.Rules;
+using HomeyDash.Api.Traffic;
 using HomeyDash.Api.Weather;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
@@ -28,6 +29,7 @@ builder.Services.AddPhotos(builder.Configuration);
 builder.Services.AddPlex(builder.Configuration);
 builder.Services.AddAirPlay(builder.Configuration);
 builder.Services.AddWeather(builder.Configuration);
+builder.Services.AddTraffic(builder.Configuration);
 builder.Services.AddRules();
 builder.Services.AddSingleton<TargetCatalog>();
 builder.Services.AddRealtime();
@@ -57,6 +59,7 @@ using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.LoadAccounts();
     scope.ServiceProvider.LoadPhotoSets();
     scope.ServiceProvider.LoadPlex();
+    scope.ServiceProvider.LoadTraffic();
     await scope.ServiceProvider.GetRequiredService<DisplayDirectory>()
         .RefreshAsync(scope.ServiceProvider.GetRequiredService<HomeyDashDbContext>(), CancellationToken.None);
 }
@@ -98,6 +101,7 @@ api.MapPhotos();
 api.MapPlex();
 api.MapAirPlay();
 api.MapWeather();
+api.MapTraffic();
 api.MapDashboards();
 api.MapBackgrounds();
 api.MapPresetBackgrounds();

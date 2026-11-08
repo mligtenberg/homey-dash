@@ -25,7 +25,7 @@ What a display shows over the photo set or colour an **Idle rule** plays: its **
 _Avoid_: Screensaver, overlay, clock screen
 
 **Lock screen widget**:
-One thing on a **Lock screen**: the time and date, the weather where a Homey is (Homey's own weather, of the oldest Homey or a chosen one), or the value of one capability of a **Device**. Widgets in the same spot stack in order. One that has nothing to show, such as a weather Homey hasn't told yet or a value whose device is gone, is left out. It can't be operated; touches go through it.
+One thing on a **Lock screen**: the time and date, the weather where a Homey is (Homey's own weather, of the oldest Homey or a chosen one), the value of one capability of a **Device**, or the car travel time on a route from TomTom (its time, in amber or red with a delay, and the route's name; a **Traffic tile**'s route, chosen in the same way). Widgets in the same spot stack in order. One that has nothing to show, such as a weather Homey hasn't told yet, a value whose device is gone, or traffic with no route chosen or not yet known, is left out. It can't be operated; touches go through it.
 _Avoid_: Tile, complication
 
 **Dashboard tape**:
@@ -85,7 +85,7 @@ Something Homey controls or reads, such as a light, sensor, or thermostat. Never
 _Avoid_: Accessory, thing, appliance
 
 **Account**:
-A sign-in HomeyDash holds for the home, so it can reach a service on everyone's behalf: Homey, Immich or Plex. Set up in Management; displays never hold one. A home can have several accounts of each, such as one Homey per house, one per person's Immich or one per Plex server, each with a name that tells them apart. A Homey or Plex tile points into one account: the one it names, or the oldest.
+A sign-in HomeyDash holds for the home, so it can reach a service on everyone's behalf: Homey, Immich, Plex or TomTom. Set up in Management; displays never hold one. A home can have several accounts of each, such as one Homey per house, one per person's Immich or one per Plex server, each with a name that tells them apart. A Homey or Plex tile points into one account: the one it names, or the oldest.
 _Avoid_: Connection, integration, credential
 
 ### Layout
@@ -184,6 +184,13 @@ _Avoid_: New media tile
 **Weather tile**:
 A tile that shows the weather where a **Homey** is, or at a town chosen for the tile instead: now, and by its size the coming hours and days, and the rain of the next two hours where Buienradar knows it (ADR-0013). Without a town of its own the place is the location set in Homey, and the tile names its Homey like any Homey tile.
 _Avoid_: Forecast widget, weather card
+
+**Traffic tile**:
+A tile that shows the car travel time now on one route, from TomTom (ADR-0014): the minutes, and the delay over the usual time at this hour, which colours the tile; by its size also the distance, the arrival time when leaving now, and the usual time. Its route is a name and an origin and destination found by name in **Management**, kept as names and coordinates in the tile's settings; it points at nothing in **Homey**, so it is never **Missing**. Without a **TomTom account** it says so. HomeyDash asks TomTom once every 5 minutes per route in use, however many tiles and **Lock screen widgets** show it.
+_Avoid_: Commute tile, route card, travel-time widget
+
+**TomTom account**:
+An **Account** holding the API key of a TomTom developer account, under a name; set up in **Management**, checked with TomTom, and never shown again or sent to a display. A **Traffic tile** or traffic **Lock screen widget** names one, or uses the oldest. Removing it leaves them without traffic until they are given another.
 
 **Logic tile**:
 A tile that holds an ordered list of other tiles, each with a rule, and shows the first whose rule holds, or its fallback tile when none does; with no fallback it shows nothing, like empty cells. It holds tiles of any kind except another logic tile, and a tile it holds that points at a missing target is shown as **Missing** when chosen, not skipped. The tiles it holds take its size, so it only holds kinds that support that size. It fades from one tile to the next, and once switched it can stay on a tile for a chosen **Minimum show time**, after which it shows whatever its rules then choose.

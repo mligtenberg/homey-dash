@@ -29,7 +29,7 @@ public sealed class ManagementTools(
     // Arguments and results read and write dashboards as the API does. The SDK needs a resolver set explicitly.
     public static JsonSerializerOptions Json { get; } = new(Dashboard.Json) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() };
 
-    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts, PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts, WEATHER_TILES in libs/tiles/src/lib/weather/weather-tiles.ts, SONOS_TILES in libs/tiles/src/lib/sonos/sonos-tiles.ts and
+    // Mirrors CORE_TILES in libs/tiles/src/lib/core/core-tiles.ts, PLEX_TILES in libs/tiles/src/lib/plex/plex-tiles.ts, WEATHER_TILES in libs/tiles/src/lib/weather/weather-tiles.ts, TRAFFIC_TILES in libs/tiles/src/lib/traffic/traffic-tiles.ts, SONOS_TILES in libs/tiles/src/lib/sonos/sonos-tiles.ts and
     // LOGIC_TILES in libs/tiles/src/lib/logic/logic-tile.ts; the API only looks inside a logic tile's rules (ADR-0003, ADR-0010).
     private const string TileKinds = """
         Tile kinds, with the sizes each supports and the target type its settings.target takes:
@@ -53,6 +53,11 @@ public sealed class ManagementTools(
           full-large the coming days. A press opens the full forecast. settings.target is "weather:here" for where a Homey is
           (settings.account picks which), or "weather:place" for a place of its own in settings.place,
           { "name", "latitude", "longitude" } in degrees.
+        - "traffic" (small, wide, full, large, full-large): the car travel time now on one route from TomTom, with the delay over
+          the usual time; wide and up add the distance, arrival time and usual time. It points at nothing in Homey:
+          settings.target is null and settings.route is { "name", "origin": { "name", "latitude", "longitude" },
+          "destination": { same } } in degrees (places are found by name in Management). settings.account picks the TomTom
+          account (the oldest without it). Needs a TomTom account set up in Management.
         - "sonos" (small, wide, full, large, full-large, full-tall): Sonos multiroom; settings.targets lists the ids of the speaker
           devices in order and settings.target is null. The tile shows what the first room that plays is playing with play/pause
           (and skip, from wide up) and one volume for its group; a press opens every room with its own volume and a button that
@@ -222,7 +227,9 @@ public sealed class ManagementTools(
         date, { "kind": "clock", "spot" }, the weather where a Homey is, { "kind": "weather", "spot", "account"? } (the
         Homey account's id, or the oldest without it), or the value of a device's capability, { "kind": "value", "spot",
         "signal" }, whose signal is a Homey capability signal (homey:<account>:capability:<device>:<capability>, see
-        list_signals). Replaces the display's lock screen as a whole.
+        list_signals), or the car travel time on a route from TomTom, { "kind": "traffic", "spot", "route": { "name",
+        "origin": { "name", "latitude", "longitude" }, "destination": { same } }, "account"? } (the TomTom account's id,
+        or the oldest without it; needs a TomTom account set up in Management). Replaces the display's lock screen as a whole.
         """)]
     public async Task<DisplayInfo> SetLockScreen(Guid displayId, LockWidget[] widgets, CancellationToken ct = default)
     {

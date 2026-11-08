@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { DashboardLayout } from './dashboards';
 import { Rule } from './rules';
+import { TrafficRoute } from './traffic';
 
 // Mirrors apps/api/Displays/Display.cs.
 
@@ -30,12 +31,14 @@ export const LOCK_SPOTS: readonly LockSpot[] = ['top-left', 'top-right', 'center
 /**
  * Something a display shows on its lock screen, over the photo set or colour an idle rule plays: the time and date,
  * the weather where a Homey is (of `account`, or the oldest), or the value of a device's capability, named by its
- * Homey signal (`homey:<account>:capability:<device>:<capability>`). Widgets in the same spot stack in order.
+ * Homey signal (`homey:<account>:capability:<device>:<capability>`), or the car travel time on a route (of the TomTom
+ * `account`, or the oldest; ADR-0014), which has nothing to show until a route is chosen. Widgets in the same spot stack in order.
  */
 export type LockWidget =
   | { kind: 'clock'; spot: LockSpot }
   | { kind: 'weather'; spot: LockSpot; account?: number | null }
-  | { kind: 'value'; spot: LockSpot; signal: string };
+  | { kind: 'value'; spot: LockSpot; signal: string }
+  | { kind: 'traffic'; spot: LockSpot; route?: TrafficRoute | null; account?: number | null };
 
 /** The device and capability a Homey capability signal names, `homey:<account>:capability:<device>:<capability>`. */
 export function capabilitySignal(signal: string): { account: number; device: string; capability: string } | null {
