@@ -1,3 +1,4 @@
+import { AccountSelect } from '../account-select';
 import {
   booleanAttribute,
   ChangeDetectionStrategy,
@@ -15,8 +16,19 @@ import {
 } from '@angular/core';
 import { Tile } from '@homey-dash/api-client';
 import { TileSize } from '@homey-dash/layout';
-import { LucideChartLine, LucideSparkles, LucideWorkflow } from '@lucide/angular';
-import { deviceLook, deviceType, isHomeyTarget, TileData, TileKind, TileSettings } from '@homey-dash/tiles';
+import {
+  LucideChartLine,
+  LucideSparkles,
+  LucideWorkflow,
+} from '@lucide/angular';
+import {
+  deviceLook,
+  deviceType,
+  isHomeyTarget,
+  TileData,
+  TileKind,
+  TileSettings,
+} from '@homey-dash/tiles';
 import { PhotoSetField } from './photo-set-field';
 import { PlexTargetField } from './plex-target-field';
 import { SizePicker } from './size-picker';
@@ -30,7 +42,14 @@ import { moved, removedAt, ReorderButtons } from '@homey-dash/design-system';
  */
 @Component({
   selector: 'hd-tile-panel',
-  imports: [PhotoSetField, PlexTargetField, SizePicker, TargetPicker, ReorderButtons],
+  imports: [
+    AccountSelect,
+    PhotoSetField,
+    PlexTargetField,
+    SizePicker,
+    TargetPicker,
+    ReorderButtons,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h2 class="hd-section-title">{{ kind()?.label ?? 'Unknown tile' }}</h2>
@@ -39,21 +58,24 @@ import { moved, removedAt, ReorderButtons } from '@homey-dash/design-system';
       @if (homeyAccounts(); as accounts) {
         <div class="hd-field">
           <label class="hd-field__label" for="tile-account">Homey</label>
-          <select id="tile-account" class="hd-select" (change)="setAccount(+$any($event.target).value)">
-            @if (!homey()) {
-              <option value="" selected>Account removed</option>
-            }
-            @for (account of accounts; track account.accountId) {
-              <option [value]="account.accountId" [selected]="account.accountId === homey()?.accountId">{{ account.accountName }}</option>
-            }
-          </select>
+          <hd-account-select
+            selectId="tile-account"
+            [accounts]="accounts"
+            [selected]="homey()?.accountId"
+            (picked)="setAccount($event)"
+          />
         </div>
       }
       @if (kind.target === 'none') {
         <!-- Points at nothing itself, such as a logic tile. -->
       } @else if (kind.target === 'photoSet') {
-        <hd-photo-set-field [value]="settings().target" (picked)="setTarget($event)" />
-      } @else if (kind.target === 'plexPlayer' || kind.target === 'plexLibrary') {
+        <hd-photo-set-field
+          [value]="settings().target"
+          (picked)="setTarget($event)"
+        />
+      } @else if (
+        kind.target === 'plexPlayer' || kind.target === 'plexLibrary'
+      ) {
         <hd-plex-target-field
           [type]="kind.target"
           [value]="settings().target"
@@ -63,11 +85,25 @@ import { moved, removedAt, ReorderButtons } from '@homey-dash/design-system';
         />
       } @else if (kind.multiple) {
         <div class="hd-field">
-          <label class="hd-field__label" for="tile-target">{{ targetsLabel() }}</label>
-          @for (picked of pickedTargets(); track picked.id; let i = $index, last = $last) {
+          <label class="hd-field__label" for="tile-target">{{
+            targetsLabel()
+          }}</label>
+          @for (
+            picked of pickedTargets();
+            track picked.id;
+            let i = $index, last = $last
+          ) {
             <div class="picked">
-              <span class="picked__name" [class.missing]="!picked.found">{{ picked.label }}</span>
-              <hd-reorder-buttons [label]="picked.label" [first]="i === 0" [last]="last" (moved)="moveTarget(i, $event)" (removed)="removeTarget(i)" />
+              <span class="picked__name" [class.missing]="!picked.found">{{
+                picked.label
+              }}</span>
+              <hd-reorder-buttons
+                [label]="picked.label"
+                [first]="i === 0"
+                [last]="last"
+                (moved)="moveTarget(i, $event)"
+                (removed)="removeTarget(i)"
+              />
             </div>
           }
           <hd-target-picker
@@ -112,23 +148,53 @@ import { moved, removedAt, ReorderButtons } from '@homey-dash/design-system';
       @if (!nested()) {
         <div class="hd-field">
           <span class="hd-field__label">Size</span>
-          <hd-size-picker [value]="tile().size" [enabled]="sizeEnabled()" (picked)="resized.emit($event)" />
+          <hd-size-picker
+            [value]="tile().size"
+            [enabled]="sizeEnabled()"
+            (picked)="resized.emit($event)"
+          />
         </div>
       }
     } @else {
-      <p class="hd-muted">No installed module registers the kind "{{ tile().kind }}". It shows as missing until you remove it.</p>
+      <p class="hd-muted">
+        No installed module registers the kind "{{ tile().kind }}". It shows as
+        missing until you remove it.
+      </p>
     }
 
-    <button type="button" class="hd-btn hd-btn--danger remove" (click)="removed.emit()">
+    <button
+      type="button"
+      class="hd-btn hd-btn--danger remove"
+      (click)="removed.emit()"
+    >
       {{ nested() ? 'Remove from logic tile' : 'Remove tile' }}
     </button>
   `,
   styles: `
-    :host { display: flex; flex-direction: column; gap: var(--space-4); }
-    .remove { align-self: flex-start; margin-top: var(--space-2); }
-    .picked { display: flex; align-items: center; gap: var(--space-1); }
-    .picked__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .picked__name.missing { color: var(--danger); }
+    :host {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+    .remove {
+      align-self: flex-start;
+      margin-top: var(--space-2);
+    }
+    .picked {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+    }
+    .picked__name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .picked__name.missing {
+      color: var(--danger);
+    }
   `,
 })
 export class TilePanel {
@@ -147,25 +213,44 @@ export class TilePanel {
 
   private readonly data = inject(TileData);
 
-  protected readonly settings = computed(() => this.tile().settings as TileSettings);
+  protected readonly settings = computed(
+    () => this.tile().settings as TileSettings,
+  );
 
   /** The Homey of the tile's account, whose devices, flows, moods and recorded values it can point at. */
-  protected readonly homey = computed(() => this.data.homey(this.settings().account));
+  protected readonly homey = computed(() =>
+    this.data.homey(this.settings().account),
+  );
   /** Every Homey, for a Homey kind to pick from once there is more than one. */
   protected readonly homeyAccounts = computed(() => {
     const kind = this.kind();
     const homeys = this.data.homeys() ?? [];
-    return kind && isHomeyTarget(kind.target) && homeys.length > 1 ? homeys : null;
+    return kind && isHomeyTarget(kind.target) && homeys.length > 1
+      ? homeys
+      : null;
   });
 
   protected readonly targetNoun = computed(
     () =>
-      ({ device: 'device', flow: 'flow', mood: 'mood', insight: 'recorded value', photoSet: 'photo set', plexPlayer: 'player', plexLibrary: 'library', none: 'target' })[this.kind()?.target ?? 'device'],
+      ({
+        device: 'device',
+        flow: 'flow',
+        mood: 'mood',
+        insight: 'recorded value',
+        photoSet: 'photo set',
+        plexPlayer: 'player',
+        plexLibrary: 'library',
+        none: 'target',
+      })[this.kind()?.target ?? 'device'],
   );
 
   /** What a kind that takes several targets calls them: `Moods`. */
-  protected readonly targetsLabel = computed(() => `${this.targetNoun().replace(/^./, (c) => c.toUpperCase())}s`);
-  protected readonly labelPlaceholder = computed(() => (this.kind()?.multiple ? this.targetsLabel() : "The target's name"));
+  protected readonly targetsLabel = computed(
+    () => `${this.targetNoun().replace(/^./, (c) => c.toUpperCase())}s`,
+  );
+  protected readonly labelPlaceholder = computed(() =>
+    this.kind()?.multiple ? this.targetsLabel() : "The target's name",
+  );
 
   // Devices, moods and recorded values sit in Homey's zones; flows in its flow folders.
   protected readonly targets = computed<TargetNode>(() => {
@@ -194,7 +279,12 @@ export class TilePanel {
           [...homey.flows.values()].map((f) => ({
             id: f.id,
             label: f.name,
-            type: [f.advanced ? 'Advanced flow' : 'Flow', f.enabled ? '' : 'disabled'].filter(Boolean).join(' · '),
+            type: [
+              f.advanced ? 'Advanced flow' : 'Flow',
+              f.enabled ? '' : 'disabled',
+            ]
+              .filter(Boolean)
+              .join(' · '),
             icon: LucideWorkflow,
             hue: 'flow' as const,
             groupId: f.folderId,
@@ -239,7 +329,11 @@ export class TilePanel {
     const options = new Map(allOptions(this.targets()).map((o) => [o.id, o]));
     return (this.settings().targets ?? []).map((id) => {
       const option = options.get(id);
-      return { id, label: option ? (option.summary ?? option.label) : 'Not found in Homey', found: !!option };
+      return {
+        id,
+        label: option ? (option.summary ?? option.label) : 'Not found in Homey',
+        found: !!option,
+      };
     });
   });
 
@@ -247,11 +341,16 @@ export class TilePanel {
     const kind = this.kind();
     const fits = this.fitsSize();
     const sizes = this.sizes() ?? kind?.sizes ?? [];
-    return (size: TileSize) => size === this.tile().size || (sizes.includes(size) && fits(size));
+    return (size: TileSize) =>
+      size === this.tile().size || (sizes.includes(size) && fits(size));
   });
 
-  private readonly kindSettings = viewChild('kindSettings', { read: ViewContainerRef });
-  private readonly kindSettingsComponent = computed(() => this.kind()?.settings);
+  private readonly kindSettings = viewChild('kindSettings', {
+    read: ViewContainerRef,
+  });
+  private readonly kindSettingsComponent = computed(
+    () => this.kind()?.settings,
+  );
 
   constructor() {
     // The kind's settings component, created once per kind and fed the tile's current settings.
@@ -264,7 +363,9 @@ export class TilePanel {
         container.createComponent(component, {
           bindings: [
             inputBinding('settings', this.settings),
-            outputBinding<Partial<TileSettings>>('changed', (patch) => this.patch(patch)),
+            outputBinding<Partial<TileSettings>>('changed', (patch) =>
+              this.patch(patch),
+            ),
           ],
         });
       });
@@ -273,15 +374,23 @@ export class TilePanel {
 
   protected patch(patch: Partial<TileSettings>) {
     const next = { ...this.settings(), ...patch } as Record<string, unknown>;
-    Object.keys(next).forEach((key) => next[key] === undefined && delete next[key]);
+    Object.keys(next).forEach(
+      (key) => next[key] === undefined && delete next[key],
+    );
     this.settingsChanged.emit(next as unknown as TileSettings);
   }
 
   // Another account's targets are others, so the tile starts over at its kind's default.
   protected setAccount(account: number) {
     const kind = this.kind();
-    const target = (kind?.defaultSettings as TileSettings | undefined)?.target ?? null;
-    this.settingsChanged.emit({ ...this.settings(), account, target, ...(kind?.multiple ? { targets: [] } : {}) });
+    const target =
+      (kind?.defaultSettings as TileSettings | undefined)?.target ?? null;
+    this.settingsChanged.emit({
+      ...this.settings(),
+      account,
+      target,
+      ...(kind?.multiple ? { targets: [] } : {}),
+    });
   }
 
   protected setTarget(target: string) {
@@ -294,11 +403,11 @@ export class TilePanel {
   }
 
   protected removeTarget(index: number) {
-    this.setTargets(removedAt((this.settings().targets ?? []), index));
+    this.setTargets(removedAt(this.settings().targets ?? [], index));
   }
 
   protected moveTarget(index: number, by: -1 | 1) {
-    const targets = moved((this.settings().targets ?? []), index, by);
+    const targets = moved(this.settings().targets ?? [], index, by);
     this.setTargets(targets);
   }
 
