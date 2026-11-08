@@ -1,6 +1,7 @@
 import { AccountSelect } from '../account-select';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { LOCK_SPOTS, LockSpot } from '@homey-dash/api-client';
+import { RuleEditor } from '../editor/rule-editor';
 import { SignalPicker } from '../editor/signal-picker';
 import { DisplayContext } from './display-context';
 import { DisplaysStore, isCapabilitySignal, MAX_LOCK_WIDGETS } from './displays-store';
@@ -17,12 +18,12 @@ const SPOT_NAMES: Record<LockSpot, string> = {
 /** The widgets a display's lock screen shows over a photo set or colour while an idle rule plays it. */
 @Component({
   selector: 'hd-display-lock-tab',
-  imports: [AccountSelect, SignalPicker, ReorderButtons],
+  imports: [AccountSelect, RuleEditor, SignalPicker, ReorderButtons],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
       <div class="lock">
-        <p class="hd-hint">Shown over a photo set or colour while an idle rule plays it. Widgets in the same place stack in this order.</p>
+        <p class="hd-hint">Shown over a photo set or colour while an idle rule plays it. Widgets in the same place stack in this order. A widget can be left out, or shown only while a rule holds.</p>
         @for (widget of display.lockWidgets; track $index; let i = $index, last = $last) {
           <div class="entry">
             <select class="hd-select" [attr.aria-label]="'What widget ' + (i + 1) + ' shows'" (change)="store.setLockKind(display, i, $any($event.target).value)">
@@ -47,8 +48,16 @@ const SPOT_NAMES: Record<LockSpot, string> = {
             } @else {
               <span class="spacer"></span>
             }
+            <select class="hd-select visibility" [attr.aria-label]="'When widget ' + (i + 1) + ' shows'" (change)="store.setLockVisibility(display, i, $any($event.target).value)">
+              <option value="always" [selected]="!widget.hidden && !widget.rule">Always</option>
+              <option value="never" [selected]="!!widget.hidden">Never</option>
+              <option value="rule" [selected]="!widget.hidden && !!widget.rule">When a rule holds</option>
+            </select>
             <hd-reorder-buttons [label]="'widget ' + (i + 1)" [first]="i === 0" [last]="last" (moved)="store.moveLock(display, i, $event)" (removed)="store.removeLock(display, i)" />
           </div>
+          @if (widget.rule && !widget.hidden) {
+            <hd-rule-editor class="editor" [rule]="widget.rule" (changed)="store.setLockRule(display, i, $event)" />
+          }
         }
         <button type="button" class="hd-btn lock__add" [disabled]="display.lockWidgets.length >= maxLock" (click)="store.addLock(display)">Add a widget</button>
       </div>
@@ -58,7 +67,9 @@ const SPOT_NAMES: Record<LockSpot, string> = {
     .lock { display: flex; flex-direction: column; gap: var(--space-2); }
     .entry { display: flex; align-items: center; gap: var(--space-1); }
     .entry .hd-select { flex: 0 1 170px; min-width: 0; }
+    .entry .visibility { flex: 0 0 180px; }
     .signal, .spacer { flex: 1 1 0; min-width: 0; display: block; }
+    .editor { padding: var(--space-3); border: 1px solid var(--line); border-radius: 10px; }
     .lock__add { align-self: flex-start; }
   `,
 })

@@ -30,12 +30,14 @@ export const LOCK_SPOTS: readonly LockSpot[] = ['top-left', 'top-right', 'center
 /**
  * Something a display shows on its lock screen, over the photo set or colour an idle rule plays: the time and date,
  * the weather where a Homey is (of `account`, or the oldest), or the value of a device's capability, named by its
- * Homey signal (`homey:<account>:capability:<device>:<capability>`). Widgets in the same spot stack in order.
+ * Homey signal (`homey:<account>:capability:<device>:<capability>`). Widgets in the same spot stack in order. A hidden
+ * widget stays configured but the screen leaves it out; one with a rule is shown only while it holds (ADR-0010).
  */
-export type LockWidget =
+export type LockWidget = (
   | { kind: 'clock'; spot: LockSpot }
   | { kind: 'weather'; spot: LockSpot; account?: number | null }
-  | { kind: 'value'; spot: LockSpot; signal: string };
+  | { kind: 'value'; spot: LockSpot; signal: string }
+) & { hidden?: boolean; rule?: Rule | null };
 
 /** The device and capability a Homey capability signal names, `homey:<account>:capability:<device>:<capability>`. */
 export function capabilitySignal(signal: string): { account: number; device: string; capability: string } | null {

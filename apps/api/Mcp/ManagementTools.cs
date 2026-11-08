@@ -215,14 +215,16 @@ public sealed class ManagementTools(
     }
 
     [McpServerTool(Name = "set_lock_screen", Idempotent = true)]
-    [Description("""
+    [Description($$"""
         Sets what a display's lock screen shows: widgets laid over the photo set or colour an idle rule plays (see
         set_idle_rules), in order, at most 8. Each sits in a spot, one of "top-left", "top-right",
         "center", "bottom-left" or "bottom-right"; widgets in the same spot stack in order. A widget is the time and
         date, { "kind": "clock", "spot" }, the weather where a Homey is, { "kind": "weather", "spot", "account"? } (the
         Homey account's id, or the oldest without it), or the value of a device's capability, { "kind": "value", "spot",
         "signal" }, whose signal is a Homey capability signal (homey:<account>:capability:<device>:<capability>, see
-        list_signals). Replaces the display's lock screen as a whole.
+        list_signals). A widget with "hidden": true stays configured but is left out; one with a "rule" is shown only
+        while it holds. Replaces the display's lock screen as a whole.
+        {{RuleSchema}}
         """)]
     public async Task<DisplayInfo> SetLockScreen(Guid displayId, LockWidget[] widgets, CancellationToken ct = default)
     {

@@ -8,6 +8,7 @@ export * from './lib/weather/weather-tiles';
 export * from './lib/sonos/sonos-tiles';
 export * from './lib/logic/logic-tile';
 export { shownSections } from './lib/logic/shown-sections';
+export { ruleAnswersOf } from './lib/logic/rule-answers';
 export { capabilityText, deviceLook, deviceType } from './lib/core/device-look';
 export * from './lib/dashboard-view';
 export { backgroundStyle, hasImage, renderedBackgroundStyle } from './lib/background';

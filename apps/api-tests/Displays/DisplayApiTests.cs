@@ -359,6 +359,26 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task ALockWidget_CanBeHiddenOrRuled_AndAnInvalidRuleIsRefused()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var weekend = new { match = "all", conditions = new[] { new { signal = "clock:now", @operator = "onWeekdays", value = new[] { "saturday", "sunday" } } } };
+
+        var saved = await LockScreenAsync(display,
+            new { kind = "clock", spot = "center", hidden = true },
+            new { kind = "clock", spot = "top-left", rule = weekend });
+
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var widgets = (await ViewAsync(screen)).GetProperty("display").GetProperty("lockWidgets");
+        Assert.True(widgets[0].GetProperty("hidden").GetBoolean());
+        Assert.Equal("clock:now", widgets[1].GetProperty("rule").GetProperty("conditions")[0].GetProperty("signal").GetString());
+
+        var invalid = new { match = "all", conditions = new[] { new { signal = "clock:now", @operator = "isTrue" } } };
+        Assert.Equal(HttpStatusCode.BadRequest, (await LockScreenAsync(display, new { kind = "clock", spot = "center", rule = invalid })).StatusCode);
+    }
+
+    [Fact]
     public async Task ALockWidget_NeedsAKnownKindSpotAndCapability()
     {
         var display = await SetUpAsync(Guid.NewGuid());

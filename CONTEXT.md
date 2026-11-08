@@ -25,7 +25,7 @@ What a display shows over the photo set or colour an **Idle rule** plays: its **
 _Avoid_: Screensaver, overlay, clock screen
 
 **Lock screen widget**:
-One thing on a **Lock screen**: the time and date, the weather where a Homey is (Homey's own weather, of the oldest Homey or a chosen one), or the value of one capability of a **Device**. Widgets in the same spot stack in order. One that has nothing to show, such as a weather Homey hasn't told yet or a value whose device is gone, is left out. It can't be operated; touches go through it.
+One thing on a **Lock screen**: the time and date, the weather where a Homey is (Homey's own weather, of the oldest Homey or a chosen one), or the value of one capability of a **Device**. Widgets in the same spot stack in order. Like a **Section**, a widget is shown always, never (it stays in Management but the screen leaves it out) or only while a rule holds; one whose rule hasn't answered yet is left out. One that has nothing to show, such as a weather Homey hasn't told yet or a value whose device is gone, is left out. It can't be operated; touches go through it.
 _Avoid_: Tile, complication
 
 **Dashboard tape**:

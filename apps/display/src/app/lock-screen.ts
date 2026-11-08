@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { capabilitySignal, HomeyWeather, LOCK_SPOTS, LockWidget } from '@homey-dash/api-client';
-import { capabilityText, TileData } from '@homey-dash/tiles';
+import { capabilitySignal, HomeyWeather, LOCK_SPOTS, LockWidget, Rule } from '@homey-dash/api-client';
+import { capabilityText, ruleAnswersOf, TileData } from '@homey-dash/tiles';
 import {
   LucideCloud,
   LucideCloudDrizzle,
@@ -110,8 +110,17 @@ export class LockScreen {
   // Ticks on every minute, for the clock.
   private readonly now = minuteClock();
 
+  // The widgets shown now: not the hidden ones, and those with a rule only while HomeyDash says it holds. One whose
+  // rule has not answered yet, or was refused, is left out.
+  private readonly ruled = computed(() => this.widgets().filter((w) => !w.hidden && w.rule));
+  private readonly heard = ruleAnswersOf(() => this.ruled().map((w) => w.rule as Rule));
+  private readonly shown = computed(() => {
+    const holding = new Set(this.ruled().filter((_, i) => this.heard()[i] === true));
+    return this.widgets().filter((w) => !w.hidden && (!w.rule || holding.has(w)));
+  });
+
   protected readonly spots = computed(() => {
-    const widgets = this.widgets();
+    const widgets = this.shown();
     return LOCK_SPOTS.map((spot) => ({
       spot,
       widgets: widgets.filter((w) => w.spot === spot).map((w) => this.show(w)).filter((s): s is Shown => !!s),

@@ -256,6 +256,30 @@ describe('Displays', () => {
       expect(lockRequest().body.widgets).toEqual([{ kind: 'weather', spot: 'bottom-left' }]);
     });
 
+    it('shows a widget always, never or while a rule holds, keeping the rule it had', async () => {
+      const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'center' }] }], [], '/displays/1/lock');
+      const visibility = () => root.querySelector('[aria-label="When widget 1 shows"]') as HTMLSelectElement;
+      const choose = (value: string) => {
+        visibility().value = value;
+        visibility().dispatchEvent(new Event('change'));
+      };
+
+      choose('rule');
+      const { rule, ...bare } = lockRequest().body.widgets[0];
+      expect(bare).toEqual({ kind: 'clock', spot: 'center' });
+      expect(rule.conditions.length).toBeGreaterThan(0);
+      await stable();
+      expect(root.querySelector('.lock hd-rule-editor')).not.toBeNull();
+
+      choose('never');
+      expect(lockRequest().body.widgets).toEqual([{ kind: 'clock', spot: 'center', hidden: true }]);
+      await stable();
+      expect(root.querySelector('.lock hd-rule-editor')).toBeNull();
+
+      choose('always');
+      expect(lockRequest().body.widgets).toEqual([{ kind: 'clock', spot: 'center' }]);
+    });
+
     it('shows a device value, starting on a temperature, picked from capability signals', async () => {
       const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'bottom-right' }] }], [], '/displays/1/lock');
       const signal = (id: string, name: string) => ({ id, source: 'homey', type: 'number', name, group: 'Thermostat', account: 1 });
