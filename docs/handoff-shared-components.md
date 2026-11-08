@@ -22,8 +22,8 @@ Decisions already made:
 | 1. Shared pure helpers | done (see "Skipped" below) | `3d37357` |
 | 2. Tokens and CSS | done for Management; display-side CSS cleanup deferred (see below) | see git log |
 | 3. design-system Angular primitives | partly done: `hd-reorder-buttons`, shared picker | see git log |
-| 4. Management domain components | todo | — |
-| 5. Shared tile controls | todo | — |
+| 4. Management domain components | partly done: shared Homey/Immich account form and state | see git log |
+| 5. Shared tile controls | started: `hd-statistic-readings` | see git log |
 | 6. Split the big tile files | todo | — |
 
 ### Phase 0 (done)
@@ -92,6 +92,36 @@ Each of these would have added code rather than removed it:
   - `signal-picker.ts` and `target-picker.ts` now hold only their tree logic.
   - Checked by hand in the browser: open, search, close, and the current item scrolled into view.
 - **Still to do:** `hdIcon`, `<hd-page-header>` (back links still use "←"), `<hd-empty-state>`, `<hd-confirm-inline>`, `hdRenameInput`, `hdAutofocus`, `<hd-error-line>`.
+
+### Phase 4 (partly done)
+- **`apps/management/src/app/address-key-accounts.ts`:**
+  - `addressKeyAccounts(api, noun)` holds the state and save/remove logic both panels had copied. It has a spec.
+  - `<hd-address-key-form>` is the shared name/address/API key form.
+  - `homey-account-panel.ts` and `immich-account-panel.ts` now keep only their own rows: Homey's status pills and Immich's partners.
+- **Still to do** from the list below:
+  - `<hd-account-panel>` frame (the Plex and AirPlay panels could use it too)
+  - `tree-utils.ts`
+  - `<hd-album-select>` and `ImmichAccountsStore`
+  - `<hd-account-select>`
+  - `<hd-rule-row>`
+  - `rxResource` for route loading
+  - the immich-partners race
+  - `fittedCell`
+
+### Phase 5 (started)
+- `libs/tiles/src/lib/core/statistic-readings.ts` (`<hd-statistic-readings>`): the readout, chart and figures that `statistic-tile.ts` and `statistic-history.ts` both had.
+- Everything else in the Phase 5 list below is still to do.
+
+### Bundle size
+The initial bundles grew a little:
+- Management: about +10 kB (915 → 926 kB).
+- Display: about +2.4 kB (815 → 817 kB).
+
+The cause is that shared picker, account and page CSS now lives in the global `components.css`, which both apps load up front. Before, it sat in each component's lazily loaded chunk. Both budgets were already exceeded before this work.
+
+If this matters, there are two options:
+- Move the Management-only sections of `components.css` (picker, account, page) into a stylesheet that only `apps/management` loads.
+- Put them back as component `styles` on the shared components: `PickerDialog`, `AddressKeyForm`.
 
 ## Next steps
 
