@@ -252,9 +252,24 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         _state.Replace(Devices, Flows, Moods, Zones, FlowFolders, Variables);
         _state.SetWeather(new HomeyWeather(13.2, "Clouds", 0.81, "Utrecht"));
         _state.SetLocation(new HomeyLocation(52.09, 5.12));
+        _state.SetEnergyLive(new EnergyLive(Grid: -650, Solar: 1830, Home: 1180));
+        _state.SetEnergyDay(FakeEnergyDay());
         _state.SetStatus(HomeyConnection.Connected, fake: true);
         homeys.Set([new Homeys.Entry(Account.Id, Account.Name, this)]);
         return Task.CompletedTask;
+    }
+
+    // Today by the hour so far: the home uses a morning and evening peak, the sun a bell around noon.
+    private EnergyDay FakeEnergyDay()
+    {
+        var now = time.GetLocalNow();
+        var midnight = new DateTimeOffset(now.Year, now.Month, now.Day, 0, 0, 0, now.Offset);
+        var history = Enumerable.Range(0, Math.Max(1, now.Hour + 1))
+            .Select(h => new EnergyPoint(midnight.AddHours(h),
+                Home: Math.Round(.35 + (h is >= 7 and <= 9 or >= 17 and <= 21 ? .9 : .2) + h % 3 * .05, 2),
+                Solar: Math.Round(Math.Max(0, 1.6 - Math.Abs(h - 13) * .28), 2)))
+            .ToList();
+        return new EnergyDay(Imported: 4.2, Exported: 3.1, Solar: 9.8, Home: 10.9, history);
     }
 
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;

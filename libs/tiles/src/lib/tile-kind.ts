@@ -18,7 +18,7 @@ export type KindHue =
  * What a tile kind points at: something in Homey, a photo set, a Plex player or library, or the weather where a Homey is;
  * or nothing itself, as a logic tile, whose tiles each have their own.
  */
-export type TargetType = 'device' | 'flow' | 'mood' | 'insight' | 'photoSet' | 'plexPlayer' | 'plexLibrary' | 'weather' | 'none';
+export type TargetType = 'device' | 'flow' | 'mood' | 'insight' | 'photoSet' | 'plexPlayer' | 'plexLibrary' | 'weather' | 'energy' | 'none';
 
 /** Whether a kind's target is something in Homey, read from the Homey of the tile's account. */
 export function isHomeyTarget(target: TargetType) {
@@ -27,7 +27,7 @@ export function isHomeyTarget(target: TargetType) {
 
 /** Whether a kind's tiles name a Homey account in `settings.account`: those in Homey, and the weather where a Homey is. */
 export function usesHomeyAccount(target: TargetType) {
-  return isHomeyTarget(target) || target === 'weather';
+  return isHomeyTarget(target) || target === 'weather' || target === 'energy';
 }
 
 /**

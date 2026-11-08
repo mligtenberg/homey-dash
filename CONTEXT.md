@@ -193,6 +193,10 @@ _Avoid_: Time tile
 A tile that shows today's date, and on large sizes the month as a calendar with today marked, weeks starting on Monday. It points at nothing.
 _Avoid_: Calendar tile (that is for events, which HomeyDash does not show)
 
+**Energy tile**:
+A tile that shows the energy of a **Homey** from Homey's own energy report (ADR-0014): the grid power now, importing or exporting, and by its size the sun's production, the home's consumption, today's totals and the day by the hour. It names its Homey like any Homey tile. A Homey whose API key lacks the energy scope, or that has no energy, makes it unavailable rather than missing.
+_Avoid_: Power tile, solar tile
+
 **Logic tile**:
 A tile that holds an ordered list of other tiles, each with a rule, and shows the first whose rule holds, or its fallback tile when none does; with no fallback it shows nothing, like empty cells. It holds tiles of any kind except another logic tile, and a tile it holds that points at a missing target is shown as **Missing** when chosen, not skipped. The tiles it holds take its size, so it only holds kinds that support that size. It fades from one tile to the next, and once switched it can stay on a tile for a chosen **Minimum show time**, after which it shows whatever its rules then choose.
 _Avoid_: Logic card, conditional tile, switch tile

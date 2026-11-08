@@ -58,6 +58,10 @@ public sealed class ManagementTools(
           settings.seconds true to show seconds, settings.showDate false to hide the date.
         - "date" (small, wide, full, large, full-large): today's date, and from large the month as a calendar with today
           marked; settings.target is null; optional settings.weekNumbers true numbers the weeks of the calendar.
+        - "energy" (small, wide, full, large, full-large): Homey's own energy report; small shows the grid power now (import or
+          export), wide and full add solar, home consumption and a flow bar, large and full-large add today's totals and a
+          small history of the day. A press opens today in full. settings.target is "energy:home" (settings.account picks
+          which Homey). It shows as unavailable when the Homey's API key lacks the homey.energy.readonly scope.
         - "sonos" (small, wide, full, large, full-large, full-tall): Sonos multiroom; settings.targets lists the ids of the speaker
           devices in order and settings.target is null. The tile shows what the first room that plays is playing with play/pause
           (and skip, from wide up) and one volume for its group; a press opens every room with its own volume and a button that
@@ -71,7 +75,7 @@ public sealed class ManagementTools(
           take its size, so hold only kinds that support that size, and never another logic tile. Keep a dashboard's
           existing logic tiles as they are when changing other parts of the draft.
         Every tile's settings may have a "label" that overrides its target's name. A home can have several Homey and Plex
-        accounts: a Homey, weather or Plex tile's settings.account is the account of its target (list_targets gives it); left out, the
+        accounts: a Homey, weather, energy or Plex tile's settings.account is the account of its target (list_targets gives it); left out, the
         oldest account. A mood-list tile's moods are all in its one account.
         """;
 
@@ -260,7 +264,7 @@ public sealed class ManagementTools(
         album and are made in Management, so assistants can only use the ones that exist.
         """)]
     public async Task<IEnumerable<Target>> ListTargets(
-        [Description("device, flow, mood, insight, photoSet, plexPlayer, plexLibrary or weather")] string type, CancellationToken ct) =>
+        [Description("device, flow, mood, insight, photoSet, plexPlayer, plexLibrary, weather or energy")] string type, CancellationToken ct) =>
         type switch
         {
             "device" => homeys.All.SelectMany(h => h.State.Devices.OrderBy(d => d.Name).Select(d =>
@@ -277,9 +281,10 @@ public sealed class ManagementTools(
             "plexLibrary" => plex.Overviews.SelectMany(o => (IEnumerable<Target>)[
                 new Target(TargetCatalog.AllPlexLibraries, "All libraries", $"on {o.AccountName}", o.AccountId),
                 .. o.Libraries.Select(l => new Target(TargetCatalog.PlexLibraryPrefix + l.Id, l.Title, $"{l.Type} on {o.AccountName}", o.AccountId))]),
+            "energy" => homeys.All.Select(h => new Target(TargetCatalog.EnergyHome, "Energy", $"of {h.Name}", h.AccountId)),
             "weather" => homeys.All.Select(h => new Target(TargetCatalog.WeatherHere, "Weather", $"where {h.Name} is", h.AccountId))
                 .Append(new Target(TargetCatalog.WeatherPlace, "Weather at a place", "the place in settings.place")),
-            _ => throw new McpException($"Unknown target type {type}; use device, flow, mood, insight, photoSet, plexPlayer, plexLibrary or weather."),
+            _ => throw new McpException($"Unknown target type {type}; use device, flow, mood, insight, photoSet, plexPlayer, plexLibrary, weather or energy."),
         };
 
     public sealed record ZoneInfo(string Id, string Name, string Path, string? ParentId, string Homey, int Account, int Devices, int Moods);

@@ -1,6 +1,7 @@
 import { Signal } from '@angular/core';
 import {
   HomeyDevice,
+  HomeyEnergy,
   HomeyFlow,
   HomeyFlowFolder,
   HomeyInsightLog,
@@ -29,6 +30,8 @@ export interface HomeyData {
   flowFolders: ReadonlyMap<string, HomeyFlowFolder>;
   /** The weather where this Homey is; null until Homey first told it, or when Homey won't. */
   weather: HomeyWeather | null;
+  /** Homey's energy report; null until HomeyDash first asked Homey for it. */
+  energy: HomeyEnergy | null;
 }
 
 /**

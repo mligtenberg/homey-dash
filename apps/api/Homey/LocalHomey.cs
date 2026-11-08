@@ -28,6 +28,8 @@ public sealed class LocalHomey(
 
     // Homey doesn't tell when its weather changes, and it changes slowly.
     public static TimeSpan WeatherInterval { get; set; } = TimeSpan.FromMinutes(10);
+    public static TimeSpan EnergyInterval { get; set; } = TimeSpan.FromSeconds(10);
+    public static TimeSpan EnergyDayInterval { get; set; } = TimeSpan.FromMinutes(5);
 
     public HomeyAccount Account => account;
 
@@ -119,6 +121,7 @@ public sealed class LocalHomey(
 
             using var session = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var weather = FollowWeatherAsync(session.Token);
+            var energy = FollowEnergyAsync(session.Token);
             try
             {
                 await socket.Completion.WaitAsync(ct);
@@ -126,7 +129,7 @@ public sealed class LocalHomey(
             finally
             {
                 await session.CancelAsync();
-                await weather;
+                await Task.WhenAll(weather, energy);
             }
             throw new InvalidOperationException("Homey's realtime connection ended");
         }
@@ -206,6 +209,50 @@ public sealed class LocalHomey(
             try
             {
                 await Task.Delay(WeatherInterval, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+    }
+
+    // Reads Homey's own energy report for the energy tile (ADR-0014): the live power every 10 seconds, today's report every 5
+    // minutes. An API key without the homey.energy.readonly scope, or a Homey with no energy, makes it unavailable rather than failing.
+    private async Task FollowEnergyAsync(CancellationToken ct)
+    {
+        var nextDay = DateTimeOffset.MinValue;
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                var live = HomeyMapper.EnergyLive(await GetJsonAsync("api/manager/energy/live", ct));
+                if (live is null)
+                {
+                    state.SetEnergyUnavailable();
+                    return;
+                }
+                state.SetEnergyLive(live);
+                if (DateTimeOffset.UtcNow >= nextDay)
+                {
+                    var date = DateTimeOffset.Now.ToString("yyyy-MM-dd");
+                    state.SetEnergyDay(HomeyMapper.EnergyDay(await GetJsonAsync($"api/manager/energy/report/day?date={date}", ct)));
+                    nextDay = DateTimeOffset.UtcNow + EnergyDayInterval;
+                }
+            }
+            catch (HttpRequestException e) when (e.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized or HttpStatusCode.NotFound)
+            {
+                logger.LogWarning("Homey {Account} won't tell its energy (it needs the homey.energy.readonly scope): {Error}", account.Name, e.Message);
+                state.SetEnergyUnavailable();
+                return;
+            }
+            catch (Exception e) when (e is HttpRequestException or JsonException || e is OperationCanceledException && !ct.IsCancellationRequested)
+            {
+                logger.LogDebug("Could not read the energy of Homey {Account}: {Error}", account.Name, e.Message);
+            }
+            try
+            {
+                await Task.Delay(EnergyInterval, ct);
             }
             catch (OperationCanceledException)
             {
