@@ -138,8 +138,9 @@ const TAPE_KEY = 'homeydash.tape';
   styles: `
     :host { display: block; height: 100dvh; overflow: hidden; position: relative; --lock-edge: clamp(20px, 5vh, 56px); }
     hd-dashboard-view { height: 100%; box-sizing: border-box; }
-    /* A gutter for the dashboard tape's toggle, so it floats beside the tiles rather than over them. */
-    hd-dashboard-view.has-tape { padding-left: calc(44px + var(--space-3) * 2); }
+    /* A gutter for the dashboard tape's toggle, so it floats beside the tiles rather than over them. The pages scroll
+       under it and fade out there; their content starts after it. Keep in step with TAPE_GUTTER below. */
+    hd-dashboard-view.has-tape { --dashboard-gutter: 68px; }
     .waiting { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); text-align: center; padding: var(--space-4); box-sizing: border-box; }
     .waiting h1 { margin: 0; font-size: var(--text-screen-title); line-height: 1.15; font-weight: 800; text-wrap: balance; }
     .waiting p { margin: 0; color: var(--ink-muted); line-height: 1.45; text-wrap: balance; }
@@ -239,7 +240,13 @@ export class App {
 
   private readonly height = signal(window.innerHeight);
   private readonly width = signal(window.innerWidth);
-  protected readonly cell = computed(() => fittedCellSize(this.width(), this.height(), this.current()?.layout.rows));
+  // The room the tape's toggle takes from the left edge: its width plus a gap either side (44px + 2 x --space-3).
+  private static readonly TAPE_GUTTER = 68;
+  protected readonly cell = computed(() => {
+    const gutter = (this.view()?.dashboards.length ?? 0) > 1 ? App.TAPE_GUTTER : 0;
+    const layout = this.current()?.layout;
+    return fittedCellSize(this.width() - gutter, this.height(), layout?.rows, layout?.sections.length);
+  });
 
   constructor() {
     // Fully Kiosk Browser turns its screen off while a rule says so, and on again when the rule lets go, a touch ends

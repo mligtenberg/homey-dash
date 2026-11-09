@@ -47,4 +47,11 @@ describe('fittedCellSize', () => {
 
     expect(fittedCellSize(width(3, cell * 0.85), 800, 4)).toBeCloseTo(cell);
   });
+
+  it('keeps the cell when the dashboard has no section to take the room', () => {
+    const cell = cellSize(800, 4);
+
+    expect(fittedCellSize(width(3, cell * 0.95), 800, 4, 2)).toBeCloseTo(cell);
+    expect(fittedCellSize(width(3, cell * 0.95), 800, 4, 3)).toBeCloseTo(cell * 0.95);
+  });
 });

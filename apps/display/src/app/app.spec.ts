@@ -169,7 +169,10 @@ describe('App', () => {
       expect(tape(root)).toEqual([]);
       expect(localStorage.getItem('homeydash.tape')).toBeNull();
       expect(await currentName(root)).toBe('Garden');
-      expect(parseFloat(root.style.getPropertyValue('--cell'))).toBeCloseTo(fittedCellSize(window.innerWidth, window.innerHeight, 6));
+      expect(parseFloat(root.style.getPropertyValue('--cell'))).toBeCloseTo(
+        // The tape's 68px gutter is not room for sections, and a dashboard with none has nothing to shrink for.
+        fittedCellSize(window.innerWidth - 68, window.innerHeight, 6, 0),
+      );
     });
 
     it('stays on the one picked once left alone, when no idle rule holds', async () => {

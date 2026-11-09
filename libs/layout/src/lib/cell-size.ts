@@ -43,11 +43,19 @@ export const MAX_CELL_SHRINK = 0.1;
 
 /**
  * Like `cellSize`, but when shrinking the cell by up to 10% lets one more whole section fit
- * across `width`, shrinks it just enough for that, so the extra section takes the space.
+ * across `width`, shrinks it just enough for that, so the extra section takes the space. With only `sectionCount`
+ * sections there is nothing more to fit, so it never shrinks for a section that does not exist.
  */
-export function fittedCellSize(width: number, height: number, rows: number = DEFAULT_ROWS): number {
+export function fittedCellSize(
+  width: number,
+  height: number,
+  rows: number = DEFAULT_ROWS,
+  sectionCount: number = Infinity,
+): number {
   const cell = cellSize(height, rows);
   const next = sectionsPerPage(width, cell) + 1;
+  // No extra section to take the room: keep the cell as large as the height allows.
+  if (next > sectionCount) return cell;
   const widest = width / (2 * DASHBOARD_PADDING + next * SECTION_WIDTH + (next - 1) * SECTION_GAP);
   return widest >= cell * (1 - MAX_CELL_SHRINK) ? widest : cell;
 }

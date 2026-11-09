@@ -21,6 +21,8 @@
   scrollbar-width: none;
 }
 .hd-dashboard__pages::-webkit-scrollbar { display: none; }
+/* A page swiping across the gutter fades out under the floating control instead of being cut off. */
+.hd-dashboard__pages { mask-image: linear-gradient(to right, transparent calc(var(--dashboard-gutter, 0px) * .3), #000 var(--dashboard-gutter, 0px)); }
 .hd-dashboard__page {
   flex: none;
   width: 100%;
@@ -28,7 +30,8 @@
   display: flex;
   justify-content: center;
   gap: calc(var(--cell) * var(--section-gap));
-  padding: calc(var(--cell) * var(--cell-gap)) calc(var(--cell) * var(--cell-gap)) 0;
+  /* --dashboard-gutter is the strip on the left that a floating control sits in; sections are centred in what is left. */
+  padding: calc(var(--cell) * var(--cell-gap)) calc(var(--cell) * var(--cell-gap)) 0 calc(var(--cell) * var(--cell-gap) + var(--dashboard-gutter, 0px));
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
@@ -46,7 +49,7 @@
   display: grid; place-items: center;
 }
 .hd-page-dot::before {
-  content: ""; width: calc(var(--cell) * .055); height: calc(var(--cell) * .055); border-radius: 50%;
+  content: ""; width: calc(var(--cell) * .08); height: calc(var(--cell) * .08); border-radius: 50%;
   background: var(--ink-muted); opacity: .35; transition: opacity .2s, scale .2s;
 }
 .hd-page-dot[aria-current="true"]::before { opacity: 1; scale: 1.3; }

@@ -207,7 +207,7 @@ Each kind has an `-ink` (icon, chart line, slider fill, chip; 4.5:1 on `tile-sur
 
 ## Layout
 
-A display shows a dashboard as sections side by side. A section is 3 cells wide and `rows` tall. Cell size is screen height ÷ rows. Only whole sections that fit the width are shown, centred, as one page; further sections are further pages, swiped between, with a dot per page. Tiles snap to a fixed set of sizes (small 1×1, wide 2×1, full 3×1, large 2×2, full-large 3×2, full-tall 3×4), never overlap, never reflow, and dashboards never scroll vertically.
+A display shows a dashboard as sections side by side. A section is 3 cells wide and `rows` tall. Cell size is screen height ÷ rows. Only whole sections that fit the width are shown, centred, as one page; further sections are further pages, swiped between, with a dot per page. On a display with several dashboards, the first 68px on the left is a gutter for the dashboard tape: sections are fitted to and centred in what is left, and a page swiping across the gutter fades out under the tape. A cell only shrinks (by up to 10%) to fit another section when the dashboard has one to show. Tiles snap to a fixed set of sizes (small 1×1, wide 2×1, full 3×1, large 2×2, full-large 3×2, full-tall 3×4), never overlap, never reflow, and dashboards never scroll vertically.
 
 All display measures are ratios times `--cell`: gap 0.08, section gap 0.176, padding 0.11, radius 0.2, icon 0.27, control 0.42.
 
