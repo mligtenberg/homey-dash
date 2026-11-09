@@ -488,6 +488,8 @@ public sealed class LocalHomey(
         var path = $"api/manager/presence/{Uri.EscapeDataString(userId)}";
         if (present is { } p) await SendAsync(HttpMethod.Put, $"{path}/present", new { value = p }, ct);
         if (asleep is { } a) await SendAsync(HttpMethod.Put, $"{path}/asleep", new { value = a }, ct);
+        // Ask Homey how people are now rather than wait for an event that presence may not send.
+        state.SetUsers(HomeyMapper.Values(await GetJsonAsync("api/manager/users/user", ct)).Select(HomeyMapper.User));
     }
 
     public async Task JoinSpeakerGroupAsync(string deviceId, string withDeviceId, CancellationToken ct)
