@@ -58,6 +58,8 @@
   --rest-tint: 22%;
   /* Poster and cover art keeps its own light. In dark it dims, so a poster is not the brightest thing on a night wall. */
   --art-dim: 1;
+  /* Solar generation drawn over the energy blues: the lamp amber at its brightest, so it reads as amber and not as a muddy brown. */
+  --solar-mark: var(--kind-light-fill);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -103,6 +105,7 @@
     --kind-neutral-fill: #2a4072;
     --rest-tint: 36%;
     --art-dim: .7;
+    --solar-mark: var(--kind-light-ink);
     }
 }
 
@@ -148,6 +151,7 @@
   --kind-neutral-fill: #2a4072;
   --rest-tint: 36%;
   --art-dim: .7;
+  --solar-mark: var(--kind-light-ink);
 }
 
 :root {

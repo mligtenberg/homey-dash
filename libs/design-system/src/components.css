@@ -506,6 +506,8 @@
   background: conic-gradient(from 225deg, var(--k-ink) calc(var(--fraction, 0) * 270deg), color-mix(in oklab, var(--k-ink) 16%, transparent) 0 270deg, transparent 0);
   mask: radial-gradient(farthest-side, transparent calc(100% - var(--cell) * .16), #000 calc(100% - var(--cell) * .16 + 1px));
 }
+/* A thermostat has only its dial and two buttons: they sit together at the centre instead of in two far-apart halves. */
+.hd-dev:has(.hd-dev__dial) { grid-template-columns: auto auto; justify-content: center; column-gap: calc(var(--cell) * 1); }
 .hd-dev__dial-inner { display: flex; flex-direction: column; align-items: center; gap: calc(var(--cell) * .08); }
 .hd-dev__stepper .hd-round-btns { justify-content: center; gap: calc(var(--cell) * .4); padding: 0; background: none; }
 .hd-dev__stepper .hd-round-btns .hd-round-btn { width: calc(var(--cell) * .8); height: calc(var(--cell) * .8); font-size: calc(var(--cell) * .4); background: color-mix(in oklab, var(--k-ink) 16%, transparent); }
@@ -1570,7 +1572,7 @@ a.hd-btn { text-decoration: none; }
 .hd-energy__day { grid-area: day; display: flex; flex-direction: column; justify-content: flex-end; gap: calc(var(--cell) * .03); min-height: 0; }
 .hd-energy__day svg { width: 100%; flex: 1; min-height: 0; }
 .hd-energy__bar-home { fill: var(--k-ink); }
-.hd-energy__bar-solar { fill: var(--kind-light-ink); }
+.hd-energy__bar-solar { fill: var(--solar-mark); }
 .hd-energy__axis { display: flex; justify-content: space-between; font-size: max(var(--t-caption-min), calc(var(--cell) * var(--t-caption))); font-weight: 600; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
 /* The day in full: the grid now, the figures of the day, then the power, the hours and the devices, two abreast when wide. */
 .hd-details--screen:has(.hd-energy__pane) {
@@ -1603,7 +1605,7 @@ a.hd-btn { text-decoration: none; }
 .hd-energy__legend { display: flex; align-items: center; gap: calc(var(--cell) * .06); margin: 0; font-size: max(var(--t-caption-min), calc(var(--cell) * var(--t-caption))); color: var(--ink-muted); }
 .hd-energy__key { width: calc(var(--cell) * .1); height: calc(var(--cell) * .1); border-radius: 2px; margin-left: calc(var(--cell) * .1); }
 .hd-energy__key:first-child { margin-left: 0; }
-.hd-energy__key--solar { background: var(--kind-light-ink); }
+.hd-energy__key--solar { background: var(--solar-mark); }
 .hd-energy__key--home { background: var(--k-ink); }
 .hd-energy__devices { display: flex; flex-direction: column; gap: calc(var(--cell) * .07); margin: 0; padding: 0; list-style: none; }
 .hd-energy__devices li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: calc(var(--cell) * .03) calc(var(--cell) * .1); align-items: baseline; }

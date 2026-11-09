@@ -14,7 +14,7 @@ import { clamp, clockTime, describeDevice, deviceLogs, sameLogs } from './device
 import { StatisticHistory } from './statistic-history';
 import { TileDetails } from './tile-details';
 import { flasher } from './tile-view';
-import { LucideLock, LucideLockOpen, LucideSpeaker, LucideVolume2, LucideVolumeX, clock } from '@homey-dash/design-system';
+import { LucideLock, LucideLockOpen, LucideVolume2, LucideVolumeX, clock } from '@homey-dash/design-system';
 
 
 const ON_OFF_STATES = [
@@ -85,10 +85,10 @@ const LOCK_STATES = [
                     @if (!images.has(art)) {
                       <img [src]="art" alt="" draggable="false" (error)="images.mark(art)" />
                     } @else {
-                      <svg class="hd-dev__glyph" [lucideIcon]="speakerIcon" />
+                      <svg class="hd-dev__glyph" [lucideIcon]="icon()" />
                     }
                   } @else {
-                    <svg class="hd-dev__glyph" [lucideIcon]="speakerIcon" />
+                    <svg class="hd-dev__glyph" [lucideIcon]="icon()" />
                   }
                 </div>
                 @if (c.remote) {
@@ -253,7 +253,6 @@ export class DeviceDetails {
   protected readonly page = signal<'device' | 'apps' | 'history'>('device');
   protected readonly volumeIcon = LucideVolume2;
   protected readonly muteIcon = LucideVolumeX;
-  protected readonly speakerIcon = LucideSpeaker;
   /** The cover that did not load, so the speaker's icon shows instead of a broken picture. */
   protected readonly images = brokenImages();
   protected readonly lockIcon = LucideLock;
