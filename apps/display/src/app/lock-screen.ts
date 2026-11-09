@@ -47,14 +47,14 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
               </div>
             }
             @case ('weather') {
-              <div class="weather" [attr.aria-label]="widget.state + ', ' + widget.temperature">
+              <div class="weather" role="group" [attr.aria-label]="widget.state + ', ' + widget.temperature">
                 <svg class="weather__icon" [lucideIcon]="widget.icon" />
                 <span class="weather__temperature">{{ widget.temperature }}</span>
                 <span class="weather__state">{{ widget.state }}</span>
               </div>
             }
             @case ('traffic') {
-              <div class="traffic" [class.is-unavailable]="widget.unavailable" [attr.data-delay]="widget.level" [attr.aria-label]="widget.name + ', ' + widget.time + ', ' + widget.delay">
+              <div class="traffic" role="group" [class.is-unavailable]="widget.unavailable" [attr.data-delay]="widget.level" [attr.aria-label]="widget.name + ', ' + widget.time + ', ' + widget.delay">
                 <svg class="traffic__icon" [lucideIcon]="car" />
                 <span class="traffic__time">{{ widget.time }}</span>
                 <span class="traffic__name">{{ widget.name }} · {{ widget.delay }}</span>
@@ -109,8 +109,8 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
     .weather__icon, .traffic__icon { width: calc(4 * var(--u)); height: calc(4 * var(--u)); stroke-width: 1.6; }
     .weather__temperature, .traffic__time, .value__reading { font-size: calc(4.6 * var(--u)); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
     .weather__state, .traffic__name, .value__name { grid-column: 1 / -1; font-size: calc(1.9 * var(--u)); font-weight: 500; opacity: .82; white-space: nowrap; margin-top: calc(.7 * var(--u)); }
-    .traffic[data-delay='some'] .traffic__time, .traffic[data-delay='some'] .traffic__icon { color: #ffd166; }
-    .traffic[data-delay='heavy'] .traffic__time, .traffic[data-delay='heavy'] .traffic__icon { color: #ff9b85; }
+    .traffic[data-delay='some'] .traffic__time, .traffic[data-delay='some'] .traffic__icon { color: var(--lock-warn); }
+    .traffic[data-delay='heavy'] .traffic__time, .traffic[data-delay='heavy'] .traffic__icon { color: var(--lock-danger); }
     .value { display: flex; flex-direction: column; }
     .value__units { font-size: .5em; font-weight: 500; margin-left: .15em; opacity: .85; }
     .value__name { margin-top: calc(.7 * var(--u)); }

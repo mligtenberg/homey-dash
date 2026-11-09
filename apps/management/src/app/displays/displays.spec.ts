@@ -96,23 +96,23 @@ describe('Displays', () => {
   });
 
   describe('dashboards', () => {
-    const checks = (root: HTMLElement) => [...root.querySelectorAll<HTMLInputElement>('.dashboards input')];
+    const names = (root: HTMLElement) => [...root.querySelectorAll('.dashboards .hd-item__title')].map((c) => c.textContent?.trim());
+    const button = (root: HTMLElement, label: string) => root.querySelector(`[aria-label="${label}"]`) as HTMLButtonElement;
     const assigned = () => TestBed.inject(HttpTestingController).expectOne('/api/displays/1/dashboards').request.body;
 
     it('lists the ones it offers in order, then the other published ones', async () => {
       const root = await render([display('1', 'Hallway', ['k', 'g'], status({}))]);
 
-      expect([...root.querySelectorAll('.dashboards .hd-check')].map((c) => c.textContent?.trim())).toEqual(['Kitchen', 'Garden', 'Cinema']);
-      expect(checks(root).map((c) => c.checked)).toEqual([true, true, false]);
+      expect(names(root)).toEqual(['Kitchen', 'Garden', 'Cinema']);
     });
 
-    it('offers a checked one last, and stops offering an unchecked one', async () => {
+    it('offers an added one last, and stops offering a removed one', async () => {
       const root = await render([display('1', 'Hallway', ['k', 'g'], status({}))]);
 
-      checks(root)[2].click();
+      button(root, 'Add Cinema to this display').click();
       expect(assigned()).toEqual({ dashboardIds: ['k', 'g', 'c'] });
 
-      checks(root)[0].click();
+      button(root, 'Take Kitchen off this display').click();
       expect(assigned()).toEqual({ dashboardIds: ['g'] });
     });
 
@@ -244,11 +244,10 @@ describe('Displays', () => {
     it('moves a widget to another place, and removes it', async () => {
       const lockWidgets: LockWidget[] = [{ kind: 'clock', spot: 'center' }, { kind: 'weather', spot: 'top-right' }];
       const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets }], [], '/displays/1/lock');
-      const where = root.querySelector('[aria-label="Where widget 2 sits"]') as HTMLSelectElement;
+      const spots = [...root.querySelectorAll('#lock-widget-1 .spots [role="radio"]')] as HTMLButtonElement[];
 
-      expect([...where.options].map((o) => o.textContent?.trim())).toEqual(['Top left', 'Top right', 'Middle', 'Bottom left', 'Bottom right']);
-      where.value = 'bottom-left';
-      where.dispatchEvent(new Event('change'));
+      expect(spots.map((o) => o.getAttribute('aria-label'))).toEqual(['Top left', 'Top right', 'Middle', 'Bottom left', 'Bottom right']);
+      spots[3].click();
       expect(lockRequest().body.widgets).toEqual([{ kind: 'clock', spot: 'center' }, { kind: 'weather', spot: 'bottom-left' }]);
       await stable();
 
@@ -258,25 +257,22 @@ describe('Displays', () => {
 
     it('shows a widget always, never or while a rule holds, keeping the rule it had', async () => {
       const root = await render([{ ...display('1', 'Hallway', ['k'], status({})), lockWidgets: [{ kind: 'clock', spot: 'center' }] }], [], '/displays/1/lock');
-      const visibility = () => root.querySelector('[aria-label="When widget 1 shows"]') as HTMLSelectElement;
-      const choose = (value: string) => {
-        visibility().value = value;
-        visibility().dispatchEvent(new Event('change'));
-      };
+      const choose = (label: string) =>
+        ([...root.querySelectorAll('#lock-widget-0 .seg__btn')] as HTMLButtonElement[]).find((b) => b.textContent?.trim() === label)?.click();
 
-      choose('rule');
+      choose('When a rule holds');
       const { rule, ...bare } = lockRequest().body.widgets[0];
       expect(bare).toEqual({ kind: 'clock', spot: 'center' });
       expect(rule.conditions.length).toBeGreaterThan(0);
       await stable();
       expect(root.querySelector('.lock hd-rule-editor')).not.toBeNull();
 
-      choose('never');
+      choose('Never');
       expect(lockRequest().body.widgets).toEqual([{ kind: 'clock', spot: 'center', hidden: true }]);
       await stable();
       expect(root.querySelector('.lock hd-rule-editor')).toBeNull();
 
-      choose('always');
+      choose('Always');
       expect(lockRequest().body.widgets).toEqual([{ kind: 'clock', spot: 'center' }]);
     });
 
@@ -352,8 +348,8 @@ describe('Displays', () => {
     const root = await render([display('1', 'Hallway', ['k'], status({}))], [], '/displays/1');
 
     expect(root.querySelector('h1')?.textContent).toBe('Hallway');
-    expect([...root.querySelectorAll('.tab')].map((t) => t.textContent?.trim())).toEqual(['Details', 'Dashboards', 'When idle', 'Lock screen']);
-    expect(root.querySelector('.tab[aria-current="page"]')?.textContent).toBe('Details');
+    expect([...root.querySelectorAll('.tab')].map((t) => t.textContent?.trim())).toEqual(['Status', 'Dashboards', 'When idle', 'Lock screen']);
+    expect(root.querySelector('.tab[aria-current="page"]')?.textContent).toBe('Status');
   });
 
   describe('details', () => {
@@ -385,7 +381,7 @@ describe('Displays', () => {
       expect(r['Browser']).toBe('Android WebView 119');
       expect(r['System']).toBe('Android 11');
       expect(r['JavaScript interface']).toBe('Supported');
-      expect(r['Current']).toBe('1,234 lx');
+      expect(r['Light now']).toBe('1,234 lx');
       expect(r['Measured with']).toBe('Camera (an estimate)');
       expect(r['Battery']).toBe('80%, charging');
       expect(r['Secure context']).toContain('No');

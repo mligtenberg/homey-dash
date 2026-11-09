@@ -158,10 +158,10 @@ export class DisplaysStore {
   // Lock screen
 
   // A new widget is a clock in the middle while there is none yet, else the weather at the top right.
-  addLock(display: DisplayInfo) {
+  addLock(display: DisplayInfo, spot?: LockSpot) {
     const widget: LockWidget = display.lockWidgets.some((w) => w.kind === 'clock')
-      ? { kind: 'weather', spot: 'top-right' }
-      : { kind: 'clock', spot: 'center' };
+      ? { kind: 'weather', spot: spot ?? 'top-right' }
+      : { kind: 'clock', spot: spot ?? 'center' };
     this.saveLock(display, [...display.lockWidgets, widget]);
   }
 
@@ -220,8 +220,11 @@ export class DisplaysStore {
     this.saveLock(display, display.lockWidgets.map((w, i) => (i === index && w.kind === 'value' ? { ...w, signal } : w)));
   }
 
-  moveLock(display: DisplayInfo, index: number, by: -1 | 1) {
-    this.saveLock(display, moved(display.lockWidgets, index, by));
+  // Swaps two widgets; the lock tab swaps neighbours within one place, which may not be neighbours in the list.
+  swapLock(display: DisplayInfo, a: number, b: number) {
+    const list = [...display.lockWidgets];
+    [list[a], list[b]] = [list[b], list[a]];
+    this.saveLock(display, list);
   }
 
   removeLock(display: DisplayInfo, index: number) {

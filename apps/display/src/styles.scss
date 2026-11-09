@@ -6,4 +6,14 @@ body {
 
 .hd-display {
   height: 100dvh;
+  // A wall screen is touched, not read: no text selection, grey tap flash or pull-to-refresh bounce.
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+.hd-display :is(input, textarea, select) {
+  user-select: text;
+  -webkit-user-select: text;
 }

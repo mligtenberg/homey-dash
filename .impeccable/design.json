@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-08T23:54:50.608517Z",
+  "title": "Design System: HomeyDash",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "tile-raised",
+        "value": "0 1px 2px color-mix(in oklab, var(--emboss-shade) 60%, transparent), 0 calc(var(--cell) * .05) calc(var(--cell) * .14) calc(var(--cell) * -.04) var(--emboss-shade)",
+        "purpose": "Every resting display tile."
+      },
+      {
+        "name": "tape-pill",
+        "value": "0 1px 3px color-mix(in oklab, var(--emboss-shade) 60%, transparent)",
+        "purpose": "Dashboard tape pills."
+      }
+    ],
+    "motion": [
+      {
+        "name": "press",
+        "value": "transform .12s ease",
+        "purpose": "Tile press feedback, scale 0.96."
+      },
+      {
+        "name": "tape-out",
+        "value": ".2s ease-out",
+        "purpose": "Dashboard tape pills opening."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one main action in Management.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Publish</button>",
+      "css": ".ds-btn{font:700 14px/1.3 var(--font-sans);padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}.ds-btn-primary{background:var(--brand);color:var(--on-brand);border-color:transparent}.ds-btn:active{transform:scale(.97)}.ds-btn:focus-visible{outline:3px solid var(--brand);outline-offset:2px}"
+    },
+    {
+      "name": "Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Secondary actions.",
+      "html": "<button class=\"ds-btn\">Preview</button>",
+      "css": ".ds-btn{font:700 14px/1.3 var(--font-sans);padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}.ds-btn:active{transform:scale(.97)}.ds-btn:focus-visible{outline:3px solid var(--brand);outline-offset:2px}"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Text field with label.",
+      "html": "<div class=\"ds-field\"><label>Name</label><input class=\"ds-input\" placeholder=\"Kitchen wall\"></div>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:6px}.ds-field label{font:700 12px/1.3 var(--font-sans);color:var(--ink-muted)}.ds-input{font:500 14px/1.3 var(--font-sans);padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--chrome);color:var(--ink)}.ds-input:focus-visible{outline:3px solid var(--brand);outline-offset:2px}"
+    },
+    {
+      "name": "Status pill",
+      "kind": "chip",
+      "refersTo": "panel",
+      "description": "State with a word, never colour alone.",
+      "html": "<span class=\"ds-pill\">Connected</span>",
+      "css": ".ds-pill{display:inline-flex;align-items:center;gap:6px;font:700 12px/1.3 var(--font-sans);padding:4px 10px;border-radius:999px;color:var(--ok);background:color-mix(in oklab,var(--ok) 14%,transparent)}.ds-pill::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}"
+    },
+    {
+      "name": "Tape item",
+      "kind": "nav",
+      "refersTo": "tape-item",
+      "description": "Dashboard switch pill on a display.",
+      "html": "<button class=\"ds-tape\">Living room</button>",
+      "css": ".ds-tape{min-height:44px;padding:10px 16px;border:0;border-radius:999px;background:color-mix(in oklab,var(--panel) 72%,transparent);backdrop-filter:blur(12px);box-shadow:0 1px 3px color-mix(in oklab,var(--emboss-shade) 60%,transparent);color:var(--ink-muted);font:600 14px/1.2 var(--font-sans);cursor:pointer}.ds-tape:focus-visible{outline:3px solid var(--brand);outline-offset:2px}"
+    },
+    {
+      "name": "Light tile",
+      "kind": "card",
+      "refersTo": "tile",
+      "description": "A resting tile with its kind tint, 200px cell.",
+      "html": "<div class=\"ds-tile\"><div class=\"ds-name\">Reading lamp</div><div class=\"ds-detail\">Off</div></div>",
+      "css": ".ds-tile{--cell:200px;box-sizing:border-box;width:200px;height:200px;display:flex;flex-direction:column;justify-content:space-between;padding:22px;border-radius:40px;background:color-mix(in oklab,var(--kind-light-fill) 22%,var(--tile-surface));color:var(--ink);box-shadow:var(--tile-raised);font-family:var(--font-sans);--tile-raised:0 1px 2px color-mix(in oklab,var(--emboss-shade) 60%,transparent),0 10px 28px -8px var(--emboss-shade)}.ds-name{font-weight:700;font-size:26px;margin-top:auto}.ds-detail{color:var(--ink-muted);font-size:20px;font-weight:500}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Tactile Wall",
+    "overview": "Two faces on one set of tokens: soft, button-like display tiles coloured by what they control, inside a flat, quiet Management frame.",
+    "keyCharacteristics": [
+      "Colour means a kind of thing",
+      "Tiles feel like buttons",
+      "Everything scales from --cell",
+      "Management is flat with one accent",
+      "Plain English, no emoji"
+    ],
+    "rules": [
+      {
+        "name": "The Kind Hue Rule",
+        "body": "A resting tile carries a light tint of its kind; an active tile fills with it.",
+        "section": "colors"
+      },
+      {
+        "name": "The Status Is Never Decoration Rule",
+        "body": "ok, warn and danger appear only with a word.",
+        "section": "colors"
+      },
+      {
+        "name": "The Brand Stays In Management Rule",
+        "body": "brand never appears on a display tile.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Every number uses tabular figures.",
+        "section": "typography"
+      },
+      {
+        "name": "The Press Rule",
+        "body": "A pressed tile scales to 0.96 and darkens slightly, with a ripple.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do give every new tile kind one hue pair",
+      "Do size everything on a display from --cell",
+      "Do write in the domain language",
+      "Do respect prefers-reduced-motion"
+    ],
+    "donts": [
+      "Don't use brand on a display tile",
+      "Don't add shadows to Management or inside a tile",
+      "Don't use emoji, exclamation marks, or please",
+      "Don't move or reflow tiles on their own",
+      "Don't hard-code one theme"
+    ]
+  }
+}

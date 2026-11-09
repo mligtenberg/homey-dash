@@ -25,6 +25,9 @@
   --ok: #1c8742;
   --warn: #975800;
   --danger: #c8364a;
+  /* Status on the lock screen, which always lies over a photo or colour: the same in every theme. */
+  --lock-warn: #ffd166;
+  --lock-danger: #ff9b85;
   --on-kind: #ffffff;
   --kind-light-ink: #8c5700;
   --kind-light-fill: #f5cb70;

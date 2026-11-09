@@ -141,9 +141,10 @@ const TAPE_KEY = 'homeydash.tape';
     /* A gutter for the dashboard tape's toggle, so it floats beside the tiles rather than over them. */
     hd-dashboard-view.has-tape { padding-left: calc(44px + var(--space-3) * 2); }
     .waiting { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); text-align: center; padding: var(--space-4); box-sizing: border-box; }
-    .waiting h1 { margin: 0; font-size: 32px; font-weight: 800; }
-    .waiting p { margin: 0; color: var(--ink-muted); }
+    .waiting h1 { margin: 0; font-size: 32px; font-weight: 800; text-wrap: balance; }
+    .waiting p { margin: 0; color: var(--ink-muted); text-wrap: balance; }
     .slideshow, .fill { position: fixed; inset: 0; z-index: 10; background: #000; }
+    .slideshow:focus-visible, .fill:focus-visible { outline: 3px solid #fff; outline-offset: -6px; }
     .is-leaving { pointer-events: none; animation: slideshow-out .5s ease-in-out forwards; }
     @keyframes slideshow-out { to { opacity: 0; } }
     @media (prefers-reduced-motion: reduce) { .is-leaving { animation: none; } }

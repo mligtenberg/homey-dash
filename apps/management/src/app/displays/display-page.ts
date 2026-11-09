@@ -44,13 +44,14 @@ import { DisplaysStore } from './displays-store';
     .tab:hover { color: var(--ink); }
     .tab[aria-current='page'] { color: var(--brand); border-bottom-color: var(--brand); }
     .body { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5) var(--space-6); max-width: 900px; }
+    .tab:focus-visible { outline: 3px solid var(--brand); outline-offset: -3px; border-radius: 6px; }
   `,
 })
 export class DisplayPage {
   protected readonly context = inject(DisplayContext);
   protected readonly store = inject(DisplaysStore);
   protected readonly tabs = [
-    { path: 'details', label: 'Details' },
+    { path: 'details', label: 'Status' },
     { path: 'dashboards', label: 'Dashboards' },
     { path: 'idle', label: 'When idle' },
     { path: 'lock', label: 'Lock screen' },

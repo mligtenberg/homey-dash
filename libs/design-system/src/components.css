@@ -792,6 +792,36 @@ a.hd-btn { text-decoration: none; }
 .hd-panel__title { font-size: 18px; font-weight: 800; margin: 0; }
 .hd-section-title { font-size: 16px; font-weight: 800; margin: 0; }
 
+/* A lead line under a page header or above a form: what this page is for, in a sentence or two. */
+.hd-lead { margin: 0; max-width: 62ch; color: var(--ink-muted); font-size: 14px; }
+
+/* A segmented choice, for two to four options where a dropdown would hide them: <div class="hd-seg" role="radiogroup"> of <button role="radio" aria-checked>. */
+.hd-seg { display: inline-flex; flex-wrap: wrap; padding: 2px; border-radius: 10px; border: 1px solid var(--line); background: var(--chrome); }
+.hd-seg > button { padding: 6px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-muted); font: 600 13px/1.3 var(--font-sans); cursor: pointer; }
+.hd-seg > button:hover { color: var(--ink); }
+.hd-seg > button[aria-checked="true"] { background: var(--brand); color: var(--on-brand); }
+.hd-seg > button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+/* A tinted square holding an icon, leading a card or a row. */
+.hd-icon-tile { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 10px; background: color-mix(in oklab, var(--brand) 14%, transparent); color: var(--brand); }
+.hd-icon-tile svg { width: 18px; height: 18px; }
+
+/* A card in a list the user edits: padded, rounded, and outlined in the brand colour while selected. */
+.hd-item { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.hd-item--on { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.hd-item__head { display: flex; align-items: center; gap: var(--space-3); }
+.hd-item__title { margin: 0; font-size: 15px; font-weight: 700; }
+.hd-item__sub { margin: 0; color: var(--ink-muted); font-size: 13px; }
+
+/* The last block of a page: the one action that can't be undone, kept apart from everything else. */
+.hd-danger { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4); border: 1px solid color-mix(in oklab, var(--danger) 40%, var(--line)); border-radius: var(--radius-panel); }
+.hd-danger p { margin: 0; }
+
+/* A row of facts: a label above a value. */
+.hd-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-4); margin: 0; }
+.hd-facts dt { color: var(--ink-muted); font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+.hd-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
 /* An account panel on the Accounts page: a head with its status, then one row per account. */
 .hd-account { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); }
 .hd-account__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }

@@ -14,8 +14,15 @@ import { DisplaysStore } from './displays-store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
+      <section class="hd-panel wide name">
+        <div class="hd-field">
+          <label class="hd-field__label" for="display-name">Name</label>
+          <input class="hd-input" id="display-name" [value]="display.name" (change)="store.rename(display, name.value)" (keydown.enter)="name.blur()" #name />
+          <span class="hd-hint">Shown in the sidebar and on the Displays page.</span>
+        </div>
+      </section>
       <section class="hd-panel wide">
-        <h2 class="hd-section-title">Screenshot</h2>
+        <h2 class="hd-section-title">What it shows now</h2>
         <hd-display-screenshot [display]="display" />
       </section>
       @if (display.status.details; as d) {
@@ -85,9 +92,15 @@ import { DisplaysStore } from './displays-store';
           }
         </section>
         <section class="hd-panel">
-          <h2 class="hd-section-title">Light</h2>
+          <h2 class="hd-section-title">Device, light and connection</h2>
           <dl>
-            <dt>Current</dt>
+            <dt>Battery</dt>
+            <dd>{{ battery() }}</dd>
+            <dt>Connection</dt>
+            <dd>{{ d.connection ?? 'Unknown' }}</dd>
+            <dt>Page loaded</dt>
+            <dd>{{ d.loadedAt ? store.ago(d.loadedAt) : 'Unknown' }}</dd>
+            <dt>Light now</dt>
             <dd>
               @if (display.status.lux !== null) {
                 {{ display.status.lux | number: '1.0-0' }} lx
@@ -100,17 +113,6 @@ import { DisplaysStore } from './displays-store';
             </dd>
             <dt>Measured with</dt>
             <dd>{{ lightSource() }}</dd>
-          </dl>
-        </section>
-        <section class="hd-panel">
-          <h2 class="hd-section-title">Device</h2>
-          <dl>
-            <dt>Battery</dt>
-            <dd>{{ battery() }}</dd>
-            <dt>Connection</dt>
-            <dd>{{ d.connection ?? 'Unknown' }}</dd>
-            <dt>Page loaded</dt>
-            <dd>{{ d.loadedAt ? store.ago(d.loadedAt) : 'Unknown' }}</dd>
             <dt>Last seen</dt>
             <dd>{{ display.status.connected ? 'Connected now' : display.status.lastSeenAt ? store.ago(display.status.lastSeenAt) : 'Never' }}</dd>
           </dl>
@@ -125,40 +127,29 @@ import { DisplaysStore } from './displays-store';
           </p>
         </div>
       }
-      <section class="hd-panel">
-        <h2 class="hd-section-title">Display</h2>
-        <div class="hd-field">
-          <label class="hd-field__label" for="display-name">Name</label>
-          <input
-            class="hd-input"
-            id="display-name"
-            [value]="display.name"
-            (change)="store.rename(display, name.value)"
-            (keydown.enter)="name.blur()"
-            #name
-          />
-        </div>
-        <div class="remove">
-          @if (removing()) {
-            <span class="hd-hint">Its screen goes back to setup.</span>
+      <div class="hd-danger wide">
+        @if (removing()) {
+          <p>Remove <strong>{{ display.name }}</strong>? Its screen goes back to setup.</p>
+          <div class="hd-actions">
             <button class="hd-btn hd-btn--primary" type="button" (click)="remove(display)">Remove</button>
             <button class="hd-btn" type="button" (click)="removing.set(false)">Cancel</button>
-          } @else {
-            <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(true)">Remove display</button>
-          }
-        </div>
-      </section>
+          </div>
+        } @else {
+          <p class="hd-hint">Removing a display sends its screen back to setup.</p>
+          <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(true)">Remove display</button>
+        }
+      </div>
     }
   `,
   styles: `
     h2 { margin-bottom: var(--space-3); }
-    :host { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-3); align-items: start; }
+    :host { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-3); align-items: stretch; }
     section { padding: var(--space-4); }
     .wide { grid-column: 1 / -1; }
-    .remove { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
+    .name .hd-input { max-width: 360px; }
     .hd-empty { grid-column: 1 / -1; --empty-padding: var(--space-5); }
     dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-4); margin: 0; }
-    dt { color: var(--ink-muted); }
+    dt { color: var(--ink-muted); font-size: 13px; }
     dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
     .ua { color: var(--ink-muted); font-size: 12px; }
     .api { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }

@@ -10,36 +10,50 @@ import { ReorderButtons } from '@homey-dash/design-system';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
-      <fieldset class="dashboards">
-        <legend class="hd-field__label">Dashboards</legend>
-        <p class="hd-hint">Check the ones this display offers. They sit on its tape in this order, and it starts on the first.</p>
-        @for (id of display.dashboardIds; track id; let i = $index, first = $first, last = $last) {
-          <div class="entry">
-            <label class="hd-check">
-              <input type="checkbox" checked (change)="store.offer(display, id, false)" />
-              {{ store.dashboardName(id) }}
-            </label>
-            <hd-reorder-buttons [label]="store.dashboardName(id)" [first]="first" [last]="last" [removable]="false" (moved)="store.moveDashboard(display, i, $event)" />
-          </div>
-        }
-        @for (option of store.offerable(display); track option.id) {
-          <label class="hd-check">
-            <input type="checkbox" (change)="store.offer(display, option.id, true)" />
-            {{ option.name }}
-          </label>
-        } @empty {
-          @if (!display.dashboardIds.length) {
-            <span class="hd-hint">Publish a dashboard to offer it here.</span>
+      <div class="dashboards">
+        <p class="hd-lead">Choose the dashboards this display can switch between. They sit on its tape in the order below, and it starts on the first.</p>
+
+        <section aria-labelledby="offered-title" class="group">
+          <h2 class="hd-section-title" id="offered-title">On this display</h2>
+          @for (id of display.dashboardIds; track id; let i = $index, first = $first, last = $last) {
+            <div class="hd-item row">
+              <span class="num" aria-hidden="true">{{ i + 1 }}</span>
+              <div class="name">
+                <span class="hd-item__title">{{ store.dashboardName(id) }}</span>
+                @if (first) {
+                  <span class="hd-item__sub">Shown first</span>
+                }
+              </div>
+              <hd-reorder-buttons [label]="store.dashboardName(id)" [first]="first" [last]="last" [removable]="false" (moved)="store.moveDashboard(display, i, $event)" />
+              <button type="button" class="hd-btn" [attr.aria-label]="'Take ' + store.dashboardName(id) + ' off this display'" (click)="store.offer(display, id, false)">Remove</button>
+            </div>
+          } @empty {
+            <p class="hd-hint empty">Nothing yet. The display waits until you add a dashboard.</p>
           }
-        }
-      </fieldset>
+        </section>
+
+        <section aria-labelledby="available-title" class="group">
+          <h2 class="hd-section-title" id="available-title">Available to add</h2>
+          @for (option of store.offerable(display); track option.id) {
+            <div class="hd-item row">
+              <span class="name"><span class="hd-item__title">{{ option.name }}</span></span>
+              <button type="button" class="hd-btn" [attr.aria-label]="'Add ' + option.name + ' to this display'" (click)="store.offer(display, option.id, true)">Add</button>
+            </div>
+          } @empty {
+            <p class="hd-hint empty">{{ display.dashboardIds.length ? 'Every published dashboard is already on this display.' : 'Publish a dashboard to offer it here.' }}</p>
+          }
+        </section>
+      </div>
     }
   `,
   styles: `
-    .dashboards { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); margin: 0; padding: 0; border: 0; }
-    .dashboards legend { padding: 0; margin-bottom: var(--space-2); }
-    .entry { display: flex; align-items: center; gap: var(--space-1); }
-    .entry .hd-check { min-width: 180px; }
+    .dashboards { display: flex; flex-direction: column; gap: var(--space-5); }
+    .group { display: flex; flex-direction: column; gap: var(--space-2); }
+    .group h2 { margin-bottom: var(--space-1); }
+    .row { flex-direction: row; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); }
+    .num { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: color-mix(in oklab, var(--brand) 14%, transparent); color: var(--brand); font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .name { flex: 1; min-width: 0; display: flex; flex-direction: column; margin-left: var(--space-1); }
+    .empty { padding: var(--space-3); border: 1px dashed var(--line); border-radius: 12px; }
   `,
 })
 export class DisplayDashboardsTab {
