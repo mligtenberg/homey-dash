@@ -54,6 +54,8 @@
   --kind-climate-fill: #74e0ff;
   --kind-neutral-ink: #355bbd;
   --kind-neutral-fill: #aad0ff;
+  /* How much of its kind's fill a resting tile carries. The dark fills are deep, so a dark tile needs more of them to show its hue. */
+  --rest-tint: 22%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -97,6 +99,7 @@
     --kind-climate-fill: #004a69;
     --kind-neutral-ink: #91bbff;
     --kind-neutral-fill: #2a4072;
+    --rest-tint: 36%;
     }
 }
 
@@ -140,6 +143,7 @@
   --kind-climate-fill: #004a69;
   --kind-neutral-ink: #91bbff;
   --kind-neutral-fill: #2a4072;
+  --rest-tint: 36%;
 }
 
 :root {
