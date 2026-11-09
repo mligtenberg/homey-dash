@@ -41,7 +41,7 @@ import { Camera, LightMeter } from './light-meter';
     </hd-tile-details>
   `,
   styles: `
-    .hd-select { min-width: 0; max-width: 60%; font-size: 16px; }
+    .hd-select { min-width: 0; max-width: 60%; font-size: var(--text-touch); }
     .level { font-variant-numeric: tabular-nums; }
   `,
 })

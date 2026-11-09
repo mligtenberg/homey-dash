@@ -9,6 +9,7 @@ The cell-sized surface every tile kind is built on, with a size, a kind hue and 
 - `data-size`: `small`, `wide`, `full`, `large`, `full-large` or `full-tall`. Only use sizes the tile kind's module declares.
 - `data-kind`: `light`, `heat`, `flow`, `mood`, `security`, `energy`, `cover`, `appliance` or `climate`. Leave it out to get `neutral`. It sets `--k-ink` and `--k-fill` for everything inside.
 - `.is-active`: the device is on, running, open or heating. Fills the tile with `kind-*-fill`; at rest it is `kind-*-fill` at 22% over `tile-surface`.
+- Hue says what the tile is; intensity and the white or grey button say its state. See [State](../State.md).
 - The tile's own `.hd-icon` sits in a rounded chip.
 - `data-tap` with `tabindex="0"` and `role="button"`: a tap anywhere but on a control opens the tile's [TileDetails](TileDetails.md), with press feedback: the tile shrinks and a [Ripple](Ripple.md) spreads from the press. A press on a control ripples the control instead.
 

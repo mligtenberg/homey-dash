@@ -56,6 +56,31 @@ typography:
     fontFamily: "Rubik Variable, Rubik, system-ui, sans-serif"
     fontSize: "22px"
     fontWeight: 800
+  panel-title:
+    fontFamily: "Rubik Variable, Rubik, system-ui, sans-serif"
+    fontSize: "18px"
+    fontWeight: 800
+  section-title:
+    fontFamily: "Rubik Variable, Rubik, system-ui, sans-serif"
+    fontSize: "16px"
+    fontWeight: 800
+  item-title:
+    fontFamily: "Rubik Variable, Rubik, system-ui, sans-serif"
+    fontSize: "15px"
+    fontWeight: 700
+  caption:
+    fontFamily: "Rubik Variable, Rubik, system-ui, sans-serif"
+    fontSize: "13px"
+    fontWeight: 500
+  screen-title:
+    fontFamily: "Rubik Variable, Rubik, system-ui, sans-serif"
+    fontSize: "28px"
+    fontWeight: 800
+    lineHeight: 1.15
+  touch-input:
+    fontFamily: "Rubik Variable, Rubik, system-ui, sans-serif"
+    fontSize: "16px"
+    fontWeight: 500
 rounded:
   control: "8px"
   panel: "10px"
@@ -168,12 +193,16 @@ Each kind has an `-ink` (icon, chart line, slider fill, chip; 4.5:1 on `tile-sur
 - **Unit** (600, 0.45em of its value, `ink-muted`): `20.5°C`, `1.84 kW`.
 - **Page title** (800, 22px): Management `h1`. Panel title 18px, section title 16px; no other heading sizes.
 - **Body** (500, 14px, 1.45): Management text. **Label** (700, 12px): field labels and pills. Only the overline is uppercase.
+- **Screen title** (800, 28px, `--text-screen-title`): the one heading on a full-screen state (waiting, Setup). **Touch input** (16px, `--text-touch`): inputs and buttons on Setup and screen settings, never below 16px so iOS does not zoom. Caption 13px (hints, sub lines), item title 15px.
+- **Floor**: display text is a fraction of `--cell`, but never under `--text-floor` (11px), so the smallest roles survive a short screen.
 - **Lock screen**: scales with the viewport height: clock time 13 × 1vh at weight 300, readings 4.6 × 1vh at 500, labels 1.9 × 1vh.
 
 ### Named Rules
 **The Tabular Figures Rule.** Every number uses tabular figures.
 
-**The Cell Scales Type Rule.** Never use fixed pixels for type on a display, except the 44px minimum on touch controls.
+**The Cell Scales Type Rule.** Never use fixed pixels for type on a display, except the 44px minimum on touch controls, the screen title and touch input roles, and the `--text-floor`.
+
+**The Line Break Rule.** Headings and tile names use `text-wrap: balance`; lines of prose (lead, hint, muted) use `text-wrap: pretty`.
 
 ## Layout
 
@@ -206,7 +235,7 @@ Generous and friendly. Tiles round at 0.2 × cell; Management uses small radii (
 
 ### Tile
 - **Shape:** 0.2 × cell radius, `tile-raised`, padding 0.11 × cell.
-- **States:** Active fills with `kind-*-fill`. Unavailable drops to 60% opacity with a warn "Unavailable" badge. Missing becomes a transparent outline in `line` with a danger icon and "Not found in Homey". Connection lost desaturates the dashboard and stops taps.
+- **States:** Hue is the tile's type and never changes with state; state is the intensity of that hue (rest tint, active fill) plus neutral elements on the tile: the corner button is white when on and grey when off. A lock's state colour (blue locked, yellow unlocked) goes on its icon chip, not the tile. Full model in `docs/design-system/State.md`. Active fills with `kind-*-fill`. Unavailable drops to 60% opacity with a warn "Unavailable" badge. Missing becomes a transparent outline in `line` with a danger icon and "Not found in Homey". Connection lost desaturates the dashboard and stops taps.
 - **Focus:** a solid 3px ring in the kind ink, offset 3px.
 
 ### Buttons
@@ -235,6 +264,7 @@ Generous and friendly. Tiles round at 0.2 × cell; Management uses small radii (
 - **Do** respect `prefers-reduced-motion`; drop press transitions and slow spinners.
 
 ### Don't:
+- **Don't** recolour a tile for its state. Intensity changes; the hue doesn't. State colour goes on elements inside the tile.
 - **Don't** use `brand` on a display tile, or status colours as decoration.
 - **Don't** add shadows to Management or inside a tile.
 - **Don't** use emoji, exclamation marks, or "please" in copy.

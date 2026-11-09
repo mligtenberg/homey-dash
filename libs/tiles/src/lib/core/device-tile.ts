@@ -1,7 +1,7 @@
 import { SettingSelect } from './setting-select';
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { CapabilityValue, HomeyCapability, HomeyDevice, Realtime } from '@homey-dash/api-client';
-import { LucidePause, LucidePlay, LucidePower } from '@homey-dash/design-system';
+import { LucideLock, LucideLockOpen, LucidePause, LucidePlay, LucidePower } from '@homey-dash/design-system';
 import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 import { TileData, TileSettings } from '../tile-data';
 import { CapabilityDriver, COVER_STATES, DeviceSegments, DeviceSlider, DeviceStepper } from './device-controls';
@@ -24,6 +24,9 @@ export function primaryCapability(device: HomeyDevice, picked: string | undefine
   const control = CONTROLS.map((id) => caps[id]).find((c) => c?.setable);
   return control ?? Object.values(caps).find((c) => typeof c.value === 'number' && c.id.startsWith('measure_')) ?? null;
 }
+
+/** How long a lock's button waits for the second press that unlocks. */
+export const UNLOCK_CONFIRM_MS = 3000;
 
 /** Device classes that usually open apps (an Apple TV, a smart TV, a game console). */
 const APP_CLASSES = new Set(['tv', 'settopbox', 'gameconsole']);
@@ -57,7 +60,7 @@ interface DeviceFace extends TileFace {
       } @else {
         <svg class="hd-icon" [lucideIcon]="face().icon" />
         @if (face().action; as action) {
-          <button type="button" class="hd-round-btn hd-tile__action" [attr.aria-label]="action" [disabled]="face().state !== 'ok'" (click)="act()">
+          <button type="button" class="hd-round-btn hd-tile__action" [class.is-confirming]="confirming()" [attr.aria-label]="action" [disabled]="face().state !== 'ok'" (click)="act()">
             <svg [lucideIcon]="face().actionIcon ?? powerIcon" />
           </button>
         } @else if (face().state === 'ok') {
@@ -101,6 +104,16 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
 
   protected readonly coverStates = COVER_STATES;
   protected readonly powerIcon = LucidePower;
+  /** Whether the lock's button waits for a second press to unlock. */
+  protected readonly confirming = signal(false);
+  private confirmTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly stopConfirming = inject(DestroyRef).onDestroy(() => clearTimeout(this.confirmTimer));
+  private askToUnlock() {
+    clearTimeout(this.confirmTimer);
+    this.confirming.set(true);
+    this.confirmTimer = setTimeout(() => this.confirming.set(false), UNLOCK_CONFIRM_MS);
+  }
+
   protected readonly drive = new CapabilityDriver((capability, value) => this.set(capability, value));
 
   protected readonly device = computed(() => this.homey()?.devices.get(this.settings().target ?? ''));
@@ -154,6 +167,14 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
           face.detail = primary.title;
         }
     }
+    // A lock has a button like any switch; unlocking asks for a second press, so a stray touch cannot open the door.
+    const lock = caps['locked'];
+    if (!face.action && typeof lock?.value === 'boolean' && lock.setable) {
+      const confirm = lock.value && this.confirming();
+      face.action = !lock.value ? 'Lock' : confirm ? 'Confirm unlock' : 'Unlock';
+      face.actionIcon = lock.value ? LucideLockOpen : LucideLock;
+      if (confirm) face.detail = 'Tap again';
+    }
     const art = this.art();
     if (art) face.art = art;
     if (this.flash() === 'error') face.detail = 'Did not respond';
@@ -201,6 +222,12 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
   protected override act() {
     const device = this.device();
     if (!device) return;
+    const lock = device.capabilities['locked'];
+    if (typeof lock?.value === 'boolean' && lock.setable && !device.capabilities['onoff']) {
+      if (lock.value && !this.confirming()) return this.askToUnlock();
+      this.confirming.set(false);
+      return void this.set('locked', !lock.value);
+    }
     const id = primaryCapability(device, this.settings().capability)?.id === 'speaker_playing' ? 'speaker_playing' : 'onoff';
     this.set(id, !device.capabilities[id]?.value);
   }

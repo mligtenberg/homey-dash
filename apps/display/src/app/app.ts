@@ -141,8 +141,8 @@ const TAPE_KEY = 'homeydash.tape';
     /* A gutter for the dashboard tape's toggle, so it floats beside the tiles rather than over them. */
     hd-dashboard-view.has-tape { padding-left: calc(44px + var(--space-3) * 2); }
     .waiting { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); text-align: center; padding: var(--space-4); box-sizing: border-box; }
-    .waiting h1 { margin: 0; font-size: 32px; font-weight: 800; text-wrap: balance; }
-    .waiting p { margin: 0; color: var(--ink-muted); text-wrap: balance; }
+    .waiting h1 { margin: 0; font-size: var(--text-screen-title); line-height: 1.15; font-weight: 800; text-wrap: balance; }
+    .waiting p { margin: 0; color: var(--ink-muted); line-height: 1.45; text-wrap: balance; }
     .slideshow, .fill { position: fixed; inset: 0; z-index: 10; background: #000; }
     .slideshow:focus-visible, .fill:focus-visible { outline: 3px solid #fff; outline-offset: -6px; }
     .is-leaving { pointer-events: none; animation: slideshow-out .5s ease-in-out forwards; }
@@ -154,8 +154,8 @@ const TAPE_KEY = 'homeydash.tape';
       padding: 0 var(--lock-edge) var(--lock-edge); background: none; gap: 2vh;
       text-shadow: 0 1px 2px rgb(0 0 0 / .55), 0 0 14px rgb(0 0 0 / .45), 0 0 36px rgb(0 0 0 / .35);
     }
-    .slideshow ::ng-deep .hd-photo__label { font-size: 2.3vh; font-weight: 500; }
-    .slideshow ::ng-deep .hd-photo__about, .slideshow ::ng-deep .hd-photo__people { font-size: 1.9vh; font-weight: 500; opacity: .82; }
+    .slideshow ::ng-deep .hd-photo__label { font-size: max(var(--text-floor), 2.3vh); font-weight: 500; letter-spacing: .01em; }
+    .slideshow ::ng-deep .hd-photo__about, .slideshow ::ng-deep .hd-photo__people { font-size: max(var(--text-floor), 1.9vh); font-weight: 500; letter-spacing: .01em; opacity: .82; }
     .reconnecting { position: fixed; z-index: 11; left: 50%; bottom: var(--space-5); translate: -50% 0; }
     .corner { position: fixed; z-index: 12; top: 0; right: 0; width: 40px; height: 40px; }
   `,

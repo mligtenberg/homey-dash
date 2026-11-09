@@ -10,7 +10,7 @@ const ACTION_TEMPLATE = `
   <div class="hd-row hd-row--top">
     <svg class="hd-icon" [lucideIcon]="face().icon" />
     @if (face().action; as action) {
-      <button type="button" class="hd-round-btn hd-tile__action" [attr.aria-label]="action" (click)="act()">
+      <button type="button" class="hd-round-btn hd-tile__action hd-tile__action--run"[attr.aria-label]="action" (click)="act()">
         <svg [lucideIcon]="playIcon" />
       </button>
     }

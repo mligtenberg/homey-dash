@@ -9,7 +9,7 @@ HomeyDash is a smart-home control surface for a Homey hub. It has two faces: **d
 ## Principles
 
 - **Glanceable first.** A display is read from a distance and touched for a second. Large tiles carry one big value that reads across the room. Small tiles are read at arm's length.
-- **Color means a kind of thing.** Every tile kind owns one hue. A resting tile carries a light tint of it, and an active tile fills with it. Nothing else on a display is colored.
+- **Color means a kind of thing.** Every tile kind owns one hue. A resting tile carries a light tint of it, and an active tile fills with it. State is shown by that intensity and by neutral elements on the tile, never by recolouring the tile; see [State](State.md). Nothing else on a display is colored.
 - **Tiles feel like buttons.** Tiles rest on one soft lift, and the controls inside them sit flat. Pressing a tile shrinks it slightly.
 - **Nothing moves on its own.** Tiles never reflow and dashboards never scroll vertically. Motion is limited to press feedback and state changes. The exceptions are a [PhotoTile](components/PhotoTile.md), which slowly fades to its next photo, and the [Plex now playing tile](components/PlexTiles.md), whose progress moves with what plays, because that is what they are for. A display that offers more than one dashboard also returns to its main one when left alone (see [DashboardTape](components/DashboardTape.md)).
 - **Management stays out of the way.** Management uses flat panels with hairline borders and one accent, `brand`, so the real tiles in the editor are the most colorful thing on screen.

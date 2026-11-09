@@ -29,6 +29,11 @@
   --lock-warn: #ffd166;
   --lock-danger: #ff9b85;
   --on-kind: #ffffff;
+  /* State marks (docs/design-system/State.md): white is on, grey is off. Same in both themes; the ink on white is always dark. */
+  --state-on-bg: #ffffff;
+  --state-on-ink: #22252f;
+  --state-off-bg: color-mix(in oklab, var(--ink) 12%, transparent);
+  --state-off-ink: var(--ink-muted);
   --kind-light-ink: #8c5700;
   --kind-light-fill: #f5cb70;
   --kind-heat-ink: #aa3700;
@@ -154,6 +159,11 @@
   --value-scale-l: .42;
   --value-scale-m: .24;
   --unit-scale: .45em;
+  /* The smallest a display's text gets on a short screen; type still scales with --cell above it. */
+  --text-floor: 11px;
+  /* A full-screen title (waiting, setup) and the 16px that keeps touch inputs from zooming on iOS. */
+  --text-screen-title: 28px;
+  --text-touch: 16px;
   --radius-lg: 16px;
   /* cell */
   --cell-gap: 0.08;

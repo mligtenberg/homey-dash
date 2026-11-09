@@ -131,7 +131,7 @@
   font-size: calc(var(--cell) * .12); line-height: 1.15; font-weight: 700;
   /* Two lines at most, so a long name never pushes the detail line out of the tile. */
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
-  overflow-wrap: break-word;
+  overflow-wrap: break-word; text-wrap: balance;
 }
 .hd-tile__detail {
   font-size: calc(var(--cell) * .095); line-height: 1.2; font-weight: 500; color: var(--ink-muted); margin-top: .15em;
@@ -199,9 +199,13 @@
   flex: none;
   width: calc(var(--cell) * .3); height: calc(var(--cell) * .3);
   margin: calc(var(--cell) * -.02) calc(var(--cell) * -.02) 0 0;
-  background: var(--k-ink); color: var(--on-kind);
+  background: var(--state-off-bg); color: var(--state-off-ink);
 }
-.hd-tile.is-active .hd-tile__action:not(.hd-details *) { background: var(--ink); color: var(--tile-surface); }
+.hd-tile.is-active .hd-tile__action:not(.hd-details *) { background: var(--state-on-bg); color: var(--state-on-ink); }
+/* A button that runs something (a flow, a mood) has no on or off, so it keeps the kind's colour. */
+.hd-tile__action--run, .hd-tile.is-active .hd-tile__action--run:not(.hd-details *) { background: var(--k-ink); color: var(--on-kind); }
+/* Waiting for the second press that unlocks: solid ink, so it reads across a room as "not done yet". */
+.hd-tile .hd-tile__action.is-confirming:not(.hd-details *) { background: var(--ink); color: var(--tile-surface); }
 /* Steppers are one quiet capsule. */
 .hd-round-btns { gap: 0; padding: 3px; border-radius: var(--radius-pill); background: color-mix(in oklab, var(--k-ink) 12%, transparent); }
 .hd-round-btns .hd-round-btn { background: transparent; }
@@ -261,7 +265,7 @@
   border: 0;
   border-radius: calc(var(--cell) * var(--tile-radius) * .75);
   background-color: color-mix(in oklab, var(--k-ink) 12%, transparent); color: var(--ink);
-  font: 700 calc(var(--cell) * .08)/1 var(--font-sans);
+  font: 700 max(var(--text-floor), calc(var(--cell) * .08))/1 var(--font-sans);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   position: relative; isolation: isolate;
   cursor: pointer;
@@ -317,7 +321,7 @@
 .hd-stat__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .hd-stat__head > :first-child { min-width: 0; }
 .hd-stat__head > .hd-value { flex: none; }
-.hd-chart { flex: 1; width: 100%; min-height: 0; overflow: visible; font: 600 calc(var(--cell) * .075) var(--font-sans); }
+.hd-chart { flex: 1; width: 100%; min-height: 0; overflow: visible; font: 600 max(var(--text-floor), calc(var(--cell) * .075)) var(--font-sans); }
 .hd-chart--scrub { touch-action: pan-y; cursor: crosshair; }
 .hd-chart__grid { stroke: var(--line); stroke-width: 1; }
 .hd-chart__line { fill: none; stroke: var(--k-ink); stroke-width: calc(var(--cell) * .02); stroke-linejoin: round; stroke-linecap: round; }
@@ -772,12 +776,12 @@ a.hd-btn { text-decoration: none; }
 .hd-dot-warn { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
 
 /* Text roles: secondary text, a hint under a field, and what went wrong. .hd-small makes any of them 13px. */
-.hd-muted { margin: 0; color: var(--ink-muted); }
+.hd-muted { margin: 0; color: var(--ink-muted); text-wrap: pretty; }
 /* A page's empty state: a panel with a title and a line of text. Set --empty-padding to change the padding. */
 .hd-empty { padding: var(--empty-padding, var(--space-6)); }
 .hd-empty .hd-panel__title { margin-bottom: var(--space-2); }
-.hd-empty p { margin: 0; color: var(--ink-muted); }
-.hd-hint { margin: 0; color: var(--ink-muted); font-size: 13px; }
+.hd-empty p { margin: 0; color: var(--ink-muted); text-wrap: pretty; }
+.hd-hint { margin: 0; color: var(--ink-muted); font-size: 13px; text-wrap: pretty; }
 .hd-error { margin: 0; color: var(--danger); font-weight: 700; }
 .hd-small { font-size: 13px; }
 /* A row of buttons and the like that wraps. */
@@ -785,15 +789,15 @@ a.hd-btn { text-decoration: none; }
 
 /* A page: its header with the title, and its body. */
 .hd-page__header { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--line); }
-.hd-page__title { font-size: 22px; font-weight: 800; margin: 0; }
+.hd-page__title { font-size: 22px; font-weight: 800; margin: 0; text-wrap: balance; }
 .hd-page__body { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); max-width: 900px; }
 .hd-page__body--narrow { max-width: 640px; }
 /* Headings below the page title: a panel's, and a section's within a panel. */
-.hd-panel__title { font-size: 18px; font-weight: 800; margin: 0; }
+.hd-panel__title { font-size: 18px; font-weight: 800; margin: 0; text-wrap: balance; }
 .hd-section-title { font-size: 16px; font-weight: 800; margin: 0; }
 
 /* A lead line under a page header or above a form: what this page is for, in a sentence or two. */
-.hd-lead { margin: 0; max-width: 62ch; color: var(--ink-muted); font-size: 14px; }
+.hd-lead { margin: 0; max-width: 62ch; color: var(--ink-muted); font-size: 14px; text-wrap: pretty; }
 
 /* A segmented choice, for two to four options where a dropdown would hide them: <div class="hd-seg" role="radiogroup"> of <button role="radio" aria-checked>. */
 .hd-seg { display: inline-flex; flex-wrap: wrap; padding: 2px; border-radius: 10px; border: 1px solid var(--line); background: var(--chrome); }
@@ -1032,7 +1036,7 @@ a.hd-btn { text-decoration: none; }
 }
 .hd-tile.has-art :is(.hd-tile__detail, .hd-icon):not(.hd-details *) { color: #fff; }
 .hd-tile.has-art > .hd-row > .hd-icon { background: rgb(255 255 255 / .16); }
-.hd-tile.has-art .hd-tile__action:not(.hd-details *) { background: #fff; color: #111; }
+.hd-tile.has-art .hd-tile__action:not(.hd-details *) { background: var(--state-on-bg); color: var(--state-on-ink); }
 
 /*
  * Plex tiles: what plays over its artwork, darkened so the white text and buttons read, with a thin progress bar
@@ -1056,7 +1060,7 @@ a.hd-btn { text-decoration: none; }
 }
 .hd-plex__sub { font-size: calc(var(--cell) * .1); line-height: 1.25; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-plex__controls { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--cell) * .08); }
-.hd-plex__time { font-size: calc(var(--cell) * .09); font-variant-numeric: tabular-nums; opacity: .8; }
+.hd-plex__time { font-size: max(var(--text-floor), calc(var(--cell) * .09)); font-variant-numeric: tabular-nums; opacity: .8; }
 .hd-plex.has-art .hd-round-btns { background: rgb(255 255 255 / .16); margin-left: auto; }
 .hd-plex.has-art .hd-round-btn { color: #fff; }
 .hd-plex.is-feedback.has-art, .hd-plex.is-error.has-art { background: #111; }
@@ -1124,7 +1128,7 @@ a.hd-btn { text-decoration: none; }
 .hd-plex-recent__badge {
   position: absolute; top: calc(var(--cell) * .06); left: calc(var(--cell) * .06);
   padding: .2em .55em; border-radius: var(--radius-pill); background: #e5a00d; color: #1f2326;
-  font: 800 calc(var(--cell) * .07)/1.2 var(--font-sans); letter-spacing: .04em; text-transform: uppercase;
+  font: 800 max(var(--text-floor), calc(var(--cell) * .07))/1.2 var(--font-sans); letter-spacing: .04em; text-transform: uppercase;
 }
 /* Played: a gold tick on the cover's corner opposite "New", a pill in the facts, a tick before the length in a list. */
 .hd-plex-recent__seen {
@@ -1155,8 +1159,8 @@ a.hd-btn { text-decoration: none; }
 /* clip, not hidden: a hidden overflow lets the grid row ignore the cover's height, and what is listed below would cover it. */
 .hd-plex-recent__cover--large { margin: calc(var(--cell) * .4) 0 0; border-radius: calc(var(--cell) * .08); overflow: clip; }
 .hd-plex-recent__facts { display: flex; flex-direction: column; align-items: flex-start; gap: calc(var(--cell) * .1); min-width: 0; padding-top: calc(var(--cell) * .4); }
-.hd-plex-recent__added { font: 800 calc(var(--cell) * .08)/1.2 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: #e5a00d; }
-.hd-plex-recent__headline { margin: 0; font: 800 calc(var(--cell) * .26)/1.1 var(--font-sans); overflow-wrap: anywhere; }
+.hd-plex-recent__added { font: 800 max(var(--text-floor), calc(var(--cell) * .08))/1.2 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: #e5a00d; }
+.hd-plex-recent__headline { margin: 0; text-wrap: balance; font: 800 calc(var(--cell) * .26)/1.1 var(--font-sans); overflow-wrap: anywhere; }
 .hd-plex-recent__tagline { font-size: calc(var(--cell) * .12); color: var(--ink-muted); }
 .hd-plex-recent__meta { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--cell) * .08) calc(var(--cell) * .14); font: 600 calc(var(--cell) * .1)/1.2 var(--font-sans); }
 .hd-plex-recent__rating { display: inline-flex; align-items: center; gap: .3em; color: #e5a00d; font-weight: 800; }

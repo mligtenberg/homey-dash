@@ -8,7 +8,7 @@ import { TileSize } from '@homey-dash/layout';
 import { RealtimeTileData } from '../realtime-tile-data';
 import { TileData } from '../tile-data';
 import { FlowTile, MoodTile } from './action-tiles';
-import { DeviceTile } from './device-tile';
+import { DeviceTile, UNLOCK_CONFIRM_MS } from './device-tile';
 import { CORE_TILES } from './core-tiles';
 import { MoodListTile } from './mood-list-tile';
 import { moodTint } from './mood-tint';
@@ -109,6 +109,55 @@ describe('core tiles', () => {
       await settle();
 
       expect(realtime.commands).toEqual([['setCapability', 2, 'd1', 'onoff', true]]);
+    });
+
+    // docs/design-system/State.md: the tile's hue is its type and never changes with state; state colour goes on elements.
+    it('keeps a tile on its own hue whatever its state', async () => {
+      const tile = await render(DeviceTile, 'd1');
+      const hues: (string | null)[] = [];
+      for (const caps of [[capability('onoff', false)], [capability('onoff', true)]]) {
+        await push(device(caps));
+        hues.push(tile.getAttribute('data-kind'));
+      }
+      for (const locked of [true, false]) {
+        await push(device([capability('locked', locked)], { class: 'lock' }));
+        hues.push(tile.getAttribute('data-kind'));
+      }
+      expect(hues).toEqual(['light', 'light', 'security', 'security']);
+    });
+
+    it('locks in one press and unlocks only on a second press within a few seconds', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const tile = await render(DeviceTile, 'd1');
+        await push(device([capability('locked', false)], { class: 'lock' }));
+        expect(tile.classList).toContain('is-active');
+        button(tile, 'Lock').click();
+        await settle();
+        expect(realtime.commands).toEqual([['setCapability', undefined, 'd1', 'locked', true]]);
+
+        realtime.commands.length = 0;
+        await push(device([capability('locked', true)], { class: 'lock' }));
+        expect(tile.classList).not.toContain('is-active');
+        button(tile, 'Unlock').click();
+        await settle();
+        expect(realtime.commands).toEqual([]);
+        expect(tile.textContent).toContain('Tap again');
+        button(tile, 'Confirm unlock').click();
+        await settle();
+        expect(realtime.commands).toEqual([['setCapability', undefined, 'd1', 'locked', false]]);
+
+        // Left alone, the question lapses.
+        realtime.commands.length = 0;
+        button(tile, 'Unlock').click();
+        await settle();
+        vi.advanceTimersByTime(UNLOCK_CONFIRM_MS);
+        await settle();
+        expect(button(tile, 'Unlock')).toBeTruthy();
+        expect(realtime.commands).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('toggles from its corner button, and turns active only when Homey reports it', async () => {

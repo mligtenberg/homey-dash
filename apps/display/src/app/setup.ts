@@ -49,9 +49,9 @@ import { Observable } from 'rxjs';
   styles: `
     :host { display: grid; place-items: center; min-height: 100%; padding: var(--space-6) var(--space-4); box-sizing: border-box; overflow-y: auto; }
     .setup { width: min(480px, 100%); display: flex; flex-direction: column; gap: var(--space-4); }
-    h1 { font-size: 28px; font-weight: 800; margin: 0; text-wrap: balance; }
+    h1 { font-size: var(--text-screen-title); line-height: 1.15; font-weight: 800; margin: 0; text-wrap: balance; }
     .card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); }
-    .hd-input, .hd-btn { font-size: 16px; padding: 14px 18px; }
+    .hd-input, .hd-btn { font-size: var(--text-touch); padding: 14px 18px; }
     ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
     li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
     .name { flex: 1 1 8ch; min-width: 0; overflow-wrap: anywhere; font-weight: 700; }

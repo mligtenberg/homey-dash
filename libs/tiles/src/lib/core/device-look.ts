@@ -207,7 +207,7 @@ export function deviceDetail(device: HomeyDevice): { detail: string; active: boo
   if (typeof value('alarm_contact') === 'boolean') {
     return { detail: value('alarm_contact') ? 'Open' : 'Closed', active: value('alarm_contact') as boolean };
   }
-  if (typeof value('locked') === 'boolean') return { detail: value('locked') ? 'Locked' : 'Unlocked', active: false };
+  if (typeof value('locked') === 'boolean') return { detail: value('locked') ? 'Locked' : 'Unlocked', active: value('locked') === false };
   if (typeof value('alarm_motion') === 'boolean') {
     return { detail: value('alarm_motion') ? 'Motion' : 'No motion', active: value('alarm_motion') as boolean };
   }

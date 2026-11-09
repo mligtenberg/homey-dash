@@ -101,14 +101,14 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
 
     /* The time is the one large thing: light and tight, with the date set small beneath it. */
     .clock__time { font-size: calc(13 * var(--u)); font-weight: 300; line-height: .9; font-variant-numeric: tabular-nums; letter-spacing: -.035em; }
-    .clock__date { font-size: calc(2.3 * var(--u)); font-weight: 500; letter-spacing: .01em; margin-top: calc(1.4 * var(--u)); opacity: .9; }
+    .clock__date { font-size: max(var(--text-floor), calc(2.3 * var(--u))); font-weight: 500; letter-spacing: .01em; margin-top: calc(1.4 * var(--u)); opacity: .9; }
 
     /* Everything else is a reading over its label, the same shape whatever it measures. */
     .weather, .traffic { display: grid; grid-template-columns: auto auto; column-gap: calc(1.2 * var(--u)); align-items: center; }
     .spot--center .weather, .spot--center .traffic { justify-content: center; }
     .weather__icon, .traffic__icon { width: calc(4 * var(--u)); height: calc(4 * var(--u)); stroke-width: 1.6; }
     .weather__temperature, .traffic__time, .value__reading { font-size: calc(4.6 * var(--u)); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-    .weather__state, .traffic__name, .value__name { grid-column: 1 / -1; font-size: calc(1.9 * var(--u)); font-weight: 500; opacity: .82; white-space: nowrap; margin-top: calc(.7 * var(--u)); }
+    .weather__state, .traffic__name, .value__name { grid-column: 1 / -1; font-size: max(var(--text-floor), calc(1.9 * var(--u))); font-weight: 500; letter-spacing: .01em; opacity: .82; white-space: nowrap; margin-top: calc(.7 * var(--u)); }
     .traffic[data-delay='some'] .traffic__time, .traffic[data-delay='some'] .traffic__icon { color: var(--lock-warn); }
     .traffic[data-delay='heavy'] .traffic__time, .traffic[data-delay='heavy'] .traffic__icon { color: var(--lock-danger); }
     .value { display: flex; flex-direction: column; }
