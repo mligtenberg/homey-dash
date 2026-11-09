@@ -131,7 +131,9 @@ public sealed class HomeyState(TimeProvider time, int accountId)
     {
         lock (_lock)
         {
-            if (_users.TryGetValue(user.Id, out var old) && old == user) return;
+            // An update that leaves the picture out keeps the one known.
+            if (_users.TryGetValue(user.Id, out var old)) user = user with { Avatar = user.Avatar ?? old.Avatar };
+            if (old == user) return;
             _users = _users.SetItem(user.Id, user);
         }
         Changed?.Invoke(new UsersChanged());

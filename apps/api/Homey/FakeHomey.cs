@@ -285,7 +285,7 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
 
     private static readonly HomeyUser[] Users =
     [
-        new("user-martin", "Martin", Present: true, Asleep: false),
+        new("user-martin", "Martin", Present: true, Asleep: false, Avatar: "https://api.athom.com/user/60538a9db6e5770bebd9a971/avatar"),
         new("user-lisa", "Lisa", Present: true, Asleep: false),
         new("user-noah", "Noah", Present: true, Asleep: true),
         new("user-oma", "Oma", Present: false, Asleep: false),
