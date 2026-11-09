@@ -93,6 +93,12 @@ public static class HomeyMapper
         Name: String(json, "name") ?? "",
         ParentId: String(json, "parent"));
 
+    public static HomeyUser User(JsonElement json) => new(
+        Id: String(json, "id") ?? throw new JsonException("User without id"),
+        Name: String(json, "name") ?? "",
+        Present: Bool(json, "present") ?? true,
+        Asleep: Bool(json, "asleep") ?? false);
+
     public static HomeyMood Mood(JsonElement json) => new(
         Id: String(json, "id") ?? throw new JsonException("Mood without id"),
         Name: String(json, "name") ?? "",

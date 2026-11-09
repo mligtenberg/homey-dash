@@ -11,6 +11,9 @@ public interface IHomey
     Task TriggerFlowAsync(string flowId, CancellationToken ct);
     Task ActivateMoodAsync(string moodId, CancellationToken ct);
 
+    // Marks a person as home or away (present) and/or asleep or awake; what is left null stays as it is.
+    Task SetUserAsync(string userId, bool? present, bool? asleep, CancellationToken ct);
+
     // Sonos multiroom (through the speaker's own flow actions in Homey). Speakers share a group when their
     // `sonos_group` capability is equal. Volume is 1-100 and applies to every speaker in the group.
     Task JoinSpeakerGroupAsync(string deviceId, string withDeviceId, CancellationToken ct);

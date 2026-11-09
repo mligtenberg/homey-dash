@@ -117,6 +117,14 @@ export function homeyImageUrl(accountId: number, image: HomeyImage) {
   return `/api/homey/images/${encodeURIComponent(image.id)}?account=${accountId}&v=${encodeURIComponent(image.version ?? '')}`;
 }
 
+/** A person in Homey: home or away (`present`), and asleep or awake. */
+export interface HomeyUser {
+  id: string;
+  name: string;
+  present: boolean;
+  asleep: boolean;
+}
+
 /** A room or area in Homey; zones nest, and only the top one (Home) has no parent. */
 export interface HomeyZone {
   id: string;

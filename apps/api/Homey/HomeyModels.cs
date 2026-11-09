@@ -64,6 +64,9 @@ public sealed record HomeyLightColor(double? Hue, double? Saturation, double? Te
 // One point of an insight log; V is null for a gap.
 public sealed record HomeyInsightEntry(DateTimeOffset T, double? V);
 
+// A person in Homey. Present is false while they are away; Asleep is true while they sleep.
+public sealed record HomeyUser(string Id, string Name, bool Present, bool Asleep);
+
 // A Homey Logic variable; Type is boolean, number or string.
 public sealed record HomeyVariable(string Id, string Name, string Type, JsonElement Value);
 
@@ -142,6 +145,9 @@ public sealed record VariableRemoved(string VariableId) : HomeyChange;
 
 // Flows, flow folders, moods or zones were added, renamed, moved or removed.
 public sealed record CatalogChanged : HomeyChange;
+
+// A person was added, changed or removed in Homey, so the users are the whole list now.
+public sealed record UsersChanged : HomeyChange;
 
 public sealed record WeatherChanged(HomeyWeather Weather) : HomeyChange;
 

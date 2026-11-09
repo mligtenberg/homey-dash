@@ -250,6 +250,7 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
     public Task StartAsync(CancellationToken ct)
     {
         _state.Replace(Devices, Flows, Moods, Zones, FlowFolders, Variables);
+        _state.SetUsers(Users);
         _state.SetWeather(new HomeyWeather(13.2, "Clouds", 0.81, "Utrecht"));
         _state.SetLocation(new HomeyLocation(52.09, 5.12));
         _state.SetEnergyLive(new EnergyLive(Grid: -650, Solar: 1830, Home: 1180));
@@ -282,7 +283,22 @@ public sealed class FakeHomey(Homeys homeys, TimeProvider time) : IHostedService
         return new EnergyDay(Imported: 4.2, Exported: 3.1, Solar: 9.8, Home: 10.9, Cost: .82, Currency: "EUR", history, power, devices);
     }
 
+    private static readonly HomeyUser[] Users =
+    [
+        new("user-martin", "Martin", Present: true, Asleep: false),
+        new("user-lisa", "Lisa", Present: true, Asleep: false),
+        new("user-noah", "Noah", Present: true, Asleep: true),
+        new("user-oma", "Oma", Present: false, Asleep: false),
+    ];
+
     public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+
+    public Task SetUserAsync(string userId, bool? present, bool? asleep, CancellationToken ct)
+    {
+        var user = _state.FindUser(userId) ?? throw new HomeyNotFoundException($"User {userId} not found in Homey");
+        _state.UpsertUser(user with { Present = present ?? user.Present, Asleep = asleep ?? user.Asleep });
+        return Task.CompletedTask;
+    }
 
     public Task SetCapabilityValueAsync(string deviceId, string capabilityId, JsonElement value, CancellationToken ct)
     {

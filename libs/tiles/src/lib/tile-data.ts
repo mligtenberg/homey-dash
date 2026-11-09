@@ -7,6 +7,7 @@ import {
   HomeyInsightLog,
   HomeyMood,
   HomeyStatus,
+  HomeyUser,
   HomeyWeather,
   HomeyZone,
   PhotoSet,
@@ -28,6 +29,8 @@ export interface HomeyData {
   insights: ReadonlyMap<string, HomeyInsightLog>;
   zones: ReadonlyMap<string, HomeyZone>;
   flowFolders: ReadonlyMap<string, HomeyFlowFolder>;
+  /** The people of this Homey, home or away and asleep or awake. */
+  users: ReadonlyMap<string, HomeyUser>;
   /** The weather where this Homey is; null until Homey first told it, or when Homey won't. */
   weather: HomeyWeather | null;
   /** Homey's energy report; null until HomeyDash first asked Homey for it. */

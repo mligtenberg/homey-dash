@@ -88,6 +88,7 @@ public sealed class HomeyBroadcaster(Homeys homeys, IHubContext<RealtimeHub> hub
             DeviceRemoved c => ("DeviceRemoved", new HomeyDeviceRemoval(accountId, c.DeviceId)),
             CatalogChanged => ("Catalog", new HomeyCatalog(accountId, state.Flows.OrderBy(f => f.Name), state.Moods.OrderBy(m => m.Name),
                 state.Zones.OrderBy(z => z.Name), state.FlowFolders.OrderBy(f => f.Name))),
+            UsersChanged => ("Users", new HomeyUsersChange(accountId, state.Users.OrderBy(u => u.Name))),
             WeatherChanged c => ("Weather", new HomeyWeatherChange(accountId, c.Weather)),
             EnergyChanged c => ("Energy", new HomeyEnergyChange(accountId, c.Energy)),
             ConnectionChanged c => ("HomeyStatus", c.Status),

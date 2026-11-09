@@ -23,6 +23,7 @@ import { LockScreen } from './lock-screen';
 import { ScreenSettings } from './screen-settings';
 import { ScreenCapture } from './screen-capture';
 import { screenDetails } from './screen-details';
+import { People, PEOPLE_GUTTER } from './people';
 import { Setup } from './setup';
 
 type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; view: ScreenView };
@@ -54,7 +55,7 @@ const TAPE_KEY = 'homeydash.tape';
  * to the rule's dashboard or the one shown before; its lock screen widgets, such as a clock, lie over either.
  */
 @Component({
-  imports: [DashboardView, LockScreen, LucideDynamicIcon, PhotoTile, ScreenSettings, Setup],
+  imports: [DashboardView, LockScreen, LucideDynamicIcon, People, PhotoTile, ScreenSettings, Setup],
   selector: 'hd-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -74,6 +75,7 @@ const TAPE_KEY = 'homeydash.tape';
       @case ('display') {
         @if (view(); as view) {
           @if (current(); as current) {
+            <hd-people />
             @if (view.dashboards.length > 1) {
               <nav class="hd-tape" [class.is-collapsed]="collapsed()" aria-label="Dashboards">
                 <button
@@ -104,7 +106,7 @@ const TAPE_KEY = 'homeydash.tape';
             }
             <!-- One at a time, so switching starts the next dashboard at its first page. -->
             @for (dashboard of [current]; track dashboard.id) {
-              <hd-dashboard-view [layout]="dashboard.layout" [class.has-tape]="view.dashboards.length > 1" />
+              <hd-dashboard-view [layout]="dashboard.layout" [class.has-tape]="gutter() > 0" />
             }
             <!-- Woken on the click rather than the press, so the touch that ends it presses nothing beneath. -->
             @if (slideshow(); as set) {
@@ -139,7 +141,7 @@ const TAPE_KEY = 'homeydash.tape';
     :host { display: block; height: 100dvh; overflow: hidden; position: relative; --lock-edge: clamp(20px, 5vh, 56px); }
     hd-dashboard-view { height: 100%; box-sizing: border-box; }
     /* A gutter for the dashboard tape's toggle, so it floats beside the tiles rather than over them. The pages scroll
-       under it and fade out there; their content starts after it. Keep in step with TAPE_GUTTER below. */
+       under it and fade out there; their content starts after it. Keep in step with PEOPLE_GUTTER. */
     hd-dashboard-view.has-tape { --dashboard-gutter: 68px; }
     .waiting { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); text-align: center; padding: var(--space-4); box-sizing: border-box; }
     .waiting h1 { margin: 0; font-size: var(--text-screen-title); line-height: 1.15; font-weight: 800; text-wrap: balance; }
@@ -242,10 +244,13 @@ export class App {
 
   private readonly height = signal(window.innerHeight);
   private readonly width = signal(window.innerWidth);
-  // The room the tape's toggle takes from the left edge: its width plus a gap either side (44px + 2 x --space-3).
-  private static readonly TAPE_GUTTER = 68;
+  // The room the tape's toggle and the people take from the left edge: 44px and a gap either side (see PEOPLE_GUTTER).
+  protected readonly gutter = computed(() =>
+    (this.view()?.dashboards.length ?? 0) > 1 || this.hasPeople() ? PEOPLE_GUTTER : 0,
+  );
+  private readonly hasPeople = computed(() => (this.data.homeys() ?? []).some((h) => h.users.size > 0));
   protected readonly cell = computed(() => {
-    const gutter = (this.view()?.dashboards.length ?? 0) > 1 ? App.TAPE_GUTTER : 0;
+    const gutter = this.gutter();
     const layout = this.current()?.layout;
     return fittedCellSize(this.width() - gutter, this.height(), layout?.rows, layout?.sections.length);
   });

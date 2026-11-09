@@ -38,6 +38,7 @@ public static class HomeyEndpoints
             : NoAccount(account));
         homey.MapGet("/devices", (int? account, Homeys homeys) => Read(homeys, account, s => s.Devices.OrderBy(d => d.Name)));
         homey.MapGet("/flows", (int? account, Homeys homeys) => Read(homeys, account, s => s.Flows.OrderBy(f => f.Name)));
+        homey.MapGet("/users", (int? account, Homeys homeys) => Read(homeys, account, s => s.Users.OrderBy(u => u.Name)));
         homey.MapGet("/moods", (int? account, Homeys homeys) => Read(homeys, account, s => s.Moods.OrderBy(m => m.Name)));
         homey.MapGet("/insights", (int? account, Homeys homeys, CancellationToken ct) =>
             Perform(async () => Results.Ok(await homeys.Require(account).GetInsightLogsAsync(ct))));
@@ -75,6 +76,12 @@ public static class HomeyEndpoints
                 await homeys.Require(account).TriggerFlowAsync(flowId, ct);
                 return Results.NoContent();
             }));
+        homey.MapPut("/users/{userId}", (string userId, int? account, UserPresence body, Homeys homeys, CancellationToken ct) =>
+            Perform(async () =>
+            {
+                await homeys.Require(account).SetUserAsync(userId, body.Present, body.Asleep, ct);
+                return Results.NoContent();
+            }));
         homey.MapPost("/moods/{moodId}/activate", (string moodId, int? account, Homeys homeys, CancellationToken ct) =>
             Perform(async () =>
             {
@@ -93,6 +100,8 @@ public static class HomeyEndpoints
         Results.Problem($"There is no Homey account {account}.", statusCode: StatusCodes.Status404NotFound);
 
     public sealed record CapabilityValue(JsonElement Value);
+
+    public sealed record UserPresence(bool? Present, bool? Asleep);
 
     private static async Task<IResult> Perform(Func<Task<IResult>> action)
     {

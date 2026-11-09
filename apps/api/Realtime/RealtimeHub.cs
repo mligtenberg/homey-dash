@@ -284,6 +284,9 @@ public sealed class RealtimeHub(
     public Task SetCapability(int? accountId, string deviceId, string capabilityId, JsonElement value) =>
         Perform(ct => homeys.Require(accountId).SetCapabilityValueAsync(deviceId, capabilityId, value, ct));
 
+    public Task SetUser(int? accountId, string userId, bool? present, bool? asleep) =>
+        Perform(ct => homeys.Require(accountId).SetUserAsync(userId, present, asleep, ct));
+
     public Task TriggerFlow(int? accountId, string flowId) => Perform(ct => homeys.Require(accountId).TriggerFlowAsync(flowId, ct));
 
     public Task ActivateMood(int? accountId, string moodId) => Perform(ct => homeys.Require(accountId).ActivateMoodAsync(moodId, ct));
@@ -409,6 +412,7 @@ public sealed record HomeySnapshot(
     int AccountId, string AccountName,
     HomeyStatus Status, IEnumerable<HomeyDevice> Devices, IEnumerable<HomeyFlow> Flows, IEnumerable<HomeyMood> Moods,
     IEnumerable<HomeyZone> Zones, IEnumerable<HomeyFlowFolder> FlowFolders,
+    IEnumerable<HomeyUser> Users,
     // False until the Homey's data first arrived; nothing is missing then.
     bool Loaded,
     // Null until Homey first told it, or when Homey won't.
@@ -419,7 +423,7 @@ public sealed record HomeySnapshot(
     public static List<HomeySnapshot> All(Homeys homeys) =>
         homeys.All.Select(e => new HomeySnapshot(e.AccountId, e.Name, e.State.Status, e.State.Devices.OrderBy(d => d.Name),
             e.State.Flows.OrderBy(f => f.Name), e.State.Moods.OrderBy(m => m.Name), e.State.Zones.OrderBy(z => z.Name),
-            e.State.FlowFolders.OrderBy(f => f.Name), e.State.Loaded, e.State.Weather, e.State.Energy)).ToList();
+            e.State.FlowFolders.OrderBy(f => f.Name), e.State.Users.OrderBy(u => u.Name), e.State.Loaded, e.State.Weather, e.State.Energy)).ToList();
 }
 
 public sealed record HomeyCatalog(
@@ -428,6 +432,9 @@ public sealed record HomeyCatalog(
 
 // A device of the account's Homey changed or was added.
 public sealed record HomeyDeviceChange(int AccountId, HomeyDevice Device);
+
+// The people of the account's Homey changed: all of them, as they are now.
+public sealed record HomeyUsersChange(int AccountId, IEnumerable<HomeyUser> Users);
 
 // The weather of the account's Homey changed.
 public sealed record HomeyWeatherChange(int AccountId, HomeyWeather Weather);

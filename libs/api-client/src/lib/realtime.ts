@@ -8,7 +8,7 @@ import { PlexCommand, PlexItem, PlexOverview, PlexPage, PlexProfileList, PlexSes
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
 import { RouteTraffic } from './traffic';
 import { Forecast } from './weather';
-import { CapabilityValue, DeviceApp, HomeyDevice, HomeyEnergy, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
+import { CapabilityValue, DeviceApp, HomeyDevice, HomeyEnergy, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyUser, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
 
 // Mirrors apps/api/Realtime/RealtimeHub.cs.
 
@@ -23,6 +23,8 @@ export interface HomeySnapshot {
   moods: HomeyMood[];
   zones: HomeyZone[];
   flowFolders: HomeyFlowFolder[];
+  /** The people of this Homey, with whether each is home or away and asleep or awake. */
+  users: HomeyUser[];
   /** False until the Homey's data first arrived; nothing is missing then. */
   loaded: boolean;
   /** Null until Homey first told it, or when Homey won't. */
@@ -47,6 +49,8 @@ export interface RealtimeMessages {
   DeviceRemoved: { accountId: number; deviceId: string };
   Catalog: HomeyCatalog;
   HomeyStatus: HomeyStatus;
+  /** Every person of a Homey as they are now, whenever one is added, changed or removed. */
+  Users: { accountId: number; users: HomeyUser[] };
   Weather: { accountId: number; weather: HomeyWeather };
   Energy: { accountId: number; energy: HomeyEnergy };
   /** What a joined screen now is and shows; null sends it to setup. */
@@ -254,6 +258,11 @@ export class Realtime {
 
   triggerFlow(account: number | undefined, flowId: string) {
     return this.hub.invoke<void>('TriggerFlow', account ?? null, flowId);
+  }
+
+  /** Marks a person home or away and/or asleep or awake; what is left out stays as it is. */
+  setUser(account: number | undefined, userId: string, change: { present?: boolean; asleep?: boolean }) {
+    return this.hub.invoke<void>('SetUser', account ?? null, userId, change.present ?? null, change.asleep ?? null);
   }
 
   activateMood(account: number | undefined, moodId: string) {

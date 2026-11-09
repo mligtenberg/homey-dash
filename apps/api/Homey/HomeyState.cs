@@ -13,6 +13,7 @@ public sealed class HomeyState(TimeProvider time, int accountId)
     private ImmutableDictionary<string, HomeyDevice> _devices = ImmutableDictionary<string, HomeyDevice>.Empty;
     private ImmutableDictionary<string, HomeyFlow> _flows = ImmutableDictionary<string, HomeyFlow>.Empty;
     private ImmutableDictionary<string, HomeyMood> _moods = ImmutableDictionary<string, HomeyMood>.Empty;
+    private ImmutableDictionary<string, HomeyUser> _users = ImmutableDictionary<string, HomeyUser>.Empty;
     private ImmutableDictionary<string, HomeyZone> _zones = ImmutableDictionary<string, HomeyZone>.Empty;
     private ImmutableDictionary<string, HomeyFlowFolder> _flowFolders = ImmutableDictionary<string, HomeyFlowFolder>.Empty;
     private ImmutableDictionary<string, HomeyVariable> _variables = ImmutableDictionary<string, HomeyVariable>.Empty;
@@ -46,12 +47,14 @@ public sealed class HomeyState(TimeProvider time, int accountId)
     public IEnumerable<HomeyFlow> Flows => _flows.Values;
     public IEnumerable<HomeyMood> Moods => _moods.Values;
     public IEnumerable<HomeyZone> Zones => _zones.Values;
+    public IEnumerable<HomeyUser> Users => _users.Values;
     public IEnumerable<HomeyFlowFolder> FlowFolders => _flowFolders.Values;
     public IEnumerable<HomeyVariable> Variables => _variables.Values;
 
     public HomeyDevice? FindDevice(string id) => _devices.GetValueOrDefault(id);
     public HomeyFlow? FindFlow(string id) => _flows.GetValueOrDefault(id);
     public HomeyMood? FindMood(string id) => _moods.GetValueOrDefault(id);
+    public HomeyUser? FindUser(string id) => _users.GetValueOrDefault(id);
     public HomeyVariable? FindVariable(string id) => _variables.GetValueOrDefault(id);
 
     // Whether a tile target (device, flow or mood id, or an insight log of a known device) exists in Homey.
@@ -110,6 +113,38 @@ public sealed class HomeyState(TimeProvider time, int accountId)
         }
         changes.Add(new CatalogChanged());
         foreach (var change in changes) Changed?.Invoke(change);
+    }
+
+    // Replaces every person, such as after loading Homey; people are left out when the API key may not read them.
+    public void SetUsers(IEnumerable<HomeyUser> users)
+    {
+        var next = users.ToImmutableDictionary(u => u.Id);
+        lock (_lock)
+        {
+            if (_users.Count == next.Count && next.All(kv => _users.TryGetValue(kv.Key, out var old) && old == kv.Value)) return;
+            _users = next;
+        }
+        Changed?.Invoke(new UsersChanged());
+    }
+
+    public void UpsertUser(HomeyUser user)
+    {
+        lock (_lock)
+        {
+            if (_users.TryGetValue(user.Id, out var old) && old == user) return;
+            _users = _users.SetItem(user.Id, user);
+        }
+        Changed?.Invoke(new UsersChanged());
+    }
+
+    public void RemoveUser(string id)
+    {
+        lock (_lock)
+        {
+            if (!_users.ContainsKey(id)) return;
+            _users = _users.Remove(id);
+        }
+        Changed?.Invoke(new UsersChanged());
     }
 
     public void UpsertDevice(HomeyDevice device)

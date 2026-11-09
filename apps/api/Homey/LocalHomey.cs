@@ -110,7 +110,7 @@ public sealed class LocalHomey(
         try
         {
             // Subscribe before loading, so nothing that changes in between is missed.
-            await Task.WhenAll(new[] { "homey:manager:devices", "homey:manager:flow", "homey:manager:moods", "homey:manager:zones", "homey:manager:logic" }
+            await Task.WhenAll(new[] { "homey:manager:devices", "homey:manager:flow", "homey:manager:moods", "homey:manager:zones", "homey:manager:logic", "homey:manager:users" }
                 .Select(uri => SubscribeAsync(socket, uri, ct)));
             await SubscribeToImagesAsync(socket, ct);
             await LoadSnapshotAsync(ct);
@@ -160,7 +160,8 @@ public sealed class LocalHomey(
         var flowFolders = GetJsonAsync("api/manager/flow/flowfolder", ct);
         var moods = GetJsonAsync("api/manager/moods/mood", ct);
         var variables = GetVariablesAsync(ct);
-        await Task.WhenAll(zones, devices, flows, advancedFlows, flowFolders, moods, variables);
+        var users = GetUsersAsync(ct);
+        await Task.WhenAll(zones, devices, flows, advancedFlows, flowFolders, moods, variables, users);
 
         var zoneList = HomeyMapper.Values(zones.Result).Select(HomeyMapper.Zone).ToList();
         var zoneNames = zoneList.ToDictionary(z => z.Id, z => z.Name);
@@ -172,6 +173,21 @@ public sealed class LocalHomey(
             zoneList,
             HomeyMapper.Values(flowFolders.Result).Select(HomeyMapper.FlowFolder),
             variables.Result);
+        state.SetUsers(users.Result);
+    }
+
+    // People only feed the users on a display, so an API key that may not read them leaves them out rather than failing.
+    private async Task<List<HomeyUser>> GetUsersAsync(CancellationToken ct)
+    {
+        try
+        {
+            return HomeyMapper.Values(await GetJsonAsync("api/manager/users/user", ct)).Select(HomeyMapper.User).ToList();
+        }
+        catch (HttpRequestException e)
+        {
+            logger.LogWarning("Could not read the users of Homey {Account}: {Error}", account.Name, e.Message);
+            return [];
+        }
     }
 
     // Variables only feed rules, so an API key that may not read them leaves them out rather than failing.
@@ -429,6 +445,12 @@ public sealed class LocalHomey(
             case ("homey:manager:zones", "zone.delete"):
                 state.RemoveZone(HomeyMapper.String(data, "id")!);
                 break;
+            case ("homey:manager:users", "user.create" or "user.update"):
+                state.UpsertUser(HomeyMapper.User(data));
+                break;
+            case ("homey:manager:users", "user.delete"):
+                state.RemoveUser(HomeyMapper.String(data, "id")!);
+                break;
             case ("homey:manager:logic", "variable.create" or "variable.update"):
                 state.UpsertVariable(HomeyMapper.Variable(data));
                 break;
@@ -457,6 +479,14 @@ public sealed class LocalHomey(
     {
         if (state.FindMood(moodId) is null) throw new HomeyNotFoundException($"Mood {moodId} not found in Homey");
         await SendAsync(HttpMethod.Post, $"api/manager/moods/mood/{Uri.EscapeDataString(moodId)}/set", null, ct);
+    }
+
+    public async Task SetUserAsync(string userId, bool? present, bool? asleep, CancellationToken ct)
+    {
+        if (state.FindUser(userId) is null) throw new HomeyNotFoundException($"User {userId} not found in Homey");
+        var path = $"api/manager/users/user/{Uri.EscapeDataString(userId)}";
+        if (present is { } p) await SendAsync(HttpMethod.Put, $"{path}/present", new { value = p }, ct);
+        if (asleep is { } a) await SendAsync(HttpMethod.Put, $"{path}/asleep", new { value = a }, ct);
     }
 
     public async Task JoinSpeakerGroupAsync(string deviceId, string withDeviceId, CancellationToken ct)

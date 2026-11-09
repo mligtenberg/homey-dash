@@ -83,6 +83,7 @@ export class FakeRealtime implements Partial<Realtime> {
       moods: [],
       zones: [],
       flowFolders: [],
+      users: [],
       loaded: true,
       weather: null,
       energy: null,
@@ -291,6 +292,10 @@ export class FakeRealtime implements Partial<Realtime> {
 
   activateMood(account: number | undefined, moodId: string) {
     return this.command('activateMood', account, moodId);
+  }
+
+  setUser(account: number | undefined, userId: string, change: { present?: boolean; asleep?: boolean }) {
+    return this.command('setUser', account, userId, change);
   }
 
   joinSpeakerGroup(account: number | undefined, deviceId: string, withDeviceId: string) {

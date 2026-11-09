@@ -45,6 +45,7 @@ export class RealtimeTileData extends TileData {
       this.realtime.on('Catalog', (message) =>
         this.apply(() => this.change(message.accountId, (h) => ({ ...h, ...catalog(message), loaded: true }))),
       ),
+      this.realtime.on('Users', ({ accountId, users }) => this.apply(() => this.change(accountId, (h) => ({ ...h, users: byId(users) })))),
       this.realtime.on('Weather', ({ accountId, weather }) => this.apply(() => this.change(accountId, (h) => ({ ...h, weather })))),
       this.realtime.on('Energy', ({ accountId, energy }) => this.apply(() => this.change(accountId, (h) => ({ ...h, energy })))),
       this.realtime.on('HomeyStatus', (status) =>
@@ -79,6 +80,7 @@ export class RealtimeTileData extends TileData {
         loaded: s.loaded,
         devices: byId(s.devices),
         ...catalog(s),
+        users: byId(s.users ?? []),
         weather: s.weather ?? null,
         energy: s.energy ?? null,
         insights: before.get(s.accountId)?.insights ?? new Map(),
