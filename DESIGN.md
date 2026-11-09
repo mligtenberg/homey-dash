@@ -175,7 +175,7 @@ Each kind has an `-ink` (icon, chart line, slider fill, chip; 4.5:1 on `tile-sur
 - **Lock Warn / Lock Danger** (`#ffd166` / `#ff9b85`): status on the lock screen. The same in every theme, because the lock screen always lies over a photo.
 
 ### Named Rules
-**The Kind Hue Rule.** A resting tile carries a light tint of its kind (22% fill over the surface); an active tile fills with it. Inactive tiles stay on `tile-surface` with a tinted icon, so a dashboard is still colourful when everything is off. The share is `--rest-tint`: 22% in light, 36% in dark, where the fills are deep and 22% left heat, security, climate and cover tiles the same grey-blue.
+**The Kind Hue Rule.** A resting tile carries a light tint of its kind (22% fill over the surface); an active tile fills with it. Inactive tiles stay on `tile-surface` with a tinted icon, so a dashboard is still colourful when everything is off. The share is `--rest-tint`: 22% in light, 36% in dark, where the fills are deep and 22% left heat, security, climate and cover tiles the same grey-blue. Poster and cover art dims to 70% brightness in dark (`--art-dim`), so it is not the brightest thing on a night wall.
 
 **The Status Is Never Decoration Rule.** `ok`, `warn` and `danger` appear only with a word; colour alone never carries state.
 

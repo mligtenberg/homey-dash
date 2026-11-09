@@ -1058,7 +1058,7 @@ a.hd-btn { text-decoration: none; }
  * along the bottom; and the newest posters of a library side by side. Without either they are plain tiles.
  */
 .hd-plex.has-art, .hd-plex-recent.has-art { padding: 0; background: #111; color: #fff; }
-.hd-plex__art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; }
+.hd-plex__art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; filter: brightness(var(--art-dim)); }
 .hd-plex.has-art::before {
   content: ""; position: absolute; inset: 0; z-index: 1;
   background: linear-gradient(rgb(0 0 0 / .15), rgb(0 0 0 / .72));
@@ -1089,7 +1089,7 @@ a.hd-btn { text-decoration: none; }
 .hd-plex-recent__grid[data-count="4"] { --cols: 2; }
 .hd-plex-recent__grid[data-count="6"] { --cols: 3; }
 .hd-plex-recent__item { position: relative; overflow: hidden; background: #222; }
-.hd-plex-recent__poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; }
+.hd-plex-recent__poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; filter: brightness(var(--art-dim)); }
 .hd-plex-recent__caption {
   position: absolute; inset: auto 0 0 0;
   padding: calc(var(--cell) * .25) calc(var(--cell) * .08) calc(var(--cell) * .07);

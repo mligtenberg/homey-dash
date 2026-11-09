@@ -56,6 +56,8 @@
   --kind-neutral-fill: #aad0ff;
   /* How much of its kind's fill a resting tile carries. The dark fills are deep, so a dark tile needs more of them to show its hue. */
   --rest-tint: 22%;
+  /* Poster and cover art keeps its own light. In dark it dims, so a poster is not the brightest thing on a night wall. */
+  --art-dim: 1;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -100,6 +102,7 @@
     --kind-neutral-ink: #91bbff;
     --kind-neutral-fill: #2a4072;
     --rest-tint: 36%;
+    --art-dim: .7;
     }
 }
 
@@ -144,6 +147,7 @@
   --kind-neutral-ink: #91bbff;
   --kind-neutral-fill: #2a4072;
   --rest-tint: 36%;
+  --art-dim: .7;
 }
 
 :root {
