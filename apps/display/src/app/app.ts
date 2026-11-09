@@ -150,6 +150,8 @@ const TAPE_KEY = 'homeydash.tape';
     @keyframes slideshow-out { to { opacity: 0; } }
     @media (prefers-reduced-motion: reduce) { .is-leaving { animation: none; } }
     .slideshow hd-photo-tile { width: 100%; height: 100%; border-radius: 0; box-shadow: none; --cell: calc(100dvh / 3); }
+    /* Full-bleed, not a tile: no glass rim, hairline or sheen over the picture. */
+    .slideshow ::ng-deep .hd-photo::after { content: none; }
     /* The photo's caption is part of the lock screen's layer: its margins, its type and shadow, no bar of its own. */
     .slideshow ::ng-deep .hd-photo__caption {
       padding: 0 var(--lock-edge) var(--lock-edge); background: none; gap: 2vh;
