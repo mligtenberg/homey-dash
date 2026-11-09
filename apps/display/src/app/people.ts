@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, ElementRef, inject, signal } from '@angular/core';
 import { LucideMapPinOff, LucideMoon } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
-import { Realtime } from '@homey-dash/api-client';
+import { homeyUserAvatarUrl, Realtime } from '@homey-dash/api-client';
 import { TileData } from '@homey-dash/tiles';
 
 /** The room the column of people takes from the left edge: its width plus a gap either side (44px + 2 x --space-3). */
@@ -30,7 +30,11 @@ export const PEOPLE_GUTTER = 68;
               [attr.aria-label]="person.name + ', ' + person.state"
               (click)="toggle(person.key)"
             >
-              {{ person.initial }}
+              @if (person.avatar && !failed().has(person.key)) {
+                <img class="person__photo" [src]="person.avatar" alt="" (error)="fail(person.key)" />
+              } @else {
+                {{ person.initial }}
+              }
               @if (!person.present) {
                 <span class="person__mark person__mark--away" aria-hidden="true"><svg [lucideIcon]="awayIcon" /></span>
               }
@@ -67,6 +71,8 @@ export const PEOPLE_GUTTER = 68;
       color: var(--ink); font: 800 16px/1 var(--font-sans); text-transform: uppercase;
       transition: transform .12s ease-out;
     }
+    .person__photo { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+    .person__face.is-away .person__photo { opacity: .55; }
     .person__face:active { transform: scale(.96); }
     .person__face:focus-visible, .choice button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
     /* Away is intensity: the letter fades, the marks stay at full strength. */
@@ -104,6 +110,8 @@ export class People {
   protected readonly awayIcon = LucideMapPinOff;
   protected readonly sleepIcon = LucideMoon;
   protected readonly open = signal<string | null>(null);
+  // People whose picture would not load, who show their initial instead.
+  protected readonly failed = signal<ReadonlySet<string>>(new Set());
 
   /** Every Homey's people, each Homey's by name; the key tells the same name in two Homeys apart. */
   readonly people = computed(() =>
@@ -115,6 +123,7 @@ export class People {
           accountId: homey.accountId,
           id: user.id,
           name: user.name,
+          avatar: user.hasAvatar ? homeyUserAvatarUrl(homey.accountId, user.id) : null,
           initial: [...user.name.trim()][0] ?? '?',
           present: user.present,
           asleep: user.asleep,
@@ -122,6 +131,10 @@ export class People {
         })),
     ),
   );
+
+  protected fail(key: string) {
+    this.failed.update((failed) => new Set(failed).add(key));
+  }
 
   protected toggle(key: string) {
     this.open.update((open) => (open === key ? null : key));

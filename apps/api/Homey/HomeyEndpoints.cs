@@ -76,6 +76,16 @@ public static class HomeyEndpoints
                 await homeys.Require(account).TriggerFlowAsync(flowId, ct);
                 return Results.NoContent();
             }));
+        // Only the picture a Homey user has, fetched from Athom, so HomeyDash does not fetch whatever address a request names.
+        homey.MapGet("/users/{userId}/avatar", (string userId, int? account, Homeys homeys, IHttpClientFactory http, HttpResponse response, CancellationToken ct) =>
+            Perform(async () =>
+            {
+                if (homeys.Require(account).State.FindUser(userId)?.Avatar is not { } address) return Results.NotFound();
+                using var picture = await http.CreateClient().GetAsync(address, ct);
+                if (!picture.IsSuccessStatusCode) return Results.NotFound();
+                response.Headers.CacheControl = "public, max-age=86400";
+                return Results.File(await picture.Content.ReadAsByteArrayAsync(ct), picture.Content.Headers.ContentType?.MediaType ?? "image/jpeg");
+            }));
         homey.MapPut("/users/{userId}", (string userId, int? account, UserPresence body, Homeys homeys, CancellationToken ct) =>
             Perform(async () =>
             {

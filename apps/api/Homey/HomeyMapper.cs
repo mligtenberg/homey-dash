@@ -97,7 +97,8 @@ public static class HomeyMapper
         Id: String(json, "id") ?? throw new JsonException("User without id"),
         Name: String(json, "name") ?? "",
         Present: Bool(json, "present") ?? true,
-        Asleep: Bool(json, "asleep") ?? false);
+        Asleep: Bool(json, "asleep") ?? false,
+        Avatar: String(json, "avatar") is { Length: > 0 } avatar && Uri.TryCreate(avatar, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps ? avatar : null);
 
     public static HomeyMood Mood(JsonElement json) => new(
         Id: String(json, "id") ?? throw new JsonException("Mood without id"),

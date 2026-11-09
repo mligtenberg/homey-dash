@@ -65,7 +65,11 @@ public sealed record HomeyLightColor(double? Hue, double? Saturation, double? Te
 public sealed record HomeyInsightEntry(DateTimeOffset T, double? V);
 
 // A person in Homey. Present is false while they are away; Asleep is true while they sleep.
-public sealed record HomeyUser(string Id, string Name, bool Present, bool Asleep);
+// Avatar is the picture's address at Athom, which stays in HomeyDash: displays get it from /api/homey/users/{Id}/avatar.
+public sealed record HomeyUser(string Id, string Name, bool Present, bool Asleep, [property: System.Text.Json.Serialization.JsonIgnore] string? Avatar = null)
+{
+    public bool HasAvatar => Avatar is not null;
+}
 
 // A Homey Logic variable; Type is boolean, number or string.
 public sealed record HomeyVariable(string Id, string Name, string Type, JsonElement Value);

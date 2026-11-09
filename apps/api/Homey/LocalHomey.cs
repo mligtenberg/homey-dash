@@ -484,7 +484,8 @@ public sealed class LocalHomey(
     public async Task SetUserAsync(string userId, bool? present, bool? asleep, CancellationToken ct)
     {
         if (state.FindUser(userId) is null) throw new HomeyNotFoundException($"User {userId} not found in Homey");
-        var path = $"api/manager/users/user/{Uri.EscapeDataString(userId)}";
+        // Homey keeps presence in its presence manager, by the user's id.
+        var path = $"api/manager/presence/{Uri.EscapeDataString(userId)}";
         if (present is { } p) await SendAsync(HttpMethod.Put, $"{path}/present", new { value = p }, ct);
         if (asleep is { } a) await SendAsync(HttpMethod.Put, $"{path}/asleep", new { value = a }, ct);
     }

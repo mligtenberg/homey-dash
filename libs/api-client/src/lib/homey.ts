@@ -123,6 +123,13 @@ export interface HomeyUser {
   name: string;
   present: boolean;
   asleep: boolean;
+  /** Whether the person has a picture, for `homeyUserAvatarUrl`. */
+  hasAvatar: boolean;
+}
+
+/** Where a display gets a person's picture: from HomeyDash, which fetches it. */
+export function homeyUserAvatarUrl(accountId: number, userId: string) {
+  return `/api/homey/users/${encodeURIComponent(userId)}/avatar?account=${accountId}`;
 }
 
 /** A room or area in Homey; zones nest, and only the top one (Home) has no parent. */
