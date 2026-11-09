@@ -21,8 +21,9 @@
   scrollbar-width: none;
 }
 .hd-dashboard__pages::-webkit-scrollbar { display: none; }
-/* A page swiping across the gutter fades out under the floating control instead of being cut off. */
-.hd-dashboard__pages { mask-image: linear-gradient(to right, transparent calc(var(--dashboard-gutter, 0px) * .3), #000 var(--dashboard-gutter, 0px)); }
+/* A page swiping across the gutter fades out under the floating control instead of being cut off. Not over a background
+   image: a mask makes the pages a backdrop root, so the glass tiles would blur only their own page, not the image. */
+:not(.hd-has-image) > .hd-dashboard__pages { mask-image: linear-gradient(to right, transparent calc(var(--dashboard-gutter, 0px) * .3), #000 var(--dashboard-gutter, 0px)); }
 .hd-dashboard__page {
   flex: none;
   width: 100%;
@@ -60,9 +61,13 @@
  * fills with its kind's colour or a mood's stays solid. Titles and page dots get a shadow for the same reason.
  */
 .hd-has-image .hd-tile:not(.is-active, .is-feedback, .has-tint) {
-  background: color-mix(in oklab, var(--k-fill, transparent) var(--rest-tint), var(--tile-glass));
-  -webkit-backdrop-filter: blur(18px) saturate(1.3);
-  backdrop-filter: blur(18px) saturate(1.3);
+  background:
+    linear-gradient(135deg, var(--glass-sheen), transparent 45%, color-mix(in oklab, var(--glass-sheen) 40%, transparent)),
+    color-mix(in oklab, var(--k-fill, transparent) var(--rest-tint), var(--tile-glass));
+  -webkit-backdrop-filter: blur(8px) saturate(1.25);
+  backdrop-filter: blur(8px) saturate(1.25);
+  /* The lift stays; a rim catches the light along the top and a hairline runs round the edge, like a thick pane. */
+  box-shadow: var(--tile-raised), inset 0 1px 0 var(--glass-rim), inset 0 0 0 1px var(--glass-edge);
 }
 .hd-has-image .hd-section__title { color: var(--ink); text-shadow: 0 0 6px var(--ground), 0 0 2px var(--ground); }
 .hd-has-image .hd-page-dot::before { box-shadow: 0 0 0 2px color-mix(in oklab, var(--ground) 60%, transparent); }
@@ -990,6 +995,12 @@ a.hd-btn { text-decoration: none; }
  * photo (no set picked, missing, or empty) it is a plain tile.
  */
 .hd-photo.has-photo { padding: 0; background: var(--tile-surface); }
+/* A tile whose face is a picture (a photo, a poster) has no glass to light, so the same rim, hairline and sheen sit over it. */
+:is(.hd-photo.has-photo, .hd-plex.has-art, .hd-plex-recent.has-art)::after {
+  content: ""; position: absolute; inset: 0; z-index: 4; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(135deg, var(--glass-sheen), transparent 45%, color-mix(in oklab, var(--glass-sheen) 40%, transparent));
+  box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 0 0 1px var(--glass-edge);
+}
 .hd-photo__img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
   animation: hd-photo-in 1.2s ease-in-out; user-select: none; -webkit-user-drag: none;

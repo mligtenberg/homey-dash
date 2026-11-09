@@ -60,6 +60,10 @@
   --art-dim: 1;
   /* Solar generation drawn over the energy blues: the lamp amber at its brightest, so it reads as amber and not as a muddy brown. */
   --solar-mark: var(--kind-light-fill);
+  /* Liquid glass over a background image: a bright rim along the top edge, a faint one all round, and a sheen from the top left. */
+  --glass-rim: rgb(255 255 255 / .7);
+  --glass-edge: rgb(255 255 255 / .35);
+  --glass-sheen: rgb(255 255 255 / .3);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -106,6 +110,9 @@
     --rest-tint: 36%;
     --art-dim: .7;
     --solar-mark: var(--kind-light-ink);
+    --glass-rim: rgb(255 255 255 / .28);
+    --glass-edge: rgb(255 255 255 / .12);
+    --glass-sheen: rgb(255 255 255 / .1);
     }
 }
 
@@ -152,6 +159,9 @@
   --rest-tint: 36%;
   --art-dim: .7;
   --solar-mark: var(--kind-light-ink);
+  --glass-rim: rgb(255 255 255 / .28);
+  --glass-edge: rgb(255 255 255 / .12);
+  --glass-sheen: rgb(255 255 255 / .1);
 }
 
 :root {

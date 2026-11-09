@@ -219,6 +219,7 @@ Two faces. **Displays** are lifted: every resting tile has one soft shadow (`til
 
 ### Shadow Vocabulary
 - **Tile raised** (`0 1px 2px emboss-shade@60%, 0 .05·cell .14·cell -.04·cell emboss-shade`): every resting tile.
+- **Glass tile** (over a background image): the tile lift plus an inset 1px bright rim along the top (`--glass-rim`), an inset hairline all round (`--glass-edge`) and a 135° sheen (`--glass-sheen`) over an 8px blur: a thick pane, not frosting. Fainter in dark.
 - **Detail sheet** (`0 .1·cell .4·cell emboss-shade`) over a blurred `emboss-shade` backdrop: a tile's open details.
 - **Tape pill** (`0 1px 3px emboss-shade@60%`) with a 12px backdrop blur: the dashboard tape only.
 - **Lock screen text** (`0 1px 2px / 0 0 14px / 0 0 36px` black at 55 / 45 / 35%): white type on any photo; each spot also darkens only its own corner.
