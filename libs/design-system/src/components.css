@@ -138,6 +138,8 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .hd-tile.is-active .hd-tile__detail, .hd-tile.is-feedback .hd-tile__detail, .hd-tile.is-active .hd-unit { color: var(--ink); }
+/* Muted ink is 3.5-4.0:1 on the ten kind fills; on a filled tile it becomes ink at 78% over the fill, 5.6-6.3:1. */
+.hd-tile.is-active, .hd-energy { --ink-muted: color-mix(in oklab, var(--ink) 78%, var(--k-fill)); }
 .hd-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .hd-row--top { align-items: flex-start; }
 .hd-value { white-space: nowrap; }
@@ -1070,7 +1072,7 @@ a.hd-btn { text-decoration: none; }
 }
 .hd-plex__sub { font-size: max(var(--t-detail-min), calc(var(--cell) * var(--t-detail))); line-height: 1.25; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hd-plex__controls { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--cell) * .08); }
-.hd-plex__time { font-size: max(var(--t-caption-min), calc(var(--cell) * var(--t-caption))); font-variant-numeric: tabular-nums; opacity: .8; }
+.hd-plex__time { font-size: max(var(--t-caption-min), calc(var(--cell) * var(--t-caption))); font-variant-numeric: tabular-nums; opacity: .8; text-wrap: balance; }
 .hd-plex.has-art .hd-round-btns { background: rgb(255 255 255 / .16); margin-left: auto; }
 .hd-plex.has-art .hd-round-btn { color: #fff; }
 .hd-plex.is-feedback.has-art, .hd-plex.is-error.has-art { background: #111; }
