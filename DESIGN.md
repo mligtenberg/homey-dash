@@ -194,7 +194,8 @@ Each kind has an `-ink` (icon, chart line, slider fill, chip; 4.5:1 on `tile-sur
 - **Page title** (800, 22px): Management `h1`. Panel title 18px, section title 16px; no other heading sizes.
 - **Body** (500, 14px, 1.45): Management text. **Label** (700, 12px): field labels and pills. Only the overline is uppercase.
 - **Screen title** (800, 28px, `--text-screen-title`): the one heading on a full-screen state (waiting, Setup). **Touch input** (16px, `--text-touch`): inputs and buttons on Setup and screen settings, never below 16px so iOS does not zoom. Caption 13px (hints, sub lines), item title 15px.
-- **Floor**: display text is a fraction of `--cell`, but never under `--text-floor` (11px), so the smallest roles survive a short screen.
+- **Small-text roles** (`--t-caption` .085, `--t-detail` .1, `--t-name` .12, `--t-sub` .145, `--t-title` .17, about 1.2 apart): each is `max(var(--t-x-min), calc(var(--cell) * var(--t-x)))` with floors of 11, 11, 11.5, 14 and 16px (tuned on the 916×610 hardware at 6 rows, where a 12px name breaks "Thermostat" mid-word), so the order caption < detail < name < sub < title holds on a short screen. Detail lines are weight 600, names 700. Every small display text uses one of these five; hero values stay on `--value-scale-*`.
+- **Floor**: `--text-floor` (11px) is the caption floor; no display text goes below it.
 - **Lock screen**: scales with the viewport height: clock time 13 × 1vh at weight 300, readings 4.6 × 1vh at 500, labels 1.9 × 1vh.
 
 ### Named Rules

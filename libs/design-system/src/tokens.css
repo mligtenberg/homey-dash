@@ -161,6 +161,14 @@
   --unit-scale: .45em;
   /* The smallest a display's text gets on a short screen; type still scales with --cell above it. */
   --text-floor: 11px;
+  /* The five small-text roles of a display, about 1.2 apart: a share of the tile's --cell and a floor in px, so the
+     order caption < detail < name < sub < title survives a short screen. Use max(var(--t-x-min), calc(var(--cell) * var(--t-x))):
+     --cell differs per element, so a role cannot be one precomputed custom property. Big values stay on --value-scale-*. */
+  --t-caption: .085; --t-caption-min: var(--text-floor);
+  --t-detail: .1; --t-detail-min: 11px;
+  --t-name: .12; --t-name-min: 11.5px;
+  --t-sub: .145; --t-sub-min: 14px;
+  --t-title: .17; --t-title-min: 16px;
   /* A full-screen title (waiting, setup) and the 16px that keeps touch inputs from zooming on iOS. */
   --text-screen-title: 28px;
   --text-touch: 16px;
