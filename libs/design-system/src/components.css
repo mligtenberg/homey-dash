@@ -329,6 +329,14 @@
 .hd-chart__dot { fill: var(--k-ink); stroke: var(--tile-surface); stroke-width: calc(var(--cell) * .015); }
 .hd-chart__axis { fill: var(--ink-muted); font-variant-numeric: tabular-nums; }
 .hd-chart__cursor { stroke: var(--k-ink); stroke-width: 1.5; stroke-dasharray: 3 3; }
+/*
+ * A one-row statistic tile has no height left under its name and reading, so its chart becomes a quiet backdrop along the
+ * bottom edge: the line only, no axis, grid or dot.
+ */
+.hd-stat:is([data-size="wide"], [data-size="full"]) { position: relative; overflow: hidden; }
+.hd-stat:is([data-size="wide"], [data-size="full"]) hd-statistic-chart { position: absolute; inset: auto 0 0 0; height: 45%; pointer-events: none; }
+.hd-stat:is([data-size="wide"], [data-size="full"]) .hd-chart { height: 100%; overflow: hidden; opacity: .45; }
+.hd-stat:is([data-size="wide"], [data-size="full"]) :is(.hd-chart__axis, .hd-chart__grid, .hd-chart__dot) { display: none; }
 .hd-stat__readout { display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--cell) * .1); }
 
 /* Tile details: a modal from showModal(), inside the tile so it takes the tile's kind hue */
@@ -644,6 +652,8 @@
 .hd-tile.is-missing { background: transparent; box-shadow: inset 0 0 0 2px var(--line); }
 .hd-tile.is-missing .hd-tile__name { color: var(--ink-muted); }
 .hd-tile.is-missing .hd-tile__detail, .hd-tile.is-missing .hd-icon { color: var(--danger); }
+/* The one phrase a missing tile has to say must not end in an ellipsis: it wraps instead. */
+.hd-tile.is-missing .hd-tile__detail { white-space: normal; overflow: visible; text-wrap: balance; }
 .hd-tile.is-error .hd-tile__detail { color: var(--danger); }
 
 /* Connection lost: to HomeyDash locks every tile, to a Homey only the tiles of that Homey. */
@@ -1529,7 +1539,9 @@ a.hd-btn { text-decoration: none; }
 .hd-energy:not(.has-live) { display: flex; }
 .hd-energy__now { grid-area: now; }
 .hd-energy__now .hd-value { font-weight: 700; font-variant-numeric: tabular-nums; font-size: calc(var(--cell) * .2); white-space: nowrap; }
-.hd-energy[data-size="small"] .hd-energy__now .hd-value { font-size: calc(var(--cell) * .17); }
+/* A 1x1 tile has about three cells of width for the icon and the reading: a smaller chip lets "650 W" stay large and inside the padding. */
+.hd-energy[data-size="small"] .hd-energy__now .hd-value { font-size: calc(var(--cell) * .15); }
+.hd-energy[data-size="small"] .hd-energy__now .hd-icon { width: calc(var(--cell) * .28); height: calc(var(--cell) * .28); }
 .hd-energy[data-size="full-large"] .hd-energy__now .hd-value { font-size: calc(var(--cell) * .3); }
 .hd-energy__titles { grid-area: titles; align-self: end; min-width: 0; }
 .hd-energy[data-size="wide"], .hd-energy[data-size="full"] { grid-template: "now figures" auto "titles figures" 1fr "flow flow" auto / minmax(0, 1fr) minmax(0, 1fr); }
