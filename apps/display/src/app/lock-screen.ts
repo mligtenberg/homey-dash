@@ -290,15 +290,18 @@ function backdropOf(context: OffscreenCanvasRenderingContext2D, rect: DOMRect, s
   const h = Math.min(context.canvas.height, Math.ceil(rect.bottom * scale)) - y;
   if (w < 1 || h < 1) return null;
   const { data } = context.getImageData(x, y, w, h);
-  const sum = [0, 0, 0];
-  let lightest: Rgb = [data[0], data[1], data[2]];
-  let darkest = lightest;
-  for (let i = 0; i < data.length; i += 4) {
-    for (let c = 0; c < 3; c++) sum[c] += data[i + c];
-    const pixel: Rgb = [data[i], data[i + 1], data[i + 2]];
-    if (luminance(pixel) > luminance(lightest)) lightest = pixel;
-    if (luminance(pixel) < luminance(darkest)) darkest = pixel;
-  }
   const pixels = data.length / 4;
-  return { average: [Math.round(sum[0] / pixels), Math.round(sum[1] / pixels), Math.round(sum[2] / pixels)], lightest, darkest };
+  const sum = [0, 0, 0];
+  const lights = new Float32Array(pixels);
+  for (let i = 0; i < pixels; i++) {
+    for (let c = 0; c < 3; c++) sum[c] += data[i * 4 + c];
+    lights[i] = luminance([data[i * 4], data[i * 4 + 1], data[i * 4 + 2]]);
+  }
+  // The lightest and darkest as the 95th and 5th percentile, so that one glint or speck doesn't decide.
+  const order = Array.from(lights.keys()).sort((p, q) => lights[p] - lights[q]);
+  const at = (share: number): Rgb => {
+    const i = order[Math.min(pixels - 1, Math.floor(pixels * share))] * 4;
+    return [data[i], data[i + 1], data[i + 2]];
+  };
+  return { average: [Math.round(sum[0] / pixels), Math.round(sum[1] / pixels), Math.round(sum[2] / pixels)], lightest: at(0.95), darkest: at(0.05) };
 }
