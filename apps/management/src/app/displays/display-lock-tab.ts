@@ -1,13 +1,13 @@
 import { AccountOption, AccountSelect } from '../account-select';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { DisplayInfo, LOCK_SPOTS, LockSpot, LockWidget, Rule, TomTomAccountApi } from '@homey-dash/api-client';
+import { DisplayInfo, LOCK_SPOTS, LockSpot, LockWidget, NEWS_SOURCES, Rule, TomTomAccountApi } from '@homey-dash/api-client';
 import { TrafficRouteField } from '@homey-dash/tiles';
 import { RuleEditor } from '../editor/rule-editor';
 import { SignalPicker } from '../editor/signal-picker';
 import { DisplayContext } from './display-context';
 import { DisplaysStore, isCapabilitySignal, MAX_LOCK_WIDGETS } from './displays-store';
-import { LucideCar, LucideChevronDown, LucideClock, LucideCloud, LucidePlus, LucideThermometer, RemoveButton, ReorderButtons } from '@homey-dash/design-system';
+import { LucideCar, LucideChevronDown, LucideClock, LucideCloud, LucideNewspaper, LucidePlus, LucideThermometer, RemoveButton, ReorderButtons } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { describeRule } from '../editor/rule-text';
 import { SignalCatalogue } from '../editor/signal-catalogue';
@@ -30,8 +30,8 @@ const SPOT_NAMES: Record<LockSpot, string> = {
   'bottom-right': 'Bottom right',
 };
 
-const KIND_ICONS = { clock: LucideClock, weather: LucideCloud, value: LucideThermometer, traffic: LucideCar };
-const KIND_NAMES = { clock: 'Time and date', weather: 'Weather', value: 'Device value', traffic: 'Traffic' };
+const KIND_ICONS = { clock: LucideClock, weather: LucideCloud, value: LucideThermometer, traffic: LucideCar, news: LucideNewspaper };
+const KIND_NAMES = { clock: 'Time and date', weather: 'Weather', value: 'Device value', traffic: 'Traffic', news: 'News' };
 
 /** The widgets a display's lock screen shows over a photo set or colour while an idle rule plays it. */
 @Component({
@@ -138,6 +138,12 @@ const KIND_NAMES = { clock: 'Time and date', weather: 'Weather', value: 'Device 
                     />
                   }
                   <hd-traffic-route-field [idPrefix]="'lock-traffic-' + i" [route]="widget.route" [account]="widget.account" (changed)="store.setLockRoute(display, i, $event)" />
+                } @else if (widget.kind === 'news') {
+                  <select class="hd-select" [attr.aria-label]="'News widget ' + (i + 1) + ' shows'" (change)="store.setLockSource(display, i, $any($event.target).value)">
+                    @for (source of newsSources; track source.id; let first = $first) {
+                      <option [value]="source.id" [selected]="(widget.source ?? newsSources[0].id) === source.id">{{ source.name }}</option>
+                    }
+                  </select>
                 }
 
                 <div class="when">
@@ -264,7 +270,8 @@ export class DisplayLockTab {
   protected readonly context = inject(DisplayContext);
   protected readonly store = inject(DisplaysStore);
   protected readonly spots = LOCK_SPOTS;
-  protected readonly kinds = ['clock', 'weather', 'value', 'traffic'] as const;
+  protected readonly kinds = ['clock', 'weather', 'value', 'traffic', 'news'] as const;
+  protected readonly newsSources = NEWS_SOURCES;
   protected readonly choices: { value: Visibility; label: string }[] = [
     { value: 'always', label: 'Always' },
     { value: 'rule', label: 'When a rule holds' },

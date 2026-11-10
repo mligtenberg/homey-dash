@@ -6,7 +6,8 @@ namespace HomeyDash.Api.Rules;
 /// <summary>
 /// The capabilities of every device and the Logic variables of every Homey account. Ids name the account:
 /// <c>homey:{account}:capability:{device}:{capability}</c>, <c>homey:{account}:changed:{device}:{capability}</c> (when
-/// the capability last changed, as a date and time) and <c>homey:{account}:variable:{variable}</c>. A removed account,
+/// the capability last changed, as a date and time) and <c>homey:{account}:variable:{variable}</c>, and whether a person is home or asleep:
+/// <c>homey:{account}:user:{user}:present</c> and <c>…:asleep</c>. A removed account,
 /// device, capability or variable is missing; an unreachable Homey or device keeps its last known values.
 /// </summary>
 public sealed class HomeySignals : ISignalSource, IDisposable
@@ -46,6 +47,8 @@ public sealed class HomeySignals : ISignalSource, IDisposable
             .SelectMany(d => d.Capabilities.Values.SelectMany(c => (IEnumerable<SignalInfo?>)
                 [Capability(entry, d, c), LastChanged(entry, d, c)]))
             .Concat(entry.State.Variables.OrderBy(v => v.Name, StringComparer.CurrentCultureIgnoreCase).Select(v => Variable(entry, v)))
+            .Concat(entry.State.Users.OrderBy(u => u.Name, StringComparer.CurrentCultureIgnoreCase)
+                .SelectMany(u => new[] { User(entry, u, "present"), User(entry, u, "asleep") }))
             .OfType<SignalInfo>());
 
     public SignalInfo? Find(string signalId) => Parse(signalId) switch
@@ -55,6 +58,7 @@ public sealed class HomeySignals : ISignalSource, IDisposable
         ({ } entry, "changed", var deviceId, var capabilityId) when Lookup(entry, deviceId, capabilityId) is (var d, var c) =>
             LastChanged(entry, d, c),
         ({ } entry, "variable", var variableId, _) when entry.State.FindVariable(variableId) is { } v => Variable(entry, v),
+        ({ } entry, "user", var userId, var field) when entry.State.FindUser(userId) is { } u && User(entry, u, field) is { } info => info,
         _ => null,
     };
 
@@ -76,6 +80,15 @@ public sealed class HomeySignals : ISignalSource, IDisposable
             case "variable":
                 if (entry.State.FindVariable(id) is not { } variable) return SignalReading.Missing;
                 return Type(variable.Type) is { } variableType ? SignalReading.Of(Value(variableType, variable.Value)) : SignalReading.Missing;
+            case "user":
+                return entry.State.FindUser(id) is { } user
+                    ? capabilityId switch
+                    {
+                        "present" => SignalReading.Of(user.Present),
+                        "asleep" => SignalReading.Of(user.Asleep),
+                        _ => SignalReading.Missing,
+                    }
+                    : SignalReading.Missing;
             default:
                 return SignalReading.Missing;
         }
@@ -89,7 +102,7 @@ public sealed class HomeySignals : ISignalSource, IDisposable
         if (parts.Length < 4 || !int.TryParse(parts[1], out var account)) return null;
         return parts[2] switch
         {
-            "capability" or "changed" when parts.Length == 5 => (_homeys.Find(account), parts[2], parts[3], parts[4]),
+            "capability" or "changed" or "user" when parts.Length == 5 => (_homeys.Find(account), parts[2], parts[3], parts[4]),
             "variable" when parts.Length == 4 => (_homeys.Find(account), parts[2], parts[3], null),
             _ => null,
         };
@@ -134,6 +147,26 @@ public sealed class HomeySignals : ISignalSource, IDisposable
                 AccountName = entry.Name,
             }
             : null;
+
+    // Whether a person is home, or asleep: <c>homey:{account}:user:{user}:present</c> and <c>…:asleep</c>.
+    private static SignalInfo? User(Homeys.Entry entry, HomeyUser user, string? field) => field switch
+    {
+        "present" => new SignalInfo($"{Prefix}{entry.AccountId}:user:{user.Id}:present", "homey", SignalType.YesNo, $"{user.Name} is home", "People")
+        {
+            Account = entry.AccountId,
+            AccountName = entry.Name,
+            TrueLabel = "home",
+            FalseLabel = "away",
+        },
+        "asleep" => new SignalInfo($"{Prefix}{entry.AccountId}:user:{user.Id}:asleep", "homey", SignalType.YesNo, $"{user.Name} is asleep", "People")
+        {
+            Account = entry.AccountId,
+            AccountName = entry.Name,
+            TrueLabel = "asleep",
+            FalseLabel = "awake",
+        },
+        _ => null,
+    };
 
     // Other alarms are on or off; anything else is yes or no.
     private static (string True, string False) BoolLabels(string capabilityId) =>

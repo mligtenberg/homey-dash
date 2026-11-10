@@ -100,15 +100,15 @@ public sealed record IdleRule(
 /// <see cref="Spots"/>: the time and date (<c>clock</c>), the weather where a Homey is (<c>weather</c>, of the Homey of
 /// <see cref="Account"/>, or the oldest), or the value of a device's capability (<c>value</c>, the Homey signal named
 /// by <see cref="Signal"/>), or the traffic on a route (<c>traffic</c>, <see cref="Route"/>, with the TomTom account of
-/// <see cref="Account"/>, or the oldest). Widgets in the same spot stack in order. A <see cref="Hidden"/> widget stays
+/// <see cref="Account"/>, or the oldest), or the latest headline of a news source (<c>news</c>, <see cref="Source"/>, the first without it). Widgets in the same spot stack in order. A <see cref="Hidden"/> widget stays
 /// configured but the screen leaves it out; one with a <see cref="Rule"/> (ADR-0010) is shown while it holds, as for a
 /// dashboard's sections. The rule stays JSON, kept as sent once it passed validation.
 /// </summary>
-public sealed record LockWidget(string Kind, string Spot, string? Signal = null, int? Account = null, TrafficRoute? Route = null, bool Hidden = false, JsonElement? Rule = null)
+public sealed record LockWidget(string Kind, string Spot, string? Signal = null, int? Account = null, TrafficRoute? Route = null, bool Hidden = false, JsonElement? Rule = null, string? Source = null)
 {
     public const int Max = 8;
 
-    public static readonly IReadOnlyList<string> Kinds = ["clock", "weather", "value", "traffic"];
+    public static readonly IReadOnlyList<string> Kinds = ["clock", "weather", "value", "traffic", "news"];
 
     public static readonly IReadOnlyList<string> Spots = ["top-left", "top-right", "center", "bottom-left", "bottom-right"];
 }

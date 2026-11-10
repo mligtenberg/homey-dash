@@ -6,6 +6,7 @@ import { DisplayInfo, ScreenDetails, ScreenView } from './displays';
 import { PhotoSet } from './photos';
 import { PlexCommand, PlexItem, PlexOverview, PlexPage, PlexProfileList, PlexSession, PlexSnapshot, PlexTracks } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
+import { NewsFeed } from './news';
 import { RouteTraffic } from './traffic';
 import { Forecast } from './weather';
 import { CapabilityValue, DeviceApp, HomeyDevice, HomeyEnergy, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyUser, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
@@ -71,6 +72,8 @@ export interface RealtimeMessages {
   Forecasts: Forecast[];
   /** The traffic of every route in use, whenever one changes. */
   Traffic: RouteTraffic[];
+  /** The latest stories of every news source in use, whenever one changes. */
+  News: NewsFeed[];
   /** What plays on AirPlay receivers, whenever it changes: started, paused, changed or ended. */
   AirPlayNow: AirPlayPlayback[];
   /** The answers to this connection's rule subscriptions that one change altered. */
@@ -154,6 +157,11 @@ export class Realtime {
   /** The traffic of every route in use; changes that follow arrive as `Traffic`. */
   traffic() {
     return this.hub.invoke<RouteTraffic[]>('Traffic');
+  }
+
+  /** The latest stories of every news source in use; changes that follow arrive as `News`. */
+  news() {
+    return this.hub.invoke<NewsFeed[]>('News');
   }
 
   /** Plays, pauses or skips on a player of a Plex account; fails when the player takes no remote control. */

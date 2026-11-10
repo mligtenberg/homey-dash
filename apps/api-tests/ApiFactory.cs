@@ -32,6 +32,10 @@ public class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Weather:Fake", "true");
         // Nor TomTom.
         builder.UseSetting("Traffic:Fake", FakeTraffic ? "true" : "false");
+        // Nor NOS.
+        builder.UseSetting("News:Fake", "true");
+        // Nor NOS.
+        builder.UseSetting("News:Fake", "true");
         // Without the fake, AirPlay is off: tests don't look for receivers on the network.
         builder.UseSetting("AirPlay:Enabled", FakeAirPlay ? "true" : "false");
     }

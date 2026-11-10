@@ -58,6 +58,7 @@ import {
   MonitorCog,
   Moon,
   Music,
+  Newspaper,
   Pause,
   Play,
   Plug,
@@ -115,6 +116,7 @@ export const LucideBlinds = /* @__PURE__ */ icon('blinds', Blinds);
 export const LucideBox = /* @__PURE__ */ icon('box', Box);
 export const LucideCamera = /* @__PURE__ */ icon('camera', Camera);
 export const LucideCar = /* @__PURE__ */ icon('car', Car);
+export const LucideNewspaper = /* @__PURE__ */ icon('newspaper', Newspaper);
 export const LucideChartLine = /* @__PURE__ */ icon('chart-line', ChartLine);
 export const LucideCheck = /* @__PURE__ */ icon('check', Check);
 export const LucideChevronDown = /* @__PURE__ */ icon(

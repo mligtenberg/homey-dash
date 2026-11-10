@@ -58,6 +58,9 @@ public sealed class ManagementTools(
           settings.target is null and settings.route is { "name", "origin": { "name", "latitude", "longitude" },
           "destination": { same } } in degrees (places are found by name in Management). settings.account picks the TomTom
           account (the oldest without it). Needs a TomTom account set up in Management.
+        - "news" (small, wide, full, large, full-large): the latest headlines from NOS; small and wide show the newest, larger
+          sizes more. It points at nothing in Homey: settings.target is null. Optional settings.source is nos (default),
+          nos-binnenland, nos-buitenland, nos-economie, nos-sport or nos-tech.
         - "clock" (small, wide, full, large, full-large): the time, with the date from wide up; settings.target is null.
           Optional settings.style is digital (default) or analog, settings.hours 12 or 24 (absent: the display's language),
           settings.seconds true to show seconds, settings.showDate false to hide the date.
@@ -238,7 +241,8 @@ public sealed class ManagementTools(
         "signal" }, whose signal is a Homey capability signal (homey:<account>:capability:<device>:<capability>, see
         list_signals), or the car travel time on a route from TomTom, { "kind": "traffic", "spot", "route": { "name",
         "origin": { "name", "latitude", "longitude" }, "destination": { same } }, "account"? } (the TomTom account's id,
-        or the oldest without it; needs a TomTom account set up in Management). A widget of any kind with "hidden": true
+        or the oldest without it; needs a TomTom account set up in Management), or the newest NOS headline, { "kind": "news",
+        "spot", "source"? } (nos, nos-binnenland, nos-buitenland, nos-economie, nos-sport or nos-tech; nos without it). A widget of any kind with "hidden": true
         stays configured but is left out; one with a "rule" is shown only while it holds. Replaces the display's lock
         screen as a whole.
         {{RuleSchema}}

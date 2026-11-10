@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { capabilitySignal, DashboardVersion, TrafficRoute, DisplayInfo, DisplaysApi, IdleRule, LockSpot, LockWidget, Realtime, Rule, SignalInfo, stopOnDestroy } from '@homey-dash/api-client';
+import { capabilitySignal, NEWS_SOURCES, DashboardVersion, TrafficRoute, DisplayInfo, DisplaysApi, IdleRule, LockSpot, LockWidget, Realtime, Rule, SignalInfo, stopOnDestroy } from '@homey-dash/api-client';
 import { alwaysRule, TileData } from '@homey-dash/tiles/data';
 import { DashboardsStore } from '../dashboards-store';
 import { SignalCatalogue } from '../editor/signal-catalogue';
@@ -169,7 +169,7 @@ export class DisplaysStore {
   setLockKind(display: DisplayInfo, index: number, kind: LockWidget['kind']) {
     const { spot, hidden, rule } = display.lockWidgets[index];
     let widget: LockWidget = { kind: 'clock', spot };
-    if (kind === 'weather' || kind === 'traffic') widget = { kind, spot };
+    if (kind === 'weather' || kind === 'traffic' || kind === 'news') widget = { kind, spot };
     if (kind === 'value') {
       const signals = (this.catalogue.signals() ?? []).filter(isCapabilitySignal);
       const signal = signals.find((s) => s.id.endsWith(':measure_temperature')) ?? signals[0];
@@ -214,6 +214,12 @@ export class DisplaysStore {
   // Traffic shows nothing until its route is chosen.
   setLockRoute(display: DisplayInfo, index: number, route: TrafficRoute) {
     this.saveLock(display, display.lockWidgets.map((w, i) => (i === index && w.kind === 'traffic' ? { ...w, route } : w)));
+  }
+
+  // The first source is the one a widget without a source shows.
+  setLockSource(display: DisplayInfo, index: number, source: string) {
+    const chosen = source === NEWS_SOURCES[0].id ? null : source;
+    this.saveLock(display, display.lockWidgets.map((w, i) => (i === index && w.kind === 'news' ? { ...w, source: chosen } : w)));
   }
 
   setLockSignal(display: DisplayInfo, index: number, signal: string) {

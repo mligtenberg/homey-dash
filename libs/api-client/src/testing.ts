@@ -7,6 +7,7 @@ import {
   DeviceApp,
   DisplayInfo,
   Forecast,
+  NewsFeed,
   RouteTraffic,
   HomeySnapshot,
   PhotoSet,
@@ -121,6 +122,13 @@ export class FakeRealtime implements Partial<Realtime> {
 
   async traffic() {
     return this.trafficList;
+  }
+
+  /** What `news()` answers: the stories of every source in use. */
+  newsList: NewsFeed[] = [];
+
+  async news() {
+    return this.newsList;
   }
 
   controlPlex(accountId: number, playerId: string, command: PlexCommand) {

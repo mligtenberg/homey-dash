@@ -8,6 +8,7 @@ import {
   TileKindRegistry,
   TIME_TILES,
   TRAFFIC_TILES,
+  NEWS_TILES,
   WEATHER_TILES,
 } from '@homey-dash/tiles';
 
@@ -19,6 +20,6 @@ import {
  * the root injector, where there are none.
  */
 export const tileProviders = [
-  provideTileModules(CORE_TILES, PLEX_TILES, WEATHER_TILES, TRAFFIC_TILES, TIME_TILES, ENERGY_TILES, SONOS_TILES, LOGIC_TILES),
+  provideTileModules(CORE_TILES, PLEX_TILES, WEATHER_TILES, TRAFFIC_TILES, NEWS_TILES, TIME_TILES, ENERGY_TILES, SONOS_TILES, LOGIC_TILES),
   TileKindRegistry,
 ];

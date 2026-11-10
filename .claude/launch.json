@@ -45,6 +45,7 @@
         "--AirPlay:Fake=true",
         "--Weather:Fake=true",
         "--Traffic:Fake=true",
+        "--News:Fake=true",
         "--ReverseProxy:Clusters:display:Destinations:display:Address=http://localhost:4300",
         "--ReverseProxy:Clusters:management:Destinations:management:Address=http://localhost:4301"
       ],
@@ -106,6 +107,7 @@
         "--AirPlay:Fake=true",
         "--Weather:Fake=true",
         "--Traffic:Fake=true",
+        "--News:Fake=true",
         "--ReverseProxy:Clusters:display:Destinations:display:Address=http://localhost:4302",
         "--ReverseProxy:Clusters:management:Destinations:management:Address=http://localhost:4303"
       ],

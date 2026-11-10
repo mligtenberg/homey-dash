@@ -33,6 +33,18 @@ public sealed class RuleApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         (await _client.GetFromJsonAsync<JsonElement>("/api/rules/signals")).EnumerateArray().Single(s => s.GetProperty("id").GetString() == id);
 
     [Fact]
+    public async Task ThePeopleOfHomey_AreSignalsForBeingHomeAndBeingAsleep()
+    {
+        var home = await SignalAsync("homey:1:user:user-martin:present");
+        var asleep = await SignalAsync("homey:1:user:user-martin:asleep");
+
+        Assert.Equal(("yesNo", "Martin is home", "People", "home", "away"),
+            (home.GetProperty("type").GetString(), home.GetProperty("name").GetString(), home.GetProperty("group").GetString(),
+                home.GetProperty("trueLabel").GetString(), home.GetProperty("falseLabel").GetString()));
+        Assert.Equal(("asleep", "awake"), (asleep.GetProperty("trueLabel").GetString(), asleep.GetProperty("falseLabel").GetString()));
+    }
+
+    [Fact]
     public async Task TheSignalCatalogue_ListsSignalsWithWhatHelpsWriteConditions()
     {
         var target = await SignalAsync("homey:1:capability:thermostat:target_temperature");
