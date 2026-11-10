@@ -20,9 +20,11 @@ export class ScreenCapture {
     // the picture-drawing cannot reproduce: the type vanishes. For the moment of the capture they are plain --ink instead.
     const plain = document.createElement('style');
     plain.textContent = `
-      :is(.hd-ink, .hd-ink-icon) { color: var(--ink, #fff) !important; background: none !important; filter: none !important;
-        -webkit-background-clip: border-box !important; background-clip: border-box !important; }
-      .hd-ink-icon { -webkit-mask: none !important; mask: none !important; fill: var(--ink, #fff); stroke: var(--ink, #fff); }
+      :root:root :is(.hd-ink, .hd-ink-icon) { transition: none !important; color: var(--ink, #fff) !important; background: none !important;
+        filter: none !important; -webkit-background-clip: border-box !important; background-clip: border-box !important; }
+      /* The copy starts every entrance animation over, from invisible; the lock screen's widgets come in that way. */
+      :root:root * { animation: none !important; }
+      :root:root .hd-ink-icon { -webkit-mask: none !important; mask: none !important; fill: var(--ink, #fff); stroke: var(--ink, #fff); }
     `;
     try {
       // Loaded when first asked, as most screens never are.
