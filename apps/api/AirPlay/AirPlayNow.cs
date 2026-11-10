@@ -18,6 +18,8 @@ public sealed record AirPlayPlayback(
     public string? Detail { get; init; }
     // How long it runs; 0 when the server doesn't say.
     public long DurationMs { get; init; }
+    // Where it comes from: `plex` (AccountId and ItemId say which item) or `nos` (a video or livestream, no account).
+    public string Source { get; init; } = "plex";
 }
 
 /// <summary>An album playing track by track, or a season episode by episode: Position is the index in Tracks of the one that plays now.</summary>
@@ -76,7 +78,7 @@ public sealed class AirPlayNow : IDisposable
 
     // The receiver isn't a Plex client, so what it plays is reported to the server here, as watched on the account that started it.
     private Task ReportAsync(AirPlayPlayback playback, string state, long? timeMs = null) =>
-        _timeline.ReportAsync(playback.AccountId, playback.ItemId, state, timeMs ?? PositionSeconds(playback) * 1000L, playback.DurationMs);
+        playback.Source != "plex" ? Task.CompletedTask : _timeline.ReportAsync(playback.AccountId, playback.ItemId, state, timeMs ?? PositionSeconds(playback) * 1000L, playback.DurationMs);
 
     public async Task StartedAsync(AirPlayPlayback playback)
     {

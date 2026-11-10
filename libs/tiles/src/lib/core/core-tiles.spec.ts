@@ -13,7 +13,7 @@ import { CORE_TILES } from './core-tiles';
 import { MoodListTile } from './mood-list-tile';
 import { moodTint } from './mood-tint';
 import { PhotoTile, shuffled } from './photo-tile';
-import { stripTarget } from './statistic-history';
+import { stripTarget } from './segmented-strip';
 import { drawChart, logOwner, nearestPoint, StatisticTile, statisticTone, summarize } from './statistic-tile';
 import { DETAILS_IDLE_MS } from './tile-details';
 import { FLASH_MS } from './tile-view';

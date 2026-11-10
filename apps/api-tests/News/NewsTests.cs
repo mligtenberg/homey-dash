@@ -32,6 +32,88 @@ public sealed class RssParseTests
         Assert.Throws<NewsException>(() => RssNewsFeeds.Parse("<html/>", "NOS"));
 }
 
+public sealed class ArticleParseTests
+{
+    private const string Template = """
+        <html><body><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"article":{"title":"Dylan &amp; co","description":"Een fortuin.","headerImage":{"imageAsset":{"copyright":"EPA","Ratio16x9":[{"width":128,"url":"https://images.cdn.nos.nl/a-128.webp"},{"width":1024,"url":"https://images.cdn.nos.nl/a-1024.webp"},{"width":2048,"url":"https://images.cdn.nos.nl/a-2048.webp"}]}},"content":CONTENT}}}}</script></body></html>
+        """;
+
+    private static string Page(string content) => Template.Replace("CONTENT", content);
+
+    [Fact]
+    public void TheStory_IsReadFromThePagesData()
+    {
+        var article = NosArticles.Parse(Page("""
+            [
+            {"__typename":"TextElement","text":"Hij verkocht <em>alles</em>, <a href=\"https://evil\">zie hier</a>\u003cscript>x()\u003c/script>."},
+            {"__typename":"HeaderElement","text":"Waarom"},
+            {"__typename":"QuoteElement","text":"Veel geld.","source":"Een kenner"},
+            {"__typename":"LinkContainerElement"},
+            {"__typename":"ImageElement","imageDescription":"De zanger","imageAsset":{"copyright":"ANP","Ratio16x9":[{"width":512,"url":"https://images.cdn.nos.nl/b.webp"}]}}
+            ]
+            """));
+
+        Assert.Equal("Dylan & co", article.Title);
+        Assert.Equal("https://images.cdn.nos.nl/a-1024.webp", article.Image);
+        Assert.Equal(["p", "h", "quote", "image"], article.Blocks.Select(b => b.Kind));
+        // Emphasis stays; links and scripts go, and everything is escaped.
+        Assert.Equal("Hij verkocht <em>alles</em>, zie hier.", article.Blocks[0].Text.Replace("x()", ""));
+        Assert.DoesNotContain("<a", article.Blocks[0].Text);
+        Assert.DoesNotContain("<script", article.Blocks[0].Text);
+    }
+
+    [Fact]
+    public void AStoryWithoutPictures_IsStillRead()
+    {
+        var html = Page("""
+            [{"__typename":"TextElement","text":"Tekst."},{"__typename":"ImageElement","imageAsset":null}]
+            """).Replace("\"headerImage\":", "\"headerImage\":null,\"x\":");
+
+        var article = NosArticles.Parse(html);
+
+        Assert.Null(article.Image);
+        Assert.Equal(["p"], article.Blocks.Select(b => b.Kind));
+    }
+
+    [Theory]
+    [InlineData("https://resolver.streaming.api.nos.nl/stream?stream=x&profile=hls_unencrypted", true)]
+    [InlineData("https://resolver.streaming.api.nos.nl.evil.example/stream", false)]
+    [InlineData("http://resolver.streaming.api.nos.nl/stream", false)]
+    [InlineData("https://example.com/a.m3u8", false)]
+    public void OnlyNosStreamsAreHandedOut(string url, bool expected) => Assert.Equal(expected, NosVideos.Playable(url));
+
+    [Fact]
+    public void APageWithoutTheStory_IsRefused() =>
+        Assert.Throws<NewsException>(() => NosArticles.Parse("<html><body>Nothing</body></html>"));
+
+    [Theory]
+    [InlineData("https://nos.nl/artikel/1", true)]
+    [InlineData("https://www.nos.nl/artikel/1", true)]
+    [InlineData("http://nos.nl/artikel/1", false)]
+    [InlineData("https://nos.nl.evil.example/artikel/1", false)]
+    [InlineData("https://example.com/nos.nl", false)]
+    [InlineData(null, false)]
+    public void OnlyNosIsEverFetched(string? link, bool expected) => Assert.Equal(expected, NosArticles.IsNos(link));
+
+    [Theory]
+    [InlineData("https://nos.nl/l/2638863", true)]
+    [InlineData("https://nos.nl/artikel/2638863-titel", true)]
+    [InlineData("https://nos.nl/sport/artikel/1-titel", true)]
+    [InlineData("https://nos.nl/l/abc", false)]
+    [InlineData("https://nos.nl/video/1-titel", false)]
+    [InlineData("https://nos.nl/", false)]
+    public void OnlyArticlesAreRead(string link, bool expected) => Assert.Equal(expected, NosArticles.IsArticle(link));
+
+    [Fact]
+    public void TheReaderView_EscapesWhatItShows()
+    {
+        var page = ArticlePage.Render(new NewsArticle("<b>Title</b>", null, null, null, [new("p", "ok")]), "NOS", null, dark: true);
+
+        Assert.Contains("&lt;b&gt;Title&lt;/b&gt;", page);
+        Assert.Contains("data-theme=\"dark\"", page);
+    }
+}
+
 // Against FakeNews.
 public sealed class NewsApiTests(ApiFactory factory) : IClassFixture<ApiFactory>, IAsyncLifetime
 {
@@ -71,6 +153,66 @@ public sealed class NewsApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal("NOS Sport", feed.GetProperty("name").GetString());
         Assert.True(feed.GetProperty("items").GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public async Task AStoryOfAFeedInUse_IsShownAsAReaderView_AndNoOtherIs()
+    {
+        _hub = await TrafficHelpers.ConnectAsync(factory);
+        var created = await _client.PostAsJsonAsync("/api/dashboards", new { name = "News reader" });
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString()!;
+        var draft = new
+        {
+            rows = 4,
+            sections = new[] { new { id = "s", title = "", tiles = new[] { new { id = "t", kind = "news", size = "wide", position = new { column = 0, row = 0 }, settings = new { target = (string?)null, source = "nos-economie" } } } } },
+        };
+        (await _client.PutAsJsonAsync($"/api/dashboards/{id}/draft", draft)).EnsureSuccessStatusCode();
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        string link;
+        while (true)
+        {
+            var all = (await _hub.InvokeAsync<JsonElement>("News")).EnumerateArray().ToArray();
+            if (all.FirstOrDefault(f => f.GetProperty("source").GetString() == "nos-economie") is { ValueKind: JsonValueKind.Object } found
+                && found.GetProperty("status").GetString() == "connected") { link = found.GetProperty("items")[0].GetProperty("link").GetString()!; break; }
+            if (DateTime.UtcNow > deadline) throw new TimeoutException("The news did not get there within 5 seconds");
+            await Task.Delay(50);
+        }
+
+        var story = await _client.GetAsync($"/api/news/article?source=nos-economie&link={Uri.EscapeDataString(link)}");
+        Assert.Equal(HttpStatusCode.OK, story.StatusCode);
+        Assert.Equal("text/html", story.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("frame-ancestors 'self'", story.Headers.GetValues("Content-Security-Policy").Single());
+        Assert.Contains("thuisbatterijen", await story.Content.ReadAsStringAsync());
+
+        foreach (var stranger in new[] { "https://nos.nl/video/1", "https://example.com/artikel/1", "http://nos.nl/artikel/1" })
+        {
+            var refused = await _client.GetAsync($"/api/news/article?source=nos-economie&link={Uri.EscapeDataString(stranger)}");
+            Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task AnySourceCanBeRead_ForTheCategories()
+    {
+        var feed = await _client.GetFromJsonAsync<JsonElement>("/api/news/feed?source=nos-koningshuis");
+
+        Assert.Equal("NOS Koningshuis", feed.GetProperty("name").GetString());
+        Assert.True(feed.GetProperty("items").GetArrayLength() > 0);
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync("/api/news/feed?source=elsewhere")).StatusCode);
+    }
+
+    [Fact]
+    public async Task LiveStreamsAndVideos_AreListed_AndAVideoHasAStream()
+    {
+        var live = await _client.GetFromJsonAsync<JsonElement>("/api/news/live");
+        Assert.True(live[0].GetProperty("live").GetBoolean());
+        Assert.StartsWith("https://", live[0].GetProperty("url").GetString());
+
+        var videos = await _client.GetFromJsonAsync<JsonElement>("/api/news/videos");
+        var id = videos[0].GetProperty("id").GetString();
+        var stream = await _client.GetFromJsonAsync<JsonElement>($"/api/news/video/{id}");
+        Assert.StartsWith("https://", stream.GetProperty("url").GetString());
     }
 
     [Fact]

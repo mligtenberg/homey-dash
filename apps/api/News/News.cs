@@ -18,11 +18,15 @@ public sealed record NewsSource(string Id, string Name, string Url)
     public static readonly IReadOnlyList<NewsSource> All =
     [
         new("nos", "NOS Nieuws", "https://feeds.nos.nl/nosnieuwsalgemeen"),
+        new("nos-politiek", "NOS Politiek", "https://feeds.nos.nl/nosnieuwspolitiek"),
         new("nos-binnenland", "NOS Binnenland", "https://feeds.nos.nl/nosnieuwsbinnenland"),
         new("nos-buitenland", "NOS Buitenland", "https://feeds.nos.nl/nosnieuwsbuitenland"),
         new("nos-economie", "NOS Economie", "https://feeds.nos.nl/nosnieuwseconomie"),
+        new("nos-koningshuis", "NOS Koningshuis", "https://feeds.nos.nl/nosnieuwskoningshuis"),
+        new("nos-cultuur", "NOS Cultuur & media", "https://feeds.nos.nl/nosnieuwscultuurenmedia"),
+        new("nos-opmerkelijk", "NOS Opmerkelijk", "https://feeds.nos.nl/nosnieuwsopmerkelijk"),
         new("nos-sport", "NOS Sport", "https://feeds.nos.nl/nossportalgemeen"),
-        new("nos-tech", "NOS Tech", "https://feeds.nos.nl/nieuwstech"),
+        new("nos-tech", "NOS Tech", "https://feeds.nos.nl/nosnieuwstech"),
     ];
 
     public static NewsSource Default => All[0];

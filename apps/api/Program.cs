@@ -104,6 +104,7 @@ api.MapPlex();
 api.MapAirPlay();
 api.MapWeather();
 api.MapTraffic();
+api.MapNews();
 api.MapDashboards();
 api.MapBackgrounds();
 api.MapPresetBackgrounds();

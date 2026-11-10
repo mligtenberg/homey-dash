@@ -1,25 +1,25 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { DEFAULT_NEWS_SOURCE } from '@homey-dash/api-client';
 import { LucideNewspaper, minuteClock } from '@homey-dash/design-system';
-import { LucideDynamicIcon } from '@lucide/angular';
+import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
+import { NewsBrowser } from './news-browser';
+import { NosLogo } from './nos-logo';
 import { ago, NewsData, NewsTileSettings } from './news-data';
 
 /** How many headlines each size has room for. */
-const HEADLINES = { small: 1, wide: 1, full: 2, large: 4, 'full-large': 6 } as const;
+const HEADLINES = { small: 1, wide: 1, full: 2, large: 3, 'full-large': 6 } as const;
 
 /**
  * The latest headlines of a NOS feed (ADR-0016): the newest on small and wide, more as the size allows, each with how long
- * ago it came out. A press does nothing; the screen is for glancing.
+ * ago it came out. A press opens the whole of NOS over the screen: its feeds, videos and livestreams (`NewsBrowser`).
  */
 @Component({
   selector: 'hd-news-tile',
-  imports: [LucideDynamicIcon],
+  imports: [NewsBrowser, NosLogo, TileDetails],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-news' },
   template: `
-    <div class="hd-row hd-row--top">
-      <svg class="hd-icon" [lucideIcon]="face().icon" aria-hidden="true" />
-    </div>
     @if (headlines().length) {
       <ol class="hd-news__list">
         @for (item of headlines(); track item.title) {
@@ -34,12 +34,20 @@ const HEADLINES = { small: 1, wide: 1, full: 2, large: 4, 'full-large': 6 } as c
         <div class="hd-tile__detail">{{ face().detail }}</div>
       </div>
     }
-    <div class="hd-tile__name">{{ face().name }}</div>
+    <div class="hd-tile__name hd-news__source"><hd-nos-logo /><span>{{ shortName() }}</span></div>
+
+    <hd-tile-details [screen]="true" [name]="shortName()" [icon]="face().icon">
+      <hd-nos-logo hdDetailsMark />
+      <hd-news-browser [source]="sourceId()" />
+    </hd-tile-details>
   `,
 })
 export class NewsTile extends TileView<NewsTileSettings> {
   private readonly news = inject(NewsData);
   private readonly now = minuteClock();
+
+  /** The feed the tile shows, and the tab its detail view opens on. */
+  protected readonly sourceId = computed(() => this.settings().source ?? DEFAULT_NEWS_SOURCE);
 
   protected readonly feed = computed(() => this.news.feed(this.settings().source));
 
@@ -48,12 +56,15 @@ export class NewsTile extends TileView<NewsTileSettings> {
     return (this.feed()?.items ?? []).slice(0, HEADLINES[this.size() as keyof typeof HEADLINES] ?? 1).map((i) => ({ title: i.title, age: ago(i.publishedAt, now) }));
   });
 
+  /** The feed's name without the NOS in front, which the logo says: `Nieuws`, `Sport`. */
+  protected readonly shortName = computed(() => this.face().name.replace(/^NOS\s+/, '') || this.face().name);
+
   readonly face = computed<TileFace>(() => {
     const look = { icon: LucideNewspaper, hue: 'mood' as const };
     const feed = this.feed();
     const name = this.settings().label || feed?.name || 'News';
     if (this.headlines().length) {
-      return { ...look, name, detail: '', state: feed?.status === 'disconnected' ? 'unavailable' : 'ok' };
+      return { ...look, name, detail: '', details: true, state: feed?.status === 'disconnected' ? 'unavailable' : 'ok' };
     }
     if (!this.news.feeds() || !feed || feed.status === 'loading') return { ...look, name, detail: '…', state: 'loading' };
     return { ...look, name, detail: feed.error ?? 'No news', state: 'unavailable' };

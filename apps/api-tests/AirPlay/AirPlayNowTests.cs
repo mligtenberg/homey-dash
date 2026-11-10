@@ -78,6 +78,33 @@ public sealed class AirPlayNowTests(ClockApiFactory factory) : IClassFixture<Clo
     }
 
     [Fact]
+    public async Task AVideoOrLivestreamOfNos_PlaysOnTheTv_AndShowsLikeAnyPlayback()
+    {
+        var hub = await ConnectAsync();
+        var other = await ConnectAsync();
+        var fake = factory.Services.GetRequiredService<FakeAirPlay>();
+
+        var started = NextAsync(other);
+        await hub.InvokeAsync("PlayNewsOnAirPlay", "video", "1", FakeAirPlay.LivingRoomTv);
+        var playing = Assert.Single(await started);
+        Assert.Equal("nos", playing.GetProperty("source").GetString());
+        Assert.Equal("Dierentuin voorbereid op noodsituatie", playing.GetProperty("title").GetString());
+        Assert.Equal(110_000, playing.GetProperty("durationMs").GetInt64());
+        Assert.StartsWith("https://", fake.Playing[FakeAirPlay.LivingRoomTv]);
+
+        // The same controls as for Plex; a livestream that is on replaces it; one that has not started cannot be played.
+        await other.InvokeAsync("SetAirPlayPaused", FakeAirPlay.LivingRoomTv, true);
+        await hub.InvokeAsync("PlayNewsOnAirPlay", "live", "l1", FakeAirPlay.LivingRoomTv);
+        Assert.Equal("Tweede Kamer debatteert over het Belastingplan", Assert.Single(await hub.InvokeAsync<JsonElement[]>("AirPlayNowPlaying")).GetProperty("title").GetString());
+        await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("PlayNewsOnAirPlay", "live", "l2", FakeAirPlay.LivingRoomTv));
+        await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync("PlayNewsOnAirPlay", "video", "nope", FakeAirPlay.LivingRoomTv));
+
+        var stopped = NextAsync(other);
+        await hub.InvokeAsync("StopAirPlay", FakeAirPlay.LivingRoomTv);
+        Assert.Empty(await stopped);
+    }
+
+    [Fact]
     public async Task APlaybackEndedOnTheTv_EndsForEveryScreen()
     {
         var hub = await ConnectAsync();

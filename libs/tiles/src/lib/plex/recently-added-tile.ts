@@ -402,7 +402,7 @@ export class RecentlyAddedTile extends PlexTileView {
   private readonly cast = signal<Cast>(IDLE);
 
   /** What plays on AirPlay now for this account, wherever it was started: its controls stay on show. */
-  protected readonly casting = computed(() => this.airPlay.playing().filter((p) => p.accountId === this.accountId()));
+  protected readonly casting = computed(() => this.airPlay.playing().filter((p) => p.source !== 'nos' && p.accountId === this.accountId()));
   protected readonly allPaused = computed(() => this.casting().every((p) => p.paused));
   /** Receivers whose stream is being started over with another track. */
 

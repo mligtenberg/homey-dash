@@ -17,7 +17,7 @@ public sealed class FakeNews(TimeProvider time) : INewsFeeds
     {
         var now = time.GetUtcNow();
         IReadOnlyList<NewsItem> items = Stories
-            .Select((s, i) => new NewsItem(s.Title, s.Summary, "https://example.com/" + source.Id + "/" + i, null, now.AddMinutes(-7 - 23 * i)))
+            .Select((s, i) => new NewsItem(s.Title, s.Summary, "https://nos.nl/artikel/" + (1000 + i) + "-" + source.Id, null, now.AddMinutes(-7 - 23 * i)))
             .ToList();
         return Task.FromResult(items);
     }

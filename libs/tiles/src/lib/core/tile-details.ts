@@ -32,6 +32,7 @@ export const DETAILS_IDLE_MS = 60_000;
       @if (isOpen()) {
         <div class="hd-details__panel">
           <div class="hd-details__head">
+            <ng-content select="[hdDetailsMark]" />
             <svg class="hd-icon" [lucideIcon]="icon()" />
             <div class="hd-details__titles">
               <h2 class="hd-details__name">{{ name() }}</h2>
@@ -90,6 +91,11 @@ export class TileDetails {
     this.isOpen.set(false);
     clearTimeout(this.idleTimer);
     this.closed.emit();
+  }
+
+  /** For content whose events this view cannot see, such as a frame: it is in use, so it stays open. */
+  stayOpen() {
+    this.keepOpen();
   }
 
   protected keepOpen() {

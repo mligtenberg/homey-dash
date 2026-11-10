@@ -216,6 +216,10 @@ export class FakeRealtime implements Partial<Realtime> {
     return this.command('playAlbumOnAirPlay', accountId, albumId, trackId, deviceId);
   }
 
+  playNewsOnAirPlay(kind: 'video' | 'live', id: string, deviceId: string) {
+    return this.command('playNewsOnAirPlay', kind, id, deviceId);
+  }
+
   setAirPlayPaused(deviceId: string, paused: boolean) {
     return this.command('setAirPlayPaused', deviceId, paused);
   }

@@ -229,6 +229,11 @@ export class Realtime {
     return this.hub.invoke<void>('PlayAlbumOnAirPlay', accountId, albumId, trackId, deviceId);
   }
 
+  /** Plays a video (`kind` video, `id` its NOS id) or a livestream that is on (`live`) of NOS on an AirPlay receiver; fails with the reason. */
+  playNewsOnAirPlay(kind: 'video' | 'live', id: string, deviceId: string) {
+    return this.hub.invoke<void>('PlayNewsOnAirPlay', kind, id, deviceId);
+  }
+
   /** Pauses or resumes what plays on an AirPlay receiver; fails with the reason. */
   setAirPlayPaused(deviceId: string, paused: boolean) {
     return this.hub.invoke<void>('SetAirPlayPaused', deviceId, paused);

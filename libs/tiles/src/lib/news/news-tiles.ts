@@ -16,9 +16,8 @@ export const NEWS_TILES: TileModule = {
       label: 'News tile',
       // Points at nothing in Homey: its feed is in settings.source.
       target: 'none',
-      // The newest headline on small and wide; two on full, four on large, six on full large.
+      // The newest headline on small and wide; two on full, three on large, six on full large. A press opens all of them.
       sizes: ['small', 'wide', 'full', 'large', 'full-large'],
-      details: false,
       defaultSettings: { target: null },
       component: NewsTile,
       settings: NewsTileSettingsEditor,

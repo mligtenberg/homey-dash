@@ -28,6 +28,8 @@ export interface AirPlayPlayback {
   detail?: string | null;
   /** How long it runs; 0 when the server doesn't say. */
   durationMs?: number;
+  /** Where it comes from: Plex (the account and item say which) or a video or livestream of NOS, which has no account. */
+  source?: 'plex' | 'nos';
 }
 
 /** Whether AirPlay is set up, and the receivers found. What a screen asks for. */

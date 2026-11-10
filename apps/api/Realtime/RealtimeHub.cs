@@ -41,6 +41,7 @@ public sealed class RealtimeHub(
     IAirPlay airPlay,
     AirPlayNow nowPlaying,
     PlexPlayback playback,
+    NosPlayback nosPlayback,
     AirPlayOptions airPlayOptions,
     RuleEngine rules,
     RuleSubscriptions subscriptions,
@@ -162,6 +163,10 @@ public sealed class RealtimeHub(
     // Plays an album from one of its tracks, or a season from one of its episodes (the first when trackId is null); the ones after it follow.
     public Task PlayAlbumOnAirPlay(int accountId, string albumId, string? trackId, string deviceId) =>
         playback.PlayAsync(accountId, albumId, deviceId, trackId, null, Context.ConnectionAborted);
+
+    // Plays a video (kind video, id its NOS id) or a livestream that is on (kind live) of NOS on an AirPlay receiver.
+    public Task PlayNewsOnAirPlay(string kind, string id, string deviceId) =>
+        nosPlayback.PlayAsync(kind, id, deviceId, Context.ConnectionAborted);
 
     // What plays on AirPlay now, on every receiver. Changes that follow arrive as AirPlayNow.
     public IReadOnlyList<AirPlayPlayback> AirPlayNowPlaying() => nowPlaying.All;

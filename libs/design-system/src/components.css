@@ -429,20 +429,21 @@
 .hd-details--screen .hd-details__panel > .hd-stat__pane { flex: 1; min-height: 0; }
 .hd-stat__pane { display: flex; flex-direction: column; gap: calc(var(--cell) * .16); }
 .hd-hist__bar { flex: none; display: flex; flex-wrap: wrap; justify-content: space-between; gap: calc(var(--cell) * .1); }
-.hd-hist__readings { flex: none; display: flex; align-items: center; gap: calc(var(--cell) * .08); min-width: 0; }
-.hd-hist__readings .hd-round-btn { flex: none; width: calc(var(--cell) * .3); height: calc(var(--cell) * .3); }
-/* The readings scroll sideways when they do not fit; the arrows move them an item at a time. */
-.hd-hist__strip { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; --segment-height: .26; }
-.hd-hist__strip::-webkit-scrollbar { display: none; }
+.hd-strip { flex: none; display: flex; align-items: center; gap: calc(var(--cell) * .08); min-width: 0; }
+.hd-strip .hd-round-btn { flex: none; width: calc(var(--cell) * .3); height: calc(var(--cell) * .3); }
+/* The items scroll sideways when they do not fit; the arrows move them an item at a time. */
+.hd-strip__scroll { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; --segment-height: .26; }
+.hd-strip__scroll::-webkit-scrollbar { display: none; }
 /* An item cut off by an edge fades out there, rather than being sliced. */
-.hd-hist__strip { --fade-start: 0px; --fade-end: 0px; --fade: calc(var(--cell) * .3); }
-.hd-hist__strip.has-start { --fade-start: var(--fade); }
-.hd-hist__strip.has-end { --fade-end: var(--fade); }
-.hd-hist__strip {
+.hd-strip__scroll { --fade-start: 0px; --fade-end: 0px; --fade: calc(var(--cell) * .3); }
+.hd-strip__scroll.has-start { --fade-start: var(--fade); }
+.hd-strip__scroll.has-end { --fade-end: var(--fade); }
+.hd-strip__scroll {
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent 100%);
 }
-.hd-hist__strip button { flex: none; padding-inline: calc(var(--cell) * .2); white-space: nowrap; }
+.hd-strip__scroll button { flex: none; display: inline-flex; align-items: center; gap: .45em; padding-inline: calc(var(--cell) * .2); white-space: nowrap; }
+.hd-strip__mark { width: .6em; height: .6em; border-radius: 50%; background: var(--strip-mark, currentColor); }
 .hd-hist__bar .hd-segmented { flex: none; --segment-height: .26; }
 .hd-hist__bar .hd-segmented button { flex: none; padding-inline: calc(var(--cell) * .2); }
 .hd-stat__pane .hd-chart { flex: 1; height: auto; min-height: 0; }
@@ -1144,10 +1145,7 @@ a.hd-btn { text-decoration: none; }
 .hd-plex-recent__pane {
   display: grid; align-content: start; gap: calc(var(--cell) * .2) calc(var(--cell) * .14);
   grid-template-columns: repeat(auto-fill, minmax(calc(var(--cell) * 1.1), 1fr));
-  overflow-y: auto; scrollbar-width: none; padding-block: var(--fade) calc(var(--cell) * .1);
-  /* Covers scrolled past the edges fade out instead of being cut off; the padding keeps the first row clear of the fade at rest. */
-  --fade: calc(var(--cell) * .16);
-  mask-image: linear-gradient(transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
+  overflow-y: auto; scrollbar-width: none; padding-block: 0 calc(var(--cell) * .1);
 }
 .hd-plex-recent__pane::-webkit-scrollbar { display: none; }
 .hd-plex-recent__card {
@@ -1512,20 +1510,101 @@ a.hd-btn { text-decoration: none; }
 .hd-traffic[data-size="large"] .hd-traffic__now .hd-value, .hd-traffic[data-size="full-large"] .hd-traffic__now .hd-value { font-size: calc(var(--cell) * .5); }
 .hd-traffic[data-size="large"] .hd-traffic__value, .hd-traffic[data-size="full-large"] .hd-traffic__value { font-size: max(var(--t-sub-min), calc(var(--cell) * var(--t-sub))); }
 
-/* News tile (ADR-0016): the latest headlines. The icon is the chip; the headlines are the subject, each with how long ago it came. */
-.hd-news { display: grid; gap: calc(var(--cell) * .06); grid-template: "chip" auto "list" 1fr "name" auto / minmax(0, 1fr); }
-.hd-news .hd-row { grid-area: chip; }
-.hd-news__list { grid-area: list; align-self: center; min-width: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: calc(var(--cell) * .08); }
+/*
+ * NOS's own look, as Plex has its: white and near-black, the NOS red for the icon and accents, and the same in the dark theme
+ * (NOS's dark page is charcoal). The detail view is inside the tile, so it takes the same colours.
+ */
+.hd-tile.hd-news {
+  --k-ink: light-dark(#e61e14, #ff5247); --k-fill: light-dark(#fbd9d6, #4a1f1c); --on-kind: #fff;
+  --tile-surface: light-dark(#fff, #262626); --ink: light-dark(#202020, #fff); --ink-muted: light-dark(#666, #b3b3b3);
+  --news-ground: light-dark(#f1eeee, #161616); --emboss-shade: light-dark(#d9d4d4, #0b0b0b);
+}
+/* News tile (ADR-0016): the latest headlines, the NOS logo and feed beneath them, each headline with how long ago it came. */
+.hd-news { display: grid; gap: calc(var(--cell) * .06); grid-template: "list" 1fr "name" auto / minmax(0, 1fr); }
+.hd-news__list { grid-area: list; align-self: center; min-width: 0; min-height: 0; overflow: hidden; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: calc(var(--cell) * .08); }
 .hd-news > .hd-tile__name { grid-area: name; }
+.hd-news__source { display: flex; align-items: center; gap: .5em; color: var(--ink-muted); font-size: max(var(--t-caption-min), calc(var(--cell) * var(--t-caption))); }
+.hd-nos-logo { display: inline-flex; flex: none; height: 1.25em; color: light-dark(#a69b9c, #fff); } /* The letters as on nos.nl: warm grey on light, white on dark. */
+.hd-nos-logo svg { height: 100%; width: auto; display: block; }
 .hd-news__item { display: flex; flex-direction: column; min-width: 0; }
 .hd-news__title { font-size: max(var(--t-name-min), calc(var(--cell) * var(--t-name))); font-weight: 700; line-height: 1.15; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .hd-news__age { font-size: max(var(--t-caption-min), calc(var(--cell) * var(--t-caption))); font-weight: 600; color: var(--ink-muted); }
-/* One cell high, there is only room beside the icon: the headline takes two lines and the age goes. */
-.hd-news[data-size="small"] .hd-news__title, .hd-news[data-size="wide"] .hd-news__title, .hd-news[data-size="full"] .hd-news__title { -webkit-line-clamp: 2; }
+/* One cell high there is no room for the age: small takes four lines of headline, wide and full two. */
+.hd-news[data-size="small"] .hd-news__title { -webkit-line-clamp: 4; }
+.hd-news[data-size="wide"] .hd-news__title, .hd-news[data-size="full"] .hd-news__title { -webkit-line-clamp: 2; }
 .hd-news[data-size="small"] .hd-news__age, .hd-news[data-size="wide"] .hd-news__age, .hd-news[data-size="full"] .hd-news__age { display: none; }
 .hd-news[data-size="full"] .hd-news__list { flex-direction: row; gap: calc(var(--cell) * .2); }
 .hd-news[data-size="full"] .hd-news__item { flex: 1; }
 .hd-news[data-size="large"] .hd-news__title, .hd-news[data-size="full-large"] .hd-news__title { -webkit-line-clamp: 2; font-size: max(var(--t-sub-min), calc(var(--cell) * var(--t-sub))); }
+.hd-news[data-size="full-large"] .hd-news__list { display: grid; grid-template-columns: 1fr 1fr; align-content: center; gap: calc(var(--cell) * .16) calc(var(--cell) * .2); }
+/*
+ * News detail view: every story of the feed over the whole screen, the newest large; a press on one swaps the list for the
+ * story as a reader view in a frame (NOS refuses to be framed), with "All news" in the head to go back.
+ */
+.hd-details--screen:has(.hd-news__browser) { background: var(--news-ground); }
+.hd-details--screen .hd-details__panel > .hd-news__browser { flex: 1; min-height: 0; }
+.hd-news__pane {
+  --news-gap: calc(var(--cell) * .14);
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--cell) * 2.3), 1fr)); gap: var(--news-gap); align-content: start;
+  padding-bottom: calc(var(--cell) * .18); overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain;
+}
+.hd-news__pane::-webkit-scrollbar { display: none; }
+.hd-news__story {
+  display: flex; flex-direction: column; justify-content: flex-start; align-content: start; gap: calc(var(--cell) * .07); min-width: 0; margin: 0; padding: calc(var(--cell) * .12);
+  border: 0; border-radius: calc(var(--cell) * .24); background: var(--tile-surface); color: var(--ink); font: inherit; text-align: start; cursor: pointer;
+  box-shadow: 0 calc(var(--cell) * .03) calc(var(--cell) * .12) color-mix(in oklab, var(--emboss-shade) 70%, transparent);
+  transition: transform .12s ease-out, filter .12s ease-out;
+}
+.hd-news__story:active { transform: scale(var(--press-scale)); filter: brightness(.97); }
+.hd-news__story:focus-visible { outline: 3px solid var(--k-ink); outline-offset: 2px; }
+.hd-news__story:disabled { cursor: default; }
+.hd-news__photo { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: calc(var(--cell) * .14); background: color-mix(in oklab, var(--k-ink) 14%, var(--tile-surface)); margin-bottom: calc(var(--cell) * .05); }
+.hd-news__headline { font-size: max(var(--t-name-min), calc(var(--cell) * var(--t-name))); font-weight: 800; line-height: 1.18; text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.hd-news__summary { font-size: max(var(--t-detail-min), calc(var(--cell) * var(--t-detail))); font-weight: 500; line-height: 1.35; color: var(--ink-muted); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.hd-news__story-age { font-size: max(var(--t-caption-min), calc(var(--cell) * var(--t-caption))); font-weight: 700; color: var(--k-ink); }
+/* The newest story takes the whole row: its picture beside the text on a wide screen, above it on a narrow one. */
+.hd-news__story.is-lead { grid-column: 1 / -1; align-self: start; padding: calc(var(--cell) * .16); gap: calc(var(--cell) * .1); }
+.hd-news__story.is-lead .hd-news__headline { font-size: max(var(--t-title-min), calc(var(--cell) * var(--t-title) * 1.25)); font-weight: 800; -webkit-line-clamp: 5; }
+.hd-news__story.is-lead .hd-news__summary { font-size: max(var(--t-name-min), calc(var(--cell) * var(--t-name))); -webkit-line-clamp: 4; }
+@media (min-aspect-ratio: 5/4) {
+  .hd-news__story.is-lead:has(.hd-news__photo) { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); grid-template-rows: max-content max-content 1fr; column-gap: calc(var(--cell) * .24); align-content: start; }
+  .hd-news__story.is-lead:has(.hd-news__photo) > :is(.hd-news__photo, .hd-news__thumb) { grid-row: 1 / span 3; margin: 0; height: 100%; min-height: calc(var(--cell) * 1.6); }
+  .hd-news__story.is-lead:has(.hd-news__photo) > .hd-news__photo { aspect-ratio: auto; }
+  .hd-news__story.is-lead:has(.hd-news__photo) > .hd-news__thumb .hd-news__photo { height: 100%; aspect-ratio: auto; margin: 0; }
+  .hd-news__story.is-lead:has(.hd-news__photo) > :not(.hd-news__photo, .hd-news__thumb) { align-self: start; }
+}
+.hd-news__back {
+  flex: none; display: inline-flex; align-items: center; gap: calc(var(--cell) * .06); height: calc(var(--cell) * var(--control-size)); padding: 0 calc(var(--cell) * .2) 0 calc(var(--cell) * .1);
+  border: 0; border-radius: 999px; background: color-mix(in oklab, var(--k-ink) 12%, transparent); color: var(--k-ink);
+  font: inherit; font-size: max(var(--t-name-min), calc(var(--cell) * var(--t-name))); font-weight: 700; cursor: pointer;
+}
+.hd-news__back svg { width: calc(var(--cell) * .24); height: calc(var(--cell) * .24); }
+.hd-news__back:active { filter: brightness(.95); transform: scale(var(--press-scale)); }
+.hd-news__reader { display: block; flex: 1; min-height: 0; width: 100%; border: 0; border-radius: calc(var(--cell) * .2); background: var(--tile-surface); }
+/* The detail view's one column: the tabs (or the way back) over a pane of stories, a story's frame or a player. */
+.hd-news__browser { display: flex; flex-direction: column; gap: calc(var(--cell) * .12); min-height: 0; }
+.hd-news__browser > .hd-news__pane, .hd-news__browser > .hd-news__watch { flex: 1; min-height: 0; }
+.hd-news__bar { display: flex; align-items: center; gap: calc(var(--cell) * .12); min-height: calc(var(--cell) * var(--control-size)); }
+/* In NOS's news the open item is a dark pill, as on nos.nl, and the dot says something is live. */
+.hd-news__bar .hd-segmented { background: transparent; }
+.hd-news__bar .hd-segmented button { background: transparent; color: var(--ink); font-weight: 600; }
+.hd-news__bar .hd-segmented button[aria-pressed="true"] { background: var(--ink); color: var(--tile-surface); }
+.hd-news__bar .hd-strip { flex: 1; --strip-mark: #e61e14; }
+.hd-news__back:focus-visible { outline: 3px solid var(--k-ink); outline-offset: 2px; }
+.hd-news__open-title { flex: 1; min-width: 0; font-size: max(var(--t-name-min), calc(var(--cell) * var(--t-name))); font-weight: 700; line-height: 1.2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.hd-news__thumb { position: relative; display: block; }
+.hd-news__thumb .hd-news__photo { margin-bottom: 0; }
+.hd-news__badge {
+  position: absolute; inset: auto calc(var(--cell) * .06) calc(var(--cell) * .06) auto; padding: .15em .55em; border-radius: 999px; background: rgb(0 0 0 / .75); color: #fff;
+  font-size: max(var(--t-caption-min), calc(var(--cell) * var(--t-caption))); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.hd-news__badge--live { inset: calc(var(--cell) * .06) auto auto calc(var(--cell) * .06); background: #e61e14; text-transform: uppercase; letter-spacing: .06em; }
+.hd-news__story-age.is-live { color: #e61e14; text-transform: uppercase; letter-spacing: .06em; }
+.hd-news__watch { display: flex; flex-direction: column; gap: calc(var(--cell) * .12); overflow-y: auto; scrollbar-width: none; }
+.hd-news__player { display: flex; flex: 1; min-height: 0; justify-content: center; position: relative; }
+.hd-news__video { max-width: 100%; max-height: 100%; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: calc(var(--cell) * .2); object-fit: contain; }
+.hd-news__player-error { position: absolute; inset: auto 0 calc(var(--cell) * .2); text-align: center; color: #fff; font-weight: 600; text-shadow: 0 1px 3px rgb(0 0 0 / .8); }
+.hd-news__watch-text { margin: 0; font-size: max(var(--t-name-min), calc(var(--cell) * var(--t-name))); line-height: 1.4; color: var(--ink-muted); }
 /*
  * Clock and date: tiles that point at nothing, in the neutral hue. The clock centres the time, digital at a size that fits
  * the cell (smaller while the seconds show) or an analog dial, with the date under it, or beside the dial on the wide sizes.
@@ -1652,3 +1731,51 @@ a.hd-btn { text-decoration: none; }
   background: linear-gradient(to right, var(--k-ink) calc(var(--share, 0) * 100%), color-mix(in oklab, var(--k-ink) 14%, transparent) 0);
 }
 .hd-energy__credit { margin: 0; font-size: max(var(--t-caption-min), calc(var(--cell) * var(--t-caption))); color: var(--ink-muted); }
+
+/* In the news detail view the logo stands where the icon would, and is as tall as the feed's name and count together. */
+.hd-details__head:has(.hd-nos-logo) > .hd-icon { display: none; }
+.hd-details__head > .hd-nos-logo { height: calc(var(--cell) * .24); margin-inline-end: calc(var(--cell) * .06); }
+
+/* A livestream that has not started cannot be opened: NOS has no stream for it yet. */
+.hd-news__story.is-soon { opacity: .7; }
+.hd-news__story.is-soon:active { transform: none; filter: none; }
+
+/*
+ * Playing on an Apple TV (ADR-0012) where the app has no look of its own to borrow, such as in NOS's news: the hue of the
+ * view, a pill to start, and a row for what plays with its pause and stop.
+ */
+.hd-cast { display: flex; flex-wrap: wrap; align-items: center; gap: calc(var(--cell) * .1); min-width: 0; }
+.hd-cast__button {
+  display: inline-flex; align-items: center; gap: .5em; min-height: calc(var(--cell) * var(--control-size)); padding: 0 calc(var(--cell) * .2);
+  border: 0; border-radius: 999px; background: var(--k-ink); color: var(--on-kind, #fff); cursor: pointer;
+  font: 700 max(var(--t-name-min), calc(var(--cell) * var(--t-name)))/1 var(--font-sans);
+}
+.hd-cast__button--quiet { background: color-mix(in oklab, var(--k-ink) 12%, transparent); color: var(--k-ink); }
+.hd-cast__button:active { transform: scale(var(--press-scale)); }
+.hd-cast__button:focus-visible { outline: 3px solid var(--k-ink); outline-offset: 3px; }
+.hd-cast__button svg, .hd-cast__icon { width: 1.3em; height: 1.3em; flex: none; stroke: currentColor; stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.hd-cast__receivers { display: flex; flex-wrap: wrap; gap: calc(var(--cell) * .08); }
+.hd-cast__note { font: 600 max(var(--t-name-min), calc(var(--cell) * var(--t-name)))/1.3 var(--font-sans); color: var(--ink-muted); }
+.hd-cast__error { flex-basis: 100%; font: 700 max(var(--t-detail-min), calc(var(--cell) * var(--t-detail)))/1.3 var(--font-sans); color: var(--danger); }
+.hd-cast__now { padding: calc(var(--cell) * .1) calc(var(--cell) * .16); border-radius: calc(var(--cell) * .24); background: var(--tile-surface); flex: none; }
+.hd-cast__icon { color: var(--k-ink); }
+.hd-cast__text { flex: 1 1 10em; display: flex; flex-direction: column; gap: .15em; min-width: 0; font: 600 max(var(--t-detail-min), calc(var(--cell) * var(--t-detail)))/1.2 var(--font-sans); color: var(--ink-muted); }
+.hd-cast__text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: max(var(--t-name-min), calc(var(--cell) * var(--t-name))); color: var(--ink); }
+
+/*
+ * Scrolling in a detail view: what is scrolled past an edge fades out instead of being cut off by the overflow, and only
+ * where there is more to see (nothing fades at rest, or when it all fits). The fade follows the pane's own scroll position;
+ * a browser without scroll-driven animations just cuts as before.
+ */
+@property --fade-top { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fade-bottom { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@keyframes hd-fade-top { from { --fade-top: 0px; } to { --fade-top: var(--fade); } }
+@keyframes hd-fade-bottom { from { --fade-bottom: var(--fade); } to { --fade-bottom: 0px; } }
+.hd-sonos__pane, .hd-weather__pane, .hd-energy__pane, .hd-news__pane, .hd-news__watch, .hd-plex-recent__pane, .hd-plex-recent__detail, .hd-plex-now__pane,
+.hd-details--screen .hd-details__panel > .hd-apps {
+  --fade: calc(var(--cell) * .2);
+  mask-image: linear-gradient(transparent, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent);
+  animation: hd-fade-top linear both, hd-fade-bottom linear both;
+  animation-timeline: scroll(self block);
+  animation-range: 0 var(--fade), calc(100% - var(--fade)) 100%;
+}
