@@ -12,8 +12,10 @@ namespace HomeyDash.Api.Photos;
 /// rotated photo is drawn, and its face found, turned; its Version is how far it is turned. Its user shares Daan's
 /// photos, of which the last Garden photo is one; any key but its own is Daan's.
 /// </summary>
-public sealed class FakeImmich(TimeProvider time) : IImmich
+public sealed class FakeImmich(TimeProvider time, ImmichOptions? options = null) : IImmich
 {
+    private static readonly HttpClient Picsum = new() { Timeout = TimeSpan.FromSeconds(10) };
+
     public static readonly ImmichAccount Account = new("http://fake-immich", "fake") { Id = 1, Name = "Fake Immich" };
 
     public const string SummerId = "00000000-0000-4000-8000-000000000001";
@@ -122,14 +124,15 @@ public sealed class FakeImmich(TimeProvider time) : IImmich
         return People(album, n).Length == 0 ? null : new Focus(n % 2 == 0 ? .2 : .8, .15);
     }
 
-    public Task<ImmichPhoto?> PhotoAsync(ImmichAccount account, string photoId, CancellationToken ct)
+    public async Task<ImmichPhoto?> PhotoAsync(ImmichAccount account, string photoId, CancellationToken ct)
     {
-        if (Number(photoId) is not { } n) return Task.FromResult<ImmichPhoto?>(null);
+        if (Number(photoId) is not { } n) return null;
         var (width, height) = (n % 3) switch { 0 => (1600, 1200), 1 => (1200, 1600), _ => (1920, 1080) };
         var hue = n * 360 / SummerPhotos;
         var turned = Turned(photoId);
         var (outerWidth, outerHeight) = turned is 90 or 270 ? (height, width) : (width, height);
         var turn = turned switch { 90 => $"translate({height},0) rotate(90)", 180 => $"translate({width},{height}) rotate(180)", 270 => $"translate(0,{width}) rotate(270)", _ => "" };
+        if (options?.Picsum == true && await PicsumAsync(photoId, outerWidth, outerHeight, ct) is { } picture) return picture;
         var svg = $"""
             <svg xmlns="http://www.w3.org/2000/svg" width="{outerWidth}" height="{outerHeight}" viewBox="0 0 {outerWidth} {outerHeight}">
               <g transform="{turn}">
@@ -143,6 +146,18 @@ public sealed class FakeImmich(TimeProvider time) : IImmich
               </g>
             </svg>
             """;
-        return Task.FromResult<ImmichPhoto?>(new ImmichPhoto(new MemoryStream(Encoding.UTF8.GetBytes(svg)), "image/svg+xml"));
+        return new ImmichPhoto(new MemoryStream(Encoding.UTF8.GetBytes(svg)), "image/svg+xml");
+    }
+
+    // A real picture, the same one every time for a photo.
+    private static async Task<ImmichPhoto?> PicsumAsync(string photoId, int width, int height, CancellationToken ct)
+    {
+        try
+        {
+            var bytes = await Picsum.GetByteArrayAsync($"https://picsum.photos/seed/{photoId[^4..]}/{width}/{height}.jpg", ct);
+            return new ImmichPhoto(new MemoryStream(bytes), "image/jpeg");
+        }
+        catch (HttpRequestException) { return null; }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return null; }
     }
 }

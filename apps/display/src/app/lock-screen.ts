@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, ElementRef, inject, input } from '@angular/core';
 import { capabilitySignal, HomeyWeather, LOCK_SPOTS, LockWidget, Rule } from '@homey-dash/api-client';
 import { capabilityText, delayLevel, delayText, duration, ruleAnswersOf, TileData, TrafficData } from '@homey-dash/tiles';
 import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 import { LucideCar, LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideSun, minuteClock } from '@homey-dash/design-system';
 
+import { css, inkOver, MIN_CONTRAST_SMALL, Rgb } from './lock-ink';
 /** What a widget shows now; a weather Homey hasn't told, or a value whose device is gone, shows nothing. */
 type Shown =
   | { kind: 'clock'; time: string; date: string }
@@ -73,23 +74,21 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
   `,
   styles: `
     /*
-     * The content is the subject; the widgets are a quiet layer on it. Nothing covers the photo as a whole: each spot
-     * darkens only its own corner, softly, so white type holds on any picture while the middle stays untouched.
+     * The content is the subject; the widgets are a quiet layer on it. Nothing covers the photo: each widget's type takes
+     * the inverse of the average colour right behind it (measured below), with a soft halo of that colour for fine detail.
      */
     :host {
       position: fixed; inset: 0; z-index: 10; pointer-events: none; box-sizing: border-box;
       display: grid; grid-template: 'tl . tr' auto '. c .' 1fr 'bl . br' auto / 1fr auto 1fr;
       --edge: var(--lock-edge, clamp(20px, 5vh, 56px));
       padding: var(--edge); color: #fff; --u: 1vh;
-      text-shadow: 0 1px 2px rgb(0 0 0 / .55), 0 0 14px rgb(0 0 0 / .45), 0 0 36px rgb(0 0 0 / .35);
     }
     /* Over a photo, the bottom spots stay above the caption line along its bottom (styled in the app, to the same margins): when and where it was taken, and who. */
     :host(.over-photo) { padding-bottom: calc(var(--edge) + 7vh); }
-    /* Each spot is only as wide as its widgets, so its shade is too, not the whole column's. */
     .spot { position: relative; display: flex; flex-direction: column; gap: calc(3 * var(--u)); animation: spot-in .9s cubic-bezier(.2, .7, .2, 1) backwards; }
-    .spot::before {
-      content: ''; position: absolute; z-index: -1; inset: calc(-5 * var(--u)) calc(-9 * var(--u));
-      background: radial-gradient(closest-side, rgb(0 0 0 / .5), rgb(0 0 0 / .22) 55%, transparent);
+    .clock, .weather, .traffic, .value {
+      color: var(--ink, #fff); text-shadow: 0 0 calc(1.2 * var(--u)) var(--halo, rgb(0 0 0 / .35));
+      transition: color .8s ease, text-shadow .8s ease;
     }
     .spot--top-left { grid-area: tl; justify-self: start; align-items: flex-start; }
     .spot--top-right { grid-area: tr; justify-self: end; align-items: flex-end; text-align: right; animation-delay: .08s; }
@@ -120,11 +119,71 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
 export class LockScreen {
   readonly widgets = input.required<readonly LockWidget[]>();
 
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly data = inject(TileData);
   private readonly traffic = inject(TrafficData);
   protected readonly car = LucideCar;
   // Ticks on every minute, for the clock.
   private readonly now = minuteClock();
+
+  constructor() {
+    // What lies behind a widget changes as photos fade in and out, so it is measured about once a second.
+    afterNextRender(() => {
+      this.ink();
+      const timer = setInterval(() => this.ink(), 1000);
+      inject(DestroyRef).onDestroy(() => clearInterval(timer));
+    });
+  }
+
+  /** Sets the type colour of each widget, and of the photo's caption, from the average colour of the picture or fill directly behind it. */
+  private ink() {
+    const widgets = [
+      ...this.host.querySelectorAll<HTMLElement>('.clock, .weather, .traffic, .value'),
+      ...document.querySelectorAll<HTMLElement>('.slideshow :is(.hd-photo__label, .hd-photo__about, .hd-photo__people)'),
+    ];
+    const scale = 160 / window.innerWidth;
+    const canvas = new OffscreenCanvas(160, Math.max(1, Math.round(window.innerHeight * scale)));
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context || !widgets.length) return;
+    let drawn = false;
+    try {
+      // A colour fill, then the photos over it, each as opaque as it has faded in so far.
+      const fill = document.querySelector<HTMLElement>('.fill');
+      if (fill) {
+        context.fillStyle = getComputedStyle(fill).backgroundColor;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        drawn = true;
+      }
+      for (const img of document.querySelectorAll<HTMLImageElement>('.slideshow img')) {
+        const opacity = effectiveOpacity(img);
+        if (!img.complete || !img.naturalWidth || opacity <= 0) continue;
+        const box = img.getBoundingClientRect();
+        // object-fit: cover, as the photo tile draws it.
+        const fit = Math.max(box.width / img.naturalWidth, box.height / img.naturalHeight);
+        const [w, h] = [img.naturalWidth * fit, img.naturalHeight * fit];
+        context.globalAlpha = opacity;
+        context.drawImage(img, (box.left + (box.width - w) / 2) * scale, (box.top + (box.height - h) / 2) * scale, w * scale, h * scale);
+        context.globalAlpha = 1;
+        drawn = true;
+      }
+      for (const widget of widgets) {
+        const average = drawn ? averageBehind(context, extent(widget), scale) : null;
+        if (!average) {
+          widget.style.removeProperty('--ink');
+          widget.style.removeProperty('--halo');
+          continue;
+        }
+        widget.style.setProperty('--ink', css(inkOver(average, widget.className.startsWith('hd-photo__') ? MIN_CONTRAST_SMALL : undefined)));
+        widget.style.setProperty('--halo', css(average, 0.6));
+      }
+    } catch {
+      // A picture the browser won't let it read: the type stays white.
+      for (const widget of widgets) {
+        widget.style.removeProperty('--ink');
+        widget.style.removeProperty('--halo');
+      }
+    }
+  }
 
   // The widgets shown now: not the hidden ones, and those with a rule only while HomeyDash says it holds. One whose
   // rule has not answered yet, or was refused, is left out.
@@ -187,4 +246,33 @@ export class LockScreen {
     const look = weatherLook(weather.state);
     return { kind: 'weather', temperature: `${Math.round(weather.temperature)}°`, state: look.label, icon: look.icon };
   }
+}
+
+// How visible an element is: its own opacity times that of everything around it.
+function effectiveOpacity(element: Element | null): number {
+  let opacity = 1;
+  for (; element; element = element.parentElement) opacity *= Number(getComputedStyle(element).opacity);
+  return opacity;
+}
+
+// Where an element's type is: a caption line is as wide as the screen, its words are not.
+function extent(element: HTMLElement): DOMRect {
+  if (!element.className.startsWith('hd-photo__')) return element.getBoundingClientRect();
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  return range.getBoundingClientRect();
+}
+
+// The average colour of the canvas under a screen rectangle; null when nothing of it is on the canvas.
+function averageBehind(context: OffscreenCanvasRenderingContext2D, rect: DOMRect, scale: number): Rgb | null {
+  const x = Math.max(0, Math.floor(rect.left * scale));
+  const y = Math.max(0, Math.floor(rect.top * scale));
+  const w = Math.min(context.canvas.width, Math.ceil(rect.right * scale)) - x;
+  const h = Math.min(context.canvas.height, Math.ceil(rect.bottom * scale)) - y;
+  if (w < 1 || h < 1) return null;
+  const { data } = context.getImageData(x, y, w, h);
+  const sum = [0, 0, 0];
+  for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c] += data[i + c];
+  const pixels = data.length / 4;
+  return [Math.round(sum[0] / pixels), Math.round(sum[1] / pixels), Math.round(sum[2] / pixels)];
 }

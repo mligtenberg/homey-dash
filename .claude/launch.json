@@ -40,6 +40,7 @@
         "--ConnectionStrings:HomeyDash=Data Source=../../tmp/claude/homey-dash.db",
         "--Homey:Fake=true",
         "--Immich:Fake=true",
+        "--Immich:Picsum=true",
         "--Plex:Fake=true",
         "--AirPlay:Fake=true",
         "--Weather:Fake=true",

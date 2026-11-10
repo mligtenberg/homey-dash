@@ -5,6 +5,9 @@ public sealed class ImmichOptions
 {
     // Runs against FakeImmich instead of an Immich server, for development and tests. Never a fallback.
     public bool Fake { get; set; }
+
+    // With Fake, the photos are real pictures from picsum.photos instead of numbered gradients, for judging how things look over photos. Needs the internet; falls back to the gradients without it.
+    public bool Picsum { get; set; }
 }
 
 /// <summary>
