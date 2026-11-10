@@ -1,12 +1,21 @@
 /**
- * The colour of a lock screen widget's type, from the average colour of what lies directly behind it: the inverse of
- * that colour, so it always stands apart, with its hue and saturation kept and only its lightness moved, as little as
- * it takes, until it reads (WCAG contrast of at least 3:1, the floor for large text). Inverting a mid-grey gives a
- * mid-grey, which is the one case where it has to move.
+ * The colour of a lock screen widget's type, from what lies directly behind it. It starts as the inverse of the
+ * average colour there, so it always stands apart, and is then held to the lightest and the darkest colour in that
+ * area, not the average, which a bright patch or a dark one in an otherwise even area would not show. When either fails
+ * to reach the contrast, the colour is worked out again from the inverse of the one that failed, with its lightness
+ * moved, as little as it takes, until it reads against both.
  */
 
 export type Rgb = readonly [number, number, number];
 
+/** What lies behind a piece of type: its average colour, and the lightest and darkest colour in it. */
+export interface Backdrop {
+  average: Rgb;
+  lightest: Rgb;
+  darkest: Rgb;
+}
+
+// WCAG's floor for large type.
 const MIN_CONTRAST = 3;
 // Small type, such as a photo's caption, needs more than large type does.
 export const MIN_CONTRAST_SMALL = 4.5;
@@ -46,18 +55,42 @@ function fromHsl(h: number, s: number, l: number): Rgb {
   return [f(0), f(8), f(4)];
 }
 
-/** The type colour for a background of this average colour. */
-export function inkOver(average: Rgb, minContrast = MIN_CONTRAST): Rgb {
-  const [h, s, l] = toHsl([255 - average[0], 255 - average[1], 255 - average[2]]);
-  // On a light background the type goes darker, on a dark one lighter.
-  const direction = luminance(average) > 0.179 ? -1 : 1;
-  for (let lightness = l; lightness >= 0 && lightness <= 1; lightness += direction * 0.02) {
-    const ink = fromHsl(h, s, lightness);
-    if (contrast(ink, average) >= minContrast) return ink;
-  }
-  return direction < 0 ? [0, 0, 0] : [255, 255, 255];
+const inverse = ([r, g, b]: Rgb): Rgb => [255 - r, 255 - g, 255 - b];
+
+/** How well a colour reads against the worse of the lightest and the darkest colour behind it. */
+function worst(ink: Rgb, { lightest, darkest }: Backdrop): number {
+  return Math.min(contrast(ink, lightest), contrast(ink, darkest));
 }
 
-export function css([r, g, b]: Rgb, alpha = 1): string {
-  return alpha === 1 ? `rgb(${r} ${g} ${b})` : `rgb(${r} ${g} ${b} / ${alpha})`;
+/** The inverse of `base`, moved lighter or darker, away from `base`, until it reads against the whole backdrop. */
+function against(base: Rgb, backdrop: Backdrop, minContrast: number): Rgb | null {
+  const [h, s, l] = toHsl(inverse(base));
+  const direction = luminance(base) > 0.179 ? -1 : 1;
+  for (let lightness = l; lightness >= 0 && lightness <= 1; lightness += direction * 0.02) {
+    const ink = fromHsl(h, s, lightness);
+    if (worst(ink, backdrop) >= minContrast) return ink;
+  }
+  return null;
+}
+
+/** The type colour for this backdrop. */
+export function inkOver(backdrop: Backdrop, minContrast = MIN_CONTRAST): Rgb {
+  const first = inverse(backdrop.average);
+  if (worst(first, backdrop) >= minContrast) return first;
+  // The one that fails is what the colour is worked out against again.
+  const failing = contrast(first, backdrop.lightest) < contrast(first, backdrop.darkest) ? backdrop.lightest : backdrop.darkest;
+  const again = against(failing, backdrop, minContrast);
+  if (again) return again;
+  // Neither end can be moved away from the other (an area from white to black): the lightness that reads best against both.
+  const [h, s] = toHsl(inverse(failing));
+  let best = first;
+  for (let lightness = 0; lightness <= 1; lightness += 0.02) {
+    const ink = fromHsl(h, s, lightness);
+    if (worst(ink, backdrop) > worst(best, backdrop)) best = ink;
+  }
+  return best;
+}
+
+export function css([r, g, b]: Rgb): string {
+  return `rgb(${r} ${g} ${b})`;
 }

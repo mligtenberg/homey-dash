@@ -161,7 +161,7 @@ const TAPE_KEY = 'homeydash.tape';
     }
     /* Its type takes the inverse of the picture behind it, as the lock screen's widgets do (set by the lock screen). */
     .slideshow ::ng-deep :is(.hd-photo__label, .hd-photo__about, .hd-photo__people) {
-      color: var(--ink, #fff); text-shadow: 0 0 1.2vh var(--halo, rgb(0 0 0 / .35)); transition: color .8s ease, text-shadow .8s ease;
+      color: var(--ink, #fff); text-shadow: none; transition: color .8s ease;
     }
     .slideshow ::ng-deep .hd-photo__label { font-size: max(var(--text-floor), 2.3vh); font-weight: 500; letter-spacing: .01em; }
     .slideshow ::ng-deep .hd-photo__about, .slideshow ::ng-deep .hd-photo__people { font-size: max(var(--text-floor), 1.9vh); font-weight: 500; letter-spacing: .01em; opacity: .82; }

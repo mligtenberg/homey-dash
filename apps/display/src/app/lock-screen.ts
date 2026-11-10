@@ -4,7 +4,7 @@ import { ago, capabilityText, delayLevel, delayText, duration, NewsData, ruleAns
 import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 import { LucideCar, LucideNewspaper, LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideSun, minuteClock } from '@homey-dash/design-system';
 
-import { css, inkOver, MIN_CONTRAST_SMALL, Rgb } from './lock-ink';
+import { Backdrop, css, inkOver, luminance, MIN_CONTRAST_SMALL, Rgb } from './lock-ink';
 /** What a widget shows now; a weather Homey hasn't told, or a value whose device is gone, shows nothing. */
 type Shown =
   | { kind: 'clock'; time: string; date: string }
@@ -83,7 +83,7 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
   styles: `
     /*
      * The content is the subject; the widgets are a quiet layer on it. Nothing covers the photo: each widget's type takes
-     * the inverse of the average colour right behind it (measured below), with a soft halo of that colour for fine detail.
+     * the inverse of the average colour right behind it (measured below), held to the lightest and darkest colour there.
      */
     :host {
       position: fixed; inset: 0; z-index: 10; pointer-events: none; box-sizing: border-box;
@@ -95,8 +95,7 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
     :host(.over-photo) { padding-bottom: calc(var(--edge) + 7vh); }
     .spot { position: relative; display: flex; flex-direction: column; gap: calc(3 * var(--u)); animation: spot-in .9s cubic-bezier(.2, .7, .2, 1) backwards; }
     .clock, .weather, .traffic, .value, .news {
-      color: var(--ink, #fff); text-shadow: 0 0 calc(1.2 * var(--u)) var(--halo, rgb(0 0 0 / .35));
-      transition: color .8s ease, text-shadow .8s ease;
+      color: var(--ink, #fff); transition: color .8s ease;
     }
     .spot--top-left { grid-area: tl; justify-self: start; align-items: flex-start; }
     .spot--top-right { grid-area: tr; justify-self: end; align-items: flex-end; text-align: right; animation-delay: .08s; }
@@ -183,20 +182,17 @@ export class LockScreen {
         drawn = true;
       }
       for (const widget of widgets) {
-        const average = drawn ? averageBehind(context, extent(widget), scale) : null;
-        if (!average) {
+        const backdrop = drawn ? backdropOf(context, extent(widget), scale) : null;
+        if (!backdrop) {
           widget.style.removeProperty('--ink');
-          widget.style.removeProperty('--halo');
           continue;
         }
-        widget.style.setProperty('--ink', css(inkOver(average, widget.className.startsWith('hd-photo__') ? MIN_CONTRAST_SMALL : undefined)));
-        widget.style.setProperty('--halo', css(average, 0.6));
+        widget.style.setProperty('--ink', css(inkOver(backdrop, widget.className.startsWith('hd-photo__') ? MIN_CONTRAST_SMALL : undefined)));
       }
     } catch {
       // A picture the browser won't let it read: the type stays white.
       for (const widget of widgets) {
         widget.style.removeProperty('--ink');
-        widget.style.removeProperty('--halo');
       }
     }
   }
@@ -286,8 +282,8 @@ function extent(element: HTMLElement): DOMRect {
   return range.getBoundingClientRect();
 }
 
-// The average colour of the canvas under a screen rectangle; null when nothing of it is on the canvas.
-function averageBehind(context: OffscreenCanvasRenderingContext2D, rect: DOMRect, scale: number): Rgb | null {
+// The average, lightest and darkest colour of the canvas under a screen rectangle; null when nothing of it is on the canvas.
+function backdropOf(context: OffscreenCanvasRenderingContext2D, rect: DOMRect, scale: number): Backdrop | null {
   const x = Math.max(0, Math.floor(rect.left * scale));
   const y = Math.max(0, Math.floor(rect.top * scale));
   const w = Math.min(context.canvas.width, Math.ceil(rect.right * scale)) - x;
@@ -295,7 +291,14 @@ function averageBehind(context: OffscreenCanvasRenderingContext2D, rect: DOMRect
   if (w < 1 || h < 1) return null;
   const { data } = context.getImageData(x, y, w, h);
   const sum = [0, 0, 0];
-  for (let i = 0; i < data.length; i += 4) for (let c = 0; c < 3; c++) sum[c] += data[i + c];
+  let lightest: Rgb = [data[0], data[1], data[2]];
+  let darkest = lightest;
+  for (let i = 0; i < data.length; i += 4) {
+    for (let c = 0; c < 3; c++) sum[c] += data[i + c];
+    const pixel: Rgb = [data[i], data[i + 1], data[i + 2]];
+    if (luminance(pixel) > luminance(lightest)) lightest = pixel;
+    if (luminance(pixel) < luminance(darkest)) darkest = pixel;
+  }
   const pixels = data.length / 4;
-  return [Math.round(sum[0] / pixels), Math.round(sum[1] / pixels), Math.round(sum[2] / pixels)];
+  return { average: [Math.round(sum[0] / pixels), Math.round(sum[1] / pixels), Math.round(sum[2] / pixels)], lightest, darkest };
 }
