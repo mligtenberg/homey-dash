@@ -1,12 +1,7 @@
 /**
- * The colour of a lock screen widget's type, from what lies directly behind it. It starts as the inverse of the
- * average colour there, taken in OKLab so that it is the perceptual opposite (light for dark, the opposite hue), and is
- * then held to the lightest and the darkest colour in that area (the 95th and 5th percentile, so a lone glint doesn't
- * decide). When either fails to reach the contrast, the colour is worked out again from the inverse of the one that
- * failed, with its lightness moved, as little as it takes, until it reads against both. Where no colour can (an area
- * from mid grey to near black is one: outside it there is no room, and inside it no colour is far enough from both
- * ends), it reads against the average instead, which is most of what lies behind it, and a few of the lightest or
- * darkest spots read less well. Nothing is put behind the type.
+ * The colours of the lock screen's type. The type is cut out of the picture's inverse (see `inverseOf`, in OKLab: as
+ * light as the original is dark, in the opposite hue), with white or black over it as a base, whichever reads better
+ * against the average colour directly behind the type.
  */
 
 export type Rgb = readonly [number, number, number];
@@ -17,11 +12,6 @@ export interface Backdrop {
   lightest: Rgb;
   darkest: Rgb;
 }
-
-// WCAG's floor for large type.
-const MIN_CONTRAST = 3;
-// Small type, such as a photo's caption, needs more than large type does.
-export const MIN_CONTRAST_SMALL = 4.5;
 
 function linear(value: number): number {
   const s = value / 255;
@@ -79,48 +69,35 @@ function fit(lab: Lab): Rgb {
   return fromOklab(lab, low).rgb;
 }
 
+// A plain inverse turns a middle tone into the same middle tone, which reads on nothing. So the lightness is pushed away
+// from the point where white and black type read equally well (OKLab 0.57), and kept at least GAP from the colour it is
+// over, on the dark side for what is lighter than that point and the light side for what is darker.
+const PIVOT = 0.57;
+const PUSH = 1.8;
+const GAP = 0.4;
+
 const inverse = (colour: Rgb): Lab => {
   const [L, a, b] = toOklab(colour);
-  return [1 - L, -a, -b];
+  const pushed = PIVOT + (PIVOT - L) * PUSH;
+  const apart = L >= PIVOT ? Math.min(pushed, L - GAP) : Math.max(pushed, L + GAP);
+  return [Math.min(1, Math.max(0, apart)), -a, -b];
 };
 
-/** How well a colour reads against the worse of the lightest and the darkest colour behind it. */
-function worst(ink: Rgb, { lightest, darkest }: Backdrop): number {
-  return Math.min(contrast(ink, lightest), contrast(ink, darkest));
+/**
+ * The inverse of a colour in OKLab: light for dark, in the opposite hue, with the lightness pushed away from the middle.
+ * The lightness may come from another version of the picture than the hue does (`near`, less blurred), so that
+ * what is light and what is dark follows the picture closely while the colour changes slowly.
+ */
+export function inverseOf(colour: Rgb, near: Rgb = colour): Rgb {
+  const [, a, b] = inverse(colour);
+  return fit([inverse(near)[0], a, b]);
 }
 
-/** The inverse of `base`, moved lighter or darker, away from `base`, until it reads against the whole backdrop. */
-function against(base: Rgb, backdrop: Backdrop, minContrast: number): Rgb | null {
-  const [L, a, b] = inverse(base);
-  const direction = luminance(base) > 0.179 ? -1 : 1;
-  for (let lightness = L; lightness >= 0 && lightness <= 1; lightness += direction * 0.01) {
-    const ink = fit([lightness, a, b]);
-    if (worst(ink, backdrop) >= minContrast) return ink;
-  }
-  return null;
-}
-
-/** The type colour for this backdrop. */
-export function inkOver(backdrop: Backdrop, minContrast = MIN_CONTRAST): Rgb {
-  const first = fit(inverse(backdrop.average));
-  if (worst(first, backdrop) >= minContrast) return first;
-  // The one that fails is what the colour is worked out against again.
-  const failing = contrast(first, backdrop.lightest) < contrast(first, backdrop.darkest) ? backdrop.lightest : backdrop.darkest;
-  const again = against(failing, backdrop, minContrast);
-  if (again) return again;
-  // Neither end can be moved away from the other (an area from white to black): the lightness that reads best on both.
-  const [, a, b] = inverse(failing);
-  let best = first;
-  for (let lightness = 0; lightness <= 1; lightness += 0.01) {
-    const ink = fit([lightness, a, b]);
-    if (worst(ink, backdrop) > worst(best, backdrop)) best = ink;
-  }
-  if (worst(best, backdrop) >= minContrast) return best;
-  // No colour reads on all of it, so it reads as well as it can on most of it: as far from the average as the
-  // opposite hue allows, light or dark. A grey that only just clears the floor is the one that reads worst.
-  const [, a2, b2] = inverse(backdrop.average);
-  const candidates = [0.97, 0.08].map((lightness) => fit([lightness, a2, b2]));
-  return candidates.reduce((x, y) => (contrast(y, backdrop.average) > contrast(x, backdrop.average) ? y : x));
+/** White or black, whichever reads better against what lies behind the type. */
+export function inkOver({ average }: Backdrop): Rgb {
+  const white: Rgb = [255, 255, 255];
+  const black: Rgb = [0, 0, 0];
+  return contrast(white, average) >= contrast(black, average) ? white : black;
 }
 
 export function css([r, g, b]: Rgb): string {

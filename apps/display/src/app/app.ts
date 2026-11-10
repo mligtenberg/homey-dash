@@ -160,6 +160,28 @@ const TAPE_KEY = 'homeydash.tape';
       padding: 0 var(--lock-edge) var(--lock-edge); background: none; gap: 2vh;
     }
     /* Its type takes the inverse of the picture behind it, as the lock screen's widgets do (set by the lock screen). */
+    /*
+     * Type on the lock screen, widgets and caption alike, is cut out of the picture's inverse (set as --inverse, as
+     * large as the picture, and placed by --bx and --by), with white or black (--ink) over it at 10%.
+     */
+    ::ng-deep :is(.hd-ink, .hd-ink-icon) {
+      color: transparent !important;
+      background:
+        linear-gradient(color-mix(in srgb, var(--ink) 10%, transparent), color-mix(in srgb, var(--ink) 10%, transparent)),
+        var(--inverse, none) var(--bx, 0) var(--by, 0) / var(--inverse-size, 100vw 100vh) no-repeat,
+        linear-gradient(var(--ink), var(--ink)) !important;
+      image-rendering: auto;
+      /* A twentieth see-through; as a filter, so it stacks with the opacity of the widget itself rather than replacing it. */
+      /* And a small neutral blur around it, a grey that is neither light nor dark. A drop-shadow, since a text-shadow would be painted over the cut-out. */
+      filter: opacity(.95) drop-shadow(0 0 .35vh rgb(128 128 128 / .3));
+    }
+    ::ng-deep .hd-ink {
+      -webkit-background-clip: text !important; background-clip: text !important;
+      /* Cut-out type is drawn in greys at its edges, not in the colour fringes of subpixel rendering. */
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: geometricPrecision;
+    }
+    /* An icon is lines, not type: it is cut out through a mask of its own drawing (--mask), over the same picture. */
+    ::ng-deep .hd-ink-icon { -webkit-mask: var(--mask) center / 100% 100% no-repeat; mask: var(--mask) center / 100% 100% no-repeat; }
     .slideshow ::ng-deep :is(.hd-photo__label, .hd-photo__about, .hd-photo__people) {
       color: var(--ink, #fff); text-shadow: none; transition: color .8s ease;
     }

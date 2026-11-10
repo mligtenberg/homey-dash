@@ -4,7 +4,7 @@ import { ago, capabilityText, delayLevel, delayText, duration, NewsData, ruleAns
 import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 import { LucideCar, LucideNewspaper, LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideSun, minuteClock } from '@homey-dash/design-system';
 
-import { Backdrop, css, inkOver, luminance, MIN_CONTRAST_SMALL, Rgb } from './lock-ink';
+import { Backdrop, css, inkOver, inverseOf, luminance, Rgb } from './lock-ink';
 /** What a widget shows now; a weather Homey hasn't told, or a value whose device is gone, shows nothing. */
 type Shown =
   | { kind: 'clock'; time: string; date: string }
@@ -133,6 +133,7 @@ export class LockScreen {
   readonly widgets = input.required<readonly LockWidget[]>();
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly destroyRef = inject(DestroyRef);
   private readonly data = inject(TileData);
   private readonly traffic = inject(TrafficData);
   private readonly news = inject(NewsData);
@@ -146,22 +147,40 @@ export class LockScreen {
     afterNextRender(() => {
       this.ink();
       const timer = setInterval(() => this.ink(), 1000);
-      inject(DestroyRef).onDestroy(() => clearInterval(timer));
+      this.destroyRef.onDestroy(() => {
+        clearInterval(timer);
+        document.documentElement.style.removeProperty('--inverse');
+        document.documentElement.style.removeProperty('--inverse-size');
+        if (this.image) URL.revokeObjectURL(this.image);
+      });
     });
   }
 
-  /** Sets the type colour of each widget, and of the photo's caption, from the average colour of the picture or fill directly behind it. */
-  private ink() {
+  private busy = false;
+  private previous: Uint8ClampedArray | null = null;
+  private image: string | null = null;
+
+  /**
+   * Sets the type colour of each widget, and of the photo's caption, from the average colour of the picture or fill
+   * directly behind it, and the picture's inverse, which the type is cut out of.
+   */
+  private async ink() {
+    if (this.busy) return;
+    this.busy = true;
     const widgets = [
       ...this.host.querySelectorAll<HTMLElement>('.clock, .weather, .traffic, .value, .news'),
       ...document.querySelectorAll<HTMLElement>('.slideshow :is(.hd-photo__label, .hd-photo__about, .hd-photo__people)'),
     ];
-    const scale = 160 / window.innerWidth;
-    const canvas = new OffscreenCanvas(160, Math.max(1, Math.round(window.innerHeight * scale)));
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context || !widgets.length) return;
-    let drawn = false;
     try {
+      // The picture or fill is the frame everything is measured in, wherever it is on the page and however large.
+      const frame = document.querySelector('.slideshow, .fill')?.getBoundingClientRect() ?? new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+      if (frame.width < 1 || frame.height < 1) return;
+      const width = 240;
+      const scale = width / frame.width;
+      const canvas = new OffscreenCanvas(width, Math.max(1, Math.round(frame.height * scale)));
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context || !widgets.length) return;
+      let drawn = false;
       // A colour fill, then the photos over it, each as opaque as it has faded in so far.
       const fill = document.querySelector<HTMLElement>('.fill');
       if (fill) {
@@ -177,24 +196,107 @@ export class LockScreen {
         const fit = Math.max(box.width / img.naturalWidth, box.height / img.naturalHeight);
         const [w, h] = [img.naturalWidth * fit, img.naturalHeight * fit];
         context.globalAlpha = opacity;
-        context.drawImage(img, (box.left + (box.width - w) / 2) * scale, (box.top + (box.height - h) / 2) * scale, w * scale, h * scale);
+        context.drawImage(img, (box.left - frame.left + (box.width - w) / 2) * scale, (box.top - frame.top + (box.height - h) / 2) * scale, w * scale, h * scale);
         context.globalAlpha = 1;
         drawn = true;
       }
+      if (!drawn) {
+        this.clear(widgets);
+        return;
+      }
+      await this.invert(context, canvas);
+      document.documentElement.style.setProperty('--inverse-size', `${frame.width}px ${frame.height}px`);
       for (const widget of widgets) {
-        const backdrop = drawn ? backdropOf(context, extent(widget), scale) : null;
+        const backdrop = backdropOf(context, within(extent(widget), frame), scale);
         if (!backdrop) {
-          widget.style.removeProperty('--ink');
+          this.clear([widget]);
           continue;
         }
-        widget.style.setProperty('--ink', css(inkOver(backdrop, widget.className.startsWith('hd-photo__') ? MIN_CONTRAST_SMALL : undefined)));
+        const box = widget.getBoundingClientRect();
+        widget.style.setProperty('--ink', css(inkOver(backdrop)));
+        // The inverse is as large as the frame, so its place behind this widget is the widget's place in the frame.
+        widget.style.setProperty('--bx', `${frame.left - box.left}px`);
+        widget.style.setProperty('--by', `${frame.top - box.top}px`);
+        widget.classList.add('hd-ink');
+        for (const icon of widget.querySelectorAll<SVGElement>('svg')) {
+          const at = icon.getBoundingClientRect();
+          icon.style.setProperty('--ink', css(inkOver(backdrop)));
+          icon.style.setProperty('--mask', this.mask(icon));
+          icon.style.setProperty('--bx', `${frame.left - at.left}px`);
+          icon.style.setProperty('--by', `${frame.top - at.top}px`);
+          icon.classList.add('hd-ink-icon');
+        }
       }
     } catch {
       // A picture the browser won't let it read: the type stays white.
-      for (const widget of widgets) {
-        widget.style.removeProperty('--ink');
-      }
+      this.clear(widgets);
+    } finally {
+      this.busy = false;
     }
+  }
+
+  private readonly masks = new WeakMap<SVGElement, { key: string; mask: string }>();
+
+  /** An icon's own drawing, in black, as an image a mask can be made of. */
+  private mask(icon: SVGElement): string {
+    const key = icon.innerHTML + getComputedStyle(icon).strokeWidth;
+    const known = this.masks.get(icon);
+    if (known?.key === key) return known.mask;
+    const copy = icon.cloneNode(true) as SVGElement;
+    for (const name of ['class', 'style', 'width', 'height']) copy.removeAttribute(name);
+    copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    copy.setAttribute('viewBox', icon.getAttribute('viewBox') ?? '0 0 24 24');
+    copy.setAttribute('fill', 'none');
+    copy.setAttribute('stroke', '#000');
+    copy.setAttribute('stroke-width', getComputedStyle(icon).strokeWidth);
+    copy.setAttribute('stroke-linecap', 'round');
+    copy.setAttribute('stroke-linejoin', 'round');
+    const mask = `url("data:image/svg+xml,${encodeURIComponent(new XMLSerializer().serializeToString(copy))}")`;
+    this.masks.set(icon, { key, mask });
+    return mask;
+  }
+
+  private clear(widgets: HTMLElement[]) {
+    for (const widget of widgets) {
+      widget.style.removeProperty('--ink');
+      widget.classList.remove('hd-ink');
+      widget.querySelectorAll('svg').forEach((icon) => icon.classList.remove('hd-ink-icon'));
+    }
+  }
+
+  /**
+   * The picture, blurred and then as OKLab inverts it, colour by colour (light for dark, the opposite hue), as an image the size of the
+   * screen. It is made again only when the picture has changed, and shown only once it can be drawn.
+   */
+  private async invert(context: OffscreenCanvasRenderingContext2D, canvas: OffscreenCanvas) {
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    if (this.previous?.length === data.length && this.previous.every((v, i) => v === data[i])) return;
+    // The picture is blurred first, and inverted after: a letter over a ridge of dark against light takes the inverse of
+    // their mean, a colour that is then pushed light or dark, not the mean of two inverses, which is a grey. The colour
+    // comes from a heavy blur, so that it changes slowly along a line of type; what is light and what is dark from a
+    // light one, so that it stays where the picture is, and does not smear far from a dark edge.
+    const soft = blurred(canvas, INVERSE_BLUR);
+    const near = blurred(canvas, NEAR_BLUR);
+    if (!soft || !near) return;
+    const out = new ImageData(canvas.width, canvas.height);
+    const known = new Map<number, Rgb>();
+    for (let i = 0; i < soft.length; i += 4) {
+      // 5 bits of each channel tell colours apart well enough, and spare working most of them out again.
+      const key = ((soft[i] >> 3) << 25) | ((soft[i + 1] >> 3) << 20) | ((soft[i + 2] >> 3) << 15) | ((near[i] >> 3) << 10) | ((near[i + 1] >> 3) << 5) | (near[i + 2] >> 3);
+      let inverse = known.get(key);
+      if (!inverse) known.set(key, (inverse = inverseOf([soft[i], soft[i + 1], soft[i + 2]], [near[i], near[i + 1], near[i + 2]])));
+      out.data.set([inverse[0], inverse[1], inverse[2], 255], i);
+    }
+    const target = new OffscreenCanvas(canvas.width, canvas.height);
+    target.getContext('2d')?.putImageData(out, 0, 0);
+    const url = URL.createObjectURL(await target.convertToBlob());
+    const picture = new Image();
+    picture.src = url;
+    await picture.decode();
+    document.documentElement.style.setProperty('--inverse', `url("${url}")`);
+    if (this.image) URL.revokeObjectURL(this.image);
+    this.image = url;
+    this.previous = data;
   }
 
   // The widgets shown now: not the hidden ones, and those with a rule only while HomeyDash says it holds. One whose
@@ -265,6 +367,32 @@ export class LockScreen {
     const look = weatherLook(weather.state);
     return { kind: 'weather', temperature: `${Math.round(weather.temperature)}°`, state: look.label, icon: look.icon };
   }
+}
+
+// How far the picture is blurred for the lightness of the inverse, in the same pixels.
+const NEAR_BLUR = 3;
+
+// How far the inverse picture is blurred, in pixels of its 240-wide size: about 6% of the screen's width.
+const INVERSE_BLUR = 14;
+
+// A copy of the canvas, blurred. It is set on a larger canvas, at its own size, over a stretched copy of itself, so that its
+// edges blur into more of itself rather than into nothing, and nothing in it is moved.
+function blurred(canvas: OffscreenCanvas, radius: number): Uint8ClampedArray | null {
+  const margin = 3 * radius;
+  const padded = new OffscreenCanvas(canvas.width + 2 * margin, canvas.height + 2 * margin);
+  const paint = padded.getContext('2d');
+  paint?.drawImage(canvas, 0, 0, padded.width, padded.height);
+  paint?.drawImage(canvas, margin, margin);
+  const result = new OffscreenCanvas(canvas.width, canvas.height).getContext('2d', { willReadFrequently: true });
+  if (!result) return null;
+  result.filter = `blur(${radius}px)`;
+  result.drawImage(padded, -margin, -margin);
+  return result.getImageData(0, 0, canvas.width, canvas.height).data;
+}
+
+// A rectangle as it lies in a frame, with the frame's corner as its origin.
+function within(rect: DOMRect, frame: DOMRect): DOMRect {
+  return new DOMRect(rect.x - frame.x, rect.y - frame.y, rect.width, rect.height);
 }
 
 // How visible an element is: its own opacity times that of everything around it.
