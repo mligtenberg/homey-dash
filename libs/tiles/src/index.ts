@@ -5,6 +5,7 @@ export * from './lib/tile-host';
 export * from './lib/core/core-tiles';
 export * from './lib/plex/plex-tiles';
 export * from './lib/weather/weather-tiles';
+export * from './lib/news/news-tiles';
 export * from './lib/traffic/traffic-tiles';
 export * from './lib/time/time-tiles';
 export * from './lib/energy/energy-tiles';

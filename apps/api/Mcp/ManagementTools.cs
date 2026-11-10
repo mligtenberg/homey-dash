@@ -58,6 +58,9 @@ public sealed class ManagementTools(
           settings.target is null and settings.route is { "name", "origin": { "name", "latitude", "longitude" },
           "destination": { same } } in degrees (places are found by name in Management). settings.account picks the TomTom
           account (the oldest without it). Needs a TomTom account set up in Management.
+        - "news" (small, wide, full, large, full-large): the latest headlines from NOS; small and wide show the newest, larger
+          sizes more. It points at nothing in Homey: settings.target is null. Optional settings.source is nos (default),
+          nos-binnenland, nos-buitenland, nos-economie, nos-sport or nos-tech.
         - "clock" (small, wide, full, large, full-large): the time, with the date from wide up; settings.target is null.
           Optional settings.style is digital (default) or analog, settings.hours 12 or 24 (absent: the display's language),
           settings.seconds true to show seconds, settings.showDate false to hide the date.

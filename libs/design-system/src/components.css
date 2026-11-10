@@ -1511,6 +1511,21 @@ a.hd-btn { text-decoration: none; }
 .hd-traffic[data-size="wide"] .hd-traffic__now .hd-value, .hd-traffic[data-size="full"] .hd-traffic__now .hd-value { font-size: calc(var(--cell) * .28); }
 .hd-traffic[data-size="large"] .hd-traffic__now .hd-value, .hd-traffic[data-size="full-large"] .hd-traffic__now .hd-value { font-size: calc(var(--cell) * .5); }
 .hd-traffic[data-size="large"] .hd-traffic__value, .hd-traffic[data-size="full-large"] .hd-traffic__value { font-size: max(var(--t-sub-min), calc(var(--cell) * var(--t-sub))); }
+
+/* News tile (ADR-0016): the latest headlines. The icon is the chip; the headlines are the subject, each with how long ago it came. */
+.hd-news { display: grid; gap: calc(var(--cell) * .06); grid-template: "chip" auto "list" 1fr "name" auto / minmax(0, 1fr); }
+.hd-news .hd-row { grid-area: chip; }
+.hd-news__list { grid-area: list; align-self: center; min-width: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: calc(var(--cell) * .08); }
+.hd-news > .hd-tile__name { grid-area: name; }
+.hd-news__item { display: flex; flex-direction: column; min-width: 0; }
+.hd-news__title { font-size: max(var(--t-name-min), calc(var(--cell) * var(--t-name))); font-weight: 700; line-height: 1.15; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.hd-news__age { font-size: max(var(--t-caption-min), calc(var(--cell) * var(--t-caption))); font-weight: 600; color: var(--ink-muted); }
+/* One cell high, there is only room beside the icon: the headline takes two lines and the age goes. */
+.hd-news[data-size="small"] .hd-news__title, .hd-news[data-size="wide"] .hd-news__title, .hd-news[data-size="full"] .hd-news__title { -webkit-line-clamp: 2; }
+.hd-news[data-size="small"] .hd-news__age, .hd-news[data-size="wide"] .hd-news__age, .hd-news[data-size="full"] .hd-news__age { display: none; }
+.hd-news[data-size="full"] .hd-news__list { flex-direction: row; gap: calc(var(--cell) * .2); }
+.hd-news[data-size="full"] .hd-news__item { flex: 1; }
+.hd-news[data-size="large"] .hd-news__title, .hd-news[data-size="full-large"] .hd-news__title { -webkit-line-clamp: 2; font-size: max(var(--t-sub-min), calc(var(--cell) * var(--t-sub))); }
 /*
  * Clock and date: tiles that point at nothing, in the neutral hue. The clock centres the time, digital at a size that fits
  * the cell (smaller while the seconds show) or an analog dial, with the date under it, or beside the dial on the wide sizes.
