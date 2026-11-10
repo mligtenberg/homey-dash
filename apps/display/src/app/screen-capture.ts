@@ -16,10 +16,19 @@ export class ScreenCapture {
   }
 
   private async take(requestId: string) {
+    // The lock screen cuts its type and icons out of a picture (transparent colour, background-clip: text, masks), which
+    // the picture-drawing cannot reproduce: the type vanishes. For the moment of the capture they are plain --ink instead.
+    const plain = document.createElement('style');
+    plain.textContent = `
+      :is(.hd-ink, .hd-ink-icon) { color: var(--ink, #fff) !important; background: none !important; filter: none !important;
+        -webkit-background-clip: border-box !important; background-clip: border-box !important; }
+      .hd-ink-icon { -webkit-mask: none !important; mask: none !important; fill: var(--ink, #fff); stroke: var(--ink, #fff); }
+    `;
     try {
       // Loaded when first asked, as most screens never are.
       const { toJpeg } = await import('html-to-image');
       const page = document.documentElement;
+      document.head.appendChild(plain);
       const url = await toJpeg(page, {
         quality: 0.8,
         width: window.innerWidth,
@@ -31,6 +40,8 @@ export class ScreenCapture {
       await new Promise<void>((done, fail) => this.api.sendScreenshot(requestId, picture).subscribe({ next: () => done(), error: fail }));
     } catch {
       // Management gives up waiting and says so.
+    } finally {
+      plain.remove();
     }
   }
 }
