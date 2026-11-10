@@ -3,6 +3,7 @@ export * from './lib/accounts';
 export * from './lib/photos';
 export * from './lib/plex';
 export * from './lib/weather';
+export * from './lib/news';
 export * from './lib/traffic';
 export * from './lib/airplay';
 export * from './lib/dashboards';

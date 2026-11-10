@@ -7,6 +7,7 @@ using HomeyDash.Api.Homey;
 using HomeyDash.Api.Photos;
 using HomeyDash.Api.Plex;
 using HomeyDash.Api.Rules;
+using HomeyDash.Api.News;
 using HomeyDash.Api.Traffic;
 using HomeyDash.Api.Weather;
 using Microsoft.AspNetCore.SignalR;
@@ -49,6 +50,7 @@ public sealed class RealtimeHub(
     AppCatalog appCatalog,
     WeatherWatcher weather,
     TrafficWatcher traffic,
+    NewsWatcher news,
     TimeProvider time) : Hub
 {
     public const string Path = "/api/realtime";
@@ -68,6 +70,9 @@ public sealed class RealtimeHub(
 
     // The traffic of every route in use (ADR-0015). Changes that follow arrive as Traffic.
     public IReadOnlyList<RouteTraffic> Traffic() => traffic.All;
+
+    // The latest stories of every news source in use (ADR-0016). Changes that follow arrive as News.
+    public IReadOnlyList<NewsFeed> News() => news.All;
 
     // Items of the account's Plex libraries (one, or every one when libraryId is null) whose title matches, not only the newest:
     // movies, shows and albums, and episodes and tracks by their own title.
