@@ -116,9 +116,11 @@ export function inkOver(backdrop: Backdrop, minContrast = MIN_CONTRAST): Rgb {
     if (worst(ink, backdrop) > worst(best, backdrop)) best = ink;
   }
   if (worst(best, backdrop) >= minContrast) return best;
-  // No colour reads on all of it: it reads on most of it.
-  const mostly: Backdrop = { average: backdrop.average, lightest: backdrop.average, darkest: backdrop.average };
-  return against(backdrop.average, mostly, minContrast) ?? first;
+  // No colour reads on all of it, so it reads as well as it can on most of it: as far from the average as the
+  // opposite hue allows, light or dark. A grey that only just clears the floor is the one that reads worst.
+  const [, a2, b2] = inverse(backdrop.average);
+  const candidates = [0.97, 0.08].map((lightness) => fit([lightness, a2, b2]));
+  return candidates.reduce((x, y) => (contrast(y, backdrop.average) > contrast(x, backdrop.average) ? y : x));
 }
 
 export function css([r, g, b]: Rgb): string {
