@@ -18,6 +18,7 @@ import { fittedCellSize } from '@homey-dash/layout';
 import { DashboardView, homeyLost, PhotoTile, ruleAnswersOf, TileData, TileKindRegistry } from '@homey-dash/tiles';
 import { screenId, safeStorage } from './screen-id';
 import { BRIGHTNESS_MS, LightMeter } from './light-meter';
+import { Theme, themeFor } from './auto-theme';
 import { KioskScreen } from './kiosk-screen';
 import { LockScreen } from './lock-screen';
 import { ScreenSettings } from './screen-settings';
@@ -330,6 +331,9 @@ export class App {
 
   // From when it first is a display, a screen measures the light falling on it now and every while after, for rules on
   // its brightness; never during setup, and no more once it has no way to measure or is refused, until a camera is picked.
+  // The theme the room's light last asked for; null until measured, when the device's own preference applies.
+  private theme: Theme | null = null;
+
   private async measureLight() {
     if (this.measuring) return;
     if (this.state().kind === 'display' && this.realtime.connected()) {
@@ -337,6 +341,8 @@ export class App {
       try {
         const lux = await this.lightMeter.measure();
         if (lux === null) return;
+        this.theme = themeFor(lux, this.theme);
+        document.documentElement.dataset['theme'] = this.theme;
         await this.realtime.brightness(lux);
         // The first reading says whether a sensor or the camera measured it.
         const source = this.lightMeter.reading()?.source ?? null;
