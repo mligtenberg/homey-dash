@@ -94,7 +94,7 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
     /* Over a photo, the bottom spots stay above the caption line along its bottom (styled in the app, to the same margins): when and where it was taken, and who. */
     :host(.over-photo) { padding-bottom: calc(var(--edge) + 7vh); }
     .spot { position: relative; display: flex; flex-direction: column; gap: calc(3 * var(--u)); animation: spot-in .9s cubic-bezier(.2, .7, .2, 1) backwards; }
-    .clock, .weather, .traffic, .value {
+    .clock, .weather, .traffic, .value, .news {
       color: var(--ink, #fff); text-shadow: 0 0 calc(1.2 * var(--u)) var(--halo, rgb(0 0 0 / .35));
       transition: color .8s ease, text-shadow .8s ease;
     }
@@ -154,7 +154,7 @@ export class LockScreen {
   /** Sets the type colour of each widget, and of the photo's caption, from the average colour of the picture or fill directly behind it. */
   private ink() {
     const widgets = [
-      ...this.host.querySelectorAll<HTMLElement>('.clock, .weather, .traffic, .value'),
+      ...this.host.querySelectorAll<HTMLElement>('.clock, .weather, .traffic, .value, .news'),
       ...document.querySelectorAll<HTMLElement>('.slideshow :is(.hd-photo__label, .hd-photo__about, .hd-photo__people)'),
     ];
     const scale = 160 / window.innerWidth;
