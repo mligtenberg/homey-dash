@@ -241,7 +241,8 @@ public sealed class ManagementTools(
         "signal" }, whose signal is a Homey capability signal (homey:<account>:capability:<device>:<capability>, see
         list_signals), or the car travel time on a route from TomTom, { "kind": "traffic", "spot", "route": { "name",
         "origin": { "name", "latitude", "longitude" }, "destination": { same } }, "account"? } (the TomTom account's id,
-        or the oldest without it; needs a TomTom account set up in Management). A widget of any kind with "hidden": true
+        or the oldest without it; needs a TomTom account set up in Management), or the newest NOS headline, { "kind": "news",
+        "spot", "source"? } (nos, nos-binnenland, nos-buitenland, nos-economie, nos-sport or nos-tech; nos without it). A widget of any kind with "hidden": true
         stays configured but is left out; one with a "rule" is shown only while it holds. Replaces the display's lock
         screen as a whole.
         {{RuleSchema}}

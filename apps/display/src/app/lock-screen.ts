@@ -1,15 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { capabilitySignal, HomeyWeather, LOCK_SPOTS, LockWidget, Rule } from '@homey-dash/api-client';
-import { capabilityText, delayLevel, delayText, duration, ruleAnswersOf, TileData, TrafficData } from '@homey-dash/tiles';
+import { ago, capabilityText, delayLevel, delayText, duration, NewsData, ruleAnswersOf, TileData, TrafficData } from '@homey-dash/tiles';
 import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
-import { LucideCar, LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideSun, minuteClock } from '@homey-dash/design-system';
+import { LucideCar, LucideNewspaper, LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideSun, minuteClock } from '@homey-dash/design-system';
 
 /** What a widget shows now; a weather Homey hasn't told, or a value whose device is gone, shows nothing. */
 type Shown =
   | { kind: 'clock'; time: string; date: string }
   | { kind: 'weather'; temperature: string; state: string; icon: LucideIconInput }
   | { kind: 'value'; name: string; value: string; units: string; unavailable: boolean }
-  | { kind: 'traffic'; name: string; time: string; delay: string; level: 'none' | 'some' | 'heavy'; unavailable: boolean };
+  | { kind: 'traffic'; name: string; time: string; delay: string; level: 'none' | 'some' | 'heavy'; unavailable: boolean }
+  | { kind: 'news'; headline: string; name: string; age: string; unavailable: boolean };
 
 // Homey's conditions, after OpenWeatherMap's main groups, by the start of the word.
 const WEATHER: [RegExp, LucideIconInput, string][] = [
@@ -58,6 +59,13 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
                 <svg class="traffic__icon" [lucideIcon]="car" />
                 <span class="traffic__time">{{ widget.time }}</span>
                 <span class="traffic__name">{{ widget.name }} · {{ widget.delay }}</span>
+              </div>
+            }
+            @case ('news') {
+              <div class="news" role="group" [class.is-unavailable]="widget.unavailable" [attr.aria-label]="widget.name + ': ' + widget.headline">
+                <svg class="news__icon" [lucideIcon]="newspaper" />
+                <span class="news__headline">{{ widget.headline }}</span>
+                <span class="news__name">{{ widget.name }} · {{ widget.age }}</span>
               </div>
             }
             @case ('value') {
@@ -111,6 +119,12 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
     .weather__state, .traffic__name, .value__name { grid-column: 1 / -1; font-size: max(var(--text-floor), calc(1.9 * var(--u))); font-weight: 500; letter-spacing: .01em; opacity: .82; white-space: nowrap; margin-top: calc(.7 * var(--u)); }
     .traffic[data-delay='some'] .traffic__time, .traffic[data-delay='some'] .traffic__icon { color: var(--lock-warn); }
     .traffic[data-delay='heavy'] .traffic__time, .traffic[data-delay='heavy'] .traffic__icon { color: var(--lock-danger); }
+    /* A headline is a sentence, not a reading: it wraps at a comfortable measure, never running into the middle of the screen. */
+    .news { display: grid; grid-template-columns: auto minmax(0, calc(52 * var(--u))); column-gap: calc(1.2 * var(--u)); align-items: start; }
+    .spot--center .news { justify-content: center; text-align: left; }
+    .news__icon { width: calc(3.2 * var(--u)); height: calc(3.2 * var(--u)); stroke-width: 1.6; margin-top: calc(.4 * var(--u)); }
+    .news__headline { font-size: calc(3 * var(--u)); font-weight: 500; line-height: 1.2; letter-spacing: -.01em; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+    .news__name { grid-column: 2; font-size: max(var(--text-floor), calc(1.9 * var(--u))); font-weight: 500; letter-spacing: .01em; opacity: .82; margin-top: calc(.7 * var(--u)); }
     .value { display: flex; flex-direction: column; }
     .value__units { font-size: .5em; font-weight: 500; margin-left: .15em; opacity: .85; }
     .value__name { margin-top: calc(.7 * var(--u)); }
@@ -122,7 +136,9 @@ export class LockScreen {
 
   private readonly data = inject(TileData);
   private readonly traffic = inject(TrafficData);
+  private readonly news = inject(NewsData);
   protected readonly car = LucideCar;
+  protected readonly newspaper = LucideNewspaper;
   // Ticks on every minute, for the clock.
   private readonly now = minuteClock();
 
@@ -167,6 +183,13 @@ export class LockScreen {
           level: delayLevel(result.delaySeconds, result.usualSeconds),
           unavailable: result.status === 'disconnected',
         };
+      }
+      case 'news': {
+        // Nothing to show until the feed has been read once.
+        const feed = this.news.feed(widget.source);
+        const item = feed?.items[0];
+        if (!feed || !item) return null;
+        return { kind: 'news', headline: item.title, name: feed.name, age: ago(item.publishedAt, this.now().getTime()), unavailable: feed.status === 'disconnected' };
       }
       case 'value': {
         const named = capabilitySignal(widget.signal);

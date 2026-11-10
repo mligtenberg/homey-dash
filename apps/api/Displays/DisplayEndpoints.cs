@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using HomeyDash.Api.Data;
+using HomeyDash.Api.News;
 using HomeyDash.Api.Realtime;
 using HomeyDash.Api.Rules;
 using Microsoft.EntityFrameworkCore;
@@ -210,6 +211,13 @@ public static partial class DisplayEndpoints
             }
             else if (widget.Route is not null)
                 errors[$"widgets[{i}].route"] = ["Only traffic shows a route."];
+            if (widget.Kind == "news")
+            {
+                if (NewsSource.Find(widget.Source) is null)
+                    errors[$"widgets[{i}].source"] = [$"News is from one of {string.Join(", ", NewsSource.All.Select(s => s.Id))}."];
+            }
+            else if (widget.Source is not null)
+                errors[$"widgets[{i}].source"] = ["Only news names a source."];
             if (widget.Rule is { ValueKind: not JsonValueKind.Null } rule && RuleSetup.Check(rule, engine).Error is { } error)
                 errors[$"widgets[{i}].rule"] = [error];
         }
