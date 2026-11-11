@@ -208,6 +208,13 @@ public sealed class FakePlex(TimeProvider time) : IPlex
             [new PlexTrack("1", "English (AC3 5.1)", true), new PlexTrack("2", "Nederlands (AAC Stereo)", false), new PlexTrack("3", "Japanese (DTS-HD MA 7.1)", false)],
             [new PlexTrack("11", "English (SRT)", false), new PlexTrack("12", "Nederlands (SRT)", false), new PlexTrack("13", "English (PGS)", false)]));
 
+    public async Task<PlexPerson> PersonAsync(PlexConnection server, PlexActor actor, CancellationToken ct)
+    {
+        // Ada Lovelace and Grace Hopper are in every film and series that lists them.
+        var works = (await CatalogAsync(ct)).Select(c => c.Item).Where(i => i.Cast.Any(a => a.Name == actor.Name)).ToList();
+        return new PlexPerson(actor.Name, actor.Image, $"{actor.Name} appears in {works.Count} titles.", "10 December 1815", "27 November 1852 (aged 36)", "London, England", "Actor, Producer", works);
+    }
+
     public async Task<PlexItem?> ItemAsync(PlexConnection server, string itemId, CancellationToken ct) =>
         (await CatalogAsync(ct)).Select(c => c.Item).FirstOrDefault(i => i.Id == itemId);
 

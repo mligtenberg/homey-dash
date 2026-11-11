@@ -109,7 +109,12 @@ public sealed record PlexItem(string Id, string Kind, string Title, string? Subt
 }
 
 // An actor of a film or show: Image is a picture path or Plex's own https://metadata-static.plex.tv one, for /api/plex/image.
-public sealed record PlexActor(string Name, string? Role, string? Image);
+// Id is the server's tag for the person, which finds their other work on it; Key is plex.tv's, which finds their biography.
+public sealed record PlexActor(string Name, string? Role, string? Image, string? Id = null, string? Key = null);
+
+// A person from the cast and what the server holds of their work: Bio, Born ("10 March 1992 (34 years)"), Died ("11 August 2014 (aged 63)"), Place of birth and Roles ("Actor, Producer") are plex.tv's, when it knows them; Works are the films and
+// series on this server they appear in, newest first.
+public sealed record PlexPerson(string Name, string? Image, string? Bio, string? Born, string? Died, string? Place, string? Roles, IReadOnlyList<PlexItem> Works);
 
 // An audio or subtitle track of an item. Label says language, format and channels (English (AC3 5.1)); Selected is the one
 // Plex plays when asked for none in particular.
@@ -176,6 +181,9 @@ public interface IPlex
 
     // The audio and subtitle tracks of an item's first media.
     Task<PlexTracks> TracksAsync(PlexConnection server, string itemId, CancellationToken ct);
+
+    // A person from an item's cast: their biography (when plex.tv has one) and the films and series of the server they are in.
+    Task<PlexPerson> PersonAsync(PlexConnection server, PlexActor actor, CancellationToken ct);
 
     // One item by its id, or null when the server no longer has it.
     Task<PlexItem?> ItemAsync(PlexConnection server, string itemId, CancellationToken ct);

@@ -4,7 +4,7 @@ import { AirPlayInfo, AirPlayPlayback } from './airplay';
 import { DashboardSummary } from './dashboards';
 import { DisplayInfo, ScreenDetails, ScreenView } from './displays';
 import { PhotoSet } from './photos';
-import { PlexActor, PlexCommand, PlexItem, PlexOverview, PlexPage, PlexProfileList, PlexSession, PlexSnapshot, PlexTracks } from './plex';
+import { PlexActor, PlexCommand, PlexItem, PlexOverview, PlexPage, PlexPerson, PlexProfileList, PlexSession, PlexSnapshot, PlexTracks } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
 import { NewsFeed } from './news';
 import { RouteTraffic } from './traffic';
@@ -192,6 +192,11 @@ export class Realtime {
   /** The actors of a Plex item with their pictures, which a list of items doesn't carry. */
   plexCast(accountId: number, itemId: string) {
     return this.hub.invoke<PlexActor[]>('PlexCast', accountId, itemId);
+  }
+
+  /** A person from a cast: their biography and the films and series of the server they are in. */
+  plexPerson(accountId: number, actor: PlexActor) {
+    return this.hub.invoke<PlexPerson>('PlexPerson', accountId, actor);
   }
 
   /** The profiles of the Plex Home an account belongs to; none when it has no home. */

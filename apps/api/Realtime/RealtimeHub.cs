@@ -138,6 +138,20 @@ public sealed class RealtimeHub(
         }
     }
 
+    // A person from the cast of an item: the biography and the films and series of this server they are in.
+    public async Task<PlexPerson> PlexPerson(int accountId, PlexActor actor)
+    {
+        if (plexAccounts.Find(accountId)?.Connection is not { } server) throw new HubException("Sign in with Plex under Accounts first.");
+        try
+        {
+            return await plex.PersonAsync(server, actor, Context.ConnectionAborted);
+        }
+        catch (PlexException e)
+        {
+            throw new HubException(e.Message);
+        }
+    }
+
     // Plays or pauses what plays on one of the account's players, or skips; the player must allow remote control.
     public async Task ControlPlex(int accountId, string playerId, PlexCommand command)
     {

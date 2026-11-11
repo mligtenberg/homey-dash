@@ -200,6 +200,56 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
         return Metadata(json).Select(ToItem).FirstOrDefault();
     }
 
+    public async Task<PlexPerson> PersonAsync(PlexConnection server, PlexActor actor, CancellationToken ct)
+    {
+        var works = new List<PlexItem>();
+        if (actor.Id is { Length: > 0 } id)
+        {
+            var sections = (await ServerAsync(server, HttpMethod.Get, "/library/sections", ct)).GetProperty("MediaContainer");
+            foreach (var section in sections.TryGetProperty("Directory", out var d) ? d.EnumerateArray() : [])
+            {
+                if (Str(section, "type") is not ("movie" or "show")) continue;
+                var json = await ServerAsync(server, HttpMethod.Get,
+                    $"/library/sections/{Uri.EscapeDataString(Str(section, "key")!)}/all?actor={Uri.EscapeDataString(id)}&sort=year:desc&X-Plex-Container-Start=0&X-Plex-Container-Size=100", ct);
+                works.AddRange(Metadata(json).Select(ToItem));
+            }
+        }
+        string? bio = null, born = null, died = null, place = null, roles = null;
+        // plex.tv knows the person's biography. It is a nicety: without it, or without its answer, the works still show.
+        if (actor.Key is { Length: > 0 } key)
+        {
+            try
+            {
+                var json = await SendAsync(HttpMethod.Get, $"https://discover.provider.plex.tv/library/people/{Uri.EscapeDataString(key)}", server.ClientId, server.Token, ct);
+                if (Metadata(json).FirstOrDefault() is { ValueKind: JsonValueKind.Object } p)
+                {
+                    bio = Str(p, "summary") is { Length: > 0 } summary ? summary.Trim() : null;
+                    var bornOn = Day(Str(p, "bornAt"));
+                    var diedOn = Day(Str(p, "diedAt"));
+                    born = bornOn is { } b ? $"{Written(b)}{(diedOn is null ? $" ({Age(b, time.GetUtcNow())} years)" : "")}" : null;
+                    died = diedOn is { } d ? $"{Written(d)}{(bornOn is { } b2 ? $" (aged {Age(b2, d)})" : "")}" : null;
+                    place = Str(p, "birthPlace") is { Length: > 0 } birthPlace ? birthPlace : null;
+                    roles = p.TryGetProperty("CreditType", out var credits) && credits.ValueKind == JsonValueKind.Array
+                        ? string.Join(", ", credits.EnumerateArray().Select(c => Str(c, "title")).OfType<string>()) is { Length: > 0 } list ? list : null
+                        : null;
+                }
+            }
+            catch (PlexException)
+            {
+            }
+        }
+        return new PlexPerson(actor.Name, actor.Image, bio, born, died, place, roles, works.DistinctBy(w => w.Id).OrderByDescending(w => w.Year ?? 0).ToList());
+    }
+
+    private static DateOnly? Day(string? date) =>
+        DateOnly.TryParse(date, System.Globalization.CultureInfo.InvariantCulture, out var day) ? day : null;
+
+    private static string Written(DateOnly day) => day.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static int Age(DateOnly born, DateOnly on) => on.Year - born.Year - (on < born.AddYears(on.Year - born.Year) ? 1 : 0);
+
+    private static int Age(DateOnly born, DateTimeOffset now) => Age(born, DateOnly.FromDateTime(now.UtcDateTime));
+
     public async Task<PlexTracks> TracksAsync(PlexConnection server, string itemId, CancellationToken ct)
     {
         var json = await ServerAsync(server, HttpMethod.Get, $"/library/metadata/{Uri.EscapeDataString(itemId)}", ct);
@@ -260,7 +310,7 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
             ? genres.EnumerateArray().Select(g => Str(g, "tag")).OfType<string>().Take(3).ToList()
             : [],
         Cast = m.TryGetProperty("Role", out var roles) && roles.ValueKind == JsonValueKind.Array
-            ? roles.EnumerateArray().Select(r => Str(r, "tag") is { Length: > 0 } name ? new PlexActor(name, Str(r, "role"), Str(r, "thumb")) : null).OfType<PlexActor>().Take(40).ToList()
+            ? roles.EnumerateArray().Select(r => Str(r, "tag") is { Length: > 0 } name ? new PlexActor(name, Str(r, "role"), Str(r, "thumb"), Str(r, "id"), Str(r, "tagKey")) : null).OfType<PlexActor>().Take(40).ToList()
             : [],
         Art = Str(m, "grandparentArt") ?? Str(m, "art"),
         Watched = Str(m, "type") switch

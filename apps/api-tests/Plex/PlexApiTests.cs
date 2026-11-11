@@ -53,6 +53,18 @@ public sealed class PlexApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Person_ListsTheWorkOnTheServerThatTheyAreIn()
+    {
+        var hub = await ConnectAsync();
+
+        var person = await hub.InvokeAsync<JsonElement>("PlexPerson", 1, new { name = "Ada Lovelace", role = "The Engineer", image = null as string });
+
+        Assert.Equal("Ada Lovelace", person.GetProperty("name").GetString());
+        Assert.Contains("Dune: Part Two", person.GetProperty("works").EnumerateArray().Select(w => w.GetProperty("title").GetString()));
+        await Assert.ThrowsAsync<HubException>(() => hub.InvokeAsync<JsonElement>("PlexPerson", 2, new { name = "Ada Lovelace" }));
+    }
+
+    [Fact]
     public async Task Profiles_ListTheHome_AndSwitchingNamesTheProfileInTheSnapshot()
     {
         var hub = await ConnectAsync();

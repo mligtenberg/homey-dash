@@ -13,6 +13,7 @@ import {
   PhotoSet,
   PlexCommand,
   PlexActor,
+  PlexPerson,
   PlexItem,
   PlexSnapshot,
   PlexProfileList,
@@ -166,6 +167,14 @@ export class FakeRealtime implements Partial<Realtime> {
   async plexCast(accountId: number, itemId: string) {
     this.commands.push(['plexCast', accountId, itemId]);
     return this.plexCastList;
+  }
+
+  /** What any person is found to be and to have worked on, whoever is asked. */
+  plexPersonResult: PlexPerson = { name: 'Ada Lovelace', image: null, bio: null, born: null, died: null, place: null, roles: null, works: [] };
+
+  async plexPerson(accountId: number, actor: PlexActor) {
+    this.commands.push(['plexPerson', accountId, actor.name]);
+    return this.plexPersonResult;
   }
 
   /** The profiles of the Plex Home, as an account first asks for them. */

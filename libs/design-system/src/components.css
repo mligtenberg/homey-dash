@@ -1216,6 +1216,8 @@ a.hd-btn { text-decoration: none; }
 .hd-plex-recent__certificate { padding: .1em .45em; border: 1.5px solid rgb(255 255 255 / .5); border-radius: .25em; font-size: .85em; }
 .hd-plex-recent__genres { display: flex; flex-wrap: wrap; gap: calc(var(--cell) * .06); }
 .hd-plex-recent__genres span { padding: .35em .9em; border-radius: var(--radius-pill); background: rgb(255 255 255 / .12); font: 700 max(var(--t-caption-min), calc(var(--cell) * var(--t-caption)))/1 var(--font-sans); }
+/* A biography keeps the paragraphs plex.tv gives it. */
+.hd-plex-recent__summary--bio { white-space: pre-line; }
 .hd-plex-recent__summary { margin: calc(var(--cell) * .04) 0 0; max-width: 40em; font-size: max(var(--t-name-min), calc(var(--cell) * var(--t-name))); line-height: 1.5; color: rgb(255 255 255 / .85); }
 @media (max-width: 640px) {
   .hd-plex-recent__detail { grid-template-columns: minmax(0, 1fr); justify-items: center; }
@@ -1232,6 +1234,12 @@ a.hd-btn { text-decoration: none; }
   background: rgb(255 255 255 / .12); color: rgb(255 255 255 / .6); font: 800 calc(var(--cell) * .24)/1 var(--font-sans);
 }
 .hd-plex-recent__face img { width: 100%; height: 100%; object-fit: cover; }
+/* A cast member is pressed to open their page; the button only wraps the portrait and the names. */
+.hd-plex-recent__person { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; border-radius: calc(var(--cell) * .06); }
+.hd-plex-recent__person:active { background: rgb(255 255 255 / .12); }
+.hd-plex-recent__person:focus-visible { outline: 3px solid #e5a00d; outline-offset: 2px; }
+/* The actor's own page: a large portrait where a cover would be. */
+.hd-plex-recent__face--large { width: calc(var(--cell) * 1.6); margin: 0; }
 .hd-plex-recent__seasons { display: grid; gap: calc(var(--cell) * .2) calc(var(--cell) * .14); grid-template-columns: repeat(auto-fill, minmax(calc(var(--cell) * 1.1), 1fr)); }
 .hd-plex-recent__rows { margin: 0; padding: 0; list-style: none; }
 .hd-plex-recent__rows li + li { border-top: 1px solid rgb(255 255 255 / .08); }

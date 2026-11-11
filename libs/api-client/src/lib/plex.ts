@@ -60,6 +60,24 @@ export interface PlexActor {
   name: string;
   role: string | null;
   image: string | null;
+  /** The server's tag for them, and plex.tv's: what `plexPerson` finds their work and biography with. */
+  id?: string | null;
+  key?: string | null;
+}
+
+/** A person from a cast: biography when plex.tv has one, and the films and series of this server they are in, newest first. */
+export interface PlexPerson {
+  name: string;
+  image: string | null;
+  bio: string | null;
+  /** Written out for reading: "10 March 1992 (34 years)", and, when they have died, "11 August 2014 (aged 63)". */
+  born: string | null;
+  died: string | null;
+  /** Where they were born. */
+  place: string | null;
+  /** What they do in films, such as "Actor, Producer". */
+  roles: string | null;
+  works: PlexItem[];
 }
 
 /** An audio or subtitle track of a movie or episode: `label` says language, format and channels. */

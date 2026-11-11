@@ -405,6 +405,31 @@ describe('Plex tiles', () => {
       expect(realtime.commands).toContainEqual(['changeAirPlayTracks', 'tv', '2', '11']);
     });
 
+    it('opens an actor from the cast with their biography and other work on the server', async () => {
+      prepare();
+      realtime.plexCastList = [{ name: 'Ada Lovelace', role: 'The Engineer', image: null, id: '7' }];
+      realtime.plexPersonResult = { name: 'Ada Lovelace', image: null, bio: 'Mathematician.', born: '10 December 1815', died: '27 November 1852 (aged 36)', place: 'London', roles: 'Mathematician', works: [{ ...item(9, '1970-01-01T00:00:00Z'), title: 'Analytical' }] };
+      const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
+      const press = presser(tile);
+      const text = (selector: string) => tile.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim();
+      tile.click();
+      await settle();
+      await press('.hd-plex-recent__card');
+      await settle();
+
+      await press('.hd-plex-recent__person');
+      await settle();
+      expect(realtime.commands).toContainEqual(['plexPerson', 1, 'Ada Lovelace']);
+      expect(text('.hd-plex-recent__headline')).toBe('Ada Lovelace');
+      expect(text('.hd-plex-recent__summary')).toBe('Mathematician.');
+      expect(text('.hd-plex-recent__meta')).toBe('Born 10 December 1815Died 27 November 1852 (aged 36)London');
+      expect(text('.hd-plex-recent__card-title')).toBe('Analytical');
+
+      // Back returns to the cover the actor was opened from.
+      await press('.hd-plex-recent__back');
+      expect(tile.querySelector('.hd-plex-recent__people')).not.toBeNull();
+    });
+
     it('searches the whole library, and what it finds opens like a cover', async () => {
       prepare();
       realtime.plexSearchResults = [{ ...item(9, '1970-01-01T00:00:00Z'), title: 'Older movie', year: 2001 }];

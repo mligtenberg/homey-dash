@@ -6,7 +6,7 @@ import { PlexLocalPlayer } from './plex-local-player';
 import { PlexProfilePicker } from './plex-profile-picker';
 import { PlexTileView } from './plex-tile-view';
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
-import { AirPlayDevice, ALL_PLEX_LIBRARIES, PlexActor, PlexItem, PlexLibrary, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
+import { AirPlayDevice, ALL_PLEX_LIBRARIES, PlexActor, PlexItem, PlexLibrary, PlexPerson, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
 import { cells } from '@homey-dash/layout';
 import { LucideAirplay, LucideCheck, LucideChevronLeft, LucideClapperboard, LucideLibrary, LucideLock, LucidePause, LucidePlay, LucideSquare, LucideTv, LucideStar, LucideVolume2 } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
@@ -46,6 +46,13 @@ interface Cast {
 const IDLE: Cast = { step: 'idle' };
 
 /** What is under a show, season or album: nothing while it loads. */
+/** An actor opened for their biography and the work of theirs this server holds. */
+interface PersonView {
+  actor: PlexActor;
+  person?: PlexPerson;
+  error?: string;
+}
+
 interface Under {
   items?: PlexItem[];
   error?: string;
@@ -119,7 +126,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
           </div>
         </div>
       }
-      @if (!selected() && tabs().length > (browse ? 1 : 2)) {
+      @if (!selected() && !personView() && tabs().length > (browse ? 1 : 2)) {
         <hd-segmented hdDetailsHead label="Show" [options]="tabs()" [value]="activeTab()" (picked)="selectTab($event)" />
       }
       @if (player.play(); as l) {
@@ -140,7 +147,73 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
       @for (p of casting(); track p.deviceId) {
         <hd-plex-airplay-controls [playing]="p" />
       }
-      @if (selected(); as item) {
+      @if (personView(); as view) {
+        <div class="hd-plex-recent__detail hd-plex-recent__detail--person">
+          <button type="button" class="hd-round-btn hd-plex-recent__back" aria-label="Back" (click)="closePerson()">
+            <svg [lucideIcon]="backIcon" />
+          </button>
+          <div class="hd-plex-recent__face hd-plex-recent__face--large">
+            @if (view.person?.image ?? view.actor.image; as image) {
+              <img [src]="faceUrl(image)" alt="" draggable="false" />
+            } @else {
+              {{ initials(view.actor.name) }}
+            }
+          </div>
+          <div class="hd-plex-recent__facts">
+            <div class="hd-plex-recent__added">{{ view.person?.roles || 'Actor' }}</div>
+            <h3 class="hd-plex-recent__headline">{{ view.actor.name }}</h3>
+            @if (view.person; as person) {
+              @if (person.born || person.died || person.place) {
+                <div class="hd-plex-recent__meta">
+                  @if (person.born) {
+                    <span>Born {{ person.born }}</span>
+                  }
+                  @if (person.died) {
+                    <span>Died {{ person.died }}</span>
+                  }
+                  @if (person.place) {
+                    <span>{{ person.place }}</span>
+                  }
+                </div>
+              }
+            }
+            @if (view.person?.bio; as bio) {
+              <p class="hd-plex-recent__summary hd-plex-recent__summary--bio">{{ bio }}</p>
+            }
+          </div>
+          <div class="hd-plex-recent__children">
+            @if (view.error) {
+              <div class="hd-note hd-plex-recent__empty" role="alert">{{ view.error }}</div>
+            } @else if (!view.person) {
+              <div class="hd-note hd-plex-recent__empty">Loading…</div>
+            } @else if (!view.person.works.length) {
+              <div class="hd-note hd-plex-recent__empty">Nothing else by {{ view.actor.name }} on this server</div>
+            } @else {
+              <h4 class="hd-plex-recent__section">Also on your server</h4>
+              <div class="hd-plex-recent__seasons">
+                @for (work of view.person.works; track work.id) {
+                  <button type="button" class="hd-plex-recent__card" (click)="openWork(work)">
+                    <div class="hd-plex-recent__cover">
+                      @if (work.image) {
+                        <img [src]="posterUrl(work.image)" alt="" loading="lazy" draggable="false" />
+                      } @else {
+                        <svg [lucideIcon]="icon" />
+                      }
+                      @if (work.watched) {
+                        <span class="hd-plex-recent__seen" role="img" aria-label="Watched"><svg [lucideIcon]="seenIcon" /></span>
+                      }
+                    </div>
+                    <div class="hd-plex-recent__card-title">{{ work.title }}</div>
+                    @if (work.subtitle) {
+                      <div class="hd-plex-recent__card-sub">{{ work.subtitle }}</div>
+                    }
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      } @else if (selected(); as item) {
         @if (item.art) {
           <img class="hd-plex-recent__backdrop" [src]="artUrl(item.art)" alt="" draggable="false" />
         }
@@ -218,17 +291,19 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
               <ul class="hd-plex-recent__people">
                 @for (person of people; track $index) {
                   <li>
-                    <div class="hd-plex-recent__face">
-                      @if (person.image) {
-                        <img [src]="faceUrl(person.image)" alt="" loading="lazy" draggable="false" />
-                      } @else {
-                        {{ initials(person.name) }}
+                    <button type="button" class="hd-plex-recent__person" (click)="openPerson(person)">
+                      <div class="hd-plex-recent__face">
+                        @if (person.image) {
+                          <img [src]="faceUrl(person.image)" alt="" loading="lazy" draggable="false" />
+                        } @else {
+                          {{ initials(person.name) }}
+                        }
+                      </div>
+                      <div class="hd-plex-recent__card-title">{{ person.name }}</div>
+                      @if (person.role) {
+                        <div class="hd-plex-recent__card-sub">{{ person.role }}</div>
                       }
-                    </div>
-                    <div class="hd-plex-recent__card-title">{{ person.name }}</div>
-                    @if (person.role) {
-                      <div class="hd-plex-recent__card-sub">{{ person.role }}</div>
-                    }
+                    </button>
                   </li>
                 }
               </ul>
@@ -414,6 +489,8 @@ export class RecentlyAddedTile extends PlexTileView {
   /** The actors with their pictures, which Plex gives for the one item and not in a list; until then the list's names. */
   private readonly casts = signal<Record<string, PlexActor[]>>({});
   private readonly cast = signal<Cast>(IDLE);
+  /** The actor opened from a cast, over the cover they were opened from. */
+  protected readonly personView = signal<PersonView | null>(null);
 
   /** What plays on AirPlay now for this account, wherever it was started: its controls stay on show. */
   protected readonly casting = computed(() => this.airPlay.playing().filter((p) => p.source !== 'nos' && p.accountId === this.accountId()));
@@ -671,6 +748,26 @@ export class RecentlyAddedTile extends PlexTileView {
     }
   }
 
+  protected async openPerson(actor: PlexActor) {
+    this.personView.set({ actor });
+    try {
+      const person = await this.realtime.plexPerson(this.accountId(), actor);
+      this.personView.update((v) => (v?.actor === actor ? { actor, person } : v));
+    } catch (error) {
+      this.personView.update((v) => (v?.actor === actor ? { actor, error: reason(error, 'Could not load them.') } : v));
+    }
+  }
+
+  protected closePerson() {
+    this.personView.set(null);
+  }
+
+  /** A film or series from an actor's page, opened on top of the cover the actor was opened from. */
+  protected openWork(item: PlexItem) {
+    this.personView.set(null);
+    this.push(item);
+  }
+
   private async loadCast(item: PlexItem) {
     if (this.casts()[item.id] || !['movie', 'show', 'episode'].includes(item.kind)) return;
     try {
@@ -872,6 +969,7 @@ export class RecentlyAddedTile extends PlexTileView {
 
   protected closeScreen() {
     this.stopVideo();
+    this.personView.set(null);
     this.paneScroll = 0;
     this.trail.set([]);
     // Opened again, a listing is of what the library holds then.
