@@ -38,6 +38,8 @@ public class PhotoDrawTests(PhotoDrawTests.Factory factory) : IClassFixture<Phot
         public Task<ImmichPhoto?> PhotoAsync(ImmichAccount account, string photoId, CancellationToken ct) => fake.PhotoAsync(account, photoId, ct);
         public Task<RotatedPhoto?> RotateAsync(ImmichAccount account, string photoId, int degrees, CancellationToken ct) =>
             fake.RotateAsync(account, photoId, degrees, ct);
+        public Task FavoriteAsync(ImmichAccount account, string photoId, bool favorite, CancellationToken ct) =>
+            fake.FavoriteAsync(account, photoId, favorite, ct);
 
         public async IAsyncEnumerable<Photo> DrawAsync(
             ImmichAccount account, PhotoSelection selection, [EnumeratorCancellation] CancellationToken ct)

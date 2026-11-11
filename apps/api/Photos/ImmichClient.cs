@@ -344,6 +344,12 @@ public sealed class ImmichClient(IHttpClientFactory httpFactory, Random? random 
         return new(before);
     }
 
+    public async Task FavoriteAsync(ImmichAccount account, string photoId, bool favorite, CancellationToken ct)
+    {
+        if (!Guid.TryParse(photoId, out _)) throw new ImmichException("That is not a photo in Immich.");
+        await SendAsync(account, HttpMethod.Put, $"assets/{photoId}", new { isFavorite = favorite }, ct);
+    }
+
     // Null when the asset is gone.
     private async Task<JsonElement?> AssetAsync(ImmichAccount account, string photoId, CancellationToken ct)
     {
@@ -411,6 +417,10 @@ public sealed class ImmichClient(IHttpClientFactory httpFactory, Random? random 
             new("The API key may not edit photos. Give it the asset.edit.get, asset.edit.create and asset.edit.delete permissions in Immich.", keyRefused: true),
         HttpStatusCode.BadRequest when what.EndsWith("/edits", StringComparison.Ordinal) && Message(text) is { } message =>
             new($"Immich can't rotate this photo: {message}.", inner: new HttpRequestException(null, null, status)),
+        HttpStatusCode.Forbidden when what.StartsWith("PUT assets/", StringComparison.Ordinal) =>
+            new("The API key may not change photos. Give it the asset.update permission in Immich.", keyRefused: true),
+        HttpStatusCode.BadRequest or HttpStatusCode.NotFound when what.StartsWith("PUT assets/", StringComparison.Ordinal) =>
+            new("Immich won't let this account favorite the photo."),
         HttpStatusCode.Forbidden => new("The API key may not read albums, people, faces and photos. Give it the album.read, asset.read, asset.view, face.read and person.read permissions in Immich.", keyRefused: true),
         _ => new($"Immich answered {(int)status} to {what}" + (string.IsNullOrWhiteSpace(text) ? "." : $": {text}"),
             inner: new HttpRequestException(null, null, status)),

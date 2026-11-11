@@ -101,6 +101,11 @@ public sealed class FakeImmich(TimeProvider time, ImmichOptions? options = null)
         return Task.FromResult<RotatedPhoto?>(new(Version(photoId)));
     }
 
+    // Daan's photos belong to Daan's account, so the fake's own key can't favorite them.
+    public Task FavoriteAsync(ImmichAccount account, string photoId, bool favorite, CancellationToken ct) =>
+        Number(photoId) is null ? Task.FromException(new ImmichException("That is not a photo in Immich."))
+        : Task.CompletedTask;
+
     private int Turned(string photoId) => _turned.GetValueOrDefault(photoId);
 
     private string? Version(string photoId) => Turned(photoId) is var turned and not 0 ? $"turned-{turned}" : null;

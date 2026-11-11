@@ -99,6 +99,10 @@ public interface IImmich
 
     // Turns the photo by degrees, clockwise, a multiple of 90, once its preview is turned too. Null when the photo is gone.
     Task<RotatedPhoto?> RotateAsync(ImmichAccount account, string photoId, int degrees, CancellationToken ct);
+
+    // Marks the photo a favorite in the account's Immich, or takes the mark off. Only the photo's owner may, so the
+    // account's key must be theirs; Immich's refusal comes as an ImmichException.
+    Task FavoriteAsync(ImmichAccount account, string photoId, bool favorite, CancellationToken ct);
 }
 
 // Immich could not be reached, or refused. The message says what to do about it.

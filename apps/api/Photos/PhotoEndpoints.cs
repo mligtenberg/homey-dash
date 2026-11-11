@@ -36,6 +36,9 @@ public static class PhotoEndpoints
     // Clockwise, in degrees: 90, or -90 to turn the other way.
     public sealed record Rotation(int Degrees);
 
+    // Marks the photo a favorite, or takes the mark off.
+    public sealed record FavoriteChoice(bool Favorite = true);
+
     // ApiKey may be left out of a change to keep the current key, such as when only the address changes.
     public sealed record ImmichAccountChange(string? Name, string? Address, string? ApiKey);
 
@@ -332,6 +335,30 @@ public static class PhotoEndpoints
             await s.Sync.EditedAsync(account.Id, photoId, rotated.Version, CancellationToken.None);
             set = await s.Db.PhotoSets.AsNoTracking().FirstAsync(set => set.Id == id, ct);
             return Results.Ok(await ViewAsync(s, set, ct));
+        });
+
+        // From a display: marks the photo a favorite in Immich, always as its owner, since only they may. A partner's photo
+        // takes the partner's key. Nothing changes in the set, so nothing is pushed.
+        sets.MapPut("/{id:guid}/photos/{photoId}/favorite", async (Guid id, string photoId, FavoriteChoice body, IImmich photos,
+            [AsParameters] Services s, CancellationToken ct) =>
+        {
+            var set = await s.Db.PhotoSets.AsNoTracking().FirstOrDefaultAsync(set => set.Id == id, ct);
+            if (set?.Photos.FirstOrDefault(p => p.Id == photoId) is not { } photo) return Results.NotFound();
+            if (s.Accounts.Find(set.AccountId) is not { } account) return NotSetUp();
+            var owner = account;
+            if (account.Partners.FirstOrDefault(p => p.Id == photo.OwnerId) is { } partner)
+                if (account.AsPartner(partner) is { } partnerAccount) owner = partnerAccount;
+                else return Results.Problem($"Only {partner.Name} may favorite this photo. Add an API key of theirs to {account.Name} under Accounts.",
+                    statusCode: StatusCodes.Status409Conflict);
+            try
+            {
+                await photos.FavoriteAsync(owner, photoId, body.Favorite, CancellationToken.None);
+            }
+            catch (ImmichException e)
+            {
+                return Results.Problem(e.Message, statusCode: StatusCodes.Status502BadGateway);
+            }
+            return Results.NoContent();
         });
 
         // From Management: an album syncs at once, so the photo is back if it is still in the album. A selection draws it

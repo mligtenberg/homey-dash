@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { apiProblem, canRotate, Photo, PhotoSet, PhotoSetsApi, photoUrl } from '@homey-dash/api-client';
-import { LucideChevronLeft, LucideChevronRight, LucideImage, LucideImageOff, LucideMapPin, LucideRotateCcw, LucideRotateCw, LucideUsers } from '@homey-dash/design-system';
+import { LucideChevronLeft, LucideChevronRight, LucideHeart, LucideImage, LucideImageOff, LucideMapPin, LucideRotateCcw, LucideRotateCw, LucideUsers } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { TileDetails } from './tile-details';
@@ -56,6 +56,8 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
           <div class="hd-photo-details__middle">
             @if (failure(); as failure) {
               <span class="hd-details__label" role="alert">{{ failure }}</span>
+            } @else if (favorited()) {
+              <span class="hd-details__label" role="status">Favorited</span>
             } @else if (busy() === 'rotating') {
               <span class="hd-details__label" role="status">Rotating…</span>
             } @else {
@@ -68,6 +70,10 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
             <button type="button" class="hd-btn" aria-label="Rotate right" [disabled]="busy() || !photo.rotatable" [attr.title]="photo.rotatable ? null : lockedHint"
               (click)="rotate(true)">
               <svg [lucideIcon]="rotateRightIcon" />
+            </button>
+            <button type="button" class="hd-btn" aria-label="Favorite" [disabled]="busy() || !photo.rotatable" [attr.title]="photo.rotatable ? null : lockedHint"
+              (click)="favorite()">
+              <svg [lucideIcon]="favoriteIcon" />
             </button>
             <button type="button" class="hd-btn hd-btn--danger" [disabled]="busy()" (click)="exclude()">
               <svg [lucideIcon]="excludeIcon" />Exclude photo
@@ -96,6 +102,7 @@ export class PhotoViewer {
   protected readonly placeIcon = LucideMapPin;
   protected readonly peopleIcon = LucideUsers;
   protected readonly excludeIcon = LucideImageOff;
+  protected readonly favoriteIcon = LucideHeart;
   protected readonly rotateLeftIcon = LucideRotateCcw;
   protected readonly rotateRightIcon = LucideRotateCw;
 
@@ -105,7 +112,9 @@ export class PhotoViewer {
   /** Why a partner's photo can't be rotated. */
   protected readonly lockedHint = "A partner's photo: add an API key of theirs under Accounts to rotate it";
   /** What the viewer is waiting on HomeyDash for. */
-  protected readonly busy = signal<'rotating' | 'excluding' | null>(null);
+  protected readonly busy = signal<'rotating' | 'excluding' | 'favoriting' | null>(null);
+  /** Whether the last favorite went through. */
+  protected readonly favorited = signal(false);
   /** Why the last rotation or exclusion failed. */
   protected readonly failure = signal<string | null>(null);
 
@@ -154,6 +163,7 @@ export class PhotoViewer {
 
   /** Opens the photo at the position among `photos`. */
   open(index: number) {
+    this.favorited.set(false);
     this.excluded.set(new Set());
     this.index.set(index);
     this.failure.set(null);
@@ -196,8 +206,26 @@ export class PhotoViewer {
     }
   }
 
+  // As the photo's owner, so a partner's photo takes a key of theirs, like rotating it. Immich's reason when it can't.
+  protected async favorite() {
+    const photo = this.shown()?.photo;
+    if (!photo) return;
+    this.busy.set('favoriting');
+    this.failure.set(null);
+    this.favorited.set(false);
+    try {
+      await firstValueFrom(this.api.favorite(this.set(), photo));
+      this.favorited.set(true);
+    } catch (e) {
+      this.failure.set(apiProblem(e, 'Could not favorite the photo. Try again.', 502, 409));
+    } finally {
+      this.busy.set(null);
+    }
+  }
+
   protected step(by: number) {
     this.failure.set(null);
+    this.favorited.set(false);
     const count = this.list().length;
     if (count) this.index.update((i) => (i + by + count) % count);
   }

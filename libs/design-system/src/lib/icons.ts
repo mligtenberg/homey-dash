@@ -40,6 +40,7 @@ import {
   Fan,
   Flame,
   Gamepad2,
+  Heart,
   House,
   Image,
   ImageOff,
@@ -174,6 +175,7 @@ export const LucideFlame = /* @__PURE__ */ icon('flame', Flame);
 export const LucideGamepad2 = /* @__PURE__ */ icon('gamepad-2', Gamepad2);
 export const LucideHouse = /* @__PURE__ */ icon('house', House);
 export const LucideImage = /* @__PURE__ */ icon('image', Image);
+export const LucideHeart = /* @__PURE__ */ icon('heart', Heart);
 export const LucideImageOff = /* @__PURE__ */ icon('image-off', ImageOff);
 export const LucideImages = /* @__PURE__ */ icon('images', Images);
 export const LucideKeyRound = /* @__PURE__ */ icon('key-round', KeyRound);

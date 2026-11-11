@@ -205,6 +205,13 @@ export class PhotoSetsApi {
   }
 
   /**
+   * Marks the photo a favorite in Immich, as its owner: a partner's photo only with a key of theirs, like rotating it.
+   */
+  favorite(set: Pick<PhotoSet, 'id'>, photo: Pick<Photo, 'id'>, favorite = true) {
+    return this.http.put<void>(`/api/photo-sets/${set.id}/photos/${encodeURIComponent(photo.id)}/favorite`, { favorite });
+  }
+
+  /**
    * Lets an excluded photo back into the set. An album syncs at once, so it is back if it is still in the album; a
    * selection draws it again only by chance.
    */

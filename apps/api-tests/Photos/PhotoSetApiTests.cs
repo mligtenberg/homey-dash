@@ -349,6 +349,20 @@ public class PhotoSetApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task APhoto_IsFavoritedAsItsOwner()
+    {
+        var set = await CreateAsync();
+        var id = set.GetProperty("id").GetString()!;
+        var photo = Ids(set)[0];
+
+        var ok = await _client.PutAsJsonAsync($"/api/photo-sets/{id}/photos/{photo}/favorite", new { favorite = true });
+        var notOfTheSet = await _client.PutAsJsonAsync($"/api/photo-sets/{id}/photos/{Guid.NewGuid()}/favorite", new { favorite = true });
+
+        Assert.Equal(HttpStatusCode.NoContent, ok.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, notOfTheSet.StatusCode);
+    }
+
+    [Fact]
     public async Task OnlyAQuarterTurnOfAPhotoOfTheSet_IsRotated()
     {
         var garden = await CreateAsync("Garden", FakeImmich.GardenId);
