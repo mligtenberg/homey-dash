@@ -1,5 +1,5 @@
 import { TIMER_SOUNDS } from './timers';
-import { renderSound, roomImpulse } from './timer-sounds';
+import { addRoom, renderSound } from './timer-sounds';
 
 const peak = (samples: ArrayLike<number>, from = 0) => {
   let loudest = 0;
@@ -30,9 +30,13 @@ describe('renderSound', () => {
     expect(peak(bell, Math.floor(bell.length * 0.9))).toBeLessThan(0.1);
   });
 
-  it('gives a stereo room that dies out', () => {
-    const [left, right] = roomImpulse(rate);
-    expect(left).not.toEqual(right);
-    expect(peak(left, left.length - 100)).toBeLessThan(peak(left) / 20);
+  it('puts a sound in a room that rings on after it and dies out', () => {
+    const dry = renderSound('chime', rate);
+    const wet = addRoom(dry, rate, 0.3);
+    expect(wet.length).toBeGreaterThan(dry.length);
+    expect(wet.every(Number.isFinite)).toBe(true);
+    expect(peak(wet, dry.length)).toBeGreaterThan(0);
+    expect(peak(wet, wet.length - 100)).toBeLessThan(peak(wet) / 20);
+    expect(addRoom(dry, rate, 0)).toEqual(dry);
   });
 });

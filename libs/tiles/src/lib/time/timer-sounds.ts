@@ -1,15 +1,9 @@
 import type { TimerSound } from './timers';
 
-/** How often (in seconds) a ringing timer plays its sound again, how loud (0..1) it is played, and how much of it goes through the room. */
-export const SOUND_REPEAT: Record<TimerSound, number> = {
-  beep: 1, bell: 3, chime: 3, kitchen: 2, pulse: 2, siren: 2, musicbox: 6, piano: 6, marimba: 5, flute: 6, harp: 5, none: 1,
-};
-export const SOUND_LEVEL: Record<TimerSound, number> = {
-  beep: 0.55, bell: 0.95, chime: 0.95, kitchen: 0.75, pulse: 0.6, siren: 0.5, musicbox: 0.95, piano: 0.95, marimba: 0.95, flute: 0.95, harp: 0.95, none: 0,
-};
-export const SOUND_ROOM: Record<TimerSound, number> = {
-  beep: 0, bell: 0.22, chime: 0.28, kitchen: 0.05, pulse: 0, siren: 0.05, musicbox: 0.2, piano: 0.2, marimba: 0.15, flute: 0.28, harp: 0.25, none: 0,
-};
+/*
+ * The timer sounds, synthesised: nothing here runs on a screen. `npm run sounds` renders them (see tools/render-sounds.mts)
+ * to the MP3 files the display plays from apps/display/public/sounds, so a slow tablet only decodes them.
+ */
 
 /** One mode of a struck or plucked body: its frequency relative to the pitch, loudness and how long it takes to fall 60 dB (seconds). */
 type Mode = readonly [ratio: number, amp: number, decay: number];
@@ -247,18 +241,32 @@ export function renderSound(sound: TimerSound, rate: number): Float32Array<Array
   return out;
 }
 
-/** A small room as an impulse response: stereo noise that fades out and darkens as it goes. */
-export function roomImpulse(rate: number): Float32Array<ArrayBuffer>[] {
-  return [11, 29].map((seed) => {
-    const rand = noise(seed);
-    const out = new Float32Array(Math.floor(rate * 1.3));
-    const early = Math.floor(0.012 * rate);
-    let low = 0;
-    for (let i = early; i < out.length; i++) {
-      const t = (i - early) / rate;
-      low += (rand() - low) * (0.05 + 0.6 * Math.exp(-t / 0.25));
-      out[i] = low * Math.exp(-t / 0.28);
+/** Puts a sound in a room (a Freeverb: parallel damped combs into series allpasses), `wet` being how much of the room is heard; the sound is followed by the room's tail. */
+export function addRoom(dry: Float32Array, rate: number, wet: number): Float32Array<ArrayBuffer> {
+  const out = new Float32Array(dry.length + (wet ? Math.floor(rate * 1.4) : 0));
+  const scale = rate / 44100;
+  const delay = (samples: number) => ({ buf: new Float32Array(Math.round(samples * scale)), at: 0, store: 0 });
+  const combs = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617].map(delay);
+  const allpasses = [556, 441, 341, 225].map(delay);
+  for (let i = 0; i < out.length; i++) {
+    const x = i < dry.length ? dry[i] : 0;
+    let room = 0;
+    if (wet) {
+      for (const c of combs) {
+        const y = c.buf[c.at];
+        c.store = y * 0.8 + c.store * 0.2;
+        c.buf[c.at] = x * 0.015 + c.store * 0.84;
+        c.at = (c.at + 1) % c.buf.length;
+        room += y;
+      }
+      for (const a of allpasses) {
+        const y = a.buf[a.at];
+        a.buf[a.at] = room + y * 0.5;
+        a.at = (a.at + 1) % a.buf.length;
+        room = y - room;
+      }
     }
-    return out;
-  });
+    out[i] = x + wet * 3 * room;
+  }
+  return out;
 }

@@ -1,6 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { Realtime, TimerView } from '@homey-dash/api-client';
-import { renderSound, roomImpulse, SOUND_LEVEL, SOUND_REPEAT, SOUND_ROOM } from './timer-sounds';
 
 /** What a timer plays while it rings. */
 export type TimerSound = 'beep' | 'bell' | 'chime' | 'kitchen' | 'pulse' | 'siren' | 'musicbox' | 'piano' | 'marimba' | 'flute' | 'harp' | 'none';
@@ -32,8 +31,10 @@ export interface TimerDraft {
   sound: TimerSound;
 }
 
-/** How much louder than the sounds are rendered they are played. */
-const LOUDER_DB = 5;
+/** How often (in seconds) a ringing timer plays its sound again: a bell rings on for a few seconds, a beep is over at once. */
+const SOUND_REPEAT: Record<TimerSound, number> = {
+  beep: 1, bell: 3, chime: 3, kitchen: 2, pulse: 2, siren: 2, musicbox: 6, piano: 6, marimba: 5, flute: 6, harp: 5, none: 1,
+};
 
 const KEY = 'hd-timers';
 const SOUND_KEY = 'hd-timer-sound';
@@ -100,10 +101,10 @@ export class Timers {
 
   private readonly realtime = inject(Realtime);
   private audio?: AudioContext;
-  private room?: ConvolverNode;
-  private out?: GainNode;
   private rung = 0;
+  /** The sounds fetched and decoded so far, or on their way; a screen plays from files, so a slow one has nothing to synthesise. */
   private readonly buffers = new Map<TimerSound, AudioBuffer>();
+  private readonly loading = new Map<TimerSound, Promise<void>>();
   private tick?: ReturnType<typeof setInterval>;
 
   constructor() {
@@ -116,6 +117,7 @@ export class Timers {
   add(seconds: number, name = '', sound: TimerSound = this.draft().sound) {
     if (seconds <= 0) return;
     this.unlock();
+    void this.load(sound);
     this.save({ id: crypto.randomUUID(), seconds, end: Date.now() + seconds * 1000, name: name.trim() || undefined, sound });
   }
 
@@ -131,7 +133,8 @@ export class Timers {
     if (patch.sound) {
       write(SOUND_KEY, patch.sound);
       this.unlock();
-      this.play(patch.sound);
+      const sound = patch.sound;
+      void this.load(sound).then(() => this.play(sound));
     }
   }
 
@@ -208,53 +211,39 @@ export class Timers {
   private unlock() {
     this.audio ??= typeof AudioContext === 'undefined' ? undefined : new AudioContext();
     void this.audio?.resume();
+    void this.load(this.draft().sound);
   }
 
-  /** Everything goes out through here: 5 dB louder, with a limiter so the peaks it lifts don't distort. */
-  private master(ctx: AudioContext): AudioNode {
-    if (!this.out) {
-      const gain = ctx.createGain();
-      gain.gain.value = 10 ** (LOUDER_DB / 20);
-      const limiter = ctx.createDynamicsCompressor();
-      limiter.threshold.value = -3;
-      limiter.knee.value = 0;
-      limiter.ratio.value = 20;
-      limiter.attack.value = 0.002;
-      limiter.release.value = 0.15;
-      gain.connect(limiter).connect(ctx.destination);
-      this.out = gain;
+  /** Fetches and decodes a sound, so it is ready when a timer rings; settles once it is. */
+  private load(sound: TimerSound): Promise<void> {
+    const ctx = this.audio;
+    if (!ctx || sound === 'none' || this.buffers.has(sound)) return Promise.resolve();
+    let loading = this.loading.get(sound);
+    if (!loading) {
+      loading = fetch(new URL(`sounds/${sound}.mp3`, document.baseURI))
+        .then((response) => response.arrayBuffer())
+        .then((bytes) => ctx.decodeAudioData(bytes))
+        .then((buffer) => void this.buffers.set(sound, buffer))
+        // Tried again the next time it rings.
+        .catch(() => undefined)
+        .finally(() => this.loading.delete(sound));
+      this.loading.set(sound, loading);
     }
-    return this.out;
+    return loading;
   }
 
   private play(sound: TimerSound) {
     const ctx = this.audio;
     if (!ctx || ctx.state !== 'running' || sound === 'none') return;
-    let buffer = this.buffers.get(sound);
+    const buffer = this.buffers.get(sound);
     if (!buffer) {
-      const samples = renderSound(sound, ctx.sampleRate);
-      buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
-      buffer.copyToChannel(samples, 0);
-      this.buffers.set(sound, buffer);
+      // Not here yet: it rings from the next second on.
+      void this.load(sound);
+      return;
     }
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    const dry = ctx.createGain();
-    dry.gain.value = SOUND_LEVEL[sound];
-    source.connect(dry).connect(this.master(ctx));
-    if (SOUND_ROOM[sound]) {
-      if (!this.room) {
-        const impulse = roomImpulse(ctx.sampleRate);
-        const room = ctx.createBuffer(2, impulse[0].length, ctx.sampleRate);
-        impulse.forEach((channel, i) => room.copyToChannel(channel, i));
-        this.room = ctx.createConvolver();
-        this.room.buffer = room;
-        this.room.connect(this.master(ctx));
-      }
-      const wet = ctx.createGain();
-      wet.gain.value = SOUND_ROOM[sound] * SOUND_LEVEL[sound];
-      source.connect(wet).connect(this.room);
-    }
+    source.connect(ctx.destination);
     source.start();
   }
 }

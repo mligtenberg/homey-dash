@@ -2,7 +2,9 @@
   "name": "@homey-dash/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "sounds": "node --experimental-strip-types tools/render-sounds.mts"
+  },
   "private": true,
   "dependencies": {
     "@angular/common": "~22.2.0",
