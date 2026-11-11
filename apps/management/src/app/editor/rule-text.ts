@@ -141,3 +141,9 @@ export function describeRule(rule: Rule, signals: ReadonlyMap<string, SignalInfo
   const text = describeTerm(first, signals);
   return rest.length ? `${text} ${rule.match === 'all' ? 'and' : 'or'} ${rest.length} more` : text;
 }
+
+/** A rule in full, as one sentence: every condition, with groups in brackets, "A and (B or C)". */
+export function describeRuleFull(rule: Rule, signals: ReadonlyMap<string, SignalInfo>): string {
+  if (!rule.conditions.length) return 'No conditions';
+  return rule.conditions.map((t) => describeTerm(t, signals)).join(rule.match === 'all' ? ' and ' : ' or ');
+}

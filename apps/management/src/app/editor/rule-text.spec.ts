@@ -1,5 +1,5 @@
 import { SignalInfo } from '@homey-dash/api-client';
-import { describeRule, notAllowed, onSignal } from './rule-text';
+import { describeRule, describeRuleFull, notAllowed, onSignal } from './rule-text';
 
 const thermostat: SignalInfo = {
   id: 'homey:1:capability:t:target_temperature',
@@ -75,6 +75,21 @@ describe('rule text', () => {
 
     expect(describeRule({ match: 'any', conditions: [group, { signal: door.id, operator: 'isFalse' }] }, signals)).toBe(
       '(Front door Contact is open and Thermostat Target temperature is below 18 °C) or 1 more',
+    );
+  });
+
+  it('writes a whole rule out with its groups in brackets', () => {
+    const signals = new Map([[door.id, door], [thermostat.id, thermostat]]);
+    const rule = {
+      match: 'all' as const,
+      conditions: [
+        { signal: door.id, operator: 'isTrue' as const },
+        { match: 'any' as const, conditions: [{ signal: thermostat.id, operator: 'greaterThan' as const, value: 21 }, { signal: door.id, operator: 'isFalse' as const }] },
+      ],
+    };
+
+    expect(describeRuleFull(rule, signals)).toBe(
+      'Front door Contact is open and (Thermostat Target temperature is above 21 °C or Front door Contact is no)',
     );
   });
 });

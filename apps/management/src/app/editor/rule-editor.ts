@@ -1,9 +1,12 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { Condition, ConditionValue, isGroup, Operator, Rule, SpanUnit, Weekday } from '@homey-dash/api-client';
+import { LucideX } from '@homey-dash/design-system';
 import { alwaysRule } from '@homey-dash/tiles';
+import { LucideDynamicIcon } from '@lucide/angular';
 import {
   defaultValue,
+  describeRuleFull,
   MONTHS,
   notAllowed,
   onSignal,
@@ -24,117 +27,135 @@ function localInput(iso: string) {
   return isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** One condition: its signal, picked in a dialog by where it comes from, then an operator that suits it and a value. */
+/**
+ * One condition, set out as a line you can read across: the signal on top, picked in a dialog by where it comes from,
+ * and under it how it is compared ("not", the operator, the value). It has no frame of its own; the rule it sits in
+ * draws the rail that joins it to its neighbours.
+ */
 @Component({
   selector: 'hd-condition-editor',
-  imports: [NgTemplateOutlet, SignalPicker],
+  imports: [NgTemplateOutlet, SignalPicker, LucideDynamicIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <hd-signal-picker [value]="condition().signal" (picked)="pickSignal($event)" />
+    <div class="top">
+      <hd-signal-picker [value]="condition().signal" (picked)="pickSignal($event)" />
+      @if (removable()) {
+        <button type="button" class="drop" aria-label="Remove condition" (click)="removed.emit()">
+          <svg [lucideIcon]="x" aria-hidden="true" />
+        </button>
+      }
+    </div>
     @if (!signal()) {
       <p class="warn">HomeyDash no longer has the signal "{{ condition().signal }}". Pick another, or remove this condition.</p>
     }
 
-    <div class="pick">
-      <label class="hd-check not">
-        <input type="checkbox" [checked]="!!condition().not" (change)="setNot($any($event.target).checked)" />
-        Not
-      </label>
-      <select class="hd-select" aria-label="Operator" (change)="setOperator($any($event.target).value)">
+    <div class="how">
+      <button type="button" class="not" [attr.aria-pressed]="!!condition().not" (click)="setNot(!condition().not)">Not</button>
+      <select class="hd-select op" aria-label="Operator" (change)="setOperator($any($event.target).value)">
         @for (op of operators(); track op) {
           <option [value]="op" [selected]="op === condition().operator">{{ label(op) }}</option>
         }
       </select>
-    </div>
 
-    @switch (condition().operator) {
-      @case ('between') {
-        <div class="pick">
-          <input class="hd-input" type="number" aria-label="From" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
-            [value]="range().min" (change)="set({ min: +$any($event.target).value, max: range().max })" />
-          <span>and</span>
-          <input class="hd-input" type="number" aria-label="To" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
-            [value]="range().max" (change)="set({ min: range().min, max: +$any($event.target).value })" />
-          @if (signal()?.unit; as unit) {
-            <span>{{ unit }}</span>
-          }
-        </div>
-      }
-      @case ('timeOfDayBetween') {
-        <div class="pick">
-          <input class="hd-input" type="time" step="1" aria-label="From" [value]="fromTo().from" (change)="setFromTo('from', $any($event.target).value)" />
-          <span>and</span>
-          <input class="hd-input" type="time" step="1" aria-label="To" [value]="fromTo().to" (change)="setFromTo('to', $any($event.target).value)" />
-        </div>
-      }
-      @case ('dateBetween') {
-        @for (end of ends; track end) {
-          <div class="pick">
-            <span class="end">{{ end === 'from' ? 'From' : 'To' }}</span>
-            <select class="hd-select" [attr.aria-label]="(end === 'from' ? 'From' : 'To') + ' month'" (change)="setDay(end, +$any($event.target).value, day(end).day)">
-              @for (month of months; track $index) {
-                <option [value]="$index + 1" [selected]="$index + 1 === day(end).month">{{ month }}</option>
-              }
-            </select>
-            <input class="hd-input" type="number" min="1" max="31" [attr.aria-label]="(end === 'from' ? 'From' : 'To') + ' day'"
-              [value]="day(end).day" (change)="setDay(end, day(end).month, +$any($event.target).value)" />
-          </div>
-        }
-      }
-      @case ('onWeekdays') {
-        <div class="days">
-          @for (d of weekdays; track d.id) {
-            <label class="hd-check">
-              <input type="checkbox" [checked]="days().includes(d.id)" (change)="toggleDay(d.id, $any($event.target).checked)" />
-              {{ d.label }}
-            </label>
-          }
-        </div>
-      }
-      @case ('withinLast') {
-        <ng-container *ngTemplateOutlet="spanInputs" />
-      }
-      @case ('longerAgoThan') {
-        <ng-container *ngTemplateOutlet="spanInputs" />
-      }
-      @case ('before') {
-        <input class="hd-input" type="datetime-local" aria-label="Moment" [value]="moment()" (change)="setMoment($any($event.target).value)" />
-      }
-      @case ('after') {
-        <input class="hd-input" type="datetime-local" aria-label="Moment" [value]="moment()" (change)="setMoment($any($event.target).value)" />
-      }
-      @case ('isTrue') {}
-      @case ('isFalse') {}
-      @case ('isEmpty') {}
-      @default {
-        @if (signal()?.allowedValues; as allowed) {
-          <select class="hd-select" aria-label="Value" (change)="set($any($event.target).value)">
-            @if (stale()) {
-              <option [value]="condition().value" selected>{{ condition().value }} (no longer offered)</option>
-            }
-            @for (v of allowed; track v.value) {
-              <option [value]="v.value" [selected]="v.value === condition().value">{{ v.label }}</option>
-            }
-          </select>
-        } @else if (isNumber()) {
-          <div class="pick">
-            <input class="hd-input" type="number" aria-label="Value" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
-              [value]="condition().value" (change)="set(+$any($event.target).value)" />
+      @switch (condition().operator) {
+        @case ('between') {
+          <div class="val">
+            <input class="hd-input" type="number" aria-label="From" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
+              [value]="range().min" (change)="set({ min: +$any($event.target).value, max: range().max })" />
+            <span>and</span>
+            <input class="hd-input" type="number" aria-label="To" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
+              [value]="range().max" (change)="set({ min: range().min, max: +$any($event.target).value })" />
             @if (signal()?.unit; as unit) {
               <span>{{ unit }}</span>
             }
           </div>
-        } @else {
-          <input class="hd-input" aria-label="Value" [value]="condition().value ?? ''" (change)="set($any($event.target).value)" />
+        }
+        @case ('timeOfDayBetween') {
+          <div class="val">
+            <input class="hd-input" type="time" step="1" aria-label="From" [value]="fromTo().from" (change)="setFromTo('from', $any($event.target).value)" />
+            <span>and</span>
+            <input class="hd-input" type="time" step="1" aria-label="To" [value]="fromTo().to" (change)="setFromTo('to', $any($event.target).value)" />
+          </div>
+        }
+        @case ('dateBetween') {
+          <div class="val wide stack">
+            @for (end of ends; track end) {
+              <div class="val">
+                <span class="end">{{ end === 'from' ? 'From' : 'To' }}</span>
+                <select class="hd-select" [attr.aria-label]="(end === 'from' ? 'From' : 'To') + ' month'" (change)="setDay(end, +$any($event.target).value, day(end).day)">
+                  @for (month of months; track $index) {
+                    <option [value]="$index + 1" [selected]="$index + 1 === day(end).month">{{ month }}</option>
+                  }
+                </select>
+                <input class="hd-input" type="number" min="1" max="31" [attr.aria-label]="(end === 'from' ? 'From' : 'To') + ' day'"
+                  [value]="day(end).day" (change)="setDay(end, day(end).month, +$any($event.target).value)" />
+              </div>
+            }
+          </div>
+        }
+        @case ('onWeekdays') {
+          <div class="val wide days" role="group" aria-label="Days">
+            @for (d of weekdays; track d.id) {
+              <label class="day">
+                <input type="checkbox" [checked]="days().includes(d.id)" (change)="toggleDay(d.id, $any($event.target).checked)" />
+                <span>{{ d.label }}</span>
+              </label>
+            }
+          </div>
+        }
+        @case ('withinLast') {
+          <ng-container *ngTemplateOutlet="spanInputs" />
+        }
+        @case ('longerAgoThan') {
+          <ng-container *ngTemplateOutlet="spanInputs" />
+        }
+        @case ('before') {
+          <div class="val wide">
+            <input class="hd-input" type="datetime-local" aria-label="Moment" [value]="moment()" (change)="setMoment($any($event.target).value)" />
+          </div>
+        }
+        @case ('after') {
+          <div class="val wide">
+            <input class="hd-input" type="datetime-local" aria-label="Moment" [value]="moment()" (change)="setMoment($any($event.target).value)" />
+          </div>
+        }
+        @case ('isTrue') {}
+        @case ('isFalse') {}
+        @case ('isEmpty') {}
+        @default {
+          @if (signal()?.allowedValues; as allowed) {
+            <div class="val">
+              <select class="hd-select" aria-label="Value" (change)="set($any($event.target).value)">
+                @if (stale()) {
+                  <option [value]="condition().value" selected>{{ condition().value }} (no longer offered)</option>
+                }
+                @for (v of allowed; track v.value) {
+                  <option [value]="v.value" [selected]="v.value === condition().value">{{ v.label }}</option>
+                }
+              </select>
+            </div>
+          } @else if (isNumber()) {
+            <div class="val">
+              <input class="hd-input" type="number" aria-label="Value" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
+                [value]="condition().value" (change)="set(+$any($event.target).value)" />
+              @if (signal()?.unit; as unit) {
+                <span>{{ unit }}</span>
+              }
+            </div>
+          } @else {
+            <div class="val">
+              <input class="hd-input" aria-label="Value" [value]="condition().value ?? ''" (change)="set($any($event.target).value)" />
+            </div>
+          }
         }
       }
-    }
+    </div>
     @if (stale()) {
       <p class="warn">"{{ condition().value }}" is no longer one of this signal's values, so this condition never holds.</p>
     }
 
     <ng-template #spanInputs>
-      <div class="pick">
+      <div class="val">
         <input class="hd-input" type="number" min="1" aria-label="Amount" [value]="span().amount" (change)="set({ amount: +$any($event.target).value, unit: span().unit })" />
         <select class="hd-select" aria-label="Unit" (change)="set({ amount: span().amount, unit: $any($event.target).value })">
           @for (unit of units; track unit) {
@@ -143,20 +164,40 @@ function localInput(iso: string) {
         </select>
       </div>
     </ng-template>
-
-    @if (removable()) {
-      <button type="button" class="hd-btn remove" (click)="removed.emit()">Remove condition</button>
-    }
   `,
   styles: `
-    :host { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--line); border-radius: 10px; }
-    .pick { display: flex; gap: var(--space-2); align-items: center; }
-    .pick > .hd-select, .pick > .hd-input { flex: 1; min-width: 0; }
-    .not { flex: none; }
-    .end { width: 3em; color: var(--ink-muted); }
-    .days { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    :host { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .top { display: flex; align-items: center; gap: var(--space-1); }
+    .top hd-signal-picker { flex: 1; min-width: 0; display: flex; }
+    .top ::ng-deep .hd-picker__trigger { flex: 1; min-width: 0; font-weight: 700; }
+    .drop {
+      flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-control);
+      background: none; color: var(--ink-muted); cursor: pointer;
+    }
+    .drop:hover { background: color-mix(in oklab, var(--danger) 12%, transparent); color: var(--danger); }
+    .drop svg { width: 16px; height: 16px; }
+    .how { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 8px; }
+    .not {
+      flex: none; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); color: var(--ink-muted);
+      font: 700 12px/1.3 var(--font-sans); cursor: pointer;
+    }
+    .not[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+    .op { flex: 1 1 130px; min-width: 0; }
+    .val { flex: 1 1 130px; min-width: 0; display: flex; align-items: center; gap: var(--space-2); color: var(--ink-muted); }
+    .val.wide { flex-basis: 100%; }
+    .val.stack { flex-direction: column; align-items: stretch; }
+    .val > .hd-select, .val > .hd-input { flex: 1; min-width: 0; }
+    .end { width: 3em; flex: none; }
+    .days { flex-wrap: wrap; gap: 6px; }
+    .day { position: relative; cursor: pointer; }
+    .day input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+    .day span {
+      display: block; min-width: 42px; padding: 7px 4px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel);
+      color: var(--ink-muted); font: 700 12px/1.3 var(--font-sans); text-align: center;
+    }
+    .day input:checked + span { background: color-mix(in oklab, var(--brand) 14%, var(--panel)); border-color: var(--brand); color: var(--brand); }
+    .day input:focus-visible + span { outline: 3px solid var(--brand); outline-offset: 2px; }
     .warn { color: var(--danger); margin: 0; font-size: 13px; }
-    .remove { align-self: flex-start; }
   `,
 })
 export class ConditionEditor {
@@ -167,6 +208,7 @@ export class ConditionEditor {
 
   private readonly catalogue = inject(SignalCatalogue);
 
+  protected readonly x = LucideX;
   protected readonly weekdays = WEEKDAYS;
   protected readonly units = SPAN_UNITS;
   protected readonly months = MONTHS;
@@ -232,61 +274,102 @@ export class ConditionEditor {
 }
 
 /**
- * A rule: its conditions and groups, and whether all or any of them must hold. A group is a rule of its own, edited the
- * same way, one level deep.
+ * A rule: its conditions and groups, and whether all or any of them must hold. Terms hang on one rail, and the word on
+ * the rail between two ("and", "or") is how they combine, so a long rule reads top to bottom. A group is a rule of its
+ * own in a tinted block, one level deep, and combines the other way than the rule around it. Once a rule has more than
+ * one term it is also written out in words underneath, to check what it says.
  */
 @Component({
   selector: 'hd-rule-editor',
-  imports: [ConditionEditor],
+  imports: [ConditionEditor, LucideDynamicIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.group]': 'group()' },
   template: `
     <div class="head">
-      <span class="hd-field__label">{{ group() ? 'Group' : 'Show when' }}</span>
+      <span class="label">{{ group() ? 'Group' : 'Show when' }}</span>
       @if (rule().conditions.length > 1) {
         <select class="hd-select" aria-label="Combine conditions" (change)="setMatch($any($event.target).value)">
           <option value="all" [selected]="rule().match === 'all'">all of these hold</option>
           <option value="any" [selected]="rule().match === 'any'">any of these holds</option>
         </select>
       }
+      @if (group() && removable()) {
+        <button type="button" class="drop" aria-label="Remove group" (click)="removed.emit()">
+          <svg [lucideIcon]="x" aria-hidden="true" />
+        </button>
+      }
     </div>
-    @for (term of rule().conditions; track $index; let i = $index) {
-      @if (i > 0) {
-        <span class="joiner">{{ rule().match === 'all' ? 'and' : 'or' }}</span>
+
+    <ol class="terms">
+      @for (term of rule().conditions; track $index; let i = $index) {
+        @if (i > 0) {
+          <li class="joiner" [class.or]="rule().match === 'any'" aria-hidden="true"><span>{{ rule().match === 'all' ? 'and' : 'or' }}</span></li>
+        }
+        <li class="term">
+          @if (isGroup(term)) {
+            <hd-rule-editor
+              [rule]="term"
+              [group]="true"
+              [removable]="rule().conditions.length > 1"
+              (changed)="setTerm(i, $event)"
+              (removed)="removeTerm(i)"
+            />
+          } @else {
+            <hd-condition-editor
+              [condition]="term"
+              [removable]="rule().conditions.length > 1"
+              (changed)="setTerm(i, $event)"
+              (removed)="removeTerm(i)"
+            />
+          }
+        </li>
       }
-      @if (isGroup(term)) {
-        <hd-rule-editor
-          [rule]="term"
-          [group]="true"
-          [removable]="rule().conditions.length > 1"
-          (changed)="setTerm(i, $event)"
-          (removed)="removeTerm(i)"
-        />
-      } @else {
-        <hd-condition-editor
-          [condition]="term"
-          [removable]="rule().conditions.length > 1"
-          (changed)="setTerm(i, $event)"
-          (removed)="removeTerm(i)"
-        />
-      }
-    }
+    </ol>
+
     <div class="actions">
-      <button type="button" class="hd-btn" (click)="addCondition()">Add condition</button>
+      <button type="button" class="add" (click)="addCondition()">+ Condition</button>
       @if (!group()) {
-        <button type="button" class="hd-btn" (click)="addGroup()">Add group</button>
-      } @else if (removable()) {
-        <button type="button" class="hd-btn" (click)="removed.emit()">Remove group</button>
+        <button type="button" class="add" (click)="addGroup()">+ Group</button>
       }
     </div>
+
+    @if (!group() && complex()) {
+      <p class="words"><span class="label">In words</span>{{ words() }}</p>
+    }
   `,
   styles: `
-    :host { display: flex; flex-direction: column; gap: var(--space-2); }
-    :host(.group) { padding: var(--space-3); border: 1px dashed var(--line); border-radius: 12px; }
-    .head { display: flex; align-items: center; gap: var(--space-2); }
-    .head .hd-select { flex: 1; }
-    .joiner { align-self: center; color: var(--ink-muted); font-size: 13px; }
-    .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    :host { display: flex; flex-direction: column; min-width: 0; }
+    :host(.group) { padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-panel); background: color-mix(in oklab, var(--ink) 4%, transparent); }
+    .label { font: 700 12px/1.3 var(--font-sans); color: var(--ink-muted); }
+    .head { display: flex; margin-bottom: var(--space-3); align-items: center; gap: var(--space-2); min-height: 32px; }
+    .head .hd-select { flex: 1; min-width: 0; }
+    .drop {
+      flex: none; display: grid; place-items: center; width: 32px; height: 32px; margin-left: auto; padding: 0; border: 0; border-radius: var(--radius-control);
+      background: none; color: var(--ink-muted); cursor: pointer;
+    }
+    .drop:hover { background: color-mix(in oklab, var(--danger) 12%, transparent); color: var(--danger); }
+    .drop svg { width: 16px; height: 16px; }
+
+    /* The rail every term hangs on; the joining word sits on it between two terms. */
+    .terms { list-style: none; margin: 0; padding: 4px 0 4px 18px; border-left: 2px solid var(--line); display: flex; flex-direction: column; }
+    .term { min-width: 0; }
+    .joiner { display: flex; margin: 14px 0; margin-left: -21px; }
+    .joiner span {
+      padding: 1px 8px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--panel); color: var(--ink-muted);
+      font: 800 10px/1.5 var(--font-sans); letter-spacing: .08em; text-transform: uppercase;
+    }
+    .joiner.or span { color: var(--ink); border-color: var(--ink-muted); }
+    :host(.group) .joiner span { background: color-mix(in oklab, var(--ink) 4%, var(--panel)); }
+
+    .actions { display: flex; gap: var(--space-2); margin-top: var(--space-4); }
+    .add {
+      padding: 6px 10px; border: 1px dashed var(--line); border-radius: var(--radius-control); background: none; color: var(--brand);
+      font: 700 13px/1.3 var(--font-sans); cursor: pointer;
+    }
+    .add:hover { border-style: solid; border-color: var(--brand); }
+    .add:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+    .words { display: flex; flex-direction: column; gap: 2px; margin: var(--space-4) 0 0; padding-top: var(--space-4); border-top: 1px solid var(--line); color: var(--ink); font-size: 13px; text-wrap: pretty; }
   `,
 })
 export class RuleEditor {
@@ -297,7 +380,13 @@ export class RuleEditor {
   readonly changed = output<Rule>();
   readonly removed = output<void>();
 
+  private readonly catalogue = inject(SignalCatalogue);
+
   protected readonly isGroup = isGroup;
+  protected readonly x = LucideX;
+
+  protected readonly complex = computed(() => this.rule().conditions.length > 1 || this.rule().conditions.some(isGroup));
+  protected readonly words = computed(() => describeRuleFull(this.rule(), this.catalogue.byId()));
 
   protected setMatch(match: Rule['match']) {
     this.changed.emit({ ...this.rule(), match });
