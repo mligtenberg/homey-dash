@@ -6,7 +6,7 @@ import { PhotoViewer, RealtimeTileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
 import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue } from './immich-albums';
 import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-selection-form';
-import { BackLink, clock, timeAgo } from '@homey-dash/design-system';
+import { clock, timeAgo } from '@homey-dash/design-system';
 
 /**
  * One photo set (ADR-0008), kept current over the realtime connection: its name, the Immich album it follows or the
@@ -16,11 +16,11 @@ import { BackLink, clock, timeAgo } from '@homey-dash/design-system';
  */
 @Component({
   selector: 'hd-photo-set-page',
-  imports: [BackLink, RouterLink, PhotoSelectionForm, PhotoViewer],
+  imports: [RouterLink, PhotoSelectionForm, PhotoViewer],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="hd-page__header">
-      <hd-back-link class="back" link="/photo-sets">Photo sets</hd-back-link>
+      <ol class="hd-crumbs" aria-label="You are here"><li><a routerLink="/photo-sets">Photo sets</a></li></ol>
       @if (set(); as set) {
         <input
           class="hd-input name"
@@ -202,9 +202,10 @@ import { BackLink, clock, timeAgo } from '@homey-dash/design-system';
     </div>
   `,
   styles: `
-    .hd-page__header { gap: var(--space-4); }
-    .back { font-weight: 700; }
-    .name { font-size: 18px; font-weight: 800; max-width: 420px; }
+    :host { --sec: var(--sec-photos); }
+    .hd-page__header { gap: var(--space-2) var(--space-4); }
+    .name { font-size: 20px; font-weight: 600; max-width: 420px; border-color: transparent; background: none; padding-inline: 8px; margin-left: -8px; }
+    .name:hover, .name:focus { border-color: var(--line-strong); background: var(--panel); }
     .panel { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); }
     .album { max-width: 420px; }
     .rules { display: flex; flex-direction: column; gap: var(--space-4); max-width: 560px; }

@@ -5,6 +5,7 @@ import { RealtimeTileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
 import { AlbumSelect } from './album-select';
 import { AlbumGroup, loadAlbums, parseAlbumValue } from './immich-albums';
+import { PageHeader } from './page-header';
 import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
 
 /**
@@ -15,15 +16,14 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
  */
 @Component({
   selector: 'hd-photo-sets-page',
-  imports: [RouterLink, AlbumSelect, PhotoSelectionForm],
+  imports: [RouterLink, AlbumSelect, PhotoSelectionForm, PageHeader],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header class="hd-page__header">
-      <h1 class="hd-page__title">Photo sets</h1>
+    <hd-page-header section="photos" title="Photo sets">
       @if (!adding()) {
         <button class="hd-btn hd-btn--primary" type="button" (click)="startAdding()">New photo set</button>
       }
-    </header>
+    </hd-page-header>
     <div class="hd-page__body">
       @if (adding()) {
         <div class="hd-panel new-panel">
@@ -144,10 +144,9 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
     </div>
   `,
   styles: `
-    .hd-page__header { justify-content: space-between; }
     .sets { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
     .set { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-4); padding: var(--space-4); color: inherit; text-decoration: none; }
-    .set:hover { border-color: var(--brand); }
+    .set:hover { border-color: var(--sec-photos); }
     .chevron { font-size: 28px; color: var(--ink-muted); }
     .new-panel { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4); }
     .source { display: flex; gap: var(--space-2); }

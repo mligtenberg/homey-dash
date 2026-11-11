@@ -348,8 +348,8 @@ describe('Displays', () => {
     const root = await render([display('1', 'Hallway', ['k'], status({}))], [], '/displays/1');
 
     expect(root.querySelector('h1')?.textContent).toBe('Hallway');
-    expect([...root.querySelectorAll('.tab')].map((t) => t.textContent?.trim())).toEqual(['Status', 'Dashboards', 'When idle', 'Lock screen']);
-    expect(root.querySelector('.tab[aria-current="page"]')?.textContent).toBe('Status');
+    expect([...root.querySelectorAll('.tab__label')].map((t) => t.textContent?.trim())).toEqual(['Status', 'Dashboards', 'When idle', 'Lock screen']);
+    expect(root.querySelector('.tab[aria-current="page"] .tab__label')?.textContent).toBe('Status');
   });
 
   describe('details', () => {

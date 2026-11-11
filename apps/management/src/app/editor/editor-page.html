@@ -1,5 +1,7 @@
 @if (dashboard(); as dashboard) {
   <header class="hd-page__header">
+    <ol class="hd-crumbs" aria-label="You are here"><li><a routerLink="/dashboards">Dashboards</a></li></ol>
+    <span class="hd-mark hd-mark--lg" aria-hidden="true"><svg [lucideIcon]="icons.LucideLayoutDashboard" /></span>
     <h1 class="hd-page__title">{{ dashboard.name }}</h1>
     @if (justPublished()) {
       <span class="hd-pill hd-pill--ok">Published</span>
@@ -117,13 +119,7 @@
 
     <aside class="hd-panel panel">
       @if (adding()) {
-        <h2 class="hd-section-title">Add a tile</h2>
-        <div class="kinds">
-          @for (kind of kinds.all(); track kind.id) {
-            <button class="hd-btn kind" type="button" [disabled]="!canAdd(kind)" (click)="add(kind)">{{ kind.label }}</button>
-          }
-        </div>
-        <button class="hd-btn" type="button" (click)="adding.set(null)">Cancel</button>
+        <hd-tile-kind-chooser [kinds]="kinds.all()" [fits]="fits" (picked)="add($event)" (cancelled)="adding.set(null)" />
       } @else if (openSection(); as section) {
         <h2 class="hd-section-title">{{ section.title || 'Untitled section' }}</h2>
         <div class="hd-field">

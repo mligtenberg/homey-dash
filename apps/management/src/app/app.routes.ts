@@ -1,6 +1,7 @@
 import { Route } from '@angular/router';
 import { DisplayPage } from './displays/display-page';
 import { DisplaysPage } from './displays/displays-page';
+import { DashboardsPage } from './dashboards-page';
 import { HomePage } from './home-page';
 import { Shell } from './shell';
 
@@ -11,7 +12,8 @@ export const appRoutes: Route[] = [
     path: '',
     component: Shell,
     children: [
-      { path: '', component: HomePage, title: 'HomeyDash' },
+      { path: '', component: HomePage, title: 'Overview · HomeyDash' },
+      { path: 'dashboards', component: DashboardsPage, title: 'Dashboards · HomeyDash' },
       { path: 'dashboards/:id', loadChildren: () => import('./editor/editor.routes') },
       { path: 'displays', component: DisplaysPage, title: 'Displays · HomeyDash' },
       {

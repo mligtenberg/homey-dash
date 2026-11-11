@@ -32,8 +32,9 @@ import {
   TileSettings,
 } from '@homey-dash/tiles';
 import { BackgroundField } from './background-field';
-import { LucideChevronLeft, LucideChevronRight, LucideEye, LucideEyeOff, LucideScanEye, LucidePlus, LucideTrash } from '@homey-dash/design-system';
+import { LucideChevronLeft, LucideChevronRight, LucideEye, LucideEyeOff, LucideScanEye, LucidePlus, LucideTrash, LucideLayoutDashboard } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
+import { TileKindChooser } from './tile-kind-chooser';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { AsDisplayPicker } from '../as-display-picker';
 import { DashboardsStore } from '../dashboards-store';
@@ -58,7 +59,7 @@ interface Drag {
 
 @Component({
   selector: 'hd-editor-page',
-  imports: [AsDisplayPicker, BackgroundArt, BackgroundField, LogicPanel, RouterLink, RuleEditor, TileHost, TilePanel, LucideDynamicIcon],
+  imports: [AsDisplayPicker, BackgroundArt, BackgroundField, LogicPanel, RouterLink, RuleEditor, TileHost, TileKindChooser, TilePanel, LucideDynamicIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // Logic tiles say which of their tiles they show.
   providers: [{ provide: LOGIC_TILE_BADGE, useValue: true }],
@@ -74,7 +75,7 @@ export class EditorPage {
   private readonly router = inject(Router);
   protected readonly kinds = inject(TileKindRegistry);
 
-  protected readonly icons = { LucidePlus, LucideChevronLeft, LucideChevronRight, LucideEye, LucideEyeOff, LucideScanEye, LucideTrash };
+  protected readonly icons = { LucidePlus, LucideChevronLeft, LucideChevronRight, LucideEye, LucideEyeOff, LucideScanEye, LucideTrash, LucideLayoutDashboard };
   protected readonly rowChoices = Array.from({ length: MAX_ROWS }, (_, i) => i + 1);
 
   protected readonly dashboard = signal<DashboardDetail | null>(null);
@@ -264,6 +265,8 @@ export class EditorPage {
     this.openSectionId.set(null);
     this.adding.set({ sectionId, position });
   }
+
+  protected readonly fits = (kind: TileKind) => this.canAdd(kind);
 
   protected canAdd(kind: TileKind): boolean {
     const at = this.adding();

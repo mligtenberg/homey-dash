@@ -1,4 +1,4 @@
-:host { display: flex; flex-direction: column; height: 100dvh; }
+:host { display: flex; flex-direction: column; height: 100dvh; --sec: var(--sec-dashboards); }
 
 .spacer { flex: 1; }
 
@@ -13,6 +13,7 @@ hd-background-art { grid-area: 1 / 1; position: relative; }
   border: 0; border-radius: 4px; background: none;
   font-family: inherit;
   &:hover, &:focus { background: var(--panel); outline: none; box-shadow: inset 0 0 0 1px var(--line); }
+  &:focus-visible { outline: 3px solid var(--brand); outline-offset: 1px; }
 }
 .icon-btn {
   display: grid; place-items: center;
@@ -65,14 +66,12 @@ hd-tile-host.is-selected { outline: 2.5px solid var(--brand); outline-offset: 4p
   overflow-y: auto;
   border-radius: var(--radius-panel);
 }
-.kinds { display: flex; flex-direction: column; gap: var(--space-2); }
-.kind { text-align: left; }
 .delete { align-self: flex-start; }
 .back {
   align-self: flex-start; display: inline-flex; align-items: center; gap: var(--space-1);
   svg { width: 16px; height: 16px; }
 }
-.save-error { max-width: 32em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.save-error { max-width: 32em; }
 
 @media (max-width: 860px) {
   :host { height: auto; }

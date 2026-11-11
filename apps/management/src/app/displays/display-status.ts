@@ -16,7 +16,8 @@ import { DisplaysStore } from './displays-store';
     } @else if (status.connected) {
       <span class="hd-pill hd-pill--ok hd-pill--dot">Connected</span>
     } @else {
-      <span class="hd-pill hd-pill--dot">{{ status.lastSeenAt ? 'Last seen ' + store.ago(status.lastSeenAt) : 'Never connected' }}</span>
+      <!-- Seen before but not now is stale, in warn, as on the Overview and in the sidebar. -->
+      <span class="hd-pill hd-pill--dot" [class.hd-pill--warn]="status.lastSeenAt">{{ status.lastSeenAt ? 'Last seen ' + store.ago(status.lastSeenAt) : 'Never connected' }}</span>
     }
     @if (status.connected) {
       @if (status.kiosk) {

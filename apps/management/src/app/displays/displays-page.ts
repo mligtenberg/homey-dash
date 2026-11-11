@@ -1,65 +1,87 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { LucideChevronRight, LucideMonitor } from '@homey-dash/design-system';
-import { LucideDynamicIcon } from '@lucide/angular';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { map } from 'rxjs';
+import { PageHeader } from '../page-header';
+import { DisplaySketch } from './display-sketch';
 import { DisplayStatus } from './display-status';
 import { DisplaysStore } from './displays-store';
 
-/** Every display at a glance, each opening to its own pages. Displays are added by running setup on a screen. */
+const TABS = { dashboards: 'Dashboards', idle: 'When idle', lock: 'Lock screen' } as const;
+type Tab = keyof typeof TABS;
+
+/**
+ * Every display, drawn as a screen with what it shows and how it is doing. Arriving from a task (`?then=idle`), it asks
+ * which display and opens that page of it. Displays are added by running setup on a screen.
+ */
 @Component({
   selector: 'hd-displays-page',
-  imports: [RouterLink, DisplayStatus, LucideDynamicIcon],
+  imports: [RouterLink, PageHeader, DisplaySketch, DisplayStatus],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'sec-displays' },
   template: `
-    <header class="hd-page__header">
-      <h1 class="hd-page__title">Displays</h1>
-    </header>
+    <hd-page-header section="displays" title="Displays" />
     <div class="hd-page__body">
-      <p class="hd-lead">Each screen in the home is a display. Open one to see how it is doing, choose what it shows, and set what it does when left alone.</p>
+      @if (then(); as then) {
+        <p class="hint" role="status">Pick the display whose {{ then === 'dashboards' ? 'dashboards' : then === 'idle' ? 'idle rules' : 'lock screen' }} you want to change.</p>
+      }
       @if (store.loaded() && store.list().length === 0) {
         <div class="hd-empty hd-panel">
           <h2 class="hd-panel__title">No displays yet</h2>
           <p>Open HomeyDash's display address on a screen in the home. It asks for a name and then shows up here.</p>
         </div>
       }
-      <div class="grid">
+      <ul class="grid">
         @for (display of store.list(); track display.id) {
-          <a class="card hd-panel" [routerLink]="['/displays', display.id]">
-            <div class="card__head">
-              <span class="hd-icon-tile" aria-hidden="true"><svg [lucideIcon]="monitor" /></span>
-              <h2 class="hd-panel__title">{{ display.name }}</h2>
-              <svg class="card__go" [lucideIcon]="chevron" aria-hidden="true" />
-            </div>
+          <li class="hd-panel cell">
+            <a class="open" [routerLink]="['/displays', display.id, then() ?? 'details']" [attr.aria-label]="display.name">
+              <hd-display-sketch [display]="display" [state]="false" />
+            </a>
             <hd-display-status [display]="display" />
-            <ul class="facts">
-              <li><strong>{{ display.dashboardIds.length }}</strong> {{ display.dashboardIds.length === 1 ? 'dashboard' : 'dashboards' }}</li>
-              <li><strong>{{ display.idleRules.length }}</strong> idle {{ display.idleRules.length === 1 ? 'rule' : 'rules' }}</li>
-              <li><strong>{{ display.lockWidgets.length }}</strong> lock {{ display.lockWidgets.length === 1 ? 'widget' : 'widgets' }}</li>
-            </ul>
-          </a>
+            <dl class="facts">
+              <div><dt>{{ display.dashboardIds.length === 1 ? 'dashboard' : 'dashboards' }}</dt><dd>{{ display.dashboardIds.length }}</dd></div>
+              <div><dt>{{ display.idleRules.length === 1 ? 'idle rule' : 'idle rules' }}</dt><dd>{{ display.idleRules.length }}</dd></div>
+              <div><dt>{{ display.lockWidgets.length === 1 ? 'lock widget' : 'lock widgets' }}</dt><dd>{{ display.lockWidgets.length }}</dd></div>
+            </dl>
+            <nav class="jump" [attr.aria-label]="'Pages of ' + display.name">
+              @for (tab of tabs; track tab.id) {
+                <a [routerLink]="['/displays', display.id, tab.id]" [class.is-next]="then() === tab.id">{{ tab.label }}</a>
+              }
+            </nav>
+          </li>
         }
-      </div>
+      </ul>
       @if (store.error(); as error) {
         <p class="hd-error" role="alert">{{ error }}</p>
       }
     </div>
   `,
   styles: `
-    .hd-page__body { max-width: none; }
-    .hd-empty { max-width: 640px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-3); }
-    .card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); color: inherit; text-decoration: none; transition: border-color .15s, box-shadow .15s; }
-    .card:hover, .card:focus-visible { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
-    .card__head { display: flex; align-items: center; gap: var(--space-3); }
-    .card__head h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .card__go { width: 18px; height: 18px; color: var(--ink-muted); }
-    .facts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--line); list-style: none; color: var(--ink-muted); font-size: 13px; }
-    .facts strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+    .hd-page__body { max-width: 1240px; }
+    .hint { margin: 0; padding: 10px 14px; border-radius: var(--radius-control); background: color-mix(in oklab, var(--sec) 10%, var(--panel)); border: 1px solid color-mix(in oklab, var(--sec) 30%, var(--line)); font-weight: 500; }
+    .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-4); }
+    .cell { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); }
+    .open { --screen-max: 240px; color: inherit; text-decoration: none; border-radius: 8px; }
+    .open:focus-visible { outline: 3px solid var(--brand); outline-offset: 4px; }
+    .facts { display: flex; flex-wrap: wrap; gap: 4px var(--space-4); margin: auto 0 0; padding-top: var(--space-3); border-top: 1px solid var(--line); }
+    .facts div { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+    .facts dt { order: 1; font-size: 13px; color: var(--ink-muted); }
+    .facts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .jump { display: flex; flex-wrap: wrap; gap: 4px var(--space-4); }
+    .jump a { font-size: 13px; font-weight: 600; color: var(--brand); text-decoration: none; white-space: nowrap; }
+    .jump a:hover, .jump a.is-next { text-decoration: underline; text-underline-offset: 3px; }
   `,
 })
 export class DisplaysPage {
   protected readonly store = inject(DisplaysStore);
-  protected readonly monitor = LucideMonitor;
-  protected readonly chevron = LucideChevronRight;
-
+  protected readonly tabs = (Object.keys(TABS) as Tab[]).map((id) => ({ id, label: TABS[id] }));
+  protected readonly then = toSignal(
+    inject(ActivatedRoute).queryParamMap.pipe(
+      map((q) => {
+        const then = q.get('then');
+        return then && then in TABS ? (then as Tab) : null;
+      }),
+    ),
+    { initialValue: null },
+  );
 }

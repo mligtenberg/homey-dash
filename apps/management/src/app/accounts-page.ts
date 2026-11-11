@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { AirPlayPanel } from './airplay-panel';
+import { PageHeader } from './page-header';
 import { HomeyAccountPanel } from './homey-account-panel';
 import { ImmichAccountPanel } from './immich-account-panel';
 import { PlexAccountPanel } from './plex-account-panel';
@@ -12,12 +13,10 @@ import { TomTomAccountPanel } from './tomtom-account-panel';
  */
 @Component({
   selector: 'hd-accounts-page',
-  imports: [AirPlayPanel, HomeyAccountPanel, ImmichAccountPanel, PlexAccountPanel, TomTomAccountPanel],
+  imports: [PageHeader, AirPlayPanel, HomeyAccountPanel, ImmichAccountPanel, PlexAccountPanel, TomTomAccountPanel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header class="hd-page__header">
-      <h1 class="hd-page__title">Accounts</h1>
-    </header>
+    <hd-page-header section="accounts" title="Accounts" />
     <div class="hd-page__body hd-page__body--narrow">
       <hd-homey-account-panel />
       <hd-immich-account-panel />

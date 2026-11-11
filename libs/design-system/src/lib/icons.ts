@@ -97,6 +97,13 @@ import {
   Workflow,
   X,
   Zap,
+  LayoutDashboard,
+  Calendar,
+  CornerDownLeft,
+  ArrowRight,
+  TriangleAlert,
+  CloudUpload,
+  Gauge,
 } from 'lucide';
 
 // Icons as plain data, not as @lucide/angular's icon components: those each carry their own copy of the template,
@@ -238,3 +245,10 @@ export const LucideWashingMachine = /* @__PURE__ */ icon(
 export const LucideWorkflow = /* @__PURE__ */ icon('workflow', Workflow);
 export const LucideX = /* @__PURE__ */ icon('x', X);
 export const LucideZap = /* @__PURE__ */ icon('zap', Zap);
+export const LucideLayoutDashboard = /* @__PURE__ */ icon('layout-dashboard', LayoutDashboard);
+export const LucideCalendar = /* @__PURE__ */ icon('calendar', Calendar);
+export const LucideCornerDownLeft = /* @__PURE__ */ icon('corner-down-left', CornerDownLeft);
+export const LucideArrowRight = /* @__PURE__ */ icon('arrow-right', ArrowRight);
+export const LucideTriangleAlert = /* @__PURE__ */ icon('triangle-alert', TriangleAlert);
+export const LucideCloudUpload = /* @__PURE__ */ icon('cloud-upload', CloudUpload);
+export const LucideGauge = /* @__PURE__ */ icon('gauge', Gauge);
