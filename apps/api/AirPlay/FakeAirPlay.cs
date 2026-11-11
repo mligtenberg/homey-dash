@@ -18,7 +18,17 @@ public sealed class FakeAirPlay : IAirPlay
     // The receivers that were paired; the bedroom TV is not until someone does.
     private readonly ConcurrentDictionary<string, bool> _paired = new([new(LivingRoomTv, true), new("fake-speaker", true)]);
 
-    private IReadOnlyList<AirPlayDevice> Devices => Known.Select(d => new AirPlayDevice(d.Id, d.Name, d.Kind, _paired.ContainsKey(d.Id))).ToList();
+    private readonly ConcurrentDictionary<string, string> _names = new();
+
+    public Task RenameAsync(string deviceId, string? name, CancellationToken ct)
+    {
+        if (Known.All(d => d.Id != deviceId)) throw new AirPlayException("That receiver isn't on the network.");
+        if (string.IsNullOrWhiteSpace(name)) _names.TryRemove(deviceId, out _);
+        else _names[deviceId] = name.Trim();
+        return Task.CompletedTask;
+    }
+
+    private IReadOnlyList<AirPlayDevice> Devices => Known.Select(d => new AirPlayDevice(d.Id, _names.GetValueOrDefault(d.Id) ?? d.Name, d.Kind, _paired.ContainsKey(d.Id))).ToList();
 
     public event Action<string>? Ended;
 

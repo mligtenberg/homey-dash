@@ -67,4 +67,9 @@ export class AirPlayAccountApi {
   finishPairing(deviceId: string, pin: string) {
     return this.http.post<void>(`/api/accounts/airplay/${encodeURIComponent(deviceId)}/pair/finish`, { pin });
   }
+
+  /** Gives the receiver a name of our own; an empty name goes back to the one it calls itself. */
+  rename(deviceId: string, name: string) {
+    return this.http.put<void>(`/api/accounts/airplay/${encodeURIComponent(deviceId)}/name`, { name });
+  }
 }

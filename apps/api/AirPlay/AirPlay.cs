@@ -40,6 +40,9 @@ public interface IAirPlay
     // Pauses or resumes what plays on the receiver.
     Task SetPausedAsync(string deviceId, bool paused, CancellationToken ct);
 
+    // Gives the receiver a name of our own, shown in place of what it calls itself; an empty name goes back to that.
+    Task RenameAsync(string deviceId, string? name, CancellationToken ct);
+
     // Makes the receiver show a PIN, which PairFinishAsync then takes; its credentials are kept for later.
     Task PairStartAsync(string deviceId, CancellationToken ct);
 

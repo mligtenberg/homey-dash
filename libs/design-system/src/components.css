@@ -1258,6 +1258,10 @@ a.hd-btn { text-decoration: none; }
 .hd-plex-recent__play:focus-visible, .hd-plex-recent__receiver:focus-visible { outline: 3px solid #e5a00d; outline-offset: 3px; }
 .hd-plex-recent__play svg, .hd-plex-recent__receiver svg { width: 1.3em; height: 1.3em; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
 .hd-plex-recent__receivers { display: flex; flex-wrap: wrap; gap: calc(var(--cell) * .08); }
+/* The receiver picker takes the place of the two buttons, so it is as tall as them rather than the generic cast control. */
+.hd-plex-recent__cast .hd-cast__receivers { gap: calc(var(--cell) * .1); align-items: center; }
+.hd-plex-recent__cast .hd-cast__button { min-height: 44px; font-weight: 800; }
+.hd-plex-recent__cast .hd-cast__cancel { min-height: 44px; padding: 0 calc(var(--cell) * .2); box-shadow: inset 0 0 0 2px rgb(255 255 255 / .3); }
 .hd-plex-recent__cast-error { flex-basis: 100%; font: 700 max(var(--t-detail-min), calc(var(--cell) * var(--t-detail)))/1.3 var(--font-sans); color: var(--danger); }
 .hd-plex-recent__casting {
   position: absolute; z-index: 2; top: calc(var(--cell) * .08); right: calc(var(--cell) * .08); display: grid; place-items: center;

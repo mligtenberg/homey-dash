@@ -8,6 +8,8 @@ public static class AirPlayEndpoints
 {
     public sealed record Pairing(string? Pin);
 
+    public sealed record Rename(string? Name);
+
     public static IServiceCollection AddAirPlay(this IServiceCollection services, IConfiguration configuration)
     {
         var options = configuration.GetSection("AirPlay").Get<AirPlayOptions>() ?? new AirPlayOptions();
@@ -75,6 +77,12 @@ public static class AirPlayEndpoints
                 return Results.Problem(e.Message, statusCode: StatusCodes.Status502BadGateway);
             }
         });
+
+        // A name of our own for a receiver; an empty name goes back to what it calls itself.
+        airPlay.MapPut("/{id}/name", async (string id, Rename body, AirPlayOptions options, IAirPlay service, CancellationToken ct) =>
+            body.Name is { Length: > 60 }
+                ? Results.ValidationProblem(new Dictionary<string, string[]> { ["name"] = ["Use at most 60 characters."] })
+                : await Pair(options, () => service.RenameAsync(id, body.Name, ct)));
 
         // The receiver shows a PIN for finish.
         airPlay.MapPost("/{id}/pair", async (string id, AirPlayOptions options, IAirPlay service, CancellationToken ct) =>

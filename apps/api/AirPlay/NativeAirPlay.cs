@@ -34,8 +34,9 @@ public sealed class NativeAirPlay(AirPlayOptions options, ILogger<NativeAirPlay>
         LoadKnown();
         if (Stale) await SearchNetwork().WaitAsync(ct);
         var credentials = ReadCredentials();
-        return _known.Values.OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(r => new AirPlayDevice(r.Id, r.Name, r.Kind, credentials.ContainsKey(r.Id))).ToList();
+        var names = ReadNames();
+        return _known.Values.Select(r => new AirPlayDevice(r.Id, names.GetValueOrDefault(r.Id) ?? r.Name, r.Kind, credentials.ContainsKey(r.Id)))
+            .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     public async Task<IReadOnlyList<AirPlayDevice>> PairedAsync(CancellationToken ct)
@@ -45,8 +46,10 @@ public sealed class NativeAirPlay(AirPlayOptions options, ILogger<NativeAirPlay>
         // Looking is started for the play that follows, and not waited for unless there is nothing yet to offer.
         var search = Stale ? SearchNetwork() : null;
         if (search is not null && paired.Any(id => !_known.ContainsKey(id))) await search.WaitAsync(ct);
-        return paired.Where(_known.ContainsKey).Select(id => _known[id]).OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(r => new AirPlayDevice(r.Id, r.Name, r.Kind, true)).ToList();
+        var names = ReadNames();
+        return paired.Where(_known.ContainsKey).Select(id => _known[id])
+            .Select(r => new AirPlayDevice(r.Id, names.GetValueOrDefault(r.Id) ?? r.Name, r.Kind, true))
+            .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     public async Task PlayAsync(string deviceId, string url, CancellationToken ct)
@@ -102,6 +105,24 @@ public sealed class NativeAirPlay(AirPlayOptions options, ILogger<NativeAirPlay>
         {
             if (!_players.TryGetValue(deviceId, out var player)) throw new AirPlayException("Nothing is playing on that Apple TV.");
             await player.SetPausedAsync(paused, ct);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task RenameAsync(string deviceId, string? name, CancellationToken ct)
+    {
+        LoadKnown();
+        if (!_known.ContainsKey(deviceId) && !ReadCredentials().ContainsKey(deviceId)) throw new AirPlayException("That receiver isn't known.");
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var names = ReadNames();
+            if (string.IsNullOrWhiteSpace(name)) names.Remove(deviceId);
+            else names[deviceId] = name.Trim();
+            WriteJson(NamesPath, names);
         }
         finally
         {
@@ -233,6 +254,23 @@ public sealed class NativeAirPlay(AirPlayOptions options, ILogger<NativeAirPlay>
         catch (JsonException)
         {
             throw new AirPlayException("The saved AirPlay pairings could not be read.");
+        }
+    }
+
+    // ---- the names given in Management, receiver id to name, in place of what the receiver calls itself ----
+
+    private string NamesPath => Path.Combine(Path.GetDirectoryName(Path.GetFullPath(options.CredentialsPath)) ?? "",
+        Path.GetFileNameWithoutExtension(options.CredentialsPath) + "-names.json");
+
+    private Dictionary<string, string> ReadNames()
+    {
+        try
+        {
+            return File.Exists(NamesPath) ? JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(NamesPath)) ?? [] : [];
+        }
+        catch (Exception e) when (e is JsonException or IOException)
+        {
+            return [];
         }
     }
 

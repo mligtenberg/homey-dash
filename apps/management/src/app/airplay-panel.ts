@@ -49,7 +49,18 @@ import { firstValueFrom } from 'rxjs';
                 <strong>{{ device.name }}</strong>
                 <span class="hd-muted">{{ device.paired ? 'Paired' : 'Not paired' }}</span>
               </div>
-              @if (pairing()?.id === device.id) {
+              @if (renaming()?.id === device.id) {
+                <form class="pin" (submit)="saveName($event, device, name.value)">
+                  <div class="hd-field">
+                    <label class="hd-field__label" [for]="'airplay-name-' + device.id">Name</label>
+                    <input #name [id]="'airplay-name-' + device.id" class="hd-input" maxlength="60" [value]="device.name" />
+                  </div>
+                  <div class="hd-actions">
+                    <button class="hd-btn hd-btn--primary" type="submit">Save</button>
+                    <button class="hd-btn" type="button" (click)="renaming.set(null)">Cancel</button>
+                  </div>
+                </form>
+              } @else if (pairing()?.id === device.id) {
                 @if (pairing()!.step === 'starting') {
                   <span class="hd-muted" role="status">Asking {{ device.name }} for a PIN…</span>
                 } @else {
@@ -79,6 +90,7 @@ import { firstValueFrom } from 'rxjs';
                 }
               } @else {
                 <div class="hd-actions">
+                  <button class="hd-btn" type="button" (click)="renaming.set({ id: device.id })">Rename</button>
                   <button class="hd-btn" type="button" [disabled]="!!pairing()" (click)="startPairing(device)">
                     {{ device.paired ? 'Pair again' : 'Pair' }}
                   </button>
@@ -116,6 +128,9 @@ export class AirPlayPanel {
   /** The Apple TV being paired: asking it for a PIN, waiting for the PIN, or checking it. */
   protected readonly pairing = signal<{ id: string; step: 'starting' | 'pin' | 'finishing'; error?: string } | null>(null);
 
+  /** The Apple TV being renamed. */
+  protected readonly renaming = signal<{ id: string } | null>(null);
+
   constructor() {
     this.load();
   }
@@ -133,6 +148,17 @@ export class AirPlayPanel {
       this.error.set(apiProblem(e, 'Could not look for Apple TVs. Try again.'));
     } finally {
       this.looking.set(false);
+    }
+  }
+
+  protected async saveName(event: Event, device: AirPlayDevice, name: string) {
+    event.preventDefault();
+    try {
+      await firstValueFrom(this.api.rename(device.id, name));
+      this.renaming.set(null);
+      await this.load();
+    } catch (e) {
+      this.error.set(apiProblem(e, `Could not rename ${device.name}.`));
     }
   }
 

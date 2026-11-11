@@ -27,6 +27,19 @@ public sealed class AirPlayAccountsApiTests(ApiFactory factory) : IClassFixture<
     }
 
     [Fact]
+    public async Task Renaming_ShowsTheNewNameAndAnEmptyNameGoesBack()
+    {
+        var renamed = await _client.PutAsJsonAsync("/api/accounts/airplay/fake-speaker/name", new { name = " Study speaker " });
+        var name = (await StatusAsync()).GetProperty("devices").EnumerateArray().First(d => d.GetProperty("id").GetString() == "fake-speaker").GetProperty("name").GetString();
+        await _client.PutAsJsonAsync("/api/accounts/airplay/fake-speaker/name", new { name = "" });
+        var reset = (await StatusAsync()).GetProperty("devices").EnumerateArray().First(d => d.GetProperty("id").GetString() == "fake-speaker").GetProperty("name").GetString();
+
+        Assert.Equal(HttpStatusCode.NoContent, renamed.StatusCode);
+        Assert.Equal("Study speaker", name);
+        Assert.Equal("Kitchen speaker", reset);
+    }
+
+    [Fact]
     public async Task Pairing_TakesThePinTheReceiverShows()
     {
         var start = await _client.PostAsync("/api/accounts/airplay/fake-bedroom/pair", null);
