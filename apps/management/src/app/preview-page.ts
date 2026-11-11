@@ -36,7 +36,9 @@ const MARGIN = 24;
         </ol>
         <span class="hd-mark hd-mark--lg" aria-hidden="true"><svg [lucideIcon]="icon" /></span>
         <h1 class="hd-page__title">{{ 'Preview' | t }}</h1>
-        <span class="hd-pill">{{ sizeLabel() }}</span>
+        @if (sizeLabel(); as label) {
+          <span class="hd-pill">{{ label }}</span>
+        }
         <span class="spacer"></span>
         <hd-as-display-picker />
         <a class="hd-btn hd-btn--primary" [routerLink]="['/dashboards', id()]">{{ 'Back to editor' | t }}</a>
@@ -129,7 +131,7 @@ export class PreviewPage {
   protected readonly sizeLabel = computed(() => {
     const display = this.display();
     const screen = this.screen();
-    if (!display) return 'The draft, fitted to this window';
+    if (!display) return '';
     if (!screen) return `${display.name} hasn't said its screen size; fitted to this window`;
     const scale = this.scale();
     return `${display.name} · ${screen.width} × ${screen.height}${scale < 1 ? ` · shown at ${Math.round(scale * 100)}%` : ''}`;

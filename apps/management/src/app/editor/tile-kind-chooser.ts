@@ -6,6 +6,7 @@ import {
   LucideChartLine,
   LucideClapperboard,
   LucideClock,
+  LucideTimer,
   LucideCloudSun,
   LucideImage,
   LucideLibrary,
@@ -50,6 +51,7 @@ const INFO: Record<string, KindInfo> = {
   traffic: { icon: LucideCar, hue: 'neutral', group: 'Information', about: 'Travel time on a route, with delays' },
   news: { icon: LucideNewspaper, hue: 'neutral', group: 'Information', about: 'Headlines, videos and livestreams' },
   clock: { icon: LucideClock, hue: 'neutral', group: 'Information', about: 'The time' },
+  timer: { icon: LucideTimer, hue: 'neutral', group: 'Information', about: 'Timers with an alert' },
   date: { icon: LucideCalendar, hue: 'neutral', group: 'Information', about: 'Today’s date' },
 };
 const GROUPS = ['Homey', 'Media', 'Information', 'Other'];

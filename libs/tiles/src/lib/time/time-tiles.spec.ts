@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TileSize } from '@homey-dash/layout';
 import { ClockTile } from './clock-tile';
 import { DateTile } from './date-tile';
-import { ClockTileSettings, DateTileSettings, digitalTime, handAngles, monthGrid, weekNumber } from './time-data';
+import { ClockTileSettings, DateTileSettings, digitalTime, handAngles, monthGrid, timerText, weekNumber } from './time-data';
 import { TIME_TILES } from './time-tiles';
 
 // Sunday 8 November 2026, 14:05:30 local time.
@@ -20,6 +20,13 @@ describe('time helpers', () => {
   it('turns the hands of an analog clock continuously', () => {
     expect(handAngles(AT)).toEqual({ hour: 2 * 30 + 2.5, minute: 5 * 6 + 3, second: 180 });
     expect(handAngles(new Date(2026, 0, 1, 0, 0, 0))).toEqual({ hour: 0, minute: 0, second: 0 });
+  });
+
+  it('writes the time left on a timer, rounded up', () => {
+    expect(timerText(245_000)).toBe('4:05');
+    expect(timerText(244_100)).toBe('4:05');
+    expect(timerText(3_845_000)).toBe('1:04:05');
+    expect(timerText(-5)).toBe('0:00');
   });
 
   it('numbers weeks by ISO 8601', () => {
@@ -64,10 +71,11 @@ describe('clock and date tiles', () => {
   const clock = (settings: ClockTileSettings, size: TileSize = 'small') => render(ClockTile, { settings, size }).nativeElement as HTMLElement;
   const date = (settings: DateTileSettings, size: TileSize) => render(DateTile, { settings, size }).nativeElement as HTMLElement;
 
-  it('registers both as tiles that point at nothing', () => {
+  it('registers all as tiles that point at nothing', () => {
     expect(TIME_TILES.kinds.map((k) => [k.id, k.target])).toEqual([
       ['clock', 'none'],
       ['date', 'none'],
+      ['timer', 'none'],
     ]);
   });
 

@@ -96,3 +96,19 @@ export function weekdayNames(): string[] {
   // 2024-01-01 was a Monday.
   return Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(formatTag(), { weekday: 'short' }));
 }
+
+export interface TimerTileSettings extends TileSettings {
+  /** The lengths, in minutes, of the buttons that start a timer; 1, 5, 10 and 15 by default. */
+  minutes?: number[];
+}
+
+/** The lengths of the buttons a timer tile starts a timer with, unless its settings say otherwise. */
+export const DEFAULT_TIMER_MINUTES: readonly number[] = [1, 5, 10, 15];
+
+/** Time left on a timer as `4:05`, or `1:04:05` from an hour; rounded up so it reads 0:00 only when it is over. */
+export function timerText(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const [h, m, s] = [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60];
+  const two = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${m}:${two(s)}`;
+}

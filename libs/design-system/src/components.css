@@ -1669,6 +1669,98 @@ a.hd-btn { text-decoration: none; }
 .hd-clock__hand--second { stroke: var(--kind-heat-ink); stroke-width: 1.4; }
 .hd-clock__pin { fill: var(--ink); }
 
+/*
+ * Timer tile: the timer that ends first is the hero; the others queue under it. Controls are tinted, never raised, and a
+ * ringing tile fills with its kind (`is-active`), so it reads from across the room.
+ */
+.hd-timer { --timer-size: .34; gap: calc(var(--cell) * .06); }
+.hd-timer[data-size="large"] { --timer-size: .34; }
+.hd-timer[data-size="full-large"] { --timer-size: .4; }
+.hd-timer__main { flex: 1 1 0; min-height: 0; min-width: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: calc(var(--cell) * .04); }
+.hd-timer__head { display: flex; align-items: flex-start; justify-content: space-between; gap: calc(var(--cell) * .06); }
+.hd-timer__name { min-width: 0; display: flex; align-items: baseline; gap: .4em; white-space: nowrap; }
+.hd-timer__name .hd-tile__name { overflow: hidden; text-overflow: ellipsis; }
+.hd-timer__digits { font-size: calc(var(--cell) * var(--timer-size)); }
+.hd-timer__digits.is-done { animation: hd-timer-ring 1s steps(2, jump-none) infinite; }
+.hd-timer__icon { align-self: flex-start; }
+.hd-timer__x { stroke-width: 2.5; }
+.hd-timer__head > .hd-round-btn { flex: none; width: calc(var(--cell) * .32); height: calc(var(--cell) * .32); }
+.hd-timer__head > .hd-timer__stop { flex: none; min-height: calc(var(--cell) * .32); }
+.hd-timer__others { margin: 0; }
+.hd-timer__main .hd-progress { --progress-height: .06; --progress-fill: var(--k-ink); }
+.hd-timer.is-active .hd-progress { --progress-track: color-mix(in oklab, var(--ink) 16%, transparent); --progress-fill: var(--ink); }
+.hd-timer__queue { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--cell) * .04); }
+.hd-timer[data-size="full-large"] .hd-timer__queue { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--cell) * .04) calc(var(--cell) * .2); }
+.hd-timer__queue li { display: flex; align-items: center; gap: calc(var(--cell) * .08); }
+.hd-timer__queue .hd-tile__detail { flex: 1; margin: 0; }
+.hd-timer__qtime { font-size: max(var(--t-title-min), calc(var(--cell) * var(--t-title))); font-weight: 800; font-variant-numeric: tabular-nums; }
+.hd-timer__queue .is-done .hd-timer__qtime { animation: hd-timer-ring 1s steps(2, jump-none) infinite; }
+.hd-timer__queue .hd-round-btn { width: calc(var(--cell) * .3); height: calc(var(--cell) * .3); }
+.hd-timer__add { display: flex; gap: calc(var(--cell) * .06); }
+.hd-timer__preset, .hd-timer__stop {
+  flex: 1 1 0; min-height: max(44px, calc(var(--cell) * .34)); padding: 0 calc(var(--cell) * .08);
+  display: inline-flex; align-items: baseline; justify-content: center; gap: .1em;
+  border: 0; border-radius: var(--radius-pill); cursor: pointer;
+  font: 700 max(var(--t-name-min), calc(var(--cell) * var(--t-name)))/1 var(--font-sans); font-variant-numeric: tabular-nums;
+  background: color-mix(in oklab, var(--k-ink) 12%, transparent); color: var(--k-ink);
+  align-items: center; transition: transform .1s;
+}
+.hd-timer.is-active .hd-timer__preset { background: color-mix(in oklab, var(--ink) 10%, transparent); color: var(--ink); }
+.hd-timer__preset .hd-unit { margin: 0; color: inherit; }
+.hd-timer__stop { flex: none; padding-inline: calc(var(--cell) * .16); background: var(--k-ink); color: var(--on-kind); }
+.hd-timer__preset:active, .hd-timer__stop:active { transform: scale(.95); }
+.hd-timer :is(button):focus-visible { outline: 3px solid var(--k-ink); outline-offset: 3px; }
+.hd-timer__digits.is-paused { opacity: .55; }
+/* The timer's full screen, built on `.hd-dev`: the dial for a new timer is the hero, the running timers the controls. */
+.hd-timer-panel__new { gap: calc(var(--cell) * .14); }
+.hd-timer-panel__dial { display: grid; grid-template-columns: repeat(3, auto); gap: calc(var(--cell) * .24); justify-content: center; }
+.hd-timer-panel__unit { display: flex; flex-direction: column; align-items: center; gap: calc(var(--cell) * .08); }
+.hd-timer-panel__unit .hd-round-btn { width: calc(var(--cell) * .44); height: calc(var(--cell) * .44); }
+.hd-timer-panel__unit .hd-dev__big { font-size: calc(var(--cell) * .5); white-space: nowrap; overflow-wrap: normal; }
+.hd-timer-panel__new .hd-segmented { width: min(100%, calc(var(--cell) * 4)); }
+.hd-timer-panel__name {
+  box-sizing: border-box; width: min(100%, calc(var(--cell) * 4)); min-height: 44px; padding: 0 calc(var(--cell) * .2);
+  border: 0; border-radius: var(--radius-pill); background: color-mix(in oklab, var(--k-ink) 10%, transparent); color: var(--ink);
+  font: 600 max(16px, calc(var(--cell) * var(--t-sub)))/1 var(--font-sans); text-align: center;
+}
+.hd-timer-panel__name::placeholder { color: var(--ink-muted); }
+.hd-timer-panel__name:focus-visible { outline: 3px solid var(--k-ink); outline-offset: 3px; }
+.hd-timer-panel__new .hd-segmented button[aria-pressed="true"] { background-color: var(--k-ink); color: var(--on-kind); }
+.hd-timer-panel__start { flex: none; width: min(100%, calc(var(--cell) * 4)); min-height: max(52px, calc(var(--cell) * .6)); font-size: max(var(--t-title-min), calc(var(--cell) * var(--t-title))); }
+.hd-timer-panel__start:disabled { opacity: .45; cursor: default; }
+.hd-timer-panel__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: calc(var(--cell) * .12); }
+.hd-timer-panel__what { min-width: 0; display: flex; flex-direction: column; gap: calc(var(--cell) * .05); }
+.hd-timer-panel__what .hd-progress { --progress-height: .05; --progress-fill: var(--k-ink); }
+.hd-timer-panel__left { white-space: nowrap; }
+.hd-timer-panel__row.is-paused :is(.hd-timer-panel__left, .hd-progress) { opacity: .55; }
+.hd-timer-panel__row.is-done .hd-timer-panel__left { color: var(--kind-heat-ink); animation: hd-timer-ring 1s steps(2, jump-none) infinite; }
+.hd-timer-panel__actions { display: flex; gap: calc(var(--cell) * .06); }
+.hd-timer-panel__more { font-size: calc(var(--cell) * .18); }
+.hd-timer-panel__actions .hd-round-btn { width: calc(var(--cell) * .46); height: calc(var(--cell) * .46); }
+.hd-timer-panel__dial button:focus-visible, .hd-timer-panel__actions button:focus-visible, .hd-timer-panel__start:focus-visible { outline: 3px solid var(--k-ink); outline-offset: 3px; }
+/*
+ * Wide and full are one row of the timer (its reading, how far it is and the stop or cancel button) over one row of start buttons,
+ * which give their length in minutes, without the unit on wide. With no timer the row is the icon and the name.
+ */
+.hd-timer:is([data-size="wide"], [data-size="full"]) { --timer-size: .27; justify-content: space-between; gap: calc(var(--cell) * .05); }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__main { flex: 1 1 0; row-gap: calc(var(--cell) * .02); align-content: center; overflow: visible; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: calc(var(--cell) * .1); }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__head { display: contents; }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__name { display: none; }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__digits { order: 1; }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__main .hd-progress { order: 2; }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__head > :is(.hd-round-btn, .hd-timer__stop) { order: 3; }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__icon { width: calc(var(--cell) * .3); height: calc(var(--cell) * .3); align-self: center; }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__main > div:not(.hd-timer__head) { grid-column: 2 / -1; display: flex; align-items: baseline; gap: calc(var(--cell) * .1); min-width: 0; }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__main > div:not(.hd-timer__head) .hd-tile__detail { margin: 0; }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__head > .hd-round-btn { width: calc(var(--cell) * .28); height: calc(var(--cell) * .28); }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__others { order: 4; grid-column: 1 / -1; margin: 0; line-height: 1; }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__stop { min-height: calc(var(--cell) * .26); padding-inline: calc(var(--cell) * .14); }
+.hd-timer[data-size="wide"] .hd-timer__preset .hd-unit { display: none; }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__add { gap: calc(var(--cell) * .04); }
+.hd-timer:is([data-size="wide"], [data-size="full"]) .hd-timer__preset { padding: 0; min-width: 0; }
+@keyframes hd-timer-ring { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .hd-timer-panel__row.is-done .hd-timer-panel__left, .hd-timer__digits.is-done, .hd-timer__queue .is-done .hd-timer__qtime { animation: none; } }
+
 .hd-date { gap: calc(var(--cell) * .04); }
 .hd-date[data-size="small"] { justify-content: center; align-items: center; text-align: center; }
 .hd-date[data-size="small"] .hd-date__day { align-items: center; }

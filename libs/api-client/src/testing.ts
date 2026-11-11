@@ -25,6 +25,7 @@ import {
   ScreenView,
   SpeakerMusic,
   SpeakerMusicKind,
+  TimerView,
 } from './index';
 
 /**
@@ -110,6 +111,25 @@ export class FakeRealtime implements Partial<Realtime> {
 
   async plex() {
     return this.plexSnapshot;
+  }
+
+  /** The shared timers, kept as the backend keeps them: saving or removing one tells every listener, this one too. */
+  timerList: TimerView[] = [];
+
+  async timers() {
+    return this.timerList;
+  }
+
+  async saveTimer(timer: TimerView) {
+    this.commands.push(['saveTimer', timer.id]);
+    this.timerList = this.timerList.some((t) => t.id === timer.id) ? this.timerList.map((t) => (t.id === timer.id ? timer : t)) : [...this.timerList, timer];
+    this.push('Timers', this.timerList);
+  }
+
+  async removeTimer(id: string) {
+    this.commands.push(['removeTimer', id]);
+    this.timerList = this.timerList.filter((t) => t.id !== id);
+    this.push('Timers', this.timerList);
   }
 
   /** What `forecasts()` answers: the weather where each Homey is. */

@@ -2,6 +2,7 @@ using HomeyDash.Api.Dashboards;
 using HomeyDash.Api.Data;
 using HomeyDash.Api.Displays;
 using HomeyDash.Api.Photos;
+using HomeyDash.Api.Timers;
 using HomeyDash.Api.News;
 using HomeyDash.Api.Traffic;
 using HomeyDash.Api.Weather;
@@ -49,4 +50,8 @@ public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresen
     // Every photo set, to every connection: displays show their photos, Management also how syncing with Immich went.
     public async Task PhotoSetsChangedAsync(HomeyDashDbContext db, CancellationToken ct) =>
         await hub.Clients.All.SendAsync("PhotoSets", await PhotoEndpoints.ListAsync(db, sync, immich, ct), ct);
+
+    // Every shared timer, to every connection.
+    public async Task TimersChangedAsync(HomeyDashDbContext db, CancellationToken ct) =>
+        await hub.Clients.All.SendAsync("Timers", await TimerEndpoints.ListAsync(db, ct), ct);
 }

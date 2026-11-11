@@ -8,6 +8,7 @@ using HomeyDash.Api.Photos;
 using HomeyDash.Api.Plex;
 using HomeyDash.Api.Rules;
 using HomeyDash.Api.News;
+using HomeyDash.Api.Timers;
 using HomeyDash.Api.Traffic;
 using HomeyDash.Api.Weather;
 using Microsoft.AspNetCore.SignalR;
@@ -21,7 +22,7 @@ namespace HomeyDash.Api.Realtime;
 /// again when a Homey account is added, removed or renamed. A screen joins with its screen id and is told which
 /// display it is with <c>Screen</c>; Management joins to receive <c>Displays</c> with every display's status and
 /// <c>Dashboards</c> with the dashboard list. Every connection also receives <c>PhotoSets</c> whenever a photo set changes,
-/// <c>Plex</c> and <c>PlexSessions</c> as Plex's libraries and what plays change, and <c>Forecasts</c> as the weather where
+/// <c>Timers</c> as the shared timers change, <c>Plex</c> and <c>PlexSessions</c> as Plex's libraries and what plays change, and <c>Forecasts</c> as the weather where
 /// each Homey is changes. A connection can subscribe to rules
 /// (ADR-0010), whose changed answers arrive as <c>RuleAnswers</c>.
 /// Mirrored in libs/api-client/src/lib/realtime.ts.
@@ -65,6 +66,23 @@ public sealed class RealtimeHub(
 
     // Every Plex account's libraries, and what plays now. Changes that follow arrive as Plex and PlexSessions.
     public PlexSnapshot Plex() => plexWatcher.Snapshot;
+
+    // The timers every screen shares. Changes that follow arrive as Timers.
+    public Task<List<TimerView>> Timers() => TimerEndpoints.ListAsync(db, Context.ConnectionAborted);
+
+    // Starts a timer or changes one (paused, resumed, given time, restarted); every connection is told.
+    public async Task SaveTimer(TimerView timer)
+    {
+        await TimerEndpoints.SaveAsync(db, timer, Context.ConnectionAborted);
+        await notifier.TimersChangedAsync(db, Context.ConnectionAborted);
+    }
+
+    // Stops or cancels a timer on every screen.
+    public async Task RemoveTimer(Guid id)
+    {
+        await TimerEndpoints.RemoveAsync(db, id, Context.ConnectionAborted);
+        await notifier.TimersChangedAsync(db, Context.ConnectionAborted);
+    }
 
     // The weather where each Homey is, oldest account first (ADR-0013). Changes that follow arrive as Forecasts.
     public IReadOnlyList<Forecast> Forecasts() => weather.All;

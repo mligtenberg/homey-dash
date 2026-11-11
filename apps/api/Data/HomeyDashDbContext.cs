@@ -4,6 +4,7 @@ using HomeyDash.Api.Dashboards;
 using HomeyDash.Api.Displays;
 using HomeyDash.Api.Photos;
 using HomeyDash.Api.Plex;
+using HomeyDash.Api.Timers;
 using HomeyDash.Api.Traffic;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,6 +20,7 @@ public class HomeyDashDbContext(DbContextOptions<HomeyDashDbContext> options) : 
     public DbSet<PlexAccount> PlexAccounts => Set<PlexAccount>();
     public DbSet<TomTomAccount> TomTomAccounts => Set<TomTomAccount>();
     public DbSet<PhotoSet> PhotoSets => Set<PhotoSet>();
+    public DbSet<SharedTimer> Timers => Set<SharedTimer>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -78,6 +80,8 @@ public class HomeyDashDbContext(DbContextOptions<HomeyDashDbContext> options) : 
             account.Property(a => a.Name).HasMaxLength(AccountEndpoints.MaxNameLength);
             account.Ignore(a => a.Connection);
         });
+
+        model.Entity<SharedTimer>(timer => timer.Property(t => t.Name).HasMaxLength(SharedTimer.MaxNameLength));
 
         model.Entity<PhotoSet>(set =>
         {

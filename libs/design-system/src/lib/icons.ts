@@ -22,6 +22,7 @@ import {
   ChevronsUp,
   Clapperboard,
   Clock,
+  Timer,
   Cloud,
   CloudDrizzle,
   CloudFog,
@@ -60,6 +61,7 @@ import {
   Moon,
   Music,
   Newspaper,
+  Minus,
   Pause,
   Play,
   Plug,
@@ -150,6 +152,7 @@ export const LucideClapperboard = /* @__PURE__ */ icon(
   Clapperboard,
 );
 export const LucideClock = /* @__PURE__ */ icon('clock', Clock);
+export const LucideTimer = /* @__PURE__ */ icon('timer', Timer);
 export const LucideCloud = /* @__PURE__ */ icon('cloud', Cloud);
 export const LucideCloudDrizzle = /* @__PURE__ */ icon(
   'cloud-drizzle',
@@ -199,6 +202,7 @@ export const LucideMonitor = /* @__PURE__ */ icon('monitor', Monitor);
 export const LucideMonitorCog = /* @__PURE__ */ icon('monitor-cog', MonitorCog);
 export const LucideMoon = /* @__PURE__ */ icon('moon', Moon);
 export const LucideMusic = /* @__PURE__ */ icon('music', Music);
+export const LucideMinus = /* @__PURE__ */ icon('minus', Minus);
 export const LucidePause = /* @__PURE__ */ icon('pause', Pause);
 export const LucidePlay = /* @__PURE__ */ icon('play', Play);
 export const LucidePlug = /* @__PURE__ */ icon('plug', Plug);

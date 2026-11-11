@@ -7,6 +7,7 @@ import { PhotoSet } from './photos';
 import { PlexActor, PlexCommand, PlexItem, PlexOverview, PlexPage, PlexPerson, PlexProfileList, PlexSession, PlexSnapshot, PlexTracks } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
 import { NewsFeed } from './news';
+import { TimerView } from './timers';
 import { RouteTraffic } from './traffic';
 import { Forecast } from './weather';
 import { CapabilityValue, DeviceApp, HomeyDevice, HomeyEnergy, HomeyFlow, HomeyFlowFolder, HomeyMood, HomeyStatus, HomeyUser, HomeyWeather, HomeyZone, SpeakerMusic, SpeakerMusicKind } from './homey';
@@ -76,6 +77,8 @@ export interface RealtimeMessages {
   News: NewsFeed[];
   /** What plays on AirPlay receivers, whenever it changes: started, paused, changed or ended. */
   AirPlayNow: AirPlayPlayback[];
+  /** Every shared timer, whenever one is started, changed or removed. */
+  Timers: TimerView[];
   /** The answers to this connection's rule subscriptions that one change altered. */
   RuleAnswers: RuleAnswers;
 }
@@ -147,6 +150,21 @@ export class Realtime {
   /** Plex's libraries and what plays now; changes that follow arrive as `Plex` and `PlexSessions`. */
   plex() {
     return this.hub.invoke<PlexSnapshot>('Plex');
+  }
+
+  /** The timers every screen shares; changes that follow arrive as `Timers`. */
+  timers() {
+    return this.hub.invoke<TimerView[]>('Timers');
+  }
+
+  /** Starts a timer or changes one; every screen is told. */
+  saveTimer(timer: TimerView) {
+    return this.hub.invoke<void>('SaveTimer', timer);
+  }
+
+  /** Stops or cancels a timer on every screen. */
+  removeTimer(id: string) {
+    return this.hub.invoke<void>('RemoveTimer', id);
   }
 
   /** The weather where each Homey is, oldest account first; changes that follow arrive as `Forecasts`. */
