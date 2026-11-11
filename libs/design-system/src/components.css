@@ -1233,7 +1233,9 @@ a.hd-btn { text-decoration: none; }
   display: grid; place-items: center; aspect-ratio: 1; margin-bottom: calc(var(--cell) * .06); border-radius: 50%; overflow: clip;
   background: rgb(255 255 255 / .12); color: rgb(255 255 255 / .6); font: 800 calc(var(--cell) * .24)/1 var(--font-sans);
 }
-.hd-plex-recent__face img { width: 100%; height: 100%; object-fit: cover; }
+/* The picture fills the circle without sizing it: a tall photo must not stretch its own circle into an oval. */
+.hd-plex-recent__face { position: relative; }
+.hd-plex-recent__face img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 /* A cast member is pressed to open their page; the button only wraps the portrait and the names. */
 .hd-plex-recent__person { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; border-radius: calc(var(--cell) * .06); }
 .hd-plex-recent__person:active { background: rgb(255 255 255 / .12); }

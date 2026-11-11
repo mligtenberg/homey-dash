@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { LucideChevronLeft, LucideLayers } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
-import { IdleRule, Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
+import { capabilitySignal, IdleRule, Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
 import { fittedCellSize } from '@homey-dash/layout';
 import { DashboardView, homeyLost, PhotoTile, ruleAnswersOf, TileData, TileKindRegistry } from '@homey-dash/tiles';
 import { screenId, safeStorage } from './screen-id';
@@ -364,7 +364,7 @@ export class App {
     if (this.state().kind === 'display' && this.realtime.connected()) {
       this.measuring = true;
       try {
-        const lux = await this.lightMeter.measure();
+        const lux = this.externalLux() ?? (await this.lightMeter.measure());
         if (lux === null) return;
         this.theme = themeFor(lux, this.theme);
         document.documentElement.dataset['theme'] = this.theme;
@@ -382,6 +382,13 @@ export class App {
       }
     }
     if (!this.destroyRef.destroyed) this.light = setTimeout(() => this.measureLight(), BRIGHTNESS_MS);
+  }
+
+  // The lux of the Homey device Management picked as this display's light source; null where none is, or it gives no number.
+  private externalLux(): number | null {
+    const named = capabilitySignal(this.view()?.display.lightSignal ?? '');
+    const value = named && this.data.homey(named.account)?.devices.get(named.device)?.capabilities[named.capability]?.value;
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
   }
 
   // Measures with the camera just picked at once, rather than at the next measurement.

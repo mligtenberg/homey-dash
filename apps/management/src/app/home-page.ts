@@ -7,7 +7,6 @@ import { DashboardsStore } from './dashboards-store';
 import { DisplaySketch } from './displays/display-sketch';
 import { DisplaysStore } from './displays/displays-store';
 import { PageHeader } from './page-header';
-import { section, TASKS } from './sections';
 
 interface Attention {
   kind: 'Dashboard' | 'Display' | 'Account';
@@ -19,8 +18,8 @@ interface Attention {
 }
 
 /**
- * Where Management starts: what needs attention, every display drawn with what it shows, dashboards waiting to be
- * published, and the tasks people come here for, each leading to where it lives.
+ * Where Management starts: what needs attention, every display drawn with what it shows, and dashboards waiting to be
+ * published. Tasks live in Go to.
  */
 @Component({
   selector: 'hd-home-page',
@@ -46,6 +45,28 @@ interface Attention {
             </ul>
           }
         </section>
+      </div>
+      <div class="side">
+        @if (attention().length) {
+          <section class="hd-panel block" aria-labelledby="attention">
+            <div class="block__head"><h2 class="hd-label" id="attention">Needs attention</h2><span class="n warn">{{ attention().length }}</span></div>
+            <ul class="hd-rows">
+              @for (item of attention(); track item.name + item.kind) {
+                <li class="sec-{{ item.sec }}">
+                  <a class="hd-row-link" [routerLink]="item.link">
+                    <span class="hd-mark"><svg [lucideIcon]="alert" /></span>
+                    <span class="hd-row-link__text">
+                      <span class="hd-row-link__title">{{ item.name }}</span>
+                      <span class="hd-row-link__sub">{{ item.kind }} · {{ item.problem }}</span>
+                      <span class="go-label">{{ item.action }}</span>
+                    </span>
+                    <svg class="hd-row-link__go" [lucideIcon]="chevron" aria-hidden="true" />
+                  </a>
+                </li>
+              }
+            </ul>
+          </section>
+        }
         <section class="hd-panel block sec-dashboards" aria-labelledby="drafts">
           <div class="block__head">
             <h2 class="hd-label" id="drafts">Unpublished changes</h2>
@@ -72,48 +93,6 @@ interface Attention {
           }
         </section>
       </div>
-
-      <div class="side">
-        @if (attention().length) {
-          <section class="hd-panel block" aria-labelledby="attention">
-            <div class="block__head"><h2 class="hd-label" id="attention">Needs attention</h2><span class="n warn">{{ attention().length }}</span></div>
-            <ul class="hd-rows">
-              @for (item of attention(); track item.name + item.kind) {
-                <li class="sec-{{ item.sec }}">
-                  <a class="hd-row-link" [routerLink]="item.link">
-                    <span class="hd-mark"><svg [lucideIcon]="alert" /></span>
-                    <span class="hd-row-link__text">
-                      <span class="hd-row-link__title">{{ item.name }}</span>
-                      <span class="hd-row-link__sub">{{ item.kind }} · {{ item.problem }}</span>
-                      <span class="go-label">{{ item.action }}</span>
-                    </span>
-                    <svg class="hd-row-link__go" [lucideIcon]="chevron" aria-hidden="true" />
-                  </a>
-                </li>
-              }
-            </ul>
-          </section>
-        }
-
-        <section class="hd-panel block" aria-labelledby="tasks">
-          <div class="block__head"><h2 class="hd-label" id="tasks">What do you want to do?</h2></div>
-          <ul class="hd-rows">
-            @for (task of tasks; track task.question) {
-              <li class="sec-{{ task.section }}">
-                <a class="hd-row-link" [routerLink]="task.path ?? place(task.section).path" [queryParams]="task.tab ? { then: task.tab } : null">
-                  <span class="hd-key"></span>
-                  <span class="hd-row-link__text">
-                    <span class="hd-row-link__title">{{ task.question }}</span>
-                    <span class="hd-row-link__sub">{{ task.route.join(' › ') }}</span>
-                  </span>
-                  <svg class="hd-row-link__go" [lucideIcon]="chevron" aria-hidden="true" />
-                </a>
-              </li>
-            }
-          </ul>
-        </section>
-
-      </div>
     </div>
   `,
   styles: `
@@ -126,12 +105,12 @@ interface Attention {
     .more { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--brand); text-decoration: none; }
     .more:hover { text-decoration: underline; text-underline-offset: 3px; }
     .go-label { margin-top: 2px; font-size: 13px; font-weight: 600; color: var(--brand); }
-    .screens { list-style: none; margin: 0; padding: var(--space-5) var(--space-4); display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-5) var(--space-4); }
+    .screens { list-style: none; margin: 0; padding: var(--space-5) var(--space-4); display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: var(--space-5) var(--space-4); }
     .screen-link { display: block; color: inherit; text-decoration: none; border-radius: 8px; }
     .screen-link:focus-visible { outline: 3px solid var(--brand); outline-offset: 4px; }
     .empty { margin: 0; padding: var(--space-4); color: var(--ink-muted); text-wrap: pretty; }
     li[class^='sec-'] .hd-mark { --sec: var(--warn); }
-    /* One column: what needs attention and the tasks come before the drawing of the displays. */
+    /* One column: what needs attention comes before the drawing of the displays. */
     @media (max-width: 1080px) { .body { grid-template-columns: 1fr; } .side { order: -1; } }
     @media (max-width: 560px) {
       .body { padding: var(--space-4); }
@@ -144,10 +123,8 @@ export class HomePage {
   protected readonly displays = inject(DisplaysStore);
   private readonly homey = inject(RealtimeTileData);
 
-  protected readonly tasks = TASKS;
   protected readonly chevron = LucideChevronRight;
   protected readonly alert = LucideTriangleAlert;
-  protected readonly place = section;
 
   protected readonly drafts = computed(() => this.store.list().filter((d) => d.hasUnpublishedChanges));
 

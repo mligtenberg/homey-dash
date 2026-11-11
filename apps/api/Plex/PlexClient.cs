@@ -9,7 +9,7 @@ namespace HomeyDash.Api.Plex;
 /// pin, someone approves it on app.plex.tv, and HomeyDash picks up the account's token. Players are controlled through
 /// the server's /player API, which passes the command on to the player.
 /// </summary>
-public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time) : IPlex
+public sealed partial class PlexClient(IHttpClientFactory httpFactory, TimeProvider time) : IPlex
 {
     public const string HttpClientName = "Plex";
     public const string Product = "HomeyDash";
@@ -214,7 +214,7 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
                 works.AddRange(Metadata(json).Select(ToItem));
             }
         }
-        string? bio = null, born = null, died = null, place = null, roles = null;
+        string? bio = null, born = null, died = null, place = null, roles = null, image = actor.Image;
         // plex.tv knows the person's biography. It is a nicety: without it, or without its answer, the works still show.
         if (actor.Key is { Length: > 0 } key)
         {
@@ -228,6 +228,8 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
                     var diedOn = Day(Str(p, "diedAt"));
                     born = bornOn is { } b ? $"{Written(b)}{(diedOn is null ? $" ({Age(b, time.GetUtcNow())} years)" : "")}" : null;
                     died = diedOn is { } d ? $"{Written(d)}{(bornOn is { } b2 ? $" (aged {Age(b2, d)})" : "")}" : null;
+                    // An actor the server has no picture of may have one at plex.tv.
+                    image ??= Str(p, "thumb");
                     place = Str(p, "birthPlace") is { Length: > 0 } birthPlace ? birthPlace : null;
                     roles = p.TryGetProperty("CreditType", out var credits) && credits.ValueKind == JsonValueKind.Array
                         ? string.Join(", ", credits.EnumerateArray().Select(c => Str(c, "title")).OfType<string>()) is { Length: > 0 } list ? list : null
@@ -238,7 +240,7 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
             {
             }
         }
-        return new PlexPerson(actor.Name, actor.Image, bio, born, died, place, roles, works.DistinctBy(w => w.Id).OrderByDescending(w => w.Year ?? 0).ToList());
+        return new PlexPerson(actor.Name, image, bio, born, died, place, roles, works.DistinctBy(w => w.Id).OrderByDescending(w => w.Year ?? 0).ToList());
     }
 
     private static DateOnly? Day(string? date) =>
@@ -421,7 +423,29 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
         return new PlexAudio(await response.Content.ReadAsStreamAsync(ct), "video/mp4", 200, null, null);
     }
 
+    // An actor's picture as the server lists it is sometimes a dead link (https://metadata-static.plex.tv/people/<tagKey>.jpg); plex.tv's
+    // own record of the person has the picture that is there now, by tagKey.
+    [System.Text.RegularExpressions.GeneratedRegex(@"^https://metadata-static\.plex\.tv/people/([0-9a-f]{24})\.jpg$")]
+    private static partial System.Text.RegularExpressions.Regex StalePersonPicture();
+
     public async Task<(Stream Content, string ContentType)?> ImageAsync(PlexConnection server, string path, int width, int height, CancellationToken ct)
+    {
+        if (await TranscodeAsync(server, path, width, height, ct) is { } found) return found;
+        if (StalePersonPicture().Match(path) is not { Success: true } stale) return null;
+        try
+        {
+            var json = await SendAsync(HttpMethod.Get, $"https://discover.provider.plex.tv/library/people/{stale.Groups[1].Value}", server.ClientId, server.Token, ct);
+            return Metadata(json).FirstOrDefault() is { ValueKind: JsonValueKind.Object } p && Str(p, "thumb") is { Length: > 0 } current && current != path
+                ? await TranscodeAsync(server, current, width, height, ct)
+                : null;
+        }
+        catch (PlexException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<(Stream Content, string ContentType)?> TranscodeAsync(PlexConnection server, string path, int width, int height, CancellationToken ct)
     {
         var url = QueryHelpers.AddQueryString(server.Uri + "/photo/:/transcode", new Dictionary<string, string?>
         {

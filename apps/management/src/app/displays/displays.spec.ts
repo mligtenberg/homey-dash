@@ -64,6 +64,8 @@ describe('Displays', () => {
     TestBed.inject(DashboardsStore).list.set([summary('c', 'Cinema'), summary('g', 'Garden'), summary('k', 'Kitchen'), summary('d', 'Draft', 0)]);
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl(url);
+    // The screens of the overview draw their dashboards; none is needed here.
+    TestBed.inject(HttpTestingController).match((r) => /^\/api\/dashboards\/\w+$/.test(r.url)).forEach((r) => r.flush({ published: null }));
     await TestBed.inject(ApplicationRef).whenStable();
     return harness.routeNativeElement as HTMLElement;
   }
@@ -378,19 +380,18 @@ describe('Displays', () => {
       const r = rows(root);
 
       expect(r['Resolution']).toBe('1280 × 800 (1920 × 1200 pixels)');
-      expect(r['Browser']).toBe('Android WebView 119');
-      expect(r['System']).toBe('Android 11');
-      expect(r['JavaScript interface']).toBe('Supported');
-      expect(r['Light now']).toBe('1,234 lx');
+      expect(r['Browser']).toBe('Android WebView 119 on Android 11');
+      expect(r['Fully Kiosk']).toContain('1.57');
+      expect(r['Now']).toBe('1,234 lx');
       expect(r['Measured with']).toBe('Camera (an estimate)');
       expect(r['Battery']).toBe('80%, charging');
-      expect(r['Secure context']).toContain('No');
+      expect(root.textContent).toContain('need https or localhost');
     });
 
     it('says when it is not Fully Kiosk Browser', async () => {
       const root = await render([display('1', 'Hallway', ['k'], status({ connected: true, details: { ...tablet, fully: null } }))], [], '/displays/1/details');
 
-      expect(root.textContent).toContain('Not supported here');
+      expect(root.textContent).toContain('JavaScript Interface" setting is off');
     });
 
     it('asks for a reload while the screen has not reported', async () => {

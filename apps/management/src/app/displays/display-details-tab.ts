@@ -5,12 +5,13 @@ import { DisplayInfo, FULLY_FUNCTIONS } from '@homey-dash/api-client';
 import { describeUserAgent } from './browser-text';
 import { DisplayContext } from './display-context';
 import { DisplayScreenshot } from './display-screenshot';
-import { DisplaysStore } from './displays-store';
+import { SignalPicker } from '../editor/signal-picker';
+import { DisplaysStore, isLuminanceSignal } from './displays-store';
 
 /** A display's name, a screenshot of it and what its screen and browser say about themselves; removing it too. */
 @Component({
   selector: 'hd-display-details-tab',
-  imports: [DecimalPipe, DisplayScreenshot],
+  imports: [DecimalPipe, DisplayScreenshot, SignalPicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
@@ -18,12 +19,39 @@ import { DisplaysStore } from './displays-store';
         <div class="hd-field">
           <label class="hd-field__label" for="display-name">Name</label>
           <input class="hd-input" id="display-name" [value]="display.name" (change)="store.rename(display, name.value)" (keydown.enter)="name.blur()" #name />
-          <span class="hd-hint">Shown in the sidebar and on the Displays page.</span>
         </div>
       </section>
       <section class="hd-panel wide">
         <h2 class="hd-section-title">What it shows now</h2>
         <hd-display-screenshot [display]="display" />
+      </section>
+      <section class="hd-panel">
+        <h2 class="hd-section-title">Light</h2>
+        <dl>
+          <dt>Now</dt>
+          <dd>
+            @if (display.status.lux !== null) {
+              {{ display.status.lux | number: '1.0-0' }} lx
+              @if (!display.status.connected) {
+                <span class="hd-hint">as last measured</span>
+              }
+            } @else {
+              Not measured yet
+            }
+          </dd>
+          <dt>Measured with</dt>
+          <dd>{{ lightSource() }}</dd>
+          <dt>Source</dt>
+          <dd class="source">
+            <hd-signal-picker [value]="display.lightSignal ?? ''" [only]="isLuminance" (picked)="store.setLightSource(display, $event)" />
+            @if (display.lightSignal) {
+              <button type="button" class="hd-btn hd-btn--sm" (click)="store.setLightSource(display, null)">Use the screen</button>
+            }
+          </dd>
+        </dl>
+        @if (display.status.details?.secureContext === false) {
+          <p class="hd-hint">The camera and light sensor need https or localhost. Pick a luminance sensor from Homey instead.</p>
+        }
       </section>
       @if (display.status.details; as d) {
         <section class="hd-panel">
@@ -31,91 +59,51 @@ import { DisplaysStore } from './displays-store';
           <dl>
             <dt>Resolution</dt>
             <dd>{{ size(d.screenWidth, d.screenHeight) }}&ngsp;@if (physical(); as p) { <span class="hd-hint">({{ p }} pixels)</span> }</dd>
-            <dt>Page size</dt>
-            <dd>{{ size(d.viewportWidth, d.viewportHeight) }}</dd>
-            <dt>Pixel ratio</dt>
-            <dd>{{ d.pixelRatio ?? 'Unknown' }}</dd>
-            <dt>Orientation</dt>
-            <dd>{{ orientation(d.orientation) }}</dd>
-            <dt>Touch</dt>
-            <dd>{{ d.touchPoints ? d.touchPoints + ' points' : 'No touch' }}</dd>
-          </dl>
-        </section>
-        <section class="hd-panel">
-          <h2 class="hd-section-title">Browser</h2>
-          <dl>
             <dt>Browser</dt>
-            <dd>{{ text().browser ?? 'Unknown' }}</dd>
-            <dt>System</dt>
-            <dd>{{ text().system ?? 'Unknown' }}</dd>
-            <dt>Language</dt>
-            <dd>{{ d.language ?? 'Unknown' }}</dd>
-            <dt>Time zone</dt>
-            <dd>{{ d.timeZone ?? 'Unknown' }}</dd>
-            <dt>Secure context</dt>
-            <dd>
-              {{ d.secureContext ? 'Yes' : 'No' }}
-              @if (!d.secureContext) {
-                <span class="hd-hint">The camera and light sensor need https or localhost.</span>
-              }
-            </dd>
-            @if (d.userAgent) {
-              <dt>User agent</dt>
-              <dd class="ua">{{ d.userAgent }}</dd>
-            }
-          </dl>
-        </section>
-        <section class="hd-panel">
-          <h2 class="hd-section-title">Fully Kiosk Browser</h2>
-          @if (d.fully; as fully) {
-            <dl>
-              <dt>JavaScript interface</dt>
-              <dd><span class="hd-pill hd-pill--ok">Supported</span></dd>
-              @if (fully.version) {
-                <dt>Version</dt>
-                <dd>{{ fully.version }}</dd>
-              }
-              <dt>Functions</dt>
-              <dd>
-                <ul class="api">
-                  @for (name of fullyApi(); track name) {
-                    <li [class.api--off]="!fully.api.includes(name)">{{ fullyText(name) }}</li>
-                  }
-                </ul>
-              </dd>
-            </dl>
-          } @else {
-            <p class="hd-hint">
-              Not supported here: the page doesn't run in Fully Kiosk Browser, or its "JavaScript Interface" setting is off. Idle rules can't turn
-              this screen off; it goes black instead.
-            </p>
-          }
-        </section>
-        <section class="hd-panel">
-          <h2 class="hd-section-title">Device, light and connection</h2>
-          <dl>
+            <dd>{{ browser() }}</dd>
             <dt>Battery</dt>
             <dd>{{ battery() }}</dd>
-            <dt>Connection</dt>
-            <dd>{{ d.connection ?? 'Unknown' }}</dd>
-            <dt>Page loaded</dt>
-            <dd>{{ d.loadedAt ? store.ago(d.loadedAt) : 'Unknown' }}</dd>
-            <dt>Light now</dt>
-            <dd>
-              @if (display.status.lux !== null) {
-                {{ display.status.lux | number: '1.0-0' }} lx
-                @if (!display.status.connected) {
-                  <span class="hd-hint">as last measured</span>
-                }
-              } @else {
-                None measured yet
-              }
-            </dd>
-            <dt>Measured with</dt>
-            <dd>{{ lightSource() }}</dd>
             <dt>Last seen</dt>
             <dd>{{ display.status.connected ? 'Connected now' : display.status.lastSeenAt ? store.ago(display.status.lastSeenAt) : 'Never' }}</dd>
           </dl>
+          <details class="more">
+            <summary>More</summary>
+            <dl>
+              <dt>Page size</dt>
+              <dd>{{ size(d.viewportWidth, d.viewportHeight) }}</dd>
+              <dt>Pixel ratio</dt>
+              <dd>{{ d.pixelRatio ?? 'Unknown' }}</dd>
+              <dt>Orientation</dt>
+              <dd>{{ orientation(d.orientation) }}</dd>
+              <dt>Touch</dt>
+              <dd>{{ d.touchPoints ? d.touchPoints + ' points' : 'No touch' }}</dd>
+              <dt>Language</dt>
+              <dd>{{ d.language ?? 'Unknown' }}</dd>
+              <dt>Time zone</dt>
+              <dd>{{ d.timeZone ?? 'Unknown' }}</dd>
+              <dt>Connection</dt>
+              <dd>{{ d.connection ?? 'Unknown' }}</dd>
+              <dt>Page loaded</dt>
+              <dd>{{ d.loadedAt ? store.ago(d.loadedAt) : 'Unknown' }}</dd>
+              @if (d.userAgent) {
+                <dt>User agent</dt>
+                <dd class="ua">{{ d.userAgent }}</dd>
+              }
+              <dt>Fully Kiosk</dt>
+              <dd>
+                @if (d.fully; as fully) {
+                  {{ fully.version ?? 'Supported' }}
+                  <ul class="api">
+                    @for (name of fullyApi(); track name) {
+                      <li [class.api--off]="!fully.api.includes(name)">{{ fullyText(name) }}</li>
+                    }
+                  </ul>
+                } @else {
+                  <span class="hd-hint">Not here, or its "JavaScript Interface" setting is off. Idle rules can't turn this screen off; it goes black instead.</span>
+                }
+              </dd>
+            </dl>
+          </details>
         </section>
       } @else {
         <div class="hd-panel hd-empty">
@@ -147,6 +135,10 @@ import { DisplaysStore } from './displays-store';
     section { padding: var(--space-4); }
     .wide { grid-column: 1 / -1; }
     .name .hd-input { max-width: 360px; }
+    .source { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+    .more { margin-top: var(--space-3); }
+    .more summary { cursor: pointer; color: var(--ink-muted); font-size: 13px; margin-bottom: var(--space-3); }
+    .more .api { margin-top: var(--space-2); }
     .hd-empty { grid-column: 1 / -1; --empty-padding: var(--space-5); }
     dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-4); margin: 0; }
     dt { color: var(--ink-muted); font-size: 13px; }
@@ -163,6 +155,7 @@ export class DisplayDetailsTab {
   protected readonly store = inject(DisplaysStore);
   private readonly router = inject(Router);
   protected readonly removing = signal(false);
+  protected readonly isLuminance = isLuminanceSignal;
 
   protected readonly text = computed(() => describeUserAgent(this.context.display()?.status.details?.userAgent ?? null));
 
@@ -181,12 +174,15 @@ export class DisplayDetailsTab {
   });
 
   protected readonly lightSource = computed(() => {
+    if (this.context.display()?.lightSignal) return 'A device in Homey';
     const light = this.context.display()?.status.details?.light;
     if (!light?.available) return "This screen can't measure light";
     if (light.source === 'sensor') return 'Light sensor';
     if (light.source === 'camera') return 'Camera (an estimate)';
     return 'Not measured yet';
   });
+
+  protected readonly browser = computed(() => [this.text().browser, this.text().system].filter(Boolean).join(' on ') || 'Unknown');
 
   protected readonly battery = computed(() => {
     const battery = this.context.display()?.status.details?.battery;

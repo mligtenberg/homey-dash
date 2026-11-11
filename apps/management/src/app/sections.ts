@@ -25,7 +25,7 @@ export const SECTIONS: readonly Section[] = [
     label: 'Overview',
     path: '/',
     icon: LucideHouse,
-    purpose: 'What needs your attention, what each display shows, and where to go for each task.',
+    purpose: 'What needs your attention, what each display shows, and what is waiting to be published.',
   },
   {
     id: 'dashboards',

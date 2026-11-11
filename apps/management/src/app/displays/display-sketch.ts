@@ -1,5 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { DisplayInfo } from '@homey-dash/api-client';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { DashboardsApi, DisplayInfo } from '@homey-dash/api-client';
+import { cellSize, sectionsPerPage, TILE_SIZES } from '@homey-dash/layout';
+import { backgroundStyle } from '@homey-dash/tiles';
+import { of } from 'rxjs';
+import { DashboardsStore } from '../dashboards-store';
 import { DisplaysStore } from './displays-store';
 
 export type DisplayHealth = 'ok' | 'stale' | 'none' | 'lost';
@@ -23,8 +28,19 @@ export function displayHealth(display: DisplayInfo, store: DisplaysStore): { ton
   host: { class: 'sketch', '[class.is-empty]': '!first()', '[attr.data-tone]': 'health().tone' },
   template: `
     <div class="screen" aria-hidden="true">
-      <div class="glass">
-        @if (first(); as first) {
+      <div class="glass" [class.mini]="!!miniature()" [style.background]="miniature() ? miniature()!.background : null">
+        @if (miniature(); as mini) {
+          @for (section of mini.sections; track section.id) {
+            <div class="sec" [style.aspect-ratio]="'3 / ' + mini.rows" [style.grid-template-rows]="'repeat(' + mini.rows + ', 1fr)'">
+              @for (tile of section.tiles; track tile.id) {
+                <i [style.grid-column]="tile.column" [style.grid-row]="tile.row"></i>
+              }
+            </div>
+          }
+          @if (more() > 0) {
+            <span class="badge">+{{ more() }}</span>
+          }
+        } @else if (first(); as first) {
           <span class="shows">{{ first }}</span>
           @if (more() > 0) {
             <span class="more">+{{ more() }} more</span>
@@ -32,13 +48,13 @@ export function displayHealth(display: DisplayInfo, store: DisplaysStore): { ton
         } @else {
           <span class="shows">No dashboard</span>
         }
+        <span class="name">{{ display().name }}</span>
       </div>
     </div>
-    <span class="name">{{ display().name }}</span>
     @if (state()) {
       <span class="state"><i></i>{{ health().text }}</span>
     }
-    <span class="sr-only">{{ first() ? 'Shows ' + first() + (more() ? ' and ' + more() + ' more' : '') : 'Shows no dashboard yet' }}</span>
+    <span class="sr-only">{{ display().name }}: {{ first() ? 'shows ' + first() + (more() ? ' and ' + more() + ' more' : '') : 'shows no dashboard yet' }}</span>
   `,
   styles: `
     :host { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -54,12 +70,17 @@ export function displayHealth(display: DisplayInfo, store: DisplaysStore): { ton
       border: 1px solid var(--line); border-radius: 3px;
       background: color-mix(in oklab, var(--sec-displays) 9%, var(--panel));
     }
+    .glass { position: relative; }
+    .glass.mini { flex-direction: row; gap: 8px; padding: 5px; }
+    .sec { height: 100%; min-width: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+    .sec i { border-radius: 2px; background: color-mix(in oklab, var(--ink) 22%, transparent); box-shadow: inset 0 0 0 .5px color-mix(in oklab, var(--ink) 20%, transparent); }
+    .badge { position: absolute; right: 4px; bottom: 3px; font-size: 11px; font-weight: 600; line-height: 1; padding: 2px 4px; border-radius: 6px; color: var(--ink); background: color-mix(in oklab, var(--panel) 80%, transparent); }
     .shows { font-weight: 600; font-size: 14px; line-height: 1.2; color: var(--sec-dashboards); text-wrap: balance; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .more { font-size: 12px; color: var(--ink-muted); }
     :host(.is-empty) .screen { border-style: dashed; border-color: var(--line-strong); }
     :host(.is-empty) .glass { background: none; border-style: dashed; }
     :host(.is-empty) .shows { color: var(--ink-muted); font-weight: 500; }
-    .name { font-weight: 600; overflow-wrap: anywhere; text-wrap: balance; }
+    .name { position: absolute; left: 6px; top: 5px; max-width: calc(100% - 12px); font-weight: 600; font-size: 13px; line-height: 1.2; padding: 2px 7px; border-radius: 6px; color: var(--ink); background: color-mix(in oklab, var(--panel) 82%, transparent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .state { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-muted); }
     .state i { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); flex: none; }
     :host([data-tone='ok']) .state { color: var(--ok); }
@@ -82,5 +103,38 @@ export class DisplaySketch {
     return id ? this.store.dashboardName(id) : null;
   });
   protected readonly more = computed(() => Math.max(0, this.display().dashboardIds.length - 1));
+  private readonly dashboardsApi = inject(DashboardsApi);
+  private readonly dashboardList = inject(DashboardsStore).list;
+
+  /** The published layout of the dashboard it starts on, fetched again when that dashboard is published anew. */
+  private readonly layout = rxResource({
+    params: () => {
+      const id = this.display().dashboardIds[0];
+      const version = this.dashboardList().find((d) => d.id === id)?.publishedVersion;
+      return id && version ? { id, version } : undefined;
+    },
+    stream: ({ params }) => (params ? this.dashboardsApi.get(params.id) : of(null)),
+  });
+
+  /** What it shows, drawn small: its first page of sections, each tile a block, on the dashboard's own background. */
+  protected readonly miniature = computed(() => {
+    const layout = this.layout.value()?.published;
+    if (!layout) return null;
+    const details = this.display().status.details;
+    const [width, height] = [details?.screenWidth || 1280, details?.screenHeight || 800];
+    const perPage = sectionsPerPage(width, cellSize(height, layout.rows));
+    const sections = layout.sections
+      .filter((s) => !s.hidden && s.tiles.length)
+      .slice(0, perPage)
+      .map((s) => ({
+        id: s.id,
+        tiles: s.tiles.map((t) => ({
+          id: t.id,
+          column: `${t.position.column + 1} / span ${TILE_SIZES[t.size].columns}`,
+          row: `${t.position.row + 1} / span ${TILE_SIZES[t.size].rows}`,
+        })),
+      }));
+    return sections.length ? { rows: layout.rows, sections, background: backgroundStyle(layout.background) } : null;
+  });
   protected readonly health = computed(() => displayHealth(this.display(), this.store));
 }

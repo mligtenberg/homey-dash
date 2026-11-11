@@ -25,6 +25,9 @@ public static partial class DisplayEndpoints
     // In order; widgets in the same spot stack in this order.
     public sealed record LockScreen(List<LockWidget>? Widgets);
 
+    // A capability of a device in Homey whose lux the screen reports as its brightness; null to measure itself.
+    public sealed record LightSource(string? Signal);
+
     private const int MaxScreenshotBytes = 8 * 1024 * 1024;
 
     public static void MapDisplays(this RouteGroupBuilder api)
@@ -86,6 +89,16 @@ public static partial class DisplayEndpoints
                 SetLockScreen(display, body.Widgets ?? [], engine) is { } errors
                     ? Results.ValidationProblem(errors, "These widgets can't be shown.")
                     : null)));
+
+        displays.MapPut("/{id:guid}/light-source", (Guid id, LightSource body, RuleEngine engine, [AsParameters] Services services, CancellationToken ct) =>
+            Change(id, services, ct, display =>
+            {
+                if (body.Signal is { } signal && (!IsCapabilitySignal().IsMatch(signal) || engine.Find(signal) is null))
+                    return Task.FromResult<IResult?>(Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["signal"] = ["A light source is a capability of a device in Homey."] }, "This light source can't be used."));
+                display.LightSignal = body.Signal;
+                return Task.FromResult<IResult?>(null);
+            }));
 
         // Asks the display's screen for a picture of what it shows now. 409: nothing is connected; 504: it didn't answer.
         displays.MapPost("/{id:guid}/screenshot", async (Guid id, HomeyDashDbContext db, DisplayPresence presence, ScreenshotBroker screenshots, CancellationToken ct) =>

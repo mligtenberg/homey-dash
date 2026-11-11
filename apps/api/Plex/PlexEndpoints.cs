@@ -141,9 +141,10 @@ public static class PlexEndpoints
         api.MapGet("/plex/image", async (string? path, int? w, int? h, int? account, PlexAccounts accounts, IPlex plex,
             HttpContext http, CancellationToken ct) =>
         {
-            // Or an actor's picture, which Plex hosts itself.
+            // Or an actor's picture, which Plex hosts itself or has from TMDB.
             var own = path is not null && path.StartsWith("/library/metadata/", StringComparison.Ordinal) && !path.Contains("..") && !path.Contains('?');
-            var actor = path is not null && path.StartsWith("https://metadata-static.plex.tv/", StringComparison.Ordinal) && !path.Contains("..") && !path.Contains('@');
+            var actor = path is not null && (path.StartsWith("https://metadata-static.plex.tv/", StringComparison.Ordinal) || path.StartsWith("https://image.tmdb.org/t/p/", StringComparison.Ordinal))
+                && !path.Contains("..") && !path.Contains('@');
             if (path is null || !(own || actor)) return Results.NotFound();
             if (accounts.For(account)?.Connection is not { } server) return NotSignedIn();
             try

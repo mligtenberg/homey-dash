@@ -154,6 +154,9 @@ public sealed class PlexApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Conflict, ofNoAccount.StatusCode);
         Assert.Equal("image/svg+xml", poster.Content.Headers.ContentType?.MediaType);
         Assert.Equal(HttpStatusCode.NotFound, elsewhere.StatusCode);
+        // An actor's picture is Plex's own, or TMDB's picture path; no other host.
+        Assert.Equal(HttpStatusCode.OK, (await _client.GetAsync("/api/plex/image?path=" + Uri.EscapeDataString("https://image.tmdb.org/t/p/original/abc.jpg"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.GetAsync("/api/plex/image?path=" + Uri.EscapeDataString("https://example.com/t/p/abc.jpg"))).StatusCode);
     }
 
     [Fact]

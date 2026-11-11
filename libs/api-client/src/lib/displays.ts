@@ -61,6 +61,8 @@ export const FULLY_FUNCTIONS: Readonly<Record<string, string>> = {
   getBatteryLevel: 'Read the battery',
   getScreenBrightness: 'Read the screen brightness',
   setScreenBrightness: 'Set the screen brightness',
+  getSensorInfo: 'List the tablet\'s sensors',
+  getSensorValue: 'Read a sensor, such as the light sensor',
   isScreenOn: 'Know whether the screen is on',
   startScreensaver: 'Start the screensaver',
   stopScreensaver: 'Stop the screensaver',
@@ -83,6 +85,8 @@ export interface DisplaySummary {
   idleRules: IdleRule[];
   /** In order; at most 8. */
   lockWidgets: LockWidget[];
+  /** A capability of a device in Homey (a signal id) whose lux the screen reports as its brightness; null: it measures itself. */
+  lightSignal?: string | null;
 }
 
 /**
@@ -202,6 +206,11 @@ export class DisplaysApi {
   /** Replaces what its lock screen shows. */
   setLockScreen(id: string, widgets: LockWidget[]) {
     return this.http.put<DisplayInfo>(`/api/displays/${id}/lock-screen`, { widgets });
+  }
+
+  /** Makes a device's luminance in Homey the display's brightness; null has the screen measure it itself. */
+  setLightSource(id: string, signal: string | null) {
+    return this.http.put<DisplayInfo>(`/api/displays/${id}/light-source`, { signal });
   }
 
   delete(id: string) {

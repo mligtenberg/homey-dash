@@ -29,6 +29,14 @@ import { Camera, LightMeter } from './light-meter';
         }
       </div>
       <div class="hd-details__row">
+        <label class="hd-details__label" for="screen-scale">Camera reads too high</label>
+        <select id="screen-scale" class="hd-select" (change)="calibrate($any($event.target).value)">
+          @for (option of scales; track option.value) {
+            <option [value]="option.value" [selected]="option.value === meter.scale()">{{ option.label }}</option>
+          }
+        </select>
+      </div>
+      <div class="hd-details__row">
         <span class="hd-details__label">Light</span>
         <span class="hd-details__state level">
           @if (meter.reading(); as reading) {
@@ -51,12 +59,24 @@ export class ScreenSettings {
 
   protected readonly meter = inject(LightMeter);
   protected readonly cameras = signal<Camera[]>([]);
+  protected readonly scales = [
+    { value: 1, label: 'No' },
+    { value: 0.5, label: 'Halve it' },
+    { value: 0.25, label: 'Quarter it' },
+    { value: 0.1, label: 'Tenth' },
+    { value: 0.05, label: '1/20' },
+  ];
   protected readonly icon = LucideMonitorCog;
   private readonly details = viewChild.required(TileDetails);
 
   async open() {
     this.details().open();
     if (this.meter.hasCamera) this.cameras.set(await this.meter.cameras().catch(() => []));
+  }
+
+  protected calibrate(scale: string) {
+    this.meter.calibrate(Number(scale));
+    this.cameraChanged.emit();
   }
 
   protected choose(deviceId: string) {

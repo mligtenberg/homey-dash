@@ -542,6 +542,8 @@ describe('App', () => {
           camera: signal<string | null>(null),
           hasCamera: true,
           reading: signal(null),
+          scale: signal(1),
+          calibrate: () => undefined,
           cameras: async () => [
             { deviceId: 'f', label: 'FaceTime HD Camera' },
             { deviceId: 'i', label: 'iPhone Camera' },

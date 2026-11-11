@@ -16,6 +16,9 @@ const GIVE_UP_MS = 10_000;
 // Where a screen remembers the camera picked for it in its screen settings.
 const CAMERA_KEY = 'homeydash.camera';
 
+// Where a screen remembers how much to scale the camera's estimate down, as a share of it (1 = as worked out).
+const SCALE_KEY = 'homeydash.lux-scale';
+
 // The camera's error names that mean this screen can't measure at all, rather than not this time.
 const CANNOT = ['NotAllowedError', 'NotFoundError', 'SecurityError', 'OverconstrainedError'];
 
@@ -74,6 +77,11 @@ export class LightMeter {
   private readonly storage = safeStorage();
   /** The camera picked for this screen; null to leave the choice to the screen. */
   readonly camera = signal(this.storage?.getItem(CAMERA_KEY) ?? null);
+  /**
+   * The share of the camera's estimate to report, for a camera whose automatic exposure or tone mapping brightens the
+   * frame and so reads high; 1 reports it as worked out. A light sensor's reading is never scaled.
+   */
+  readonly scale = signal(Number(this.storage?.getItem(SCALE_KEY)) || 1);
   /** What it measured last, since the screen loaded. */
   readonly reading = signal<Reading | null>(null);
 
@@ -82,6 +90,13 @@ export class LightMeter {
     this.camera.set(deviceId);
     if (deviceId) this.storage?.setItem(CAMERA_KEY, deviceId);
     else this.storage?.removeItem(CAMERA_KEY);
+  }
+
+  /** Sets the share of the camera's estimate to report, kept on this screen. */
+  calibrate(scale: number) {
+    this.scale.set(scale);
+    if (scale === 1) this.storage?.removeItem(SCALE_KEY);
+    else this.storage?.setItem(SCALE_KEY, String(scale));
   }
 
   /**
@@ -111,7 +126,7 @@ export class LightMeter {
     }
     if (!this.hasCamera) return null;
     const lux = await this.cameraLux();
-    return lux === null ? null : this.read({ lux, source: 'camera' });
+    return lux === null ? null : this.read({ lux: lux * this.scale(), source: 'camera' });
   }
 
   private read(reading: Reading) {

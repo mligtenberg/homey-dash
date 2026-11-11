@@ -105,6 +105,9 @@ namespace HomeyDash.Api.Migrations
                     b.Property<DateTimeOffset?>("LastSeenAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("LightSignal")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("LockWidgets")
                         .IsRequired()
                         .HasColumnType("TEXT");

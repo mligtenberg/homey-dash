@@ -9,6 +9,10 @@ import { changedAt, clock, moved, removedAt, timeAgo } from '@homey-dash/design-
 export const MAX_LOCK_WIDGETS = 8;
 
 /** Whether a signal is a capability of a device in Homey, which a lock screen value shows. */
+export function isLuminanceSignal(signal: SignalInfo) {
+  return capabilitySignal(signal.id)?.capability === 'measure_luminance';
+}
+
 export function isCapabilitySignal(signal: SignalInfo) {
   return capabilitySignal(signal.id) !== null;
 }
@@ -220,6 +224,11 @@ export class DisplaysStore {
   setLockSource(display: DisplayInfo, index: number, source: string) {
     const chosen = source === NEWS_SOURCES[0].id ? null : source;
     this.saveLock(display, display.lockWidgets.map((w, i) => (i === index && w.kind === 'news' ? { ...w, source: chosen } : w)));
+  }
+
+  // A device in Homey that measures the light for the display, or null to have the screen measure it.
+  setLightSource(display: DisplayInfo, signal: string | null) {
+    this.api.setLightSource(display.id, signal).subscribe({ next: (d) => this.replace(d), error: () => this.fail('set the light source of') });
   }
 
   setLockSignal(display: DisplayInfo, index: number, signal: string) {

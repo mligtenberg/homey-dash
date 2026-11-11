@@ -359,6 +359,24 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task ALightSource_ReachesTheScreen_AndOnlyADeviceCapabilityIsAccepted()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var put = (string? signal) => _client.PutAsJsonAsync($"/api/displays/{display}/light-source", new { signal });
+
+        Assert.Equal(HttpStatusCode.OK, (await put("homey:1:capability:thermostat:measure_temperature")).StatusCode);
+        Assert.Equal("homey:1:capability:thermostat:measure_temperature",
+            (await ViewAsync(screen)).GetProperty("display").GetProperty("lightSignal").GetString());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await put("homey:1:capability:nowhere:measure_luminance")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await put("display:brightness")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await put(null)).StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await ViewAsync(screen)).GetProperty("display").GetProperty("lightSignal").ValueKind);
+    }
+
+    [Fact]
     public async Task ALockWidget_CanBeHiddenOrRuled_AndAnInvalidRuleIsRefused()
     {
         var screen = Guid.NewGuid();
