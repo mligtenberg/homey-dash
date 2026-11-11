@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { tr } from '@homey-dash/i18n';
 
 type Errors = Record<string, string[]>;
 
@@ -19,17 +20,18 @@ export function isStatus(e: unknown, ...statuses: number[]): e is HttpErrorRespo
 export function apiProblem(e: unknown, fallback: string, ...statuses: number[]): string {
   if (!(e instanceof HttpErrorResponse) || (statuses.length && !statuses.includes(e.status))) return fallback;
   const errors = errorsOf(e);
-  return (errors && Object.values(errors)[0]?.[0]) ?? (typeof e.error?.detail === 'string' ? e.error.detail : fallback);
+  const given = (errors && Object.values(errors)[0]?.[0]) ?? (typeof e.error?.detail === 'string' ? e.error.detail : null);
+  return given === null ? fallback : tr(given);
 }
 
 /** Every validation error of a refused request, joined; null when it gave none. */
 export function apiProblems(e: unknown): string | null {
   const errors = errorsOf(e);
-  return errors ? Object.values(errors).flat().join(' ') : null;
+  return errors ? Object.values(errors).flat().map(tr).join(' ') : null;
 }
 
 /** The first validation error of each field of a request refused as invalid (400); null when it was refused otherwise. */
 export function fieldErrors(e: unknown): Record<string, string> | null {
   const errors = isStatus(e, 400) ? errorsOf(e) : undefined;
-  return errors ? Object.fromEntries(Object.entries(errors).map(([field, messages]) => [field, messages[0]])) : null;
+  return errors ? Object.fromEntries(Object.entries(errors).map(([field, messages]) => [field, tr(messages[0])])) : null;
 }

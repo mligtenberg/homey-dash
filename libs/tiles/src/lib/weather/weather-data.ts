@@ -3,6 +3,7 @@ import { Forecast, placeKey, RainPoint, Realtime, WEATHER_PLACE, WeatherPlace } 
 import { LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudMoon, LucideCloudMoonRain, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideCloudSunRain, LucideMoon, LucideSnowflake, LucideSun } from '@homey-dash/design-system';
 import { LucideIconInput } from '@lucide/angular';
 import { TileSettings } from '../tile-data';
+import { formatTag } from '@homey-dash/i18n';
 
 /** A weather tile's settings: where its Homey is (`weather:here`), or at `place` (`weather:place`). */
 export interface WeatherTileSettings extends TileSettings {
@@ -79,7 +80,7 @@ export const RAIN_FROM = 0.1;
 
 /** 13:05, by the display's clock. */
 export function clockTime(iso: string | number): string {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString(formatTag(), { hour: '2-digit', minute: '2-digit' });
 }
 
 /** 8°, rounded; the minus is a true minus sign. */

@@ -1,5 +1,6 @@
 import { EnergyLive, EnergyPoint, HomeyEnergy } from '@homey-dash/api-client';
 import { TileSettings } from '../tile-data';
+import { formatTag } from '@homey-dash/i18n';
 
 /** What an energy tile points at: the energy report of its Homey (ADR-0014). */
 export const ENERGY_HOME = 'energy:home';
@@ -13,19 +14,19 @@ export const BALANCED_WATTS = 10;
 /** 640 W below a kilowatt, 1.8 kW above. */
 export function formatPower(watts: number): string {
   const abs = Math.abs(watts);
-  return abs < 1000 ? `${Math.round(abs)} W` : `${(abs / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} kW`;
+  return abs < 1000 ? `${Math.round(abs)} W` : `${(abs / 1000).toLocaleString(formatTag(), { maximumFractionDigits: 1 })} kW`;
 }
 
 /** 10.9 kWh. */
 export function formatEnergy(kwh: number): string {
-  return `${kwh.toLocaleString(undefined, { maximumFractionDigits: 1 })} kWh`;
+  return `${kwh.toLocaleString(formatTag(), { maximumFractionDigits: 1 })} kWh`;
 }
 
 /** € 2.98, or 2.98 where Homey tells no currency. */
 export function formatCost(cost: number, currency: string | null): string {
-  if (!currency) return cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (!currency) return cost.toLocaleString(formatTag(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   try {
-    return cost.toLocaleString(undefined, { style: 'currency', currency });
+    return cost.toLocaleString(formatTag(), { style: 'currency', currency });
   } catch {
     return `${currency} ${cost.toFixed(2)}`;
   }

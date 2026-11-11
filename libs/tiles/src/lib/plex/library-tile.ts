@@ -1,3 +1,4 @@
+import { TranslatePipe } from '@homey-dash/i18n';
 import { AirPlayReceivers } from '../core/airplay-cast';
 import { Segmented } from '../core/segmented';
 import { PlexAirPlayControls } from './plex-airplay-controls';
@@ -17,7 +18,7 @@ import { PLEX_BROWSER_TEMPLATE, RecentlyAddedTile } from './recently-added-tile'
  */
 @Component({
   selector: 'hd-plex-library-tile',
-  imports: [TileDetails, LucideDynamicIcon, AirPlayReceivers, PlexAirPlayControls, PlexProfilePicker, Segmented],
+  imports: [TileDetails, LucideDynamicIcon, AirPlayReceivers, PlexAirPlayControls, PlexProfilePicker, Segmented, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex-recent', '[class.has-art]': 'shown().length > 0' },
   template: PLEX_BROWSER_TEMPLATE,

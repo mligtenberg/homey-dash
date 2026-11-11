@@ -7,6 +7,7 @@ import { LucideDynamicIcon } from '@lucide/angular';
 import { PickerDialog, PickerRow } from './picker-dialog';
 import { groupKey, SignalCatalogue } from './signal-catalogue';
 import { buildPlaces, countSignals, findPlace, PickerGroup, placeGroups, placeOf, searchSignals, SignalPlace } from './signal-tree';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * Picks a condition's signal: looks like a select, and opens a dialog with the accounts, Homey's zones and HomeyDash's
@@ -15,13 +16,13 @@ import { buildPlaces, countSignals, findPlace, PickerGroup, placeGroups, placeOf
  */
 @Component({
   selector: 'hd-signal-picker',
-  imports: [NgTemplateOutlet, LucideDynamicIcon, PickerDialog, PickerRow],
+  imports: [NgTemplateOutlet, LucideDynamicIcon, PickerDialog, PickerRow, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-picker-dialog
       #picker
       triggerLabel="Signal"
-      label="Pick a signal"
+      [label]="'Pick a signal' | t"
       searchLabel="Search signals"
       navLabel="Accounts and rooms"
       [summary]="summary()"
@@ -63,7 +64,7 @@ import { buildPlaces, countSignals, findPlace, PickerGroup, placeGroups, placeOf
             (pressed)="openGroup.set(entry.group.key)"
           />
         } @empty {
-          <p class="hd-picker__empty">{{ catalogue.signals() ? 'There are no signals here' : 'Loading signals…' }}</p>
+          <p class="hd-picker__empty">{{ (catalogue.signals() ? 'There are no signals here' : 'Loading signals…') | t }}</p>
         }
       }
     </hd-picker-dialog>

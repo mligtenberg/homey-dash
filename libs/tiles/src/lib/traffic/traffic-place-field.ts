@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { PlaceMatch, TrafficApi, TrafficPlace } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** How long typing rests before it searches. */
 const SEARCH_AFTER_MS = 300;
@@ -26,6 +27,7 @@ export function matchDetail(match: PlaceMatch): string {
 @Component({
   selector: 'hd-traffic-place-field',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="hd-field">
       <label class="hd-field__label" [for]="id()">{{ label() }}</label>
@@ -48,7 +50,7 @@ export function matchDetail(match: PlaceMatch): string {
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
       } @else if (query().trim().length >= 2 && searched() && !matches().length) {
-        <p class="muted">No place found</p>
+        <p class="muted">{{ 'No place found' | t }}</p>
       }
       <!-- A popover, so it floats over the settings under it instead of pushing them down; the press stays on the input. -->
       <ul #list class="matches" popover="manual" [attr.aria-label]="label() + ' matches'" (pointerdown)="$event.preventDefault()">

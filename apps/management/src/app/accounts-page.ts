@@ -5,6 +5,7 @@ import { HomeyAccountPanel } from './homey-account-panel';
 import { ImmichAccountPanel } from './immich-account-panel';
 import { PlexAccountPanel } from './plex-account-panel';
 import { TomTomAccountPanel } from './tomtom-account-panel';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * The accounts HomeyDash holds for the home (ADR-0007): Homeys, each with its address and local API key, Immich
@@ -13,10 +14,10 @@ import { TomTomAccountPanel } from './tomtom-account-panel';
  */
 @Component({
   selector: 'hd-accounts-page',
-  imports: [PageHeader, AirPlayPanel, HomeyAccountPanel, ImmichAccountPanel, PlexAccountPanel, TomTomAccountPanel],
+  imports: [PageHeader, AirPlayPanel, HomeyAccountPanel, ImmichAccountPanel, PlexAccountPanel, TomTomAccountPanel, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <hd-page-header section="accounts" title="Accounts" />
+    <hd-page-header section="accounts" [title]="'Accounts' | t" />
     <div class="hd-page__body hd-page__body--narrow">
       <hd-homey-account-panel />
       <hd-immich-account-panel />

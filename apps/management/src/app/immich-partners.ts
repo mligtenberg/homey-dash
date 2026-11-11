@@ -1,5 +1,6 @@
 import { afterNextRender, ChangeDetectionStrategy, Component, effect, ElementRef, inject, Injector, input, signal, untracked } from '@angular/core';
 import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner } from '@homey-dash/api-client';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * The people who share their photos with an Immich account through partner sharing, as Immich says when it opens.
@@ -9,10 +10,11 @@ import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner
 @Component({
   selector: 'hd-immich-partners',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     @if (partners()?.length) {
       <div class="partners" [attr.aria-label]="'Partners of ' + account().name" role="group">
-        <span class="hd-field__label">Shared by partners</span>
+        <span class="hd-field__label">{{ 'Shared by partners' | t }}</span>
         @for (partner of partners(); track partner.id) {
           <div class="partner">
             @if (adding() === partner.id) {
@@ -37,9 +39,9 @@ import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner
                 </div>
                 <div class="hd-actions">
                   <button class="hd-btn hd-btn--primary" type="submit" [disabled]="saving()">
-                    {{ saving() ? 'Checking with Immich…' : 'Save key' }}
+                    {{ (saving() ? 'Checking with Immich…' : 'Save key') | t }}
                   </button>
-                  <button class="hd-btn" type="button" (click)="add(null)">Cancel</button>
+                  <button class="hd-btn" type="button" (click)="add(null)">{{ 'Cancel' | t }}</button>
                 </div>
               </form>
             } @else {
@@ -49,10 +51,10 @@ import { apiProblem, fieldErrors, ImmichAccount, ImmichAccountApi, ImmichPartner
               </div>
               <div class="hd-actions">
                 @if (partner.hasKey) {
-                  <button class="hd-btn" type="button" (click)="add(partner.id)">Change key</button>
-                  <button class="hd-btn hd-btn--danger" type="button" (click)="removeKey(partner)">Remove key</button>
+                  <button class="hd-btn" type="button" (click)="add(partner.id)">{{ 'Change key' | t }}</button>
+                  <button class="hd-btn hd-btn--danger" type="button" (click)="removeKey(partner)">{{ 'Remove key' | t }}</button>
                 } @else {
-                  <button class="hd-btn" type="button" (click)="add(partner.id)">Add API key</button>
+                  <button class="hd-btn" type="button" (click)="add(partner.id)">{{ 'Add API key' | t }}</button>
                 }
               </div>
             }

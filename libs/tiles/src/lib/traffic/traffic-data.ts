@@ -1,6 +1,7 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { Realtime, RouteTraffic, routeKey, TrafficRoute } from '@homey-dash/api-client';
 import { TileSettings } from '../tile-data';
+import { formatTag } from '@homey-dash/i18n';
 
 /** A traffic tile's settings: the route it shows, and the TomTom account that asks for it (the oldest when absent). */
 export interface TrafficTileSettings extends TileSettings {
@@ -37,7 +38,7 @@ export function distance(meters: number): string {
 
 /** 13:05, by the display's clock. */
 export function timeOfDay(iso: string | number): string {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString(formatTag(), { hour: '2-digit', minute: '2-digit' });
 }
 
 /** What a tile says while it has no result, from its status. */

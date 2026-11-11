@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RealtimeRuleAnswers } from '@homey-dash/tiles';
 import { SignalCatalogue } from './editor/signal-catalogue';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * Which display the Editor and the Preview pretend to be on, or none, for logic tiles' rules on display signals. The
@@ -9,9 +10,10 @@ import { SignalCatalogue } from './editor/signal-catalogue';
 @Component({
   selector: 'hd-as-display-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
-    <select class="hd-select" aria-label="Rules as on display" (change)="answers.seeAs($any($event.target).value || null)">
-      <option value="" [selected]="!answers.seenAs()">As on no display</option>
+    <select class="hd-select" [attr.aria-label]="'Rules as on display' | t" (change)="answers.seeAs($any($event.target).value || null)">
+      <option value="" [selected]="!answers.seenAs()">{{ 'As on no display' | t }}</option>
       @for (display of displays(); track display.value) {
         <option [value]="display.value" [selected]="display.value === answers.seenAs()">As on {{ display.label }}</option>
       }

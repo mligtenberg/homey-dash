@@ -7,6 +7,7 @@ import { DashboardsStore } from './dashboards-store';
 import { DisplaySketch } from './displays/display-sketch';
 import { DisplaysStore } from './displays/displays-store';
 import { PageHeader } from './page-header';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 interface Attention {
   kind: 'Dashboard' | 'Display' | 'Account';
@@ -23,20 +24,20 @@ interface Attention {
  */
 @Component({
   selector: 'hd-home-page',
-  imports: [RouterLink, PageHeader, DisplaySketch, LucideDynamicIcon],
+  imports: [RouterLink, PageHeader, DisplaySketch, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <hd-page-header section="overview" title="Overview" />
+    <hd-page-header section="overview" [title]="'Overview' | t" />
     <div class="body">
       <div class="main">
         <section class="hd-panel block sec-displays" aria-labelledby="displays">
           <div class="block__head">
-            <h2 class="hd-label" id="displays">Displays</h2>
+            <h2 class="hd-label" id="displays">{{ 'Displays' | t }}</h2>
             <span class="n">{{ displays.list().length }}</span>
-            <a class="more" routerLink="/displays">All displays</a>
+            <a class="more" routerLink="/displays">{{ 'All displays' | t }}</a>
           </div>
           @if (displays.loaded() && !displays.list().length) {
-            <p class="empty">No displays yet. Open HomeyDash's display address on a screen in the home; it asks for a name and then shows up here.</p>
+            <p class="empty">{{ "No displays yet. Open HomeyDash's display address on a screen in the home; it asks for a name and then shows up here." | t }}</p>
           } @else {
             <ul class="screens">
               @for (display of displays.list(); track display.id) {
@@ -49,7 +50,7 @@ interface Attention {
       <div class="side">
         @if (attention().length) {
           <section class="hd-panel block" aria-labelledby="attention">
-            <div class="block__head"><h2 class="hd-label" id="attention">Needs attention</h2><span class="n warn">{{ attention().length }}</span></div>
+            <div class="block__head"><h2 class="hd-label" id="attention">{{ 'Needs attention' | t }}</h2><span class="n warn">{{ attention().length }}</span></div>
             <ul class="hd-rows">
               @for (item of attention(); track item.name + item.kind) {
                 <li class="sec-{{ item.sec }}">
@@ -69,7 +70,7 @@ interface Attention {
         }
         <section class="hd-panel block sec-dashboards" aria-labelledby="drafts">
           <div class="block__head">
-            <h2 class="hd-label" id="drafts">Unpublished changes</h2>
+            <h2 class="hd-label" id="drafts">{{ 'Unpublished changes' | t }}</h2>
             <span class="n">{{ drafts().length }}</span>
           </div>
           @if (drafts().length) {
@@ -81,7 +82,7 @@ interface Attention {
                     <span class="hd-row-link__text">
                       <span class="hd-row-link__title">{{ dashboard.name }}</span>
                       <span class="hd-row-link__sub">{{ dashboard.publishedVersion ? 'Displays still show version ' + dashboard.publishedVersion : 'Never published' }}</span>
-                      <span class="go-label">Review and publish</span>
+                      <span class="go-label">{{ 'Review and publish' | t }}</span>
                     </span>
                     <svg class="hd-row-link__go" [lucideIcon]="chevron" aria-hidden="true" />
                   </a>
@@ -89,7 +90,7 @@ interface Attention {
               }
             </ul>
           } @else {
-            <p class="empty">Every dashboard is published. Displays show what you see in the editor.</p>
+            <p class="empty">{{ 'Every dashboard is published. Displays show what you see in the editor.' | t }}</p>
           }
         </section>
       </div>

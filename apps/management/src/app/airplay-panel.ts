@@ -2,6 +2,7 @@ import { AccountPanel } from './account-panel';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { AirPlayAccountApi, AirPlayDevice, AirPlayStatus, apiProblem } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
+import { TranslatePipe, t } from '@homey-dash/i18n';
 
 /**
  * The Apple TVs HomeyDash can play Plex covers on through AirPlay (ADR-0012), found on the network. Whether
@@ -10,54 +11,54 @@ import { firstValueFrom } from 'rxjs';
  */
 @Component({
   selector: 'hd-airplay-panel',
-  imports: [AccountPanel],
+  imports: [AccountPanel, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <hd-account-panel key="airplay" title="AirPlay" [error]="error()">
+    <hd-account-panel key="airplay" [title]="'AirPlay' | t" [error]="error()">
       <ng-container ngProjectAs="[status]">
         @if (status(); as status) {
           @if (!status.configured) {
-            <span class="hd-pill hd-pill--warn hd-pill--dot">Not set up</span>
+            <span class="hd-pill hd-pill--warn hd-pill--dot">{{ 'Not set up' | t }}</span>
           } @else if (!status.reachable) {
-            <span class="hd-pill hd-pill--danger hd-pill--dot">Not reachable</span>
+            <span class="hd-pill hd-pill--danger hd-pill--dot">{{ 'Not reachable' | t }}</span>
           } @else if (status.fake) {
-            <span class="hd-pill hd-pill--ok hd-pill--dot">Fake AirPlay</span>
+            <span class="hd-pill hd-pill--ok hd-pill--dot">{{ 'Fake AirPlay' | t }}</span>
           } @else {
-            <span class="hd-pill hd-pill--ok hd-pill--dot">Connected</span>
+            <span class="hd-pill hd-pill--ok hd-pill--dot">{{ 'Connected' | t }}</span>
           }
         } @else if (!error()) {
-          <span class="hd-pill hd-pill--dot">Looking…</span>
+          <span class="hd-pill hd-pill--dot">{{ 'Looking…' | t }}</span>
         }
       </ng-container>
       @if (status(); as status) {
         @if (!status.configured) {
           <p class="hd-muted">
-            AirPlay is switched off, so Plex covers can't play on an Apple TV. Switch it on by removing
-            <code>AirPlay:Enabled=false</code> (<code>AirPlay__Enabled</code> in Docker) from HomeyDash's configuration.
+            {{ "AirPlay is switched off, so Plex covers can't play on an Apple TV. Switch it on by removing" | t }}
+            <code>{{ 'AirPlay:Enabled=false' | t }}</code> (<code>{{ 'AirPlay__Enabled' | t }}</code> {{ "in Docker) from HomeyDash's configuration." | t }}
           </p>
         } @else if (!status.reachable) {
           <p class="hd-error" role="alert">{{ status.error }}</p>
-          <p class="hd-muted">HomeyDash looks for Apple TVs with multicast DNS, which needs to reach your network.</p>
+          <p class="hd-muted">{{ 'HomeyDash looks for Apple TVs with multicast DNS, which needs to reach your network.' | t }}</p>
         } @else {
           <p class="hd-muted">
-            {{ status.fake ? 'HomeyDash runs against fake Apple TVs, set in its configuration. ' : '' }}Covers in the recently
+            {{ (status.fake ? 'HomeyDash runs against fake Apple TVs, set in its configuration. ' : '') | t }}Covers in the recently
             added screen play on these. Pair an Apple TV when it asks for a PIN.
           </p>
           @for (device of tvs(status); track device.id) {
             <div class="hd-account__item">
               <div class="hd-account__info">
                 <strong>{{ device.name }}</strong>
-                <span class="hd-muted">{{ device.paired ? 'Paired' : 'Not paired' }}</span>
+                <span class="hd-muted">{{ (device.paired ? 'Paired' : 'Not paired') | t }}</span>
               </div>
               @if (renaming()?.id === device.id) {
                 <form class="pin" (submit)="saveName($event, device, name.value)">
                   <div class="hd-field">
-                    <label class="hd-field__label" [for]="'airplay-name-' + device.id">Name</label>
+                    <label class="hd-field__label" [for]="'airplay-name-' + device.id">{{ 'Name' | t }}</label>
                     <input #name [id]="'airplay-name-' + device.id" class="hd-input" maxlength="60" [value]="device.name" />
                   </div>
                   <div class="hd-actions">
-                    <button class="hd-btn hd-btn--primary" type="submit">Save</button>
-                    <button class="hd-btn" type="button" (click)="renaming.set(null)">Cancel</button>
+                    <button class="hd-btn hd-btn--primary" type="submit">{{ 'Save' | t }}</button>
+                    <button class="hd-btn" type="button" (click)="renaming.set(null)">{{ 'Cancel' | t }}</button>
                   </div>
                 </form>
               } @else if (pairing()?.id === device.id) {
@@ -84,31 +85,29 @@ import { firstValueFrom } from 'rxjs';
                       <button class="hd-btn hd-btn--primary" type="submit" [disabled]="pairing()!.step === 'finishing'">
                         {{ pairing()!.step === 'finishing' ? 'Pairing…' : 'Pair' }}
                       </button>
-                      <button class="hd-btn" type="button" (click)="pairing.set(null)">Cancel</button>
+                      <button class="hd-btn" type="button" (click)="pairing.set(null)">{{ 'Cancel' | t }}</button>
                     </div>
                   </form>
                 }
               } @else {
                 <div class="hd-actions">
-                  <button class="hd-btn" type="button" (click)="renaming.set({ id: device.id })">Rename</button>
+                  <button class="hd-btn" type="button" (click)="renaming.set({ id: device.id })">{{ 'Rename' | t }}</button>
                   <button class="hd-btn" type="button" [disabled]="!!pairing()" (click)="startPairing(device)">
-                    {{ device.paired ? 'Pair again' : 'Pair' }}
+                    {{ (device.paired ? 'Pair again' : 'Pair') | t }}
                   </button>
                 </div>
               }
             </div>
           } @empty {
             <p class="hd-muted hd-account__item">
-              No Apple TV found on the network. HomeyDash finds them with multicast DNS, which a container reaches only with
-              host networking on Linux (<code>network_mode: host</code>); Docker Desktop on macOS or Windows can't. Run
-              HomeyDash directly on the computer there.
+              {{ 'No Apple TV found on the network. HomeyDash finds them with multicast DNS, which a container reaches only with host networking on Linux (' | t }}<code>{{ 'network_mode: host' | t }}</code>{{ "); Docker Desktop on macOS or Windows can't. Run HomeyDash directly on the computer there." | t }}
             </p>
           }
         }
         @if (status.configured) {
           <div class="hd-actions">
             <button class="hd-btn" type="button" [disabled]="looking()" (click)="load()">
-              {{ looking() ? 'Looking…' : 'Look again' }}
+              {{ (looking() ? 'Looking…' : 'Look again') | t }}
             </button>
           </div>
         }
@@ -145,7 +144,7 @@ export class AirPlayPanel {
       this.status.set(await firstValueFrom(this.api.status()));
       this.error.set(null);
     } catch (e) {
-      this.error.set(apiProblem(e, 'Could not look for Apple TVs. Try again.'));
+      this.error.set(apiProblem(e, t('Could not look for Apple TVs. Try again.')));
     } finally {
       this.looking.set(false);
     }
@@ -183,7 +182,7 @@ export class AirPlayPanel {
       await this.load();
     } catch (e) {
       // The receiver forgets the PIN it showed after a wrong try, so pairing starts over.
-      this.pairing.set({ id: device.id, step: 'pin', error: apiProblem(e, 'Could not pair. Try again.') });
+      this.pairing.set({ id: device.id, step: 'pin', error: apiProblem(e, t('Could not pair. Try again.')) });
     }
   }
 }

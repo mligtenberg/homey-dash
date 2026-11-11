@@ -7,6 +7,7 @@ import {
   renderedBackgroundStyle,
 } from '@homey-dash/tiles';
 import { ColorSchemeWheel } from './color-scheme-wheel';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** The directions a gradient runs in, as CSS angles: towards the top, clockwise. */
 export const GRADIENT_ANGLES = [
@@ -37,30 +38,30 @@ const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
  */
 @Component({
   selector: 'hd-background-field',
-  imports: [ColorSchemeWheel],
+  imports: [ColorSchemeWheel, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="hd-field">
-      <label class="hd-field__label" for="dashboard-background">Background</label>
+      <label class="hd-field__label" for="dashboard-background">{{ 'Background' | t }}</label>
       <div class="row">
         <select id="dashboard-background" class="hd-select" (change)="setKind($any($event.target).value)">
-          <option value="" [selected]="!background()">Theme</option>
-          <option value="color" [selected]="background()?.kind === 'color'">Colour</option>
-          <option value="gradient" [selected]="background()?.kind === 'gradient'">Gradient</option>
-          <option value="preset" [selected]="background()?.kind === 'preset'">Built-in image</option>
-          <option value="image" [selected]="background()?.kind === 'image' || picking()">Image</option>
+          <option value="" [selected]="!background()">{{ 'Theme' | t }}</option>
+          <option value="color" [selected]="background()?.kind === 'color'">{{ 'Colour' | t }}</option>
+          <option value="gradient" [selected]="background()?.kind === 'gradient'">{{ 'Gradient' | t }}</option>
+          <option value="preset" [selected]="background()?.kind === 'preset'">{{ 'Built-in image' | t }}</option>
+          <option value="image" [selected]="background()?.kind === 'image' || picking()">{{ 'Image' | t }}</option>
         </select>
         <span class="swatch" [style.background]="swatch()" aria-hidden="true"></span>
       </div>
       @switch (background()?.kind) {
         @case ('color') {
-          <input type="color" class="hd-color-input color" aria-label="Background colour" [value]="colors().color" (change)="setColor('color', $any($event.target).value)" />
+          <input type="color" class="hd-color-input color" [attr.aria-label]="'Background colour' | t" [value]="colors().color" (change)="setColor('color', $any($event.target).value)" />
         }
         @case ('gradient') {
           <div class="row">
-            <input type="color" class="hd-color-input color" aria-label="Gradient from" [value]="colors().color" (change)="setColor('color', $any($event.target).value)" />
-            <input type="color" class="hd-color-input color" aria-label="Gradient to" [value]="colors().to" (change)="setColor('to', $any($event.target).value)" />
-            <select class="hd-select" aria-label="Gradient direction" (change)="setAngle(+$any($event.target).value)">
+            <input type="color" class="hd-color-input color" [attr.aria-label]="'Gradient from' | t" [value]="colors().color" (change)="setColor('color', $any($event.target).value)" />
+            <input type="color" class="hd-color-input color" [attr.aria-label]="'Gradient to' | t" [value]="colors().to" (change)="setColor('to', $any($event.target).value)" />
+            <select class="hd-select" [attr.aria-label]="'Gradient direction' | t" (change)="setAngle(+$any($event.target).value)">
               @for (direction of angles; track direction.angle) {
                 <option [value]="direction.angle" [selected]="direction.angle === angle()">{{ direction.label }}</option>
               }
@@ -68,12 +69,12 @@ const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
           </div>
         }
         @case ('preset') {
-          <select class="hd-select" aria-label="Image style" (change)="setPreset($any($event.target).value, preset().subject)">
+          <select class="hd-select" [attr.aria-label]="'Image style' | t" (change)="setPreset($any($event.target).value, preset().subject)">
             @for (style of styles; track style.id) {
               <option [value]="style.id" [selected]="style.id === preset().style">{{ style.label }}</option>
             }
           </select>
-          <div class="presets" role="group" aria-label="Image subject">
+          <div class="presets" role="group" [attr.aria-label]="'Image subject' | t">
             @for (subject of subjects; track subject.id) {
               <button
                 type="button"
@@ -89,7 +90,7 @@ const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
           </div>
           <label class="recolor">
             <input type="checkbox" [checked]="!!scheme()" (change)="setScheme($any($event.target).checked ? startScheme : null)" />
-            My own colours
+            {{ 'My own colours' | t }}
           </label>
           @if (scheme(); as scheme) {
             <hd-color-scheme-wheel [scheme]="scheme" (previewed)="preview($event)" (changed)="setScheme($event)" />
@@ -101,7 +102,7 @@ const FIRST_PRESET = `${BACKGROUND_STYLES[0].id}/${BACKGROUND_SUBJECTS[0].id}`;
           {{ uploading() ? 'Uploading…' : background()?.kind === 'image' ? 'Choose another image' : 'Choose an image' }}
           <input type="file" accept="image/jpeg,image/png,image/webp" [disabled]="uploading()" (change)="upload($any($event.target))" />
         </label>
-        <p class="hd-hint">JPEG, PNG or WebP, at most 15 MB. Tiles turn to glass over it.</p>
+        <p class="hd-hint">{{ 'JPEG, PNG or WebP, at most 15 MB. Tiles turn to glass over it.' | t }}</p>
       }
       @if (error(); as error) {
         <p class="hd-error hd-small" role="alert">{{ error }}</p>

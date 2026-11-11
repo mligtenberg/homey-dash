@@ -10,6 +10,7 @@ import { loadableArt } from './loadable-art';
 import { albumArtUrl, CONTROLS, deviceDetail, deviceLook, formatReading, isPlaying } from './device-look';
 import { describeDevice, deviceLogs, sameLogs } from './device-view';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 export interface DeviceTileSettings extends TileSettings {
   /** The capability the tile is about; absent picks one from the device. */
@@ -49,7 +50,7 @@ interface DeviceFace extends TileFace {
 // has them all, so a small tile can still be fully operated.
 @Component({
   selector: 'hd-device-tile',
-  imports: [LucideDynamicIcon, DeviceDetails, DeviceSegments, DeviceSlider, DeviceStepper],
+  imports: [LucideDynamicIcon, DeviceDetails, DeviceSegments, DeviceSlider, DeviceStepper, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, '[class.has-art]': '!!face().art', '[style.--art]': "face().art ? 'url(' + face().art + ')' : null" },
   template: `
@@ -76,15 +77,15 @@ interface DeviceFace extends TileFace {
       <div class="hd-value hd-value--xl">{{ reading.value }}<span class="hd-unit">{{ reading.units }}</span></div>
     }
     <div>
-      <div class="hd-tile__name">{{ face().name }}</div>
-      <div class="hd-tile__detail">{{ face().detail }}</div>
+      <div class="hd-tile__name">{{ face().name | t }}</div>
+      <div class="hd-tile__detail">{{ face().detail | t }}</div>
     </div>
     @if (face().slider; as dim) {
       <hd-device-slider [capability]="dim" [label]="face().name + ' brightness'" [disabled]="face().state !== 'ok'" [driver]="drive" />
     }
     @if (face().volume; as volume) {
       <div class="hd-tile__volume">
-        <span class="hd-tile__volume-label">Volume</span>
+        <span class="hd-tile__volume-label">{{ 'Volume' | t }}</span>
         <hd-device-slider [capability]="volume" [label]="face().name + ' volume'" [disabled]="face().state !== 'ok'" [driver]="drive" />
       </div>
     }
@@ -92,7 +93,7 @@ interface DeviceFace extends TileFace {
       <hd-device-segments [capability]="cover" [options]="coverStates" [disabled]="face().state !== 'ok'" [driver]="drive" />
     }
     @if (face().state === 'unavailable') {
-      <span class="hd-badge">Unavailable</span>
+      <span class="hd-badge">{{ 'Unavailable' | t }}</span>
     }
     @if (device(); as device) {
       <hd-device-details [account]="settings().account" [deviceId]="device.id" [name]="face().name" [icon]="face().icon" />
@@ -243,11 +244,11 @@ export class DeviceTile extends TileView<DeviceTileSettings> {
 /** Management's choice of the capability a device tile is about. */
 @Component({
   selector: 'hd-device-tile-settings',
-  imports: [SettingSelect],
+  imports: [SettingSelect, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-setting-select
-      label="Shows"
+      [label]="'Shows' | t"
       selectId="tile-capability"
       emptyLabel="Automatic"
       [options]="options()"

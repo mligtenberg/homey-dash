@@ -19,6 +19,7 @@ import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { SonosMusic } from './sonos-music';
 import { SonosTileSettings } from './sonos-tile-settings';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** One of the tile's speakers; `found` is false for a device Homey does not have (any more). */
 interface Room {
@@ -42,7 +43,7 @@ interface Room {
  */
 @Component({
   selector: 'hd-sonos-tile',
-  imports: [LucideDynamicIcon, NgTemplateOutlet, Segmented, Transport, SonosMusic, TileDetails],
+  imports: [LucideDynamicIcon, NgTemplateOutlet, Segmented, Transport, SonosMusic, TileDetails, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     ...TILE_FACE_HOST,
@@ -58,20 +59,20 @@ interface Room {
           <ng-container *ngTemplateOutlet="picker" />
         } @else {
           <div class="hd-tile__name">
-            {{ face().name }}
+            {{ face().name | t }}
             @if (locked()) {
-              <svg class="hd-sonos__lock" aria-label="Locked" [lucideIcon]="lockIcon" />
+              <svg class="hd-sonos__lock" [attr.aria-label]="'Locked' | t" [lucideIcon]="lockIcon" />
             }
           </div>
         }
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
       <ng-container *ngTemplateOutlet="transport; context: { $implicit: false }" />
     </div>
     <ng-template #picker>
       <select
         class="hd-sonos__pick"
-        aria-label="Room to control"
+        [attr.aria-label]="'Room to control' | t"
         (change)="picked.set($any($event.target).value)"
       >
         @for (room of foundRooms(); track room.id) {
@@ -97,9 +98,7 @@ interface Room {
     <ng-template #groupRow>
       @if (lead(); as lead) {
         <div class="hd-sonos__row">
-          <span class="hd-sonos__label">{{
-            grouped().length > 1 ? 'Group' : 'Volume'
-          }}</span>
+          <span class="hd-sonos__label">{{ (grouped().length > 1 ? 'Group' : 'Volume') | t }}</span>
           <div
             class="hd-slider"
             role="slider"
@@ -180,7 +179,7 @@ interface Room {
               </button>
             } @else {
               <span class="hd-sonos__label">{{ room.name }}</span>
-              <span class="hd-sonos__label">Not found in Homey</span>
+              <span class="hd-sonos__label">{{ 'Not found in Homey' | t }}</span>
             }
           </div>
         }
@@ -199,14 +198,14 @@ interface Room {
       [icon]="speakerIcon"
       [subtitle]="face().detail"
     >
-      <hd-segmented hdDetailsHead label="Show" [options]="tabs" [value]="tab()" (picked)="tab.set($event)" />
+      <hd-segmented hdDetailsHead [label]="'Show' | t" [options]="tabs" [value]="tab()" (picked)="tab.set($event)" />
       <div class="hd-sonos__pane">
         @if (lead(); as lead) {
           <div class="hd-sonos__now">
             <span class="hd-sonos__now-name">
               {{ lead.name }}
               @if (locked()) {
-                <svg class="hd-sonos__lock" aria-label="Locked" [lucideIcon]="lockIcon" />
+                <svg class="hd-sonos__lock" [attr.aria-label]="'Locked' | t" [lucideIcon]="lockIcon" />
               }
             </span>
             <ng-container *ngTemplateOutlet="transport; context: { $implicit: true }" />

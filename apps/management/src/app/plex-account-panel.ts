@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { apiProblem, PlexAccount, PlexAccountApi, PlexAccounts, PlexServer } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
+import { TranslatePipe, t } from '@homey-dash/i18n';
 
 /** How often the panel looks whether someone approved the sign-in on Plex's page. */
 const CHECK_MS = 2000;
@@ -15,20 +16,20 @@ const CHECK_MS = 2000;
  */
 @Component({
   selector: 'hd-plex-account-panel',
-  imports: [AccountPanel, ConfirmInline],
+  imports: [AccountPanel, ConfirmInline, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <hd-account-panel key="plex" title="Plex" [error]="error()">
+    <hd-account-panel key="plex" [title]="'Plex' | t" [error]="error()">
       <ng-container ngProjectAs="[status]">
         @if (info(); as info) {
           @if (info.fake) {
-            <span class="hd-pill hd-pill--ok hd-pill--dot">Fake Plex</span>
+            <span class="hd-pill hd-pill--ok hd-pill--dot">{{ 'Fake Plex' | t }}</span>
           } @else if (!info.accounts.length) {
-            <span class="hd-pill hd-pill--warn hd-pill--dot">Not signed in</span>
+            <span class="hd-pill hd-pill--warn hd-pill--dot">{{ 'Not signed in' | t }}</span>
           } @else if (info.accounts.some(noServer)) {
-            <span class="hd-pill hd-pill--warn hd-pill--dot">Choose a server</span>
+            <span class="hd-pill hd-pill--warn hd-pill--dot">{{ 'Choose a server' | t }}</span>
           } @else {
-            <span class="hd-pill hd-pill--ok hd-pill--dot">Signed in</span>
+            <span class="hd-pill hd-pill--ok hd-pill--dot">{{ 'Signed in' | t }}</span>
           }
         }
       </ng-container>
@@ -46,15 +47,15 @@ const CHECK_MS = 2000;
             @if (renaming() === account.id) {
               <form class="form" (submit)="rename($event, account, newName.value)">
                 <div class="hd-field">
-                  <label class="hd-field__label" for="plex-rename">Name</label>
+                  <label class="hd-field__label" for="plex-rename">{{ 'Name' | t }}</label>
                   <input #newName id="plex-rename" class="hd-input" autocomplete="off" [value]="account.name" (keydown.escape)="renaming.set(null)" />
                   @if (nameError(); as error) {
                     <span class="hd-error hd-small">{{ error }}</span>
                   }
                 </div>
                 <div class="hd-actions">
-                  <button class="hd-btn hd-btn--primary" type="submit">Save</button>
-                  <button class="hd-btn" type="button" (click)="renaming.set(null)">Cancel</button>
+                  <button class="hd-btn hd-btn--primary" type="submit">{{ 'Save' | t }}</button>
+                  <button class="hd-btn" type="button" (click)="renaming.set(null)">{{ 'Cancel' | t }}</button>
                 </div>
               </form>
             } @else {
@@ -63,7 +64,7 @@ const CHECK_MS = 2000;
                 @if (account.serverId) {
                   <span class="hd-muted">{{ account.serverName }}{{ account.username ? ', as ' + account.username : '' }}</span>
                 } @else {
-                  <span class="warn">Choose a server</span>
+                  <span class="warn">{{ 'Choose a server' | t }}</span>
                 }
               </div>
               @if (!info.fake) {
@@ -75,10 +76,10 @@ const CHECK_MS = 2000;
                       (cancelled)="removing.set(null)"
                     />
                   } @else if (choosing() !== account.id) {
-                    <button class="hd-btn" type="button" (click)="startRenaming(account)">Rename</button>
-                    <button class="hd-btn" type="button" (click)="loadServers(account)">{{ account.serverId ? 'Change server' : 'Choose server' }}</button>
-                    <button class="hd-btn" type="button" [disabled]="busy()" (click)="signIn({ accountId: account.id })">Sign in again</button>
-                    <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(account.id)">Remove</button>
+                    <button class="hd-btn" type="button" (click)="startRenaming(account)">{{ 'Rename' | t }}</button>
+                    <button class="hd-btn" type="button" (click)="loadServers(account)">{{ (account.serverId ? 'Change server' : 'Choose server') | t }}</button>
+                    <button class="hd-btn" type="button" [disabled]="busy()" (click)="signIn({ accountId: account.id })">{{ 'Sign in again' | t }}</button>
+                    <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(account.id)">{{ 'Remove' | t }}</button>
                   }
                 </div>
               }
@@ -86,23 +87,23 @@ const CHECK_MS = 2000;
             @if (choosing() === account.id) {
               <form class="form" (submit)="choose($event, account, server.value)">
                 <div class="hd-field">
-                  <label class="hd-field__label" for="plex-server">Server</label>
+                  <label class="hd-field__label" for="plex-server">{{ 'Server' | t }}</label>
                   <select #server id="plex-server" class="hd-select">
                     @if (!servers()) {
-                      <option value="">Loading servers…</option>
+                      <option value="">{{ 'Loading servers…' | t }}</option>
                     }
                     @for (option of servers(); track option.id) {
                       <option [value]="option.id" [selected]="option.id === account.serverId">
-                        {{ option.name }}{{ option.owned ? '' : ' (shared with you)' }}
+                        {{ option.name }}{{ (option.owned ? '' : ' (shared with you)') | t }}
                       </option>
                     }
                   </select>
                 </div>
                 <div class="hd-actions">
                   <button class="hd-btn hd-btn--primary" type="submit" [disabled]="busy() || !servers()">
-                    {{ busy() ? 'Connecting…' : 'Use this server' }}
+                    {{ (busy() ? 'Connecting…' : 'Use this server') | t }}
                   </button>
-                  <button class="hd-btn" type="button" (click)="choosing.set(null)">Cancel</button>
+                  <button class="hd-btn" type="button" (click)="choosing.set(null)">{{ 'Cancel' | t }}</button>
                 </div>
               </form>
             }
@@ -116,9 +117,9 @@ const CHECK_MS = 2000;
               </p>
               <div class="hd-actions">
                 @if (signIn.authUrl; as url) {
-                  <a class="hd-btn" [href]="url" target="_blank" rel="noopener">Open Plex's page again</a>
+                  <a class="hd-btn" [href]="url" target="_blank" rel="noopener">{{ "Open Plex's page again" | t }}</a>
                 }
-                <button class="hd-btn" type="button" (click)="cancel()">Cancel</button>
+                <button class="hd-btn" type="button" (click)="cancel()">{{ 'Cancel' | t }}</button>
               </div>
             </div>
           } @else {
@@ -129,13 +130,13 @@ const CHECK_MS = 2000;
           @if (adding() || !info.accounts.length) {
             <form class="form hd-account__item" (submit)="add($event, name.value)">
               <div class="hd-field">
-                <label class="hd-field__label" for="plex-name">Name</label>
+                <label class="hd-field__label" for="plex-name">{{ 'Name' | t }}</label>
                 <input
                   #name
                   id="plex-name"
                   class="hd-input"
                   autocomplete="off"
-                  placeholder="Such as Home or Cinema"
+                  [placeholder]="'Such as Home or Cinema' | t"
                   [attr.aria-invalid]="!!nameError() && !renaming()"
                 />
                 @if (nameError() && !renaming()) {
@@ -143,15 +144,15 @@ const CHECK_MS = 2000;
                 }
               </div>
               <div class="hd-actions">
-                <button class="hd-btn hd-btn--primary" type="submit" [disabled]="busy()">Sign in with Plex</button>
+                <button class="hd-btn hd-btn--primary" type="submit" [disabled]="busy()">{{ 'Sign in with Plex' | t }}</button>
                 @if (info.accounts.length) {
-                  <button class="hd-btn" type="button" (click)="adding.set(false)">Cancel</button>
+                  <button class="hd-btn" type="button" (click)="adding.set(false)">{{ 'Cancel' | t }}</button>
                 }
               </div>
             </form>
           } @else {
             <div class="hd-actions">
-              <button class="hd-btn" type="button" (click)="startAdding()">Add another Plex account</button>
+              <button class="hd-btn" type="button" (click)="startAdding()">{{ 'Add another Plex account' | t }}</button>
             </div>
           }
         }
@@ -199,7 +200,7 @@ export class PlexAccountPanel {
   protected add(event: Event, name: string) {
     event.preventDefault();
     if (!name.trim()) {
-      this.nameError.set('Give the account a name, such as whose it is.');
+      this.nameError.set(t('Give the account a name, such as whose it is.'));
       return;
     }
     this.signIn({ name: name.trim() });
@@ -218,8 +219,8 @@ export class PlexAccountPanel {
       await this.load();
     } catch (e) {
       tab?.close();
-      if (e instanceof HttpErrorResponse && e.status === 400) this.nameError.set(apiProblem(e, 'Choose another name.'));
-      else this.error.set(apiProblem(e, 'Could not start signing in with Plex. Try again.'));
+      if (e instanceof HttpErrorResponse && e.status === 400) this.nameError.set(apiProblem(e, t('Choose another name.')));
+      else this.error.set(apiProblem(e, t('Could not start signing in with Plex. Try again.')));
     } finally {
       this.busy.set(false);
     }
@@ -237,7 +238,7 @@ export class PlexAccountPanel {
       this.renaming.set(null);
       this.nameError.set(null);
     } catch (e) {
-      this.nameError.set(apiProblem(e, 'Could not rename the account. Try again.'));
+      this.nameError.set(apiProblem(e, t('Could not rename the account. Try again.')));
     }
   }
 
@@ -247,7 +248,7 @@ export class PlexAccountPanel {
     try {
       const servers = await firstValueFrom(this.api.servers(account.id));
       this.servers.set(servers);
-      if (!servers.length) this.error.set('This Plex account has no servers. Sign in with the account that owns or shares one.');
+      if (!servers.length) this.error.set(t('This Plex account has no servers. Sign in with the account that owns or shares one.'));
     } catch (e) {
       this.choosing.set(null);
       this.error.set(apiProblem(e, `Could not load the servers of ${account.name}. Try again.`));
@@ -263,7 +264,7 @@ export class PlexAccountPanel {
       this.choosing.set(null);
       this.error.set(null);
     } catch (e) {
-      this.error.set(apiProblem(e, 'Could not connect to that server. Try again.'));
+      this.error.set(apiProblem(e, t('Could not connect to that server. Try again.')));
     } finally {
       this.busy.set(false);
     }
@@ -274,7 +275,7 @@ export class PlexAccountPanel {
       this.info.set(await firstValueFrom(this.api.remove(account.id)));
       this.removing.set(null);
     } catch {
-      this.error.set('Could not remove the account. Try again.');
+      this.error.set(t('Could not remove the account. Try again.'));
     }
   }
 
@@ -294,7 +295,7 @@ export class PlexAccountPanel {
         await this.loadServers(unserved);
       }
     } catch {
-      this.error.set('Could not load the Plex accounts.');
+      this.error.set(t('Could not load the Plex accounts.'));
     }
   }
 }

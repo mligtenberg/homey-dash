@@ -5,6 +5,7 @@ import { TileData } from '@homey-dash/tiles';
 import { firstValueFrom } from 'rxjs';
 import { AlbumSelect } from '../album-select';
 import { AlbumGroup, loadAlbums, parseAlbumValue } from '../immich-albums';
+import { TranslatePipe, t } from '@homey-dash/i18n';
 
 /**
  * A photo tile's target: one of the photo sets, or a new one made here from an Immich album, so building a dashboard
@@ -12,27 +13,27 @@ import { AlbumGroup, loadAlbums, parseAlbumValue } from '../immich-albums';
  */
 @Component({
   selector: 'hd-photo-set-field',
-  imports: [RouterLink, AlbumSelect],
+  imports: [RouterLink, AlbumSelect, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="hd-field">
-      <label class="hd-field__label" for="tile-target">Photo set</label>
+      <label class="hd-field__label" for="tile-target">{{ 'Photo set' | t }}</label>
       @if (groups(); as groups) {
-        <hd-album-select selectId="tile-target" placeholder="Choose an Immich album" [groups]="groups" (picked)="create($event)" (cancelled)="cancel()" />
-        <button class="hd-btn" type="button" (click)="cancel()">Cancel</button>
+        <hd-album-select selectId="tile-target" [placeholder]="'Choose an Immich album' | t" [groups]="groups" (picked)="create($event)" (cancelled)="cancel()" />
+        <button class="hd-btn" type="button" (click)="cancel()">{{ 'Cancel' | t }}</button>
       } @else {
         <select id="tile-target" class="hd-select" (change)="choose($any($event.target).value)">
           @if (!value()) {
-            <option value="" selected>Pick a photo set</option>
+            <option value="" selected>{{ 'Pick a photo set' | t }}</option>
           } @else if (!selected()) {
-            <option value="" selected>Photo set not found</option>
+            <option value="" selected>{{ 'Photo set not found' | t }}</option>
           }
           @for (set of sets(); track set.id) {
             <option [value]="set.target" [selected]="set.target === value()">
-              {{ set.name }} ({{ set.photos.length }} {{ set.photos.length === 1 ? 'photo' : 'photos' }})
+              {{ set.name }} ({{ set.photos.length }} {{ (set.photos.length === 1 ? 'photo' : 'photos') | t }})
             </option>
           }
-          <option value="new">New photo set from an album…</option>
+          <option value="new">{{ 'New photo set from an album…' | t }}</option>
         </select>
       }
       @if (selected()?.syncError; as syncError) {
@@ -41,7 +42,7 @@ import { AlbumGroup, loadAlbums, parseAlbumValue } from '../immich-albums';
       @if (error(); as error) {
         <span class="hd-error hd-small" role="alert">{{ error }}</span>
       }
-      <a class="hint" routerLink="/photo-sets">Manage photo sets</a>
+      <a class="hint" routerLink="/photo-sets">{{ 'Manage photo sets' | t }}</a>
     </div>
   `,
   styles: `
@@ -91,7 +92,7 @@ export class PhotoSetField {
       this.groups.set(null);
       this.picked.emit(set.target);
     } catch (e) {
-      this.error.set(apiProblem(e, 'Could not make the photo set. Try again.'));
+      this.error.set(apiProblem(e, t('Could not make the photo set. Try again.')));
     }
   }
 }

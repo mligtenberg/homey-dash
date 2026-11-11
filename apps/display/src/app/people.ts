@@ -3,6 +3,7 @@ import { LucideMapPinOff, LucideMoon } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { homeyUserAvatarUrl, Realtime } from '@homey-dash/api-client';
 import { TileData } from '@homey-dash/tiles';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** The room the column of people takes from the left edge: its width plus a gap either side (44px + 2 x --space-3). */
 export const PEOPLE_GUTTER = 68;
@@ -13,13 +14,13 @@ export const PEOPLE_GUTTER = 68;
  * set them home or away, and awake or sleeping, in Homey. Nothing shows while Homey tells of no one.
  */
 @Component({
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   selector: 'hd-people',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown.escape)': 'close()', '(document:pointerdown)': 'outside($event)' },
   template: `
     @if (people().length) {
-      <nav class="people" aria-label="People">
+      <nav class="people" [attr.aria-label]="'People' | t">
         @for (person of people(); track person.key) {
           <div class="person">
             <button
@@ -45,13 +46,13 @@ export const PEOPLE_GUTTER = 68;
             @if (open() === person.key) {
               <div class="person__sheet" role="dialog" [attr.aria-label]="person.name">
                 <h2>{{ person.name }}</h2>
-                <div class="choice" role="group" aria-label="Home or away">
-                  <button type="button" [attr.aria-pressed]="person.present" (click)="set(person, { present: true })">Home</button>
-                  <button type="button" [attr.aria-pressed]="!person.present" (click)="set(person, { present: false })">Away</button>
+                <div class="choice" role="group" [attr.aria-label]="'Home or away' | t">
+                  <button type="button" [attr.aria-pressed]="person.present" (click)="set(person, { present: true })">{{ 'Home' | t }}</button>
+                  <button type="button" [attr.aria-pressed]="!person.present" (click)="set(person, { present: false })">{{ 'Away' | t }}</button>
                 </div>
-                <div class="choice" role="group" aria-label="Awake or sleeping">
-                  <button type="button" [attr.aria-pressed]="!person.asleep" (click)="set(person, { asleep: false })">Awake</button>
-                  <button type="button" [attr.aria-pressed]="person.asleep" (click)="set(person, { asleep: true })">Sleeping</button>
+                <div class="choice" role="group" [attr.aria-label]="'Awake or sleeping' | t">
+                  <button type="button" [attr.aria-pressed]="!person.asleep" (click)="set(person, { asleep: false })">{{ 'Awake' | t }}</button>
+                  <button type="button" [attr.aria-pressed]="person.asleep" (click)="set(person, { asleep: true })">{{ 'Sleeping' | t }}</button>
                 </div>
               </div>
             }

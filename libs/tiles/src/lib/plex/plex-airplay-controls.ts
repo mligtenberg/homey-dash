@@ -3,6 +3,7 @@ import { AirPlayPlayback, PlexTracks, Realtime } from '@homey-dash/api-client';
 import { LucidePause, LucidePlay, LucideSquare } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { reason } from './hub-reason';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * What plays on an Apple TV, in the Plex dialog: what it is, and buttons to pause or resume it, stop it and, when the
@@ -10,7 +11,7 @@ import { reason } from './hub-reason';
  */
 @Component({
   selector: 'hd-plex-airplay-controls',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-plex-recent__now', role: 'group', '[attr.aria-label]': "'Playing on ' + playing().deviceName" },
   template: `
@@ -22,27 +23,27 @@ import { reason } from './hub-reason';
       <span>{{ busy() ? 'Starting on' : playing().paused ? 'Paused on' : 'Playing on' }} {{ playing().deviceName }}</span>
     </div>
     <button type="button" class="hd-plex-recent__receiver" [disabled]="busy()" (click)="togglePause()">
-      <svg [lucideIcon]="playing().paused ? playIcon : pauseIcon" />{{ playing().paused ? 'Resume' : 'Pause' }}
+      <svg [lucideIcon]="playing().paused ? playIcon : pauseIcon" />{{ (playing().paused ? 'Resume' : 'Pause') | t }}
     </button>
-    <button type="button" class="hd-plex-recent__receiver" (click)="stop()"><svg [lucideIcon]="stopIcon" />Stop</button>
+    <button type="button" class="hd-plex-recent__receiver" (click)="stop()"><svg [lucideIcon]="stopIcon" />{{ 'Stop' | t }}</button>
     @if (tracks(); as t) {
       @if (t.audio.length > 1) {
         <label class="hd-plex-recent__track">
-          <span>Audio</span>
+          <span>{{ 'Audio' | t }}</span>
           <select [disabled]="busy()" (change)="pickAudio($any($event.target).value)">
             @for (a of t.audio; track a.id) {
-              <option [value]="a.id" [selected]="a.id === audio()">{{ a.label }}</option>
+              <option [value]="a.id" [selected]="a.id === audio()">{{ a.label | t }}</option>
             }
           </select>
         </label>
       }
       @if (t.subtitles.length) {
         <label class="hd-plex-recent__track">
-          <span>Subtitles</span>
+          <span>{{ 'Subtitles' | t }}</span>
           <select [disabled]="busy()" (change)="pickSubtitle($any($event.target).value)">
-            <option value="" [selected]="!playing().subtitleStreamId">Off</option>
+            <option value="" [selected]="!playing().subtitleStreamId">{{ 'Off' | t }}</option>
             @for (sub of t.subtitles; track sub.id) {
-              <option [value]="sub.id" [selected]="sub.id === playing().subtitleStreamId">{{ sub.label }}</option>
+              <option [value]="sub.id" [selected]="sub.id === playing().subtitleStreamId">{{ sub.label | t }}</option>
             }
           </select>
         </label>

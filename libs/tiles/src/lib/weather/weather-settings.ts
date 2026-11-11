@@ -3,6 +3,7 @@ import { PlaceMatch, WEATHER_HERE, WEATHER_PLACE, WeatherApi } from '@homey-dash
 import { firstValueFrom } from 'rxjs';
 import { TileData } from '../tile-data';
 import { WeatherData, WeatherTileSettings } from './weather-data';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** How long typing rests before it searches. */
 const SEARCH_AFTER_MS = 300;
@@ -37,13 +38,14 @@ export function placeDetail(match: PlaceMatch): string {
 @Component({
   selector: 'hd-weather-tile-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="hd-field">
-      <label class="hd-field__label" for="weather-place">Place</label>
+      <label class="hd-field__label" for="weather-place">{{ 'Place' | t }}</label>
       <p class="current">
         @if (settings().place; as place) {
           <span>{{ place.name }}</span>
-          <button type="button" class="hd-btn" (click)="useHomey()">Use Homey's location</button>
+          <button type="button" class="hd-btn" (click)="useHomey()">{{ "Use Homey's location" | t }}</button>
         } @else {
           <span>Homey location{{ town() ? ': ' + town() : '' }}</span>
         }
@@ -64,10 +66,10 @@ export function placeDetail(match: PlaceMatch): string {
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
       } @else if (query().trim().length >= 2 && searched() && !matches().length) {
-        <p class="muted">No town found</p>
+        <p class="muted">{{ 'No town found' | t }}</p>
       }
       <!-- A popover, so it floats over the settings under it instead of pushing them down; the press stays on the input. -->
-      <ul #list class="matches" popover="manual" aria-label="Towns" (pointerdown)="$event.preventDefault()">
+      <ul #list class="matches" popover="manual" [attr.aria-label]="'Towns' | t" (pointerdown)="$event.preventDefault()">
         @for (match of matches(); track $index) {
           <li>
             <button type="button" class="match" (click)="choose(match)">

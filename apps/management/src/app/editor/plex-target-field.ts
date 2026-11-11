@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { RouterLink } from '@angular/router';
 import { ALL_PLEX_LIBRARIES, ANY_PLEX_PLAYER, plexLibraryTarget, plexPlayerTarget } from '@homey-dash/api-client';
 import { PlexData } from '@homey-dash/tiles';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * A Plex tile's target: for now playing, any player or one that played something since HomeyDash started; for recently
@@ -11,12 +12,12 @@ import { PlexData } from '@homey-dash/tiles';
  */
 @Component({
   selector: 'hd-plex-target-field',
-  imports: [RouterLink, AccountSelect],
+  imports: [RouterLink, AccountSelect, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (accounts().length > 1) {
       <div class="hd-field">
-        <label class="hd-field__label" for="tile-account">Plex account</label>
+        <label class="hd-field__label" for="tile-account">{{ 'Plex account' | t }}</label>
         <hd-account-select selectId="tile-account" [accounts]="accounts()" [selected]="overview()?.accountId" (picked)="accountPicked.emit($event)" />
       </div>
     }
@@ -31,10 +32,10 @@ import { PlexData } from '@homey-dash/tiles';
         }
       </select>
       @if (type() === 'plexPlayer') {
-        <span class="hd-hint">Players show up here once they played something.</span>
+        <span class="hd-hint">{{ 'Players show up here once they played something.' | t }}</span>
       }
       @if (status(); as status) {
-        <span class="hd-hint">{{ status }} <a routerLink="/accounts">Go to Accounts</a></span>
+        <span class="hd-hint">{{ status }} <a routerLink="/accounts">{{ 'Go to Accounts' | t }}</a></span>
       }
     </div>
   `,

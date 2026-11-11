@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output } from '@angular/core';
 import { samePlaces, TrafficPlace, TrafficRoute } from '@homey-dash/api-client';
 import { TrafficPlaceField } from './traffic-place-field';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * Management's choice of a route (ADR-0015): a name, and an origin and destination found by name. Used by a traffic tile's
@@ -9,12 +10,12 @@ import { TrafficPlaceField } from './traffic-place-field';
  */
 @Component({
   selector: 'hd-traffic-route-field',
-  imports: [TrafficPlaceField],
+  imports: [TrafficPlaceField, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
     <div class="hd-field">
-      <label class="hd-field__label" [for]="idPrefix() + '-name'">Route name</label>
+      <label class="hd-field__label" [for]="idPrefix() + '-name'">{{ 'Route name' | t }}</label>
       <input
         [id]="idPrefix() + '-name'"
         class="hd-input"
@@ -24,10 +25,10 @@ import { TrafficPlaceField } from './traffic-place-field';
         (change)="rename($any($event.target).value)"
       />
     </div>
-    <hd-traffic-place-field [id]="idPrefix() + '-origin'" label="From" [place]="origin()" [account]="account()" (picked)="pick('origin', $event)" />
-    <hd-traffic-place-field [id]="idPrefix() + '-destination'" label="To" [place]="destination()" [account]="account()" (picked)="pick('destination', $event)" />
+    <hd-traffic-place-field [id]="idPrefix() + '-origin'" [label]="'From' | t" [place]="origin()" [account]="account()" (picked)="pick('origin', $event)" />
+    <hd-traffic-place-field [id]="idPrefix() + '-destination'" [label]="'To' | t" [place]="destination()" [account]="account()" (picked)="pick('destination', $event)" />
     @if (same()) {
-      <p class="error" role="alert">From and To are the same place. Pick two different places.</p>
+      <p class="error" role="alert">{{ 'From and To are the same place. Pick two different places.' | t }}</p>
     }
   `,
   styles: `

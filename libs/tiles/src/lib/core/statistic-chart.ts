@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { HomeyInsightEntry, HomeyInsightLog, InsightResolution } from '@homey-dash/api-client';
 import { formatReading } from './device-look';
+import { TranslatePipe, formatTag } from '@homey-dash/i18n';
 
 const HOUR = 3_600_000;
 
@@ -112,7 +113,7 @@ export function logOwner(
 
 /** A time as the history shows it: with the day when the window is longer than one. */
 export function statisticStamp(iso: string, windowMs: number): string {
-  return new Date(iso).toLocaleString([], {
+  return new Date(iso).toLocaleString(formatTag(), {
     ...(windowMs > 24 * HOUR
       ? { weekday: 'short', day: 'numeric', month: 'short' }
       : {}),
@@ -275,6 +276,7 @@ export function nearestPoint(
   host: {
     style: 'display: flex; flex-direction: column; flex: 1; min-height: 0',
   },
+  imports: [TranslatePipe],
   template: `
     <svg
       #chartSvg
@@ -338,7 +340,7 @@ export function nearestPoint(
           [attr.y]="box().height"
           text-anchor="end"
         >
-          Now
+          {{ 'Now' | t }}
         </text>
       }
     </svg>

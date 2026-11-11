@@ -6,6 +6,7 @@ import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { NewsBrowser } from './news-browser';
 import { NosLogo } from './nos-logo';
 import { ago, NewsData, NewsTileSettings } from './news-data';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** How many headlines each size has room for. */
 const HEADLINES = { small: 1, wide: 1, full: 2, large: 3, 'full-large': 6 } as const;
@@ -16,7 +17,7 @@ const HEADLINES = { small: 1, wide: 1, full: 2, large: 3, 'full-large': 6 } as c
  */
 @Component({
   selector: 'hd-news-tile',
-  imports: [NewsBrowser, NosLogo, TileDetails],
+  imports: [NewsBrowser, NosLogo, TileDetails, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-news' },
   template: `
@@ -31,7 +32,7 @@ const HEADLINES = { small: 1, wide: 1, full: 2, large: 3, 'full-large': 6 } as c
       </ol>
     } @else {
       <div class="hd-news__list">
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
     }
     <div class="hd-tile__name hd-news__source"><hd-nos-logo /><span>{{ shortName() }}</span></div>

@@ -22,6 +22,7 @@ import {
 } from '@homey-dash/design-system';
 import { KindHue, TileKind } from '@homey-dash/tiles';
 import { LucideDynamicIcon } from '@lucide/angular';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 interface KindInfo {
   icon: LucideIconData;
@@ -59,16 +60,16 @@ const GROUPS = ['Homey', 'Media', 'Information', 'Other'];
  */
 @Component({
   selector: 'hd-tile-kind-chooser',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
-      <h2 class="hd-section-title">Add a tile</h2>
-      <button class="hd-btn hd-btn--sm" type="button" (click)="cancelled.emit()">Cancel</button>
+      <h2 class="hd-section-title">{{ 'Add a tile' | t }}</h2>
+      <button class="hd-btn hd-btn--sm" type="button" (click)="cancelled.emit()">{{ 'Cancel' | t }}</button>
     </div>
     <label class="search">
       <svg [lucideIcon]="searchIcon" aria-hidden="true" />
-      <input #search class="hd-input" type="search" placeholder="Find a tile" aria-label="Find a tile"
+      <input #search class="hd-input" type="search" [placeholder]="'Find a tile' | t" [attr.aria-label]="'Find a tile' | t"
         [value]="query()" (input)="query.set($any($event.target).value)" (keydown.enter)="pickFirst($event)" (keydown.escape)="cancelled.emit()" />
     </label>
     @for (group of groups(); track group.name) {

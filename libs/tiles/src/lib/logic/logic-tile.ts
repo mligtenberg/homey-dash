@@ -17,6 +17,7 @@ import { TileHost } from '../tile-host';
 import { TileKind, TileModule } from '../tile-kind';
 import { TileKindRegistry } from '../tile-kind-registry';
 import { ruleAnswersOf } from './rule-answers';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 export * from './rule-answers';
 
@@ -85,7 +86,7 @@ export function heldTile(id: string, tile: HeldTile, size: TileSize): Tile {
  */
 @Component({
   selector: 'hd-logic-tile',
-  imports: [TileHost],
+  imports: [TileHost, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-logic', '[attr.data-size]': 'size()' },
   template: `
@@ -97,9 +98,9 @@ export function heldTile(id: string, tile: HeldTile, size: TileSize): Tile {
     @if (badge) {
       @if (unconfigured() || !shownTiles().length) {
         <div class="hd-tile hd-logic__empty" [attr.data-size]="size()">
-          <div class="hd-tile__name">Logic tile</div>
+          <div class="hd-tile__name">{{ 'Logic tile' | t }}</div>
           <div class="hd-tile__detail">
-            {{ unconfigured() ? 'Add tiles with rules; it shows the first whose rule holds.' : 'No rule holds right now, so it shows nothing.' }}
+            {{ (unconfigured() ? 'Add tiles with rules; it shows the first whose rule holds.' : 'No rule holds right now, so it shows nothing.') | t }}
           </div>
         </div>
       }

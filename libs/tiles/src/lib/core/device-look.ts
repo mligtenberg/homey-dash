@@ -2,6 +2,7 @@ import { LucideAirVent, LucideBell, LucideBlinds, LucideBox, LucideCamera, Lucid
 import { LucideIconInput } from '@lucide/angular';
 import { HomeyCapability, HomeyDevice, homeyImageUrl } from '@homey-dash/api-client';
 import { KindHue } from '../tile-kind';
+import { t } from '@homey-dash/i18n';
 
 const HUES: Record<string, KindHue> = {
   light: 'light',
@@ -153,7 +154,7 @@ export function capabilityText(capability: HomeyCapability): { value: string; un
   if (value === null || value === undefined) return null;
   if (typeof value === 'boolean') {
     const [yes, no] = BOOLEANS[id] ?? (id.startsWith('alarm_') ? ['Yes', 'No'] : ['On', 'Off']);
-    return { value: value ? yes : no, units: '' };
+    return { value: t(value ? yes : no), units: '' };
   }
   if (typeof value === 'number') {
     // Fractions Homey keeps 0–1 without units.
@@ -195,28 +196,28 @@ export function deviceDetail(device: HomeyDevice): { detail: string; active: boo
   const value = (id: string) => caps[id]?.value;
 
   // What plays says more than that the device is on.
-  if (isPlaying(device)) return { detail: nowPlaying(device) || 'Playing', active: true };
+  if (isPlaying(device)) return { detail: nowPlaying(device) || t('Playing'), active: true };
   if (typeof value('onoff') === 'boolean') {
     const on = value('onoff') as boolean;
     const dim = value('dim');
-    return { detail: on && typeof dim === 'number' ? `On · ${Math.round(dim * 100)}%` : on ? 'On' : 'Off', active: on };
+    return { detail: on && typeof dim === 'number' ? `${t('On')} · ${Math.round(dim * 100)}%` : on ? t('On') : t('Off'), active: on };
   }
   if (typeof value('target_temperature') === 'number' && caps['measure_temperature']?.value != null) {
-    return { detail: `${formatNumber(caps['measure_temperature'])} · set to ${formatNumber(caps['target_temperature'])}`, active: false };
+    return { detail: `${formatNumber(caps['measure_temperature'])} · ${t('set to {value}', { value: formatNumber(caps['target_temperature']) })}`, active: false };
   }
   if (typeof value('alarm_contact') === 'boolean') {
-    return { detail: value('alarm_contact') ? 'Open' : 'Closed', active: value('alarm_contact') as boolean };
+    return { detail: value('alarm_contact') ? t('Open') : t('Closed'), active: value('alarm_contact') as boolean };
   }
-  if (typeof value('locked') === 'boolean') return { detail: value('locked') ? 'Locked' : 'Unlocked', active: value('locked') === false };
+  if (typeof value('locked') === 'boolean') return { detail: value('locked') ? t('Locked') : t('Unlocked'), active: value('locked') === false };
   if (typeof value('alarm_motion') === 'boolean') {
-    return { detail: value('alarm_motion') ? 'Motion' : 'No motion', active: value('alarm_motion') as boolean };
+    return { detail: value('alarm_motion') ? t('Motion') : t('No motion'), active: value('alarm_motion') as boolean };
   }
   if (typeof value('windowcoverings_set') === 'number') {
     const open = Math.round((value('windowcoverings_set') as number) * 100);
-    return { detail: open === 0 ? 'Closed' : `${open}% open`, active: open > 0 };
+    return { detail: open === 0 ? t('Closed') : t('{open}% open', { open }), active: open > 0 };
   }
 
-  if (value('speaker_playing') === false) return { detail: 'Not playing', active: false };
+  if (value('speaker_playing') === false) return { detail: t('Not playing'), active: false };
 
   const measured = Object.values(caps).filter((c) => typeof c.value === 'number' && c.id.startsWith('measure_'));
   if (measured.length > 0) return { detail: measured.slice(0, 2).map(formatNumber).join(' · '), active: false };

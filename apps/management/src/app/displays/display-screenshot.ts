@@ -1,29 +1,31 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, input, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { DisplayInfo, DisplaysApi } from '@homey-dash/api-client';
+import { TranslatePipe, formatTag } from '@homey-dash/i18n';
 
 /** A picture of what a display's screen shows right now, asked of the screen and shown here. */
 @Component({
   selector: 'hd-display-screenshot',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="bar">
       <button type="button" class="hd-btn hd-btn--primary" [disabled]="taking() || !display().status.connected" (click)="take()">
         {{ taking() ? 'Taking…' : picture() ? 'Take another' : 'Take screenshot' }}
       </button>
       @if (picture(); as shot) {
-        <a class="hd-btn" [href]="shot.url" [download]="shot.name">Download</a>
+        <a class="hd-btn" [href]="shot.url" [download]="shot.name">{{ 'Download' | t }}</a>
         <span class="hd-hint">Taken {{ shot.at }}</span>
       }
       @if (!display().status.connected) {
-        <span class="hd-hint">The display must be connected.</span>
+        <span class="hd-hint">{{ 'The display must be connected.' | t }}</span>
       }
     </div>
     @if (error(); as message) {
       <p class="hd-error" role="alert">{{ message }}</p>
     }
     @if (picture(); as shot) {
-      <img class="shot" [src]="shot.url" alt="What the display shows" />
+      <img class="shot" [src]="shot.url" [alt]="'What the display shows' | t" />
     }
   `,
   styles: `
@@ -55,7 +57,7 @@ export class DisplayScreenshot {
         this.picture.set({
           url: URL.createObjectURL(blob),
           name: `${display.name} ${now.toISOString().slice(0, 19).replace(/[T:]/g, '-')}.jpg`,
-          at: now.toLocaleTimeString(),
+          at: now.toLocaleTimeString(formatTag()),
         });
         this.taking.set(false);
       },

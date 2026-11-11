@@ -1,14 +1,16 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { DEFAULT_NEWS_SOURCE, NEWS_SOURCES } from '@homey-dash/api-client';
 import { NewsTileSettings } from './news-data';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** Management's choice of which NOS feed a news tile shows (ADR-0016). */
 @Component({
   selector: 'hd-news-tile-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="hd-field">
-      <label class="hd-field__label" for="news-source">News</label>
+      <label class="hd-field__label" for="news-source">{{ 'News' | t }}</label>
       <select id="news-source" class="hd-select" (change)="setSource($any($event.target).value)">
         @for (source of sources; track source.id) {
           <option [value]="source.id" [selected]="(settings().source ?? defaultSource) === source.id">{{ source.name }}</option>

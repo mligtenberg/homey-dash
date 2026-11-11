@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, ElementRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import type Hls from 'hls.js';
+import { t } from '@homey-dash/i18n';
 
 /** How often a playing stream says it is in use (ms): the screen's detail view closes by itself when nobody touches it. */
 const ACTIVE_EVERY = 5_000;
@@ -54,14 +55,14 @@ export class NewsPlayer {
     const { default: HlsPlayer } = await import('hls.js');
     if (HlsPlayer.isSupported()) {
       const hls = new HlsPlayer();
-      hls.on(HlsPlayer.Events.ERROR, (_, data) => data.fatal && this.error.set('The stream cannot be played.'));
+      hls.on(HlsPlayer.Events.ERROR, (_, data) => data.fatal && this.error.set(t('The stream cannot be played.')));
       hls.loadSource(url);
       hls.attachMedia(video);
       this.hls = hls;
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = url;
     } else {
-      this.error.set('This screen cannot play the stream.');
+      this.error.set(t('This screen cannot play the stream.'));
       return;
     }
     video.play().catch(() => {

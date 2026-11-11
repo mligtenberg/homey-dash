@@ -5,6 +5,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ImmichAccountApi } from '@homey-dash/api-client';
 import { AddressKeyForm, addressKeyAccounts } from './address-key-accounts';
 import { ImmichPartners } from './immich-partners';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * The Immich accounts, whose albums photo sets follow: each a name, the server's address and an API key made in
@@ -14,31 +15,30 @@ import { ImmichPartners } from './immich-partners';
  */
 @Component({
   selector: 'hd-immich-account-panel',
-  imports: [AccountPanel, ConfirmInline, NgTemplateOutlet, AddressKeyForm, ImmichPartners],
+  imports: [AccountPanel, ConfirmInline, NgTemplateOutlet, AddressKeyForm, ImmichPartners, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <hd-account-panel key="immich" title="Immich" [error]="error()">
+    <hd-account-panel key="immich" [title]="'Immich' | t" [error]="error()">
       <ng-container ngProjectAs="[status]">
         @if (info(); as info) {
           @if (info.fake) {
-            <span class="hd-pill hd-pill--ok hd-pill--dot">Fake Immich</span>
+            <span class="hd-pill hd-pill--ok hd-pill--dot">{{ 'Fake Immich' | t }}</span>
           } @else if (info.accounts.length) {
-            <span class="hd-pill hd-pill--ok hd-pill--dot">Set up</span>
+            <span class="hd-pill hd-pill--ok hd-pill--dot">{{ 'Set up' | t }}</span>
           } @else {
-            <span class="hd-pill hd-pill--warn hd-pill--dot">Not set up</span>
+            <span class="hd-pill hd-pill--warn hd-pill--dot">{{ 'Not set up' | t }}</span>
           }
         }
       </ng-container>
       @if (info(); as info) {
         @if (info.fake) {
-          <p class="hd-muted">HomeyDash runs against a fake Immich with sample albums, set in its configuration.</p>
+          <p class="hd-muted">{{ 'HomeyDash runs against a fake Immich with sample albums, set in its configuration.' | t }}</p>
           @for (account of info.accounts; track account.id) {
             <div class="hd-account__item"><hd-immich-partners [account]="account" /></div>
           }
         } @else {
           <p class="hd-muted">
-            Photo sets follow albums in Immich. Add an account for each Immich server, or for each person whose photos you
-            want to show. Displays get their photos through HomeyDash, so only HomeyDash needs to reach Immich.
+            {{ 'Photo sets follow albums in Immich. Add an account for each Immich server, or for each person whose photos you want to show. Displays get their photos through HomeyDash, so only HomeyDash needs to reach Immich.' | t }}
           </p>
           @for (account of info.accounts; track account.id) {
             <div class="hd-account__item">
@@ -57,8 +57,8 @@ import { ImmichPartners } from './immich-partners';
                       (cancelled)="removing.set(null)"
                     />
                   } @else {
-                    <button class="hd-btn" type="button" (click)="edit(account.id)">Edit</button>
-                    <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(account.id)">Remove</button>
+                    <button class="hd-btn" type="button" (click)="edit(account.id)">{{ 'Edit' | t }}</button>
+                    <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(account.id)">{{ 'Remove' | t }}</button>
                   }
                 </div>
                 <hd-immich-partners [account]="account" />
@@ -72,7 +72,7 @@ import { ImmichPartners } from './immich-partners';
           } @else if (editing() === null) {
             <div class="hd-actions">
               <button class="hd-btn" [class.hd-btn--primary]="!info.accounts.length" type="button" (click)="edit('new')">
-                {{ info.accounts.length ? 'Add another Immich account' : 'Set up Immich' }}
+                {{ (info.accounts.length ? 'Add another Immich account' : 'Set up Immich') | t }}
               </button>
             </div>
           }

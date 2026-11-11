@@ -87,6 +87,8 @@ export interface DisplaySummary {
   lockWidgets: LockWidget[];
   /** A capability of a device in Homey (a signal id) whose lux the screen reports as its brightness; null: it measures itself. */
   lightSignal?: string | null;
+  /** The language its screen speaks, `en` or `nl`; null follows the screen's browser. */
+  language?: string | null;
 }
 
 /**
@@ -211,6 +213,11 @@ export class DisplaysApi {
   /** Makes a device's luminance in Homey the display's brightness; null has the screen measure it itself. */
   setLightSource(id: string, signal: string | null) {
     return this.http.put<DisplayInfo>(`/api/displays/${id}/light-source`, { signal });
+  }
+
+  /** Sets the language its screen speaks (`en` or `nl`); null has it follow the screen's browser. */
+  setLanguage(id: string, language: string | null) {
+    return this.http.put<DisplayInfo>(`/api/displays/${id}/language`, { language });
   }
 
   delete(id: string) {

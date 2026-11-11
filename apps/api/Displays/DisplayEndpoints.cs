@@ -27,6 +27,7 @@ public static partial class DisplayEndpoints
 
     // A capability of a device in Homey whose lux the screen reports as its brightness; null to measure itself.
     public sealed record LightSource(string? Signal);
+    public sealed record DisplayLanguage(string? Language);
 
     private const int MaxScreenshotBytes = 8 * 1024 * 1024;
 
@@ -97,6 +98,17 @@ public static partial class DisplayEndpoints
                     return Task.FromResult<IResult?>(Results.ValidationProblem(
                         new Dictionary<string, string[]> { ["signal"] = ["A light source is a capability of a device in Homey."] }, "This light source can't be used."));
                 display.LightSignal = body.Signal;
+                return Task.FromResult<IResult?>(null);
+            }));
+
+        // The language its screen speaks; null follows the screen's browser.
+        displays.MapPut("/{id:guid}/language", (Guid id, DisplayLanguage body, [AsParameters] Services services, CancellationToken ct) =>
+            Change(id, services, ct, display =>
+            {
+                if (body.Language is { } language && !Languages.Supported.Contains(language))
+                    return Task.FromResult<IResult?>(Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["language"] = ["That language is not supported."] }));
+                display.Language = body.Language;
                 return Task.FromResult<IResult?>(null);
             }));
 

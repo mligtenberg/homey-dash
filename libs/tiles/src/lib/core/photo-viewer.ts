@@ -4,10 +4,11 @@ import { LucideChevronLeft, LucideChevronRight, LucideHeart, LucideImage, Lucide
 import { LucideDynamicIcon } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { TileDetails } from './tile-details';
+import { TranslatePipe, formatTag } from '@homey-dash/i18n';
 
 /** When a photo was taken, as people say it: 12 August 2026. */
 export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
-  return photo.takenAt ? new Date(photo.takenAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  return photo.takenAt ? new Date(photo.takenAt).toLocaleDateString(formatTag(), { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 }
 
 /**
@@ -18,7 +19,7 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
  */
 @Component({
   selector: 'hd-photo-viewer',
-  imports: [TileDetails, LucideDynamicIcon],
+  imports: [TileDetails, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '(keydown.arrowleft)': 'onArrow($event, -1)',
@@ -36,20 +37,20 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
         >
           <img class="hd-photo-details__img" [src]="photo.url" alt="" draggable="false" />
         </div>
-        <button type="button" class="hd-round-btn hd-photo-details__step hd-photo-details__step--previous" aria-label="Previous photo" (click)="step(-1)">
+        <button type="button" class="hd-round-btn hd-photo-details__step hd-photo-details__step--previous" [attr.aria-label]="'Previous photo' | t" (click)="step(-1)">
           <svg [lucideIcon]="previousIcon" />
         </button>
-        <button type="button" class="hd-round-btn hd-photo-details__step hd-photo-details__step--next" aria-label="Next photo" (click)="step(1)">
+        <button type="button" class="hd-round-btn hd-photo-details__step hd-photo-details__step--next" [attr.aria-label]="'Next photo' | t" (click)="step(1)">
           <svg [lucideIcon]="nextIcon" />
         </button>
         <div class="hd-photo-details__bar">
           @if (photo.photo.place || photo.photo.faces?.people?.length) {
             <div class="hd-photo-details__meta">
               @if (photo.photo.place; as place) {
-                <span><svg [lucideIcon]="placeIcon" aria-label="Where" />{{ place }}</span>
+                <span><svg [lucideIcon]="placeIcon" [attr.aria-label]="'Where' | t" />{{ place }}</span>
               }
               @if (photo.photo.faces?.people?.length) {
-                <span><svg [lucideIcon]="peopleIcon" aria-label="Who" />{{ photo.photo.faces!.people.join(', ') }}</span>
+                <span><svg [lucideIcon]="peopleIcon" [attr.aria-label]="'Who' | t" />{{ photo.photo.faces!.people.join(', ') }}</span>
               }
             </div>
           }
@@ -57,26 +58,26 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
             @if (failure(); as failure) {
               <span class="hd-details__label" role="alert">{{ failure }}</span>
             } @else if (favorited()) {
-              <span class="hd-details__label" role="status">Favorited</span>
+              <span class="hd-details__label" role="status">{{ 'Favorited' | t }}</span>
             } @else if (busy() === 'rotating') {
-              <span class="hd-details__label" role="status">Rotating…</span>
+              <span class="hd-details__label" role="status">{{ 'Rotating…' | t }}</span>
             } @else {
               <span class="hd-details__label">{{ index() + 1 }} of {{ list().length }}</span>
             }
-            <button type="button" class="hd-btn" aria-label="Rotate left" [disabled]="busy() || !photo.rotatable" [attr.title]="photo.rotatable ? null : lockedHint"
+            <button type="button" class="hd-btn" [attr.aria-label]="'Rotate left' | t" [disabled]="busy() || !photo.rotatable" [attr.title]="photo.rotatable ? null : lockedHint"
               (click)="rotate(false)">
               <svg [lucideIcon]="rotateLeftIcon" />
             </button>
-            <button type="button" class="hd-btn" aria-label="Rotate right" [disabled]="busy() || !photo.rotatable" [attr.title]="photo.rotatable ? null : lockedHint"
+            <button type="button" class="hd-btn" [attr.aria-label]="'Rotate right' | t" [disabled]="busy() || !photo.rotatable" [attr.title]="photo.rotatable ? null : lockedHint"
               (click)="rotate(true)">
               <svg [lucideIcon]="rotateRightIcon" />
             </button>
-            <button type="button" class="hd-btn" aria-label="Favorite" [disabled]="busy() || !photo.rotatable" [attr.title]="photo.rotatable ? null : lockedHint"
+            <button type="button" class="hd-btn" [attr.aria-label]="'Favorite' | t" [disabled]="busy() || !photo.rotatable" [attr.title]="photo.rotatable ? null : lockedHint"
               (click)="favorite()">
               <svg [lucideIcon]="favoriteIcon" />
             </button>
             <button type="button" class="hd-btn hd-btn--danger" [disabled]="busy()" (click)="exclude()">
-              <svg [lucideIcon]="excludeIcon" />Exclude photo
+              <svg [lucideIcon]="excludeIcon" />{{ 'Exclude photo' | t }}
             </button>
           </div>
         </div>

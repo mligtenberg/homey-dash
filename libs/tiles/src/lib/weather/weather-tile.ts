@@ -5,6 +5,7 @@ import { LucideDynamicIcon } from '@lucide/angular';
 import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { clockTime, degrees, RAIN_FROM, rainSummary, WeatherData, weatherIdle, weatherLook, WeatherTileSettings } from './weather-data';
+import { TranslatePipe, formatTag } from '@homey-dash/i18n';
 
 /** How many hours ahead, and days, each size shows; a large tile shows the rain instead of hours while rain comes. */
 const HOURS = { small: 0, wide: 3, full: 5, large: 5, 'full-large': 6, 'full-tall': 6 } as const;
@@ -19,7 +20,7 @@ const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 export function dayName(day: WeatherDay, index: number): string {
   if (index === 0) return 'Today';
   const [y, m, d] = day.date.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short' });
+  return new Date(y, m - 1, d).toLocaleDateString(formatTag(), { weekday: 'short' });
 }
 
 /**
@@ -29,7 +30,7 @@ export function dayName(day: WeatherDay, index: number): string {
  */
 @Component({
   selector: 'hd-weather-tile',
-  imports: [TileDetails, LucideDynamicIcon],
+  imports: [TileDetails, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-weather', '[class.has-forecast]': '!!now()' },
   template: `
@@ -39,8 +40,8 @@ export function dayName(day: WeatherDay, index: number): string {
         <span class="hd-value" [class.hd-value--l]="size() !== 'small' && size() !== 'wide'" [class.hd-value--m]="size() === 'small' || size() === 'wide'">{{ degrees(now.temperature) }}</span>
       </div>
       <div class="hd-weather__titles">
-        <div class="hd-tile__name">{{ face().name }}</div>
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__name">{{ face().name | t }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
       @if (showRain()) {
         <div class="hd-weather__ahead hd-weather__rain" role="img" [attr.aria-label]="rain() ?? ''">
@@ -49,7 +50,7 @@ export function dayName(day: WeatherDay, index: number): string {
               <rect [attr.x]="i * 10 + 1" [attr.y]="60 - barHeight(point)" width="8" [attr.height]="barHeight(point)" rx="2" />
             }
           </svg>
-          <div class="hd-weather__axis"><span>Now</span><span>{{ inAnHour() }}</span><span>{{ inTwoHours() }}</span></div>
+          <div class="hd-weather__axis"><span>{{ 'Now' | t }}</span><span>{{ inAnHour() }}</span><span>{{ inTwoHours() }}</span></div>
         </div>
       } @else if (hours().length) {
         <ol class="hd-weather__ahead hd-weather__strip">
@@ -76,8 +77,8 @@ export function dayName(day: WeatherDay, index: number): string {
     } @else {
       <svg class="hd-icon" [lucideIcon]="face().icon" />
       <div>
-        <div class="hd-tile__name">{{ face().name }}</div>
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__name">{{ face().name | t }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
     }
     <hd-tile-details [screen]="true" [name]="face().name" [icon]="look().icon" [subtitle]="detailsSubtitle()">
@@ -92,11 +93,11 @@ export function dayName(day: WeatherDay, index: number): string {
               </div>
             </section>
             <dl class="hd-stat__figures">
-              <div class="hd-stat__figure"><dt class="hd-details__label">Humidity</dt><dd class="hd-stat__figure-value">{{ percent(now.humidity) }}</dd></div>
-              <div class="hd-stat__figure"><dt class="hd-details__label">Wind</dt><dd class="hd-stat__figure-value">{{ wind(now.wind, now.windDirection) }}</dd></div>
+              <div class="hd-stat__figure"><dt class="hd-details__label">{{ 'Humidity' | t }}</dt><dd class="hd-stat__figure-value">{{ percent(now.humidity) }}</dd></div>
+              <div class="hd-stat__figure"><dt class="hd-details__label">{{ 'Wind' | t }}</dt><dd class="hd-stat__figure-value">{{ wind(now.wind, now.windDirection) }}</dd></div>
               @if (forecast.days[0]; as today) {
-                <div class="hd-stat__figure"><dt class="hd-details__label">Sunrise</dt><dd class="hd-stat__figure-value">{{ clockTime(today.sunrise) }}</dd></div>
-                <div class="hd-stat__figure"><dt class="hd-details__label">Sunset</dt><dd class="hd-stat__figure-value">{{ clockTime(today.sunset) }}</dd></div>
+                <div class="hd-stat__figure"><dt class="hd-details__label">{{ 'Sunrise' | t }}</dt><dd class="hd-stat__figure-value">{{ clockTime(today.sunrise) }}</dd></div>
+                <div class="hd-stat__figure"><dt class="hd-details__label">{{ 'Sunset' | t }}</dt><dd class="hd-stat__figure-value">{{ clockTime(today.sunset) }}</dd></div>
               }
             </dl>
           }
@@ -109,12 +110,12 @@ export function dayName(day: WeatherDay, index: number): string {
                     <rect [attr.x]="i * 10 + 1" [attr.y]="60 - barHeight(point)" width="8" [attr.height]="barHeight(point)" rx="2" />
                   }
                 </svg>
-                <div class="hd-weather__axis"><span>Now</span><span>{{ inAnHour() }}</span><span>{{ inTwoHours() }}</span></div>
+                <div class="hd-weather__axis"><span>{{ 'Now' | t }}</span><span>{{ inAnHour() }}</span><span>{{ inTwoHours() }}</span></div>
               </div>
             </section>
           }
           <section class="hd-weather__section">
-            <h3 class="hd-details__label">Next 24 hours</h3>
+            <h3 class="hd-details__label">{{ 'Next 24 hours' | t }}</h3>
             <ol class="hd-weather__strip hd-weather__strip--scroll">
               @for (hour of allHours(); track hour.time) {
                 <li>
@@ -127,7 +128,7 @@ export function dayName(day: WeatherDay, index: number): string {
             </ol>
           </section>
           <section class="hd-weather__section">
-            <h3 class="hd-details__label">7 days</h3>
+            <h3 class="hd-details__label">{{ '7 days' | t }}</h3>
             <ol class="hd-weather__week">
               @for (day of forecast.days; track day.date; let i = $index) {
                 <li>
@@ -141,7 +142,7 @@ export function dayName(day: WeatherDay, index: number): string {
             </ol>
           </section>
           <p class="hd-weather__credit">
-            Forecast by Open-Meteo{{ forecast.rain ? ', rain by Buienradar' : '' }}{{ forecast.updatedAt ? ' · ' + clockTime(forecast.updatedAt) : '' }}
+            Forecast by Open-Meteo{{ (forecast.rain ? ', rain by Buienradar' : '') | t }}{{ forecast.updatedAt ? ' · ' + clockTime(forecast.updatedAt) : '' }}
           </p>
         </div>
       }
@@ -223,7 +224,7 @@ export class WeatherTile extends TileView<WeatherTileSettings> {
   }
 
   protected hourName(hour: WeatherHour) {
-    return new Date(hour.time).toLocaleTimeString(undefined, { hour: 'numeric' });
+    return new Date(hour.time).toLocaleTimeString(formatTag(), { hour: 'numeric' });
   }
 
   // Square-root, so a drizzle still shows beside a downpour.

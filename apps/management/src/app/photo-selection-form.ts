@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, signal } from '@angular/core';
 import { apiProblem, PersonRef, PhotoSelection, PhotoSetsApi, SELECTION_MAX_COUNT, SELECTION_REFRESH } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
+import { TranslatePipe, t } from '@homey-dash/i18n';
 
 /** A new selection's rules: anyone, anything, 100 photos, drawn again every day. */
 export function defaultSelection(): PhotoSelection {
@@ -25,9 +26,10 @@ export function selectionSummary(selection: PhotoSelection) {
 @Component({
   selector: 'hd-photo-selection-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="hd-field">
-      <span class="hd-field__label" id="with-label">With</span>
+      <span class="hd-field__label" id="with-label">{{ 'With' | t }}</span>
       <div class="chips" role="list" aria-labelledby="with-label">
         @for (person of selection().with; track person.id) {
           <span class="chip" role="listitem">
@@ -35,12 +37,12 @@ export function selectionSummary(selection: PhotoSelection) {
             <button type="button" class="chip__remove" [attr.aria-label]="'Remove ' + person.name" (click)="remove(person)">×</button>
           </span>
         } @empty {
-          <span class="hd-hint">Anyone. Add people to only show photos with at least one of them.</span>
+          <span class="hd-hint">{{ 'Anyone. Add people to only show photos with at least one of them.' | t }}</span>
         }
       </div>
     </div>
     <div class="hd-field">
-      <span class="hd-field__label" id="without-label">Never with</span>
+      <span class="hd-field__label" id="without-label">{{ 'Never with' | t }}</span>
       <div class="chips" role="list" aria-labelledby="without-label">
         @for (person of selection().without; track person.id) {
           <span class="chip chip--out" role="listitem">
@@ -48,12 +50,12 @@ export function selectionSummary(selection: PhotoSelection) {
             <button type="button" class="chip__remove" [attr.aria-label]="'Remove ' + person.name" (click)="remove(person)">×</button>
           </span>
         } @empty {
-          <span class="hd-hint">Nobody left out.</span>
+          <span class="hd-hint">{{ 'Nobody left out.' | t }}</span>
         }
       </div>
     </div>
     <div class="hd-field">
-      <label class="hd-field__label" for="person-search">Find someone</label>
+      <label class="hd-field__label" for="person-search">{{ 'Find someone' | t }}</label>
       <input
         id="person-search"
         class="hd-input"
@@ -68,30 +70,30 @@ export function selectionSummary(selection: PhotoSelection) {
           @for (person of matches(); track person.id) {
             <li>
               <span>{{ person.name }}</span>
-              <button class="hd-btn" type="button" (click)="add(person, 'with')">With</button>
-              <button class="hd-btn" type="button" (click)="add(person, 'without')">Never with</button>
+              <button class="hd-btn" type="button" (click)="add(person, 'with')">{{ 'With' | t }}</button>
+              <button class="hd-btn" type="button" (click)="add(person, 'without')">{{ 'Never with' | t }}</button>
             </li>
           }
         </ul>
       } @else if (search() && people()) {
-        <span class="hd-hint">Nobody by that name. Name people in Immich to find them here.</span>
+        <span class="hd-hint">{{ 'Nobody by that name. Name people in Immich to find them here.' | t }}</span>
       }
     </div>
     <div class="hd-field">
-      <label class="hd-field__label" for="selection-query">What's in them</label>
+      <label class="hd-field__label" for="selection-query">{{ "What's in them" | t }}</label>
       <input
         id="selection-query"
         class="hd-input"
         autocomplete="off"
-        placeholder="Such as landscape, beach or snow"
+        [placeholder]="'Such as landscape, beach or snow' | t"
         [value]="selection().query ?? ''"
         (change)="set({ query: $any($event.target).value.trim() || null })"
       />
-      <span class="hd-hint">Immich's smart search finds photos by what they show. Leave it empty for anything.</span>
+      <span class="hd-hint">{{ "Immich's smart search finds photos by what they show. Leave it empty for anything." | t }}</span>
     </div>
     <div class="row">
       <div class="hd-field">
-        <label class="hd-field__label" for="selection-count">Photos</label>
+        <label class="hd-field__label" for="selection-count">{{ 'Photos' | t }}</label>
         <input
           id="selection-count"
           class="hd-input"
@@ -103,10 +105,10 @@ export function selectionSummary(selection: PhotoSelection) {
         />
       </div>
       <div class="hd-field">
-        <label class="hd-field__label" for="selection-refresh">Draw new photos</label>
+        <label class="hd-field__label" for="selection-refresh">{{ 'Draw new photos' | t }}</label>
         <select id="selection-refresh" class="hd-select" (change)="set({ refreshHours: +$any($event.target).value })">
           @for (option of refreshOptions; track option.hours) {
-            <option [value]="option.hours" [selected]="option.hours === selection().refreshHours">{{ option.label }}</option>
+            <option [value]="option.hours" [selected]="option.hours === selection().refreshHours">{{ option.label | t }}</option>
           }
         </select>
       </div>
@@ -167,7 +169,7 @@ export class PhotoSelectionForm {
       if (accountId === this.accountId()) this.people.set(people);
       this.error.set(null);
     } catch (e) {
-      this.error.set(apiProblem(e, 'Could not load the people from Immich. Try again.'));
+      this.error.set(apiProblem(e, t('Could not load the people from Immich. Try again.')));
     } finally {
       this.loading = false;
     }

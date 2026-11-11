@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, input, model, output, viewChild } from '@angular/core';
 import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 import { KindHue } from '@homey-dash/tiles';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * The shell both pickers share: a trigger that looks like a select, and a dialog with a search, the groups to pick
@@ -11,6 +12,7 @@ import { KindHue } from '@homey-dash/tiles';
   selector: 'hd-picker-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
+  imports: [TranslatePipe],
   template: `
     <button
       type="button"
@@ -35,7 +37,7 @@ import { KindHue } from '@homey-dash/tiles';
           (input)="query.set($any($event.target).value)"
           (keydown.enter)="$event.preventDefault(); enter.emit()"
         />
-        <button type="button" class="hd-btn" (click)="close()">Cancel</button>
+        <button type="button" class="hd-btn" (click)="close()">{{ 'Cancel' | t }}</button>
       </div>
 
       <div class="hd-picker__body">

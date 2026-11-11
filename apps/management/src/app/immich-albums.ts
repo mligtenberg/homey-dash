@@ -1,5 +1,6 @@
 import { apiProblem, ImmichAccount, ImmichAccountApi, ImmichAlbum, PhotoSetsApi } from '@homey-dash/api-client';
 import { firstValueFrom } from 'rxjs';
+import { t } from '@homey-dash/i18n';
 
 /** One Immich account's albums, for a photo set to follow. */
 export interface AlbumGroup {
@@ -19,7 +20,7 @@ export async function loadAlbums(
   try {
     list = (await firstValueFrom(accounts.list())).accounts;
   } catch (e) {
-    return { groups: [], error: apiProblem(e, 'Could not load the Immich accounts. Try again.') };
+    return { groups: [], error: apiProblem(e, t('Could not load the Immich accounts. Try again.')) };
   }
   if (!list.length) return { groups: [], error: 'Set up Immich under Accounts first.' };
   const loaded = await Promise.all(

@@ -28,6 +28,9 @@ public sealed class Display
     // screen reports as its brightness instead of measuring with its own sensor or camera; null to measure itself.
     public string? LightSignal { get; set; }
 
+    // The language its screen speaks, one of Languages.Supported; null to follow the screen's browser.
+    public string? Language { get; set; }
+
     // The id the holding screen keeps in its localStorage. Null once no screen holds this display.
     public Guid? ScreenId { get; set; }
 
@@ -44,7 +47,7 @@ public sealed class Display
         .Select(r => r.ReturnDashboardId is { } back && !DashboardIds.Contains(back) ? r with { ReturnDashboardId = null } : r)
         .ToList();
 
-    public DisplaySummary ToSummary() => new(Id, Name, DashboardIds, OfferedIdleRules(), LockWidgets, LightSignal);
+    public DisplaySummary ToSummary() => new(Id, Name, DashboardIds, OfferedIdleRules(), LockWidgets, LightSignal, Language);
 
     // The published version of each dashboard the screen reports it shows; one it leaves out it doesn't show yet.
     public void Showing(IReadOnlyDictionary<Guid, int> versions)
@@ -121,7 +124,7 @@ public sealed record LockWidget(string Kind, string Spot, string? Signal = null,
 /// A display, the dashboards it offers in that order, the rules that choose what it shows when left alone, and what
 /// its lock screen shows.
 /// </summary>
-public sealed record DisplaySummary(Guid Id, string Name, List<Guid> DashboardIds, List<IdleRule> IdleRules, List<LockWidget> LockWidgets, string? LightSignal = null);
+public sealed record DisplaySummary(Guid Id, string Name, List<Guid> DashboardIds, List<IdleRule> IdleRules, List<LockWidget> LockWidgets, string? LightSignal = null, string? Language = null);
 
 /// <summary>
 /// Which published version of one of its dashboards a display shows. It is on the latest version when
@@ -137,7 +140,7 @@ public sealed record DisplayStatus(bool Connected, bool Held, DateTimeOffset? La
 
 /// <summary>A display as Management lists it.</summary>
 public sealed record DisplayInfo(
-    Guid Id, string Name, List<Guid> DashboardIds, List<IdleRule> IdleRules, List<LockWidget> LockWidgets, DisplayStatus Status, string? LightSignal = null);
+    Guid Id, string Name, List<Guid> DashboardIds, List<IdleRule> IdleRules, List<LockWidget> LockWidgets, DisplayStatus Status, string? LightSignal = null, string? Language = null);
 
 /// <summary>The published version a display shows.</summary>
 public sealed record ShownDashboard(Guid Id, string Name, int Version, DashboardLayout Layout);

@@ -6,6 +6,7 @@ import { PageHeader } from '../page-header';
 import { DisplaySketch } from './display-sketch';
 import { DisplayStatus } from './display-status';
 import { DisplaysStore } from './displays-store';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 const TABS = { dashboards: 'Dashboards', idle: 'When idle', lock: 'Lock screen' } as const;
 type Tab = keyof typeof TABS;
@@ -16,19 +17,19 @@ type Tab = keyof typeof TABS;
  */
 @Component({
   selector: 'hd-displays-page',
-  imports: [RouterLink, PageHeader, DisplaySketch, DisplayStatus],
+  imports: [RouterLink, PageHeader, DisplaySketch, DisplayStatus, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'sec-displays' },
   template: `
-    <hd-page-header section="displays" title="Displays" />
+    <hd-page-header section="displays" [title]="'Displays' | t" />
     <div class="hd-page__body">
       @if (then(); as then) {
         <p class="hint" role="status">Pick the display whose {{ then === 'dashboards' ? 'dashboards' : then === 'idle' ? 'idle rules' : 'lock screen' }} you want to change.</p>
       }
       @if (store.loaded() && store.list().length === 0) {
         <div class="hd-empty hd-panel">
-          <h2 class="hd-panel__title">No displays yet</h2>
-          <p>Open HomeyDash's display address on a screen in the home. It asks for a name and then shows up here.</p>
+          <h2 class="hd-panel__title">{{ 'No displays yet' | t }}</h2>
+          <p>{{ "Open HomeyDash's display address on a screen in the home. It asks for a name and then shows up here." | t }}</p>
         </div>
       }
       <ul class="grid">
@@ -39,9 +40,9 @@ type Tab = keyof typeof TABS;
             </a>
             <hd-display-status [display]="display" />
             <dl class="facts">
-              <div><dt>{{ display.dashboardIds.length === 1 ? 'dashboard' : 'dashboards' }}</dt><dd>{{ display.dashboardIds.length }}</dd></div>
-              <div><dt>{{ display.idleRules.length === 1 ? 'idle rule' : 'idle rules' }}</dt><dd>{{ display.idleRules.length }}</dd></div>
-              <div><dt>{{ display.lockWidgets.length === 1 ? 'lock widget' : 'lock widgets' }}</dt><dd>{{ display.lockWidgets.length }}</dd></div>
+              <div><dt>{{ (display.dashboardIds.length === 1 ? 'dashboard' : 'dashboards') | t }}</dt><dd>{{ display.dashboardIds.length }}</dd></div>
+              <div><dt>{{ (display.idleRules.length === 1 ? 'idle rule' : 'idle rules') | t }}</dt><dd>{{ display.idleRules.length }}</dd></div>
+              <div><dt>{{ (display.lockWidgets.length === 1 ? 'lock widget' : 'lock widgets') | t }}</dt><dd>{{ display.lockWidgets.length }}</dd></div>
             </dl>
             <nav class="jump" [attr.aria-label]="'Pages of ' + display.name">
               @for (tab of tabs; track tab.id) {

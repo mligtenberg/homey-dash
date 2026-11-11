@@ -1,3 +1,4 @@
+import { TranslatePipe } from '@homey-dash/i18n';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -59,7 +60,7 @@ interface Drag {
 
 @Component({
   selector: 'hd-editor-page',
-  imports: [AsDisplayPicker, BackgroundArt, BackgroundField, LogicPanel, RouterLink, RuleEditor, TileHost, TileKindChooser, TilePanel, LucideDynamicIcon],
+  imports: [AsDisplayPicker, BackgroundArt, BackgroundField, LogicPanel, RouterLink, RuleEditor, TileHost, TileKindChooser, TilePanel, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // Logic tiles say which of their tiles they show.
   providers: [{ provide: LOGIC_TILE_BADGE, useValue: true }],

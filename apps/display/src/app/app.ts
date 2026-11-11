@@ -14,6 +14,7 @@ import {
 import { LucideChevronLeft, LucideLayers } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { capabilitySignal, IdleRule, Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
+import { browserLocale, setLocale, TranslatePipe } from '@homey-dash/i18n';
 import { fittedCellSize } from '@homey-dash/layout';
 import { DashboardView, homeyLost, PhotoTile, ruleAnswersOf, TileData, TileKindRegistry } from '@homey-dash/tiles';
 import { screenId, safeStorage } from './screen-id';
@@ -56,7 +57,7 @@ const TAPE_KEY = 'homeydash.tape';
  * to the rule's dashboard or the one shown before; its lock screen widgets, such as a clock, lie over either.
  */
 @Component({
-  imports: [DashboardView, LockScreen, LucideDynamicIcon, People, PhotoTile, ScreenSettings, Setup],
+  imports: [DashboardView, LockScreen, LucideDynamicIcon, People, PhotoTile, ScreenSettings, Setup, TranslatePipe],
   selector: 'hd-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -78,11 +79,11 @@ const TAPE_KEY = 'homeydash.tape';
           @if (current(); as current) {
             <hd-people />
             @if (view.dashboards.length > 1) {
-              <nav class="hd-tape" [class.is-collapsed]="collapsed()" aria-label="Dashboards">
+              <nav class="hd-tape" [class.is-collapsed]="collapsed()" [attr.aria-label]="'Dashboards' | t">
                 <button
                   class="hd-tape__toggle"
                   type="button"
-                  [attr.aria-label]="collapsed() ? 'Show dashboards' : 'Hide dashboards'"
+                  [attr.aria-label]="(collapsed() ? 'Show dashboards' : 'Hide dashboards') | t"
                   [attr.aria-expanded]="!collapsed()"
                   (click)="toggleTape()"
                 >
@@ -111,12 +112,12 @@ const TAPE_KEY = 'homeydash.tape';
             }
             <!-- Woken on the click rather than the press, so the touch that ends it presses nothing beneath. -->
             @if (slideshow(); as set) {
-              <div class="slideshow" role="button" tabindex="0" aria-label="Back to the dashboard" (click)="wake()" animate.leave="is-leaving">
+              <div class="slideshow" role="button" tabindex="0" [attr.aria-label]="'Back to the dashboard' | t" (click)="wake()" animate.leave="is-leaving">
                 <hd-photo-tile [settings]="{ target: set.target }" size="full-large" [detailView]="false" [people]="true" />
               </div>
             }
             @if (fill(); as color) {
-              <div class="fill" role="button" tabindex="0" aria-label="Back to the dashboard" [style.background]="color" (click)="wake()" animate.leave="is-leaving"></div>
+              <div class="fill" role="button" tabindex="0" [attr.aria-label]="'Back to the dashboard' | t" [style.background]="color" (click)="wake()" animate.leave="is-leaving"></div>
             }
             @if (playing() && !playing()?.screenOff && view.display.lockWidgets.length) {
               <hd-lock-screen [widgets]="view.display.lockWidgets" [class.over-photo]="!!slideshow()" animate.leave="is-leaving" />
@@ -124,15 +125,15 @@ const TAPE_KEY = 'homeydash.tape';
           } @else {
             <div class="waiting">
               <h1>{{ view.display.name }}</h1>
-              <span class="hd-pill hd-pill--dot">Waiting for a dashboard</span>
-              <p>Assign a dashboard to this display in Management.</p>
+              <span class="hd-pill hd-pill--dot">{{ 'Waiting for a dashboard' | t }}</span>
+              <p>{{ 'Assign a dashboard to this display in Management.' | t }}</p>
             </div>
           }
         }
       }
     }
     @if (lost()) {
-      <span class="hd-reconnecting reconnecting" role="status">Reconnecting…</span>
+      <span class="hd-reconnecting reconnecting" role="status">{{ 'Reconnecting…' | t }}</span>
     }
     <!-- Over everything, so the taps that open the screen settings press nothing beneath. -->
     <span class="corner" aria-hidden="true" (pointerdown)="cornerTap()"></span>
@@ -282,6 +283,8 @@ export class App {
   });
 
   constructor() {
+    // The language its display is set to in Management, else the browser's; setup speaks the browser's.
+    effect(() => setLocale(this.view()?.display.language ?? browserLocale()));
     // Fully Kiosk Browser turns its screen off while a rule says so, and on again when the rule lets go, a touch ends
     // it, or it sees motion (a touch can't reach a screen that is off).
     this.kiosk.onMotion(() => this.wake());

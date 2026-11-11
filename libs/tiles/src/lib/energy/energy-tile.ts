@@ -18,12 +18,13 @@ import {
   gridWord,
   hourBars,
 } from './energy-data';
+import { TranslatePipe, formatTag } from '@homey-dash/i18n';
 
 const WIDE = ['wide', 'full', 'large', 'full-large', 'full-tall'];
 const DAY = ['large', 'full-large', 'full-tall'];
 const TOTALS = ['full-large', 'full-tall'];
 
-const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const time = (iso: string) => new Date(iso).toLocaleTimeString(formatTag(), { hour: '2-digit', minute: '2-digit' });
 
 /** A figure of the full view: `Used today 11.2 kWh`, with a note under it. */
 interface Figure {
@@ -40,7 +41,7 @@ interface Figure {
  */
 @Component({
   selector: 'hd-energy-tile',
-  imports: [TileDetails, LucideDynamicIcon, StatisticChart, NgTemplateOutlet],
+  imports: [TileDetails, LucideDynamicIcon, StatisticChart, NgTemplateOutlet, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-energy', '[class.has-live]': '!!live()' },
   template: `
@@ -63,19 +64,19 @@ interface Figure {
         <span class="hd-value">{{ gridText() }}</span>
       </div>
       <div class="hd-energy__titles">
-        <div class="hd-tile__name">{{ face().name }}</div>
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__name">{{ face().name | t }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
       @if (wide()) {
         <dl class="hd-energy__figures">
           @if (live()!.solar !== null) {
-            <div><dt><svg class="hd-icon" [lucideIcon]="sunIcon" aria-hidden="true" />Solar</dt><dd>{{ power(live()!.solar) }}</dd></div>
+            <div><dt><svg class="hd-icon" [lucideIcon]="sunIcon" aria-hidden="true" />{{ 'Solar' | t }}</dt><dd>{{ power(live()!.solar) }}</dd></div>
           }
           @if (live()!.home !== null) {
-            <div><dt><svg class="hd-icon" [lucideIcon]="homeIcon" aria-hidden="true" />Home</dt><dd>{{ power(live()!.home) }}</dd></div>
+            <div><dt><svg class="hd-icon" [lucideIcon]="homeIcon" aria-hidden="true" />{{ 'Home' | t }}</dt><dd>{{ power(live()!.home) }}</dd></div>
           }
           @if (todayHome() !== null && live()!.solar === null) {
-            <div><dt><svg class="hd-icon" [lucideIcon]="zapIcon" aria-hidden="true" />Today</dt><dd>{{ kwh(todayHome()!) }}</dd></div>
+            <div><dt><svg class="hd-icon" [lucideIcon]="zapIcon" aria-hidden="true" />{{ 'Today' | t }}</dt><dd>{{ kwh(todayHome()!) }}</dd></div>
           }
         </dl>
         @if (segments(); as s) {
@@ -88,11 +89,11 @@ interface Figure {
       }
       @if (totals() && today(); as day) {
         <dl class="hd-energy__today">
-          @if (day.home !== null) { <div><dt>Used</dt><dd>{{ kwh(day.home) }}</dd></div> }
-          @if (day.imported !== null) { <div><dt>Imported</dt><dd>{{ kwh(day.imported) }}</dd></div> }
-          @if (day.solar !== null) { <div><dt>Solar</dt><dd>{{ kwh(day.solar) }}</dd></div> }
-          @if (day.exported) { <div><dt>Exported</dt><dd>{{ kwh(day.exported) }}</dd></div> }
-          @if (day.cost !== null) { <div><dt>Cost</dt><dd>{{ cost(day.cost) }}</dd></div> }
+          @if (day.home !== null) { <div><dt>{{ 'Used' | t }}</dt><dd>{{ kwh(day.home) }}</dd></div> }
+          @if (day.imported !== null) { <div><dt>{{ 'Imported' | t }}</dt><dd>{{ kwh(day.imported) }}</dd></div> }
+          @if (day.solar !== null) { <div><dt>{{ 'Solar' | t }}</dt><dd>{{ kwh(day.solar) }}</dd></div> }
+          @if (day.exported) { <div><dt>{{ 'Exported' | t }}</dt><dd>{{ kwh(day.exported) }}</dd></div> }
+          @if (day.cost !== null) { <div><dt>{{ 'Cost' | t }}</dt><dd>{{ cost(day.cost) }}</dd></div> }
         </dl>
       }
       @if (showDay() && bars().length) {
@@ -101,8 +102,8 @@ interface Figure {
     } @else {
       <svg class="hd-icon" [lucideIcon]="zapIcon" />
       <div>
-        <div class="hd-tile__name">{{ face().name }}</div>
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__name">{{ face().name | t }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
     }
     <hd-tile-details [screen]="true" [name]="face().name" [icon]="zapIcon" [subtitle]="face().detail">
@@ -126,7 +127,7 @@ interface Figure {
             <dl class="hd-stat__figures">
               @for (figure of figures(); track figure.label) {
                 <div class="hd-stat__figure">
-                  <dt class="hd-details__label">{{ figure.label }}</dt>
+                  <dt class="hd-details__label">{{ figure.label | t }}</dt>
                   <dd class="hd-stat__figure-value">{{ figure.value }}</dd>
                   @if (figure.note) { <dd class="hd-stat__figure-note">{{ figure.note }}</dd> }
                 </div>
@@ -137,7 +138,7 @@ interface Figure {
             @if (powerWindow(); as window) {
               <section class="hd-energy__section hd-energy__section--power">
                 <div class="hd-energy__section-head">
-                  <h3 class="hd-details__label">Power today</h3>
+                  <h3 class="hd-details__label">{{ 'Power today' | t }}</h3>
                   <span class="hd-energy__readout">{{ powerReadout() }}</span>
                 </div>
                 <div class="hd-energy__chart">
@@ -148,7 +149,7 @@ interface Figure {
             @if (bars().length) {
               <section class="hd-energy__section">
                 <div class="hd-energy__section-head">
-                  <h3 class="hd-details__label">Today by the hour</h3>
+                  <h3 class="hd-details__label">{{ 'Today by the hour' | t }}</h3>
                   @if (busiest(); as hour) { <span class="hd-energy__readout">Most at {{ hour }}</span> }
                 </div>
                 <ng-container [ngTemplateOutlet]="hours" />
@@ -161,7 +162,7 @@ interface Figure {
             @if (devices().length) {
               <section class="hd-energy__section">
                 <div class="hd-energy__section-head">
-                  <h3 class="hd-details__label">Devices today</h3>
+                  <h3 class="hd-details__label">{{ 'Devices today' | t }}</h3>
                   @if (devicesNote(); as note) { <span class="hd-energy__readout">{{ note }}</span> }
                 </div>
                 <ol class="hd-energy__devices">
@@ -176,7 +177,7 @@ interface Figure {
               </section>
             }
           </div>
-          <p class="hd-energy__credit">Homey's own energy report</p>
+          <p class="hd-energy__credit">{{ "Homey's own energy report" | t }}</p>
         </div>
       }
     </hd-tile-details>

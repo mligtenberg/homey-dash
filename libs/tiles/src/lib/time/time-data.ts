@@ -1,4 +1,5 @@
 import { TileSettings } from '../tile-data';
+import { formatTag } from '@homey-dash/i18n';
 
 /** How a clock tile shows the time. */
 export type ClockStyle = 'digital' | 'analog';
@@ -44,7 +45,7 @@ export function handAngles(at: Date): { hour: number; minute: number; second: nu
 
 /** `Sunday 8 November`, as the date reads on a clock. */
 export function longDate(at: Date): string {
-  return at.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  return at.toLocaleDateString(formatTag(), { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 /** The ISO 8601 week number: the week with the year's first Thursday is week 1, and weeks start on Monday. */
@@ -93,5 +94,5 @@ export function monthGrid(at: Date): GridWeek[] {
 /** The short weekday names, Monday first, in the display's language: `Mon`. */
 export function weekdayNames(): string[] {
   // 2024-01-01 was a Monday.
-  return Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'short' }));
+  return Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(formatTag(), { weekday: 'short' }));
 }

@@ -5,6 +5,7 @@ import { STATISTIC_WINDOWS, statisticTone, WINDOW_TABS } from './statistic-chart
 import { Segmented } from './segmented';
 import { SegmentedStrip } from './segmented-strip';
 import { StatisticReadings } from './statistic-readings';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 
 /**
@@ -15,19 +16,19 @@ import { StatisticReadings } from './statistic-readings';
  */
 @Component({
   selector: 'hd-statistic-history',
-  imports: [StatisticReadings, Segmented, SegmentedStrip],
+  imports: [StatisticReadings, Segmented, SegmentedStrip, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-stat__pane hd-hist', '[attr.data-tone]': 'tone()' },
   template: `
     @if (logs().length > 1) {
-      <hd-segmented-strip label="Reading" [options]="logOptions()" [value]="log().id" (picked)="logId.set($event)" />
+      <hd-segmented-strip [label]="'Reading' | t" [options]="logOptions()" [value]="log().id" (picked)="logId.set($event)" />
     }
     <div class="hd-hist__bar">
-      <hd-segmented label="Time window" [options]="windows" [value]="window()" (picked)="window.set($event)" />
+      <hd-segmented [label]="'Time window' | t" [options]="windows" [value]="window()" (picked)="window.set($event)" />
     </div>
     <hd-statistic-readings [entries]="entries()" [window]="windowInfo()" [units]="log().units">
       @if (!history.isLoading() && entries().length === 0) {
-        <div class="hd-details__label">No history for this window</div>
+        <div class="hd-details__label">{{ 'No history for this window' | t }}</div>
       }
     </hd-statistic-readings>
   `,

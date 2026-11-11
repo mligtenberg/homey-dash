@@ -5,6 +5,7 @@ import { LucideDynamicIcon } from '@lucide/angular';
 import { KindHue } from '../tile-kind';
 import { TILE_FACE_HOST, TileFace, TileView } from '../core/tile-view';
 import { timeOfDay, delayLevel, delayText, distance, duration, TrafficData, trafficIdle, TrafficTileSettings } from './traffic-data';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 const HUES: Record<'none' | 'some' | 'heavy', KindHue> = { none: 'climate', some: 'light', heavy: 'heat' };
 
@@ -15,24 +16,24 @@ const HUES: Record<'none' | 'some' | 'heavy', KindHue> = { none: 'climate', some
  */
 @Component({
   selector: 'hd-traffic-tile',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-traffic', '[class.has-traffic]': '!!shown()' },
   template: `
     @if (shown(); as shown) {
       <div class="hd-row hd-row--top hd-traffic__now">
         <svg class="hd-icon" [lucideIcon]="face().icon" aria-hidden="true" />
-        <span class="hd-value" [class.hd-value--l]="size() !== 'small'" [class.hd-value--m]="size() === 'small'">{{ shown.number }} <span class="hd-unit">min</span></span>
+        <span class="hd-value" [class.hd-value--l]="size() !== 'small'" [class.hd-value--m]="size() === 'small'">{{ shown.number }} <span class="hd-unit">{{ 'min' | t }}</span></span>
       </div>
       <div class="hd-traffic__titles">
-        <div class="hd-tile__name">{{ face().name }}</div>
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__name">{{ face().name | t }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
       @if (figures().length) {
         <dl class="hd-traffic__figures">
           @for (figure of figures(); track figure.label) {
             <div class="hd-traffic__figure">
-              <dt class="hd-traffic__label">{{ figure.label }}</dt>
+              <dt class="hd-traffic__label">{{ figure.label | t }}</dt>
               <dd class="hd-traffic__value">{{ figure.value }}</dd>
             </div>
           }
@@ -41,8 +42,8 @@ const HUES: Record<'none' | 'some' | 'heavy', KindHue> = { none: 'climate', some
     } @else {
       <svg class="hd-icon" [lucideIcon]="face().icon" />
       <div>
-        <div class="hd-tile__name">{{ face().name }}</div>
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__name">{{ face().name | t }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
     }
   `,

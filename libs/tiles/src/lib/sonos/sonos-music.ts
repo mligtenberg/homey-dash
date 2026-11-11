@@ -4,6 +4,7 @@ import { Realtime, SpeakerMusic, SpeakerMusicKind } from '@homey-dash/api-client
 import { LucideAudioLines, LucideMusic, LucideSearch } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { brokenImages } from '../core/loadable-art';
+import { TranslatePipe, t } from '@homey-dash/i18n';
 
 /** What a result of the music picker plays as, with where it came from. */
 interface MusicItem {
@@ -18,7 +19,7 @@ interface MusicItem {
  */
 @Component({
   selector: 'hd-sonos-music',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-sonos__music' },
   template: `
@@ -36,7 +37,7 @@ interface MusicItem {
     @if (error()) {
       <div class="hd-note">{{ error() }}</div>
     } @else if (items() === null) {
-      <div class="hd-note">Loading…</div>
+      <div class="hd-note">{{ 'Loading…' | t }}</div>
     } @else {
       <div class="hd-sonos__list">
         @for (item of shown(); track item.kind + item.music.name) {
@@ -76,7 +77,7 @@ interface MusicItem {
           </button>
         } @empty {
           <div class="hd-note">
-            {{ query().trim() ? 'No matches' : 'Nothing here yet' }}
+            {{ (query().trim() ? 'No matches' : 'Nothing here yet') | t }}
           </div>
         }
       </div>
@@ -120,7 +121,7 @@ export class SonosMusic {
       this.realtime.speakerMusic(account, deviceId, kind).then(
         (found) =>
           !stale && this.items.set(found.map((music): MusicItem => ({ kind, music }))),
-        () => !stale && this.error.set('Homey did not respond'),
+        () => !stale && this.error.set(t('Homey did not respond')),
       );
     });
   }

@@ -23,6 +23,7 @@ import { SizePicker } from './size-picker';
 import { TargetPicker } from './target-picker';
 import { allOptions, buildTree, TargetNode } from './target-tree';
 import { LucideChartLine, LucideSparkles, LucideWorkflow, ReorderButtons, moved, removedAt } from '@homey-dash/design-system';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * Settings of the selected tile: its target, its kind's own settings, label and size. A tile a logic tile holds is
@@ -30,7 +31,7 @@ import { LucideChartLine, LucideSparkles, LucideWorkflow, ReorderButtons, moved,
  */
 @Component({
   selector: 'hd-tile-panel',
-  imports: [AccountSelect, PhotoSetField, PlexTargetField, SizePicker, TargetPicker, ReorderButtons],
+  imports: [AccountSelect, PhotoSetField, PlexTargetField, SizePicker, TargetPicker, ReorderButtons, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h2 class="hd-section-title">{{ kind()?.label ?? 'Unknown tile' }}</h2>
@@ -38,7 +39,7 @@ import { LucideChartLine, LucideSparkles, LucideWorkflow, ReorderButtons, moved,
     @if (kind(); as kind) {
       @if (homeyAccounts(); as accounts) {
         <div class="hd-field">
-          <label class="hd-field__label" for="tile-account">Homey</label>
+          <label class="hd-field__label" for="tile-account">{{ 'Homey' | t }}</label>
           <hd-account-select selectId="tile-account" [accounts]="accounts" [selected]="homey()?.accountId" (picked)="setAccount($event)" />
         </div>
       }
@@ -78,7 +79,7 @@ import { LucideChartLine, LucideSparkles, LucideWorkflow, ReorderButtons, moved,
         </div>
       } @else {
         <div class="hd-field">
-          <label class="hd-field__label" for="tile-target">Target</label>
+          <label class="hd-field__label" for="tile-target">{{ 'Target' | t }}</label>
           <hd-target-picker
             pickerId="tile-target"
             [tree]="targets()"
@@ -95,7 +96,7 @@ import { LucideChartLine, LucideSparkles, LucideWorkflow, ReorderButtons, moved,
 
       @if (kind.target !== 'none') {
         <div class="hd-field">
-          <label class="hd-field__label" for="tile-label">Label</label>
+          <label class="hd-field__label" for="tile-label">{{ 'Label' | t }}</label>
           <input
             id="tile-label"
             class="hd-input"
@@ -108,7 +109,7 @@ import { LucideChartLine, LucideSparkles, LucideWorkflow, ReorderButtons, moved,
 
       @if (!nested()) {
         <div class="hd-field">
-          <span class="hd-field__label">Size</span>
+          <span class="hd-field__label">{{ 'Size' | t }}</span>
           <hd-size-picker [value]="tile().size" [enabled]="sizeEnabled()" (picked)="resized.emit($event)" />
         </div>
       }
@@ -117,7 +118,7 @@ import { LucideChartLine, LucideSparkles, LucideWorkflow, ReorderButtons, moved,
     }
 
     <button type="button" class="hd-btn hd-btn--danger remove" (click)="removed.emit()">
-      {{ nested() ? 'Remove from logic tile' : 'Remove tile' }}
+      {{ (nested() ? 'Remove from logic tile' : 'Remove tile') | t }}
     </button>
   `,
   styles: `

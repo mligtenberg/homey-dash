@@ -5,6 +5,7 @@ import { moodTint } from './mood-tint';
 import { PageDots, pager } from './pager';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
 import { LucideSparkles, chunk } from '@homey-dash/design-system';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** One of the tile's moods; `found` is false for a mood Homey does not have (any more). */
 interface MoodButton {
@@ -33,7 +34,7 @@ const PAGE: Partial<Record<TileSize, { columns: number; rows: number }>> = {
 @Component({
   selector: 'hd-mood-list-tile',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageDots],
+  imports: [PageDots, TranslatePipe],
   host: {
     ...TILE_FACE_HOST,
     '[class.has-tint]': '!!glow()',
@@ -41,9 +42,9 @@ const PAGE: Partial<Record<TileSize, { columns: number; rows: number }>> = {
   },
   template: `
     <div class="hd-row">
-      <div class="hd-tile__name">{{ face().name }}</div>
+      <div class="hd-tile__name">{{ face().name | t }}</div>
       @if (face().detail || pages().length < 2) {
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       } @else {
         <hd-page-dots
           class="hd-mood-list__dots"

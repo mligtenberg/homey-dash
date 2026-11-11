@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { LOCALES, LOCALE_NAMES, locale, t, TranslatePipe } from '@homey-dash/i18n';
 import { RealtimeTileData } from '@homey-dash/tiles/data';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { filter, map } from 'rxjs';
@@ -8,6 +9,7 @@ import { DashboardsStore } from './dashboards-store';
 import { displayHealth } from './displays/display-sketch';
 import { DisplaysStore } from './displays/displays-store';
 import { GoTo } from './go-to';
+import { chooseManagementLocale } from './language';
 import { SECTIONS, SectionId, sectionOf } from './sections';
 
 /**
@@ -16,17 +18,17 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
  */
 @Component({
   selector: 'hd-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideDynamicIcon, GoTo],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideDynamicIcon, GoTo, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-app' },
   template: `
     <aside class="sidebar">
       <a class="brand" routerLink="/">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><rect x="9" y="13" width="6" height="4" rx=".5" /></svg>
-        HomeyDash
+        {{ 'HomeyDash' | t }}
       </a>
       <hd-go-to />
-      <nav class="places" aria-label="Management">
+      <nav class="places" [attr.aria-label]="'Management' | t">
         @for (place of sections; track place.id) {
           <a
             class="place sec-{{ place.id }}"
@@ -34,7 +36,7 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
             [attr.aria-current]="current() === place.id ? 'page' : null"
           >
             <span class="hd-mark"><svg [lucideIcon]="place.icon" /></span>
-            <span class="place__label">{{ place.label }}</span>
+            <span class="place__label">{{ place.label | t }}</span>
             @if (marks()[place.id]; as mark) {
               <span class="attn" [title]="mark" role="img" [attr.aria-label]="mark"></span>
             }
@@ -43,7 +45,7 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
             }
           </a>
           @if (current() === place.id && place.id === 'dashboards' && store.list().length) {
-            <ul class="items sec-dashboards" aria-label="Dashboards">
+            <ul class="items sec-dashboards" [attr.aria-label]="'Dashboards' | t">
               @for (dashboard of store.list(); track dashboard.id) {
                 <li>
                   <a class="item" [routerLink]="['/dashboards', dashboard.id]" routerLinkActive ariaCurrentWhenActive="page">
@@ -52,7 +54,7 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
                       <span class="attn" role="img" [attr.aria-label]="missingLabel(dashboard.missingTiles)" [title]="missingLabel(dashboard.missingTiles)"></span>
                     }
                     @if (dashboard.hasUnpublishedChanges) {
-                      <span class="draft" role="img" aria-label="Unpublished changes" title="Unpublished changes"></span>
+                      <span class="draft" role="img" [attr.aria-label]="'Unpublished changes' | t" [title]="'Unpublished changes' | t"></span>
                     }
                   </a>
                 </li>
@@ -60,7 +62,7 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
             </ul>
           }
           @if (current() === place.id && place.id === 'displays' && displays.list().length) {
-            <ul class="items sec-displays" aria-label="Displays">
+            <ul class="items sec-displays" [attr.aria-label]="'Displays' | t">
               @for (display of displays.list(); track display.id) {
                 <li>
                   <a class="item" [routerLink]="['/displays', display.id]" routerLinkActive ariaCurrentWhenActive="page">
@@ -72,7 +74,7 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
             </ul>
           }
           @if (current() === place.id && place.id === 'photos' && displays.photoSets().length) {
-            <ul class="items sec-photos" aria-label="Photo sets">
+            <ul class="items sec-photos" [attr.aria-label]="'Photo sets' | t">
               @for (set of displays.photoSets(); track set.id) {
                 <li>
                   <a class="item" [routerLink]="['/photo-sets', set.id]" routerLinkActive ariaCurrentWhenActive="page">
@@ -84,12 +86,20 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
           }
         }
       </nav>
+      <label class="language">
+        <span class="hd-field__label">{{ 'Language' | t }}</span>
+        <select class="hd-input" [value]="locale()" (change)="chooseLocale(language.value)" #language>
+          @for (l of locales; track l) {
+            <option [value]="l" [selected]="locale() === l">{{ names[l] }}</option>
+          }
+        </select>
+      </label>
     </aside>
     <main class="page sec-{{ current() }}">
       @if (homeyNotSetUp() && current() !== 'accounts') {
         <div class="setup" role="status">
-          <span>Homey isn't set up yet, so tiles show no devices, flows or moods.</span>
-          <a class="hd-btn hd-btn--primary" routerLink="/accounts">Set up Homey</a>
+          <span>{{ "Homey isn't set up yet, so tiles show no devices, flows or moods." | t }}</span>
+          <a class="hd-btn hd-btn--primary" routerLink="/accounts">{{ 'Set up Homey' | t }}</a>
         </div>
       }
       <router-outlet />
@@ -132,6 +142,7 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); flex: none; }
     .dot[data-tone='ok'] { background: var(--ok); }
     .dot[data-tone='stale'], .dot[data-tone='lost'] { background: var(--warn); }
+    .language { margin-top: auto; display: flex; flex-direction: column; gap: 4px; padding: 0 6px; }
     .page { min-width: 0; }
     .setup { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-6); border-bottom: 1px solid var(--line); background: color-mix(in oklab, var(--warn) 9%, var(--panel)); color: var(--warn); font-weight: 600; }
     .setup .hd-btn { white-space: nowrap; }
@@ -154,6 +165,10 @@ export class Shell {
   private readonly homey = inject(RealtimeTileData);
 
   protected readonly sections = SECTIONS;
+  protected readonly locale = locale;
+  protected readonly locales = LOCALES;
+  protected readonly names = LOCALE_NAMES;
+  protected readonly chooseLocale = chooseManagementLocale;
   protected readonly homeyNotSetUp = computed(() => this.homey.homeys()?.length === 0);
   protected readonly current = toSignal(
     this.router.events.pipe(
@@ -176,9 +191,9 @@ export class Shell {
     const missing = this.store.list().filter((d) => d.missingTiles > 0).length;
     const idle = this.displays.list().filter((d) => !d.dashboardIds.length || !d.status.held).length;
     return {
-      dashboards: missing ? `${missing} ${missing === 1 ? 'dashboard has' : 'dashboards have'} tiles not found in Homey` : undefined,
-      displays: idle ? `${idle} ${idle === 1 ? 'display needs' : 'displays need'} attention` : undefined,
-      accounts: this.homeyNotSetUp() ? 'Homey is not set up' : undefined,
+      dashboards: missing ? t('{count} dashboard has tiles not found in Homey|{count} dashboards have tiles not found in Homey', { count: missing }) : undefined,
+      displays: idle ? t('{count} display needs attention|{count} displays need attention', { count: idle }) : undefined,
+      accounts: this.homeyNotSetUp() ? t('Homey is not set up') : undefined,
     };
   });
 
@@ -195,6 +210,6 @@ export class Shell {
   }
 
   protected missingLabel(count: number) {
-    return count === 1 ? '1 tile not found in Homey' : `${count} tiles not found in Homey`;
+    return t('{count} tile not found in Homey|{count} tiles not found in Homey', { count });
   }
 }

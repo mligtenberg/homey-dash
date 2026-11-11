@@ -18,6 +18,7 @@ import {
 } from './rule-text';
 import { SignalCatalogue } from './signal-catalogue';
 import { SignalPicker } from './signal-picker';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -34,13 +35,13 @@ function localInput(iso: string) {
  */
 @Component({
   selector: 'hd-condition-editor',
-  imports: [NgTemplateOutlet, SignalPicker, LucideDynamicIcon],
+  imports: [NgTemplateOutlet, SignalPicker, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="top">
       <hd-signal-picker [value]="condition().signal" (picked)="pickSignal($event)" />
       @if (removable()) {
-        <button type="button" class="drop" aria-label="Remove condition" (click)="removed.emit()">
+        <button type="button" class="drop" [attr.aria-label]="'Remove condition' | t" (click)="removed.emit()">
           <svg [lucideIcon]="x" aria-hidden="true" />
         </button>
       }
@@ -50,8 +51,8 @@ function localInput(iso: string) {
     }
 
     <div class="how">
-      <button type="button" class="not" [attr.aria-pressed]="!!condition().not" (click)="setNot(!condition().not)">Not</button>
-      <select class="hd-select op" aria-label="Operator" (change)="setOperator($any($event.target).value)">
+      <button type="button" class="not" [attr.aria-pressed]="!!condition().not" (click)="setNot(!condition().not)">{{ 'Not' | t }}</button>
+      <select class="hd-select op" [attr.aria-label]="'Operator' | t" (change)="setOperator($any($event.target).value)">
         @for (op of operators(); track op) {
           <option [value]="op" [selected]="op === condition().operator">{{ label(op) }}</option>
         }
@@ -60,10 +61,10 @@ function localInput(iso: string) {
       @switch (condition().operator) {
         @case ('between') {
           <div class="val">
-            <input class="hd-input" type="number" aria-label="From" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
+            <input class="hd-input" type="number" [attr.aria-label]="'From' | t" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
               [value]="range().min" (change)="set({ min: +$any($event.target).value, max: range().max })" />
-            <span>and</span>
-            <input class="hd-input" type="number" aria-label="To" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
+            <span>{{ 'and' | t }}</span>
+            <input class="hd-input" type="number" [attr.aria-label]="'To' | t" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
               [value]="range().max" (change)="set({ min: range().min, max: +$any($event.target).value })" />
             @if (signal()?.unit; as unit) {
               <span>{{ unit }}</span>
@@ -72,9 +73,9 @@ function localInput(iso: string) {
         }
         @case ('timeOfDayBetween') {
           <div class="val">
-            <input class="hd-input" type="time" step="1" aria-label="From" [value]="fromTo().from" (change)="setFromTo('from', $any($event.target).value)" />
-            <span>and</span>
-            <input class="hd-input" type="time" step="1" aria-label="To" [value]="fromTo().to" (change)="setFromTo('to', $any($event.target).value)" />
+            <input class="hd-input" type="time" step="1" [attr.aria-label]="'From' | t" [value]="fromTo().from" (change)="setFromTo('from', $any($event.target).value)" />
+            <span>{{ 'and' | t }}</span>
+            <input class="hd-input" type="time" step="1" [attr.aria-label]="'To' | t" [value]="fromTo().to" (change)="setFromTo('to', $any($event.target).value)" />
           </div>
         }
         @case ('dateBetween') {
@@ -94,7 +95,7 @@ function localInput(iso: string) {
           </div>
         }
         @case ('onWeekdays') {
-          <div class="val wide days" role="group" aria-label="Days">
+          <div class="val wide days" role="group" [attr.aria-label]="'Days' | t">
             @for (d of weekdays; track d.id) {
               <label class="day">
                 <input type="checkbox" [checked]="days().includes(d.id)" (change)="toggleDay(d.id, $any($event.target).checked)" />
@@ -111,12 +112,12 @@ function localInput(iso: string) {
         }
         @case ('before') {
           <div class="val wide">
-            <input class="hd-input" type="datetime-local" aria-label="Moment" [value]="moment()" (change)="setMoment($any($event.target).value)" />
+            <input class="hd-input" type="datetime-local" [attr.aria-label]="'Moment' | t" [value]="moment()" (change)="setMoment($any($event.target).value)" />
           </div>
         }
         @case ('after') {
           <div class="val wide">
-            <input class="hd-input" type="datetime-local" aria-label="Moment" [value]="moment()" (change)="setMoment($any($event.target).value)" />
+            <input class="hd-input" type="datetime-local" [attr.aria-label]="'Moment' | t" [value]="moment()" (change)="setMoment($any($event.target).value)" />
           </div>
         }
         @case ('isTrue') {}
@@ -125,7 +126,7 @@ function localInput(iso: string) {
         @default {
           @if (signal()?.allowedValues; as allowed) {
             <div class="val">
-              <select class="hd-select" aria-label="Value" (change)="set($any($event.target).value)">
+              <select class="hd-select" [attr.aria-label]="'Value' | t" (change)="set($any($event.target).value)">
                 @if (stale()) {
                   <option [value]="condition().value" selected>{{ condition().value }} (no longer offered)</option>
                 }
@@ -136,7 +137,7 @@ function localInput(iso: string) {
             </div>
           } @else if (isNumber()) {
             <div class="val">
-              <input class="hd-input" type="number" aria-label="Value" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
+              <input class="hd-input" type="number" [attr.aria-label]="'Value' | t" [attr.min]="signal()?.min" [attr.max]="signal()?.max" [attr.step]="signal()?.step"
                 [value]="condition().value" (change)="set(+$any($event.target).value)" />
               @if (signal()?.unit; as unit) {
                 <span>{{ unit }}</span>
@@ -144,7 +145,7 @@ function localInput(iso: string) {
             </div>
           } @else {
             <div class="val">
-              <input class="hd-input" aria-label="Value" [value]="condition().value ?? ''" (change)="set($any($event.target).value)" />
+              <input class="hd-input" [attr.aria-label]="'Value' | t" [value]="condition().value ?? ''" (change)="set($any($event.target).value)" />
             </div>
           }
         }
@@ -156,8 +157,8 @@ function localInput(iso: string) {
 
     <ng-template #spanInputs>
       <div class="val">
-        <input class="hd-input" type="number" min="1" aria-label="Amount" [value]="span().amount" (change)="set({ amount: +$any($event.target).value, unit: span().unit })" />
-        <select class="hd-select" aria-label="Unit" (change)="set({ amount: span().amount, unit: $any($event.target).value })">
+        <input class="hd-input" type="number" min="1" [attr.aria-label]="'Amount' | t" [value]="span().amount" (change)="set({ amount: +$any($event.target).value, unit: span().unit })" />
+        <select class="hd-select" [attr.aria-label]="'Unit' | t" (change)="set({ amount: span().amount, unit: $any($event.target).value })">
           @for (unit of units; track unit) {
             <option [value]="unit" [selected]="unit === span().unit">{{ unit }}</option>
           }
@@ -281,20 +282,20 @@ export class ConditionEditor {
  */
 @Component({
   selector: 'hd-rule-editor',
-  imports: [ConditionEditor, LucideDynamicIcon],
+  imports: [ConditionEditor, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.group]': 'group()' },
   template: `
     <div class="head">
-      <span class="label">{{ group() ? 'Group' : 'Show when' }}</span>
+      <span class="label">{{ (group() ? 'Group' : 'Show when') | t }}</span>
       @if (rule().conditions.length > 1) {
-        <select class="hd-select" aria-label="Combine conditions" (change)="setMatch($any($event.target).value)">
-          <option value="all" [selected]="rule().match === 'all'">all of these hold</option>
-          <option value="any" [selected]="rule().match === 'any'">any of these holds</option>
+        <select class="hd-select" [attr.aria-label]="'Combine conditions' | t" (change)="setMatch($any($event.target).value)">
+          <option value="all" [selected]="rule().match === 'all'">{{ 'all of these hold' | t }}</option>
+          <option value="any" [selected]="rule().match === 'any'">{{ 'any of these holds' | t }}</option>
         </select>
       }
       @if (group() && removable()) {
-        <button type="button" class="drop" aria-label="Remove group" (click)="removed.emit()">
+        <button type="button" class="drop" [attr.aria-label]="'Remove group' | t" (click)="removed.emit()">
           <svg [lucideIcon]="x" aria-hidden="true" />
         </button>
       }
@@ -327,14 +328,14 @@ export class ConditionEditor {
     </ol>
 
     <div class="actions">
-      <button type="button" class="add" (click)="addCondition()">+ Condition</button>
+      <button type="button" class="add" (click)="addCondition()">{{ '+ Condition' | t }}</button>
       @if (!group()) {
-        <button type="button" class="add" (click)="addGroup()">+ Group</button>
+        <button type="button" class="add" (click)="addGroup()">{{ '+ Group' | t }}</button>
       }
     </div>
 
     @if (!group() && complex()) {
-      <p class="words"><span class="label">In words</span>{{ words() }}</p>
+      <p class="words"><span class="label">{{ 'In words' | t }}</span>{{ words() }}</p>
     }
   `,
   styles: `

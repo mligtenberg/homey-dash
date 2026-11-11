@@ -14,6 +14,7 @@ import { TileDetails } from '../core/tile-details';
 import { TILE_FACE_HOST, TileFace } from '../core/tile-view';
 import { AirPlayData } from './airplay-data';
 import { plexIdle, plexTime } from './plex-data';
+import { formatTag, t, TranslatePipe } from '@homey-dash/i18n';
 
 
 /** How many items the detail view lists. */
@@ -70,7 +71,7 @@ export function addedOn(iso: string, now = Date.now()): string {
   if (days <= 0) return 'Today';
   if (days === 1) return 'Yesterday';
   if (days < 7) return `${days} days ago`;
-  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return new Date(iso).toLocaleDateString(formatTag(), { day: 'numeric', month: 'short' });
 }
 
 /** The full-screen view of Plex tiles that browse a library: the newest or everything, shown the same way (see `LibraryTile`). */
@@ -96,8 +97,8 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
     } @else {
       <svg class="hd-icon" [lucideIcon]="icon" />
       <div>
-        <div class="hd-tile__name">{{ face().name }}</div>
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__name">{{ face().name | t }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
     }
     @if (badge(); as b) {
@@ -136,10 +137,10 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
             @if (player.detail(l); as detail) {
               <span>{{ detail }}</span>
             }
-            <span>{{ l.paused ? 'Paused here' : 'Playing here' }}</span>
+            <span>{{ (l.paused ? 'Paused here' : 'Playing here') | t }}</span>
           </div>
           <button type="button" class="hd-plex-recent__receiver" (click)="player.toggle()">
-            <svg [lucideIcon]="l.paused ? playIcon : pauseIcon" />{{ l.paused ? 'Resume' : 'Pause' }}
+            <svg [lucideIcon]="l.paused ? playIcon : pauseIcon" />{{ (l.paused ? 'Resume' : 'Pause') | t }}
           </button>
           <button type="button" class="hd-plex-recent__receiver" (click)="player.stop()"><svg [lucideIcon]="stopIcon" />Stop</button>
         </div>
@@ -423,7 +424,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
  */
 @Component({
   selector: 'hd-plex-recent-tile',
-  imports: [TileDetails, LucideDynamicIcon, AirPlayReceivers, PlexAirPlayControls, PlexProfilePicker, Segmented],
+  imports: [TileDetails, LucideDynamicIcon, AirPlayReceivers, PlexAirPlayControls, PlexProfilePicker, Segmented, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex-recent', '[class.has-art]': 'shown().length > 0' },
   template: PLEX_BROWSER_TEMPLATE,
@@ -547,10 +548,10 @@ export class RecentlyAddedTile extends PlexTileView {
 
   /** The head's second line. */
   protected readonly subtitle = computed(() => {
-    if (!this.browse) return 'Newly added';
+    if (!this.browse) return t('Newly added');
     const library = this.overview()?.libraries.find((l) => l.id === this.shownLibrary());
-    const noun = library?.type === 'show' ? 'shows' : library?.type === 'artist' ? 'albums' : 'movies';
-    return library?.count ? `${library.count.toLocaleString()} ${noun}` : 'Library';
+    const noun = library?.type === 'show' ? t('shows') : library?.type === 'artist' ? t('albums') : t('movies');
+    return library?.count ? `${library.count.toLocaleString(formatTag())} ${noun}` : t('Library');
   });
 
   /** What the tile's face says over its posters: its own label; a library listing always names its library and how big it is. */
@@ -558,7 +559,7 @@ export class RecentlyAddedTile extends PlexTileView {
     const { label } = this.settings();
     if (!this.browse) return label ?? '';
     const count = this.totalCount();
-    return count ? `${this.face().name} · ${count.toLocaleString()}` : this.face().name;
+    return count ? `${this.face().name} · ${count.toLocaleString(formatTag())}` : this.face().name;
   });
 
   protected emptyText() {
@@ -630,8 +631,8 @@ export class RecentlyAddedTile extends PlexTileView {
     const { target, label } = this.settings();
     const overview = this.overview();
     const status = this.plex.status(this.settings().account);
-    const name = label || (target === ALL_PLEX_LIBRARIES ? (this.browse ? 'Plex library' : 'Recently added') : (this.library()?.title ?? 'Plex library'));
-    if (!target) return { ...look, name, detail: 'Pick a library', state: 'unset' };
+    const name = label || (target === ALL_PLEX_LIBRARIES ? (this.browse ? t('Plex library') : t('Recently added')) : (this.library()?.title ?? t('Plex library')));
+    if (!target) return { ...look, name, detail: t('Pick a library'), state: 'unset' };
     if (!overview?.loaded) {
       return status && status !== 'connected'
         ? { ...look, name, detail: plexIdle(status, overview?.error), state: 'unavailable' }
@@ -926,7 +927,7 @@ export class RecentlyAddedTile extends PlexTileView {
     if (album?.kind !== 'album') return this.player.start({ queue: [item], index: 0, paused: false, album: null });
     await this.loadChildren(album);
     const tracks = (this.under()[album.id]?.items ?? []).filter((t) => t.kind === 'track');
-    if (!tracks.length) return this.player.error.set('That album has no tracks.');
+    if (!tracks.length) return this.player.error.set(t('That album has no tracks.'));
     const index = item.kind === 'track' ? Math.max(0, tracks.findIndex((t) => t.id === item.id)) : 0;
     this.player.start({ queue: tracks, index, paused: false, album });
   }

@@ -1,0 +1,19 @@
+{
+  "name": "i18n",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/i18n/src",
+  "prefix": "hd",
+  "projectType": "library",
+  "tags": ["type:util"],
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "buildTarget": "display:build:development",
+        "tsConfig": "libs/i18n/tsconfig.spec.json",
+        "runner": "vitest",
+        "watch": false
+      }
+    }
+  }
+}

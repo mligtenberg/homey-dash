@@ -5,6 +5,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { HomeyAccountApi, HomeyStatus } from '@homey-dash/api-client';
 import { AddressKeyForm, addressKeyAccounts } from './address-key-accounts';
 import { RealtimeTileData } from '@homey-dash/tiles';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** How HomeyDash's connection to a Homey reads in a status pill. */
 export function homeyStatusPill(status: HomeyStatus | undefined): { label: string; tone: 'ok' | 'warn' | 'danger' | '' } {
@@ -27,24 +28,23 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
  */
 @Component({
   selector: 'hd-homey-account-panel',
-  imports: [AccountPanel, ConfirmInline, NgTemplateOutlet, AddressKeyForm],
+  imports: [AccountPanel, ConfirmInline, NgTemplateOutlet, AddressKeyForm, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <hd-account-panel key="homey" title="Homey" [error]="error()">
+    <hd-account-panel key="homey" [title]="'Homey' | t" [error]="error()">
       <ng-container ngProjectAs="[status]">
         @if (info(); as info) {
           @if (!info.accounts.length) {
-            <span class="hd-pill hd-pill--warn hd-pill--dot">Not set up</span>
+            <span class="hd-pill hd-pill--warn hd-pill--dot">{{ 'Not set up' | t }}</span>
           }
         }
       </ng-container>
       @if (info(); as info) {
         @if (info.fake) {
-          <p class="hd-muted">HomeyDash runs against a fake Homey with sample devices, set in its configuration.</p>
+          <p class="hd-muted">{{ 'HomeyDash runs against a fake Homey with sample devices, set in its configuration.' | t }}</p>
         } @else {
           <p class="hd-muted">
-            Add each Homey Pro HomeyDash should control, such as one per house. Displays reach Homey through HomeyDash, so
-            only HomeyDash needs to be on Homey's network.
+            {{ "Add each Homey Pro HomeyDash should control, such as one per house. Displays reach Homey through HomeyDash, so only HomeyDash needs to be on Homey's network." | t }}
           </p>
         }
         @for (account of info.accounts; track account.id) {
@@ -64,7 +64,7 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
                 }
               </div>
               <div class="hd-actions">
-                <span class="hd-pill hd-pill--dot" [class]="pill.tone ? 'hd-pill--' + pill.tone : ''">{{ pill.label }}</span>
+                <span class="hd-pill hd-pill--dot" [class]="pill.tone ? 'hd-pill--' + pill.tone : ''">{{ pill.label | t }}</span>
                 @if (!info.fake) {
                   @if (removing() === account.id) {
                     <hd-confirm-inline
@@ -73,8 +73,8 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
                       (cancelled)="removing.set(null)"
                     />
                   } @else {
-                    <button class="hd-btn" type="button" (click)="edit(account.id)">Edit</button>
-                    <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(account.id)">Remove</button>
+                    <button class="hd-btn" type="button" (click)="edit(account.id)">{{ 'Edit' | t }}</button>
+                    <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(account.id)">{{ 'Remove' | t }}</button>
                   }
                 }
               </div>
@@ -89,7 +89,7 @@ export function homeyStatusPill(status: HomeyStatus | undefined): { label: strin
           } @else if (editing() === null) {
             <div class="hd-actions">
               <button class="hd-btn" [class.hd-btn--primary]="!info.accounts.length" type="button" (click)="edit('new')">
-                {{ info.accounts.length ? 'Add another Homey' : 'Set up Homey' }}
+                {{ (info.accounts.length ? 'Add another Homey' : 'Set up Homey') | t }}
               </button>
             </div>
           }

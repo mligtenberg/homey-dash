@@ -3,6 +3,7 @@ import { PlexProfile, PlexProfileList, Realtime } from '@homey-dash/api-client';
 import { LucideLock, LucideUser } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { reason } from './hub-reason';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** The next number for a picker's popover and its anchor. */
 let nextId = 0;
@@ -15,7 +16,7 @@ let nextId = 0;
  */
 @Component({
   selector: 'hd-plex-profile-picker',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
@@ -34,7 +35,7 @@ let nextId = 0;
         class="hd-plex-recent__profiles"
         popover
         role="group"
-        aria-label="Profile"
+        [attr.aria-label]="'Profile' | t"
         [id]="id"
         [style.position-anchor]="'--' + id"
         (toggle)="onToggle($any($event).newState)"
@@ -49,14 +50,14 @@ let nextId = 0;
           >
             {{ p.name }}
             @if (p.protected) {
-              <svg role="img" aria-label="PIN" [lucideIcon]="lockIcon" />
+              <svg role="img" [attr.aria-label]="'PIN' | t" [lucideIcon]="lockIcon" />
             }
           </button>
         }
         @if (pinFor(); as p) {
           <form class="hd-plex-recent__pin" (submit)="$event.preventDefault(); switchTo(p, pin.value)">
             <input #pin type="password" inputmode="numeric" autocomplete="off" [placeholder]="'PIN for ' + p.name" [attr.aria-label]="'PIN for ' + p.name" />
-            <button type="submit" class="hd-plex-recent__play" [disabled]="switching()">Switch</button>
+            <button type="submit" class="hd-plex-recent__play" [disabled]="switching()">{{ 'Switch' | t }}</button>
           </form>
         }
         @if (error(); as error) {

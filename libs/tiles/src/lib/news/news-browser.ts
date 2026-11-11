@@ -10,6 +10,7 @@ import { TileDetails } from '../core/tile-details';
 import { NewsPlayer } from './news-player';
 import { AirPlayData } from '../plex/airplay-data';
 import { ago, NewsData } from './news-data';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** What the reader view says to the screen when someone touches the story inside its frame. */
 const ACTIVE = 'hd-news-active';
@@ -54,7 +55,7 @@ function clock(iso: string | null): string {
  */
 @Component({
   selector: 'hd-news-browser',
-  imports: [AirPlayCast, AirPlayNowControls, LucideDynamicIcon, NewsPlayer, SegmentedStrip],
+  imports: [AirPlayCast, AirPlayNowControls, LucideDynamicIcon, NewsPlayer, SegmentedStrip, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-news__browser' },
   template: `
@@ -66,7 +67,7 @@ function clock(iso: string | null): string {
         </button>
         <div class="hd-news__open-title">{{ openTitle() }}</div>
       } @else {
-        <hd-segmented-strip label="News" [options]="tabs()" [value]="tab()" (picked)="pick($event)" />
+        <hd-segmented-strip [label]="'News' | t" [options]="tabs()" [value]="tab()" (picked)="pick($event)" />
       }
     </div>
 
@@ -86,7 +87,7 @@ function clock(iso: string | null): string {
             } @else if (watching()?.error) {
               <div class="hd-note">{{ watching()?.error }}</div>
             } @else {
-              <div class="hd-note">Starting the stream…</div>
+              <div class="hd-note">{{ 'Starting the stream…' | t }}</div>
             }
             @if (watching(); as w) {
               <hd-airplay-cast [start]="castStart()" (started)="close()" />
@@ -105,7 +106,7 @@ function clock(iso: string | null): string {
               <span class="hd-news__thumb">
                 <img class="hd-news__photo" [src]="stream.image" alt="" loading="lazy" draggable="false" />
                 @if (stream.live) {
-                  <span class="hd-news__badge hd-news__badge--live">Live</span>
+                  <span class="hd-news__badge hd-news__badge--live">{{ 'Live' | t }}</span>
                 }
               </span>
             }
@@ -116,7 +117,7 @@ function clock(iso: string | null): string {
             }
           </button>
         } @empty {
-          <div class="hd-note">{{ livesLoaded() ? 'No livestreams right now' : 'Loading…' }}</div>
+          <div class="hd-note">{{ (livesLoaded() ? 'No livestreams right now' : 'Loading…') | t }}</div>
         }
       </div>
     } @else if (tab() === videosTab) {
@@ -135,7 +136,7 @@ function clock(iso: string | null): string {
             <span class="hd-news__headline">{{ video.title }}</span>
           </button>
         } @empty {
-          <div class="hd-note">{{ videosLoaded() ? 'No videos' : 'Loading…' }}</div>
+          <div class="hd-note">{{ (videosLoaded() ? 'No videos' : 'Loading…') | t }}</div>
         }
       </div>
     } @else {

@@ -4,6 +4,7 @@ import {
   input,
   output,
 } from '@angular/core';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** An account as the select lists it: a Homey or a Plex account. */
 export interface AccountOption {
@@ -20,6 +21,7 @@ export interface AccountOption {
   selector: 'hd-account-select',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
+  imports: [TranslatePipe],
   template: `
     <select
       class="hd-select"
@@ -28,7 +30,7 @@ export interface AccountOption {
       (change)="picked.emit(+$any($event.target).value)"
     >
       @if (!found()) {
-        <option value="" selected>Account removed</option>
+        <option value="" selected>{{ 'Account removed' | t }}</option>
       }
       @for (account of accounts(); track account.accountId) {
         <option

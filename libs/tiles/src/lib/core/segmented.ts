@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * A row of buttons of which one is pressed: a choice between pages, windows or the values of a capability. The host
@@ -8,9 +9,10 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
   selector: 'hd-segmented',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-segmented', role: 'group', '[attr.aria-label]': 'label()' },
+  imports: [TranslatePipe],
   template: `
     @for (option of options(); track option.id) {
-      <button type="button" [attr.aria-pressed]="value() === option.id" [disabled]="disabled()" (click)="picked.emit(option.id)">{{ option.label }}</button>
+      <button type="button" [attr.aria-pressed]="value() === option.id" [disabled]="disabled()" (click)="picked.emit(option.id)">{{ option.label | t }}</button>
     }
   `,
 })

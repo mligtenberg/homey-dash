@@ -1,28 +1,30 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { DisplaysApi, DisplaySummary } from '@homey-dash/api-client';
 import { Observable } from 'rxjs';
+import { TranslatePipe, t } from '@homey-dash/i18n';
 
 /** First run on a screen: become a new display, or take over an existing one. */
 @Component({
   selector: 'hd-setup',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="setup">
-      <h1>Set up this screen</h1>
+      <h1>{{ 'Set up this screen' | t }}</h1>
 
       <form class="hd-panel card" (submit)="setUp($event, name.value)">
-        <h2 class="hd-panel__title">New display</h2>
+        <h2 class="hd-panel__title">{{ 'New display' | t }}</h2>
         <div class="hd-field">
-          <label class="hd-field__label" for="display-name">Name</label>
-          <input #name id="display-name" class="hd-input" placeholder="Name, such as Kitchen wall" autocomplete="off" enterkeyhint="done" />
+          <label class="hd-field__label" for="display-name">{{ 'Name' | t }}</label>
+          <input #name id="display-name" class="hd-input" [placeholder]="'Name, such as Kitchen wall' | t" autocomplete="off" enterkeyhint="done" />
         </div>
-        <button class="hd-btn hd-btn--primary" type="submit" [disabled]="busy()">Set up as new display</button>
+        <button class="hd-btn hd-btn--primary" type="submit" [disabled]="busy()">{{ 'Set up as new display' | t }}</button>
       </form>
 
       @if (displays().length > 0) {
         <section class="hd-panel card">
-          <h2 class="hd-panel__title">Take over a display</h2>
-          <p class="hd-muted">This screen gets that display's name and dashboard. The screen showing it now goes back to setup.</p>
+          <h2 class="hd-panel__title">{{ 'Take over a display' | t }}</h2>
+          <p class="hd-muted">{{ "This screen gets that display's name and dashboard. The screen showing it now goes back to setup." | t }}</p>
           <ul>
             @for (display of displays(); track display.id) {
               <li>
@@ -31,9 +33,9 @@ import { Observable } from 'rxjs';
                   <button class="hd-btn hd-btn--primary" type="button" [disabled]="busy()" (click)="takeOver(display.id)">
                     Take over {{ display.name }}
                   </button>
-                  <button class="hd-btn" type="button" (click)="confirming.set(null)">Cancel</button>
+                  <button class="hd-btn" type="button" (click)="confirming.set(null)">{{ 'Cancel' | t }}</button>
                 } @else {
-                  <button class="hd-btn" type="button" (click)="confirming.set(display.id)">Take over</button>
+                  <button class="hd-btn" type="button" (click)="confirming.set(display.id)">{{ 'Take over' | t }}</button>
                 }
               </li>
             }
@@ -75,7 +77,7 @@ export class Setup {
   protected setUp(event: Event, name: string) {
     event.preventDefault();
     if (!name.trim()) {
-      this.error.set('Give this display a name.');
+      this.error.set(t('Give this display a name.'));
       return;
     }
     this.run(this.api.setUp(name, this.screenId()));
@@ -92,7 +94,7 @@ export class Setup {
       next: () => this.done.emit(),
       error: () => {
         this.busy.set(false);
-        this.error.set('HomeyDash could not be reached. Try again.');
+        this.error.set(t('HomeyDash could not be reached. Try again.'));
       },
     });
   }

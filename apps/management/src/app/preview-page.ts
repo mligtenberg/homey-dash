@@ -9,6 +9,7 @@ import { LucideLayoutDashboard } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { AsDisplayPicker } from './as-display-picker';
 import { DisplaysStore } from './displays/displays-store';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** The strip a display keeps on its left for the dashboard tape and people (the display app's PEOPLE_GUTTER). */
 const GUTTER = 68;
@@ -23,22 +24,22 @@ const MARGIN = 24;
  */
 @Component({
   selector: 'hd-preview-page',
-  imports: [AsDisplayPicker, DashboardView, RouterLink, LucideDynamicIcon],
+  imports: [AsDisplayPicker, DashboardView, RouterLink, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-app', '[class.is-frame]': 'framed()', '(window:resize)': 'onResize()' },
   template: `
     @if (!framed()) {
       <header #bar class="hd-page__header">
-        <ol class="hd-crumbs" aria-label="You are here">
-          <li><a routerLink="/dashboards">Dashboards</a></li>
+        <ol class="hd-crumbs" [attr.aria-label]="'You are here' | t">
+          <li><a routerLink="/dashboards">{{ 'Dashboards' | t }}</a></li>
           <li><a [routerLink]="['/dashboards', id()]">{{ dashboard()?.name ?? 'Dashboard' }}</a></li>
         </ol>
         <span class="hd-mark hd-mark--lg" aria-hidden="true"><svg [lucideIcon]="icon" /></span>
-        <h1 class="hd-page__title">Preview</h1>
+        <h1 class="hd-page__title">{{ 'Preview' | t }}</h1>
         <span class="hd-pill">{{ sizeLabel() }}</span>
         <span class="spacer"></span>
         <hd-as-display-picker />
-        <a class="hd-btn hd-btn--primary" [routerLink]="['/dashboards', id()]">Back to editor</a>
+        <a class="hd-btn hd-btn--primary" [routerLink]="['/dashboards', id()]">{{ 'Back to editor' | t }}</a>
       </header>
     }
     <div class="stage" [class.is-screen]="screen()">

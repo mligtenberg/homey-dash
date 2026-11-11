@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, signal } from '@an
 import { HomeyInsightEntry, InsightResolution } from '@homey-dash/api-client';
 import { formatReading } from './device-look';
 import { STATISTIC_WINDOWS, StatisticChart, statisticFigures, statisticStamp } from './statistic-chart';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 type StatisticWindow = (typeof STATISTIC_WINDOWS)[InsightResolution];
 
@@ -12,7 +13,7 @@ type StatisticWindow = (typeof STATISTIC_WINDOWS)[InsightResolution];
  */
 @Component({
   selector: 'hd-statistic-readings',
-  imports: [StatisticChart],
+  imports: [StatisticChart, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
@@ -28,7 +29,7 @@ type StatisticWindow = (typeof STATISTIC_WINDOWS)[InsightResolution];
       <dl class="hd-stat__figures">
         @for (f of figures; track f.label) {
           <div class="hd-stat__figure">
-            <dt class="hd-details__label">{{ f.label }}</dt>
+            <dt class="hd-details__label">{{ f.label | t }}</dt>
             <dd class="hd-stat__figure-value">{{ f.value }}</dd>
             @if (f.note) {
               <dd class="hd-stat__figure-note">{{ f.note }}</dd>

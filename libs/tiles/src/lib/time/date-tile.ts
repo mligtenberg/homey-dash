@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 import { minuteClock } from '@homey-dash/design-system';
 import { TileSize } from '@homey-dash/layout';
 import { DateTileSettings, monthGrid, weekdayNames, weekNumber } from './time-data';
+import { TranslatePipe, formatTag } from '@homey-dash/i18n';
 
 /**
  * Today's date: on small and wide tiles the weekday and the day of the month large; on large tiles the whole month as a
@@ -11,6 +12,7 @@ import { DateTileSettings, monthGrid, weekdayNames, weekNumber } from './time-da
   selector: 'hd-date-tile',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-tile hd-date', '[attr.data-size]': 'size()', '[class.has-month]': 'month()' },
+  imports: [TranslatePipe],
   template: `
     @if (month()) {
       <div class="hd-date__head">
@@ -21,7 +23,7 @@ import { DateTileSettings, monthGrid, weekdayNames, weekNumber } from './time-da
         <thead>
           <tr>
             @if (settings().weekNumbers) {
-              <th scope="col" aria-label="Week"></th>
+              <th scope="col" [attr.aria-label]="'Week' | t"></th>
             }
             @for (name of weekdays; track $index) {
               <th scope="col">{{ name }}</th>
@@ -65,10 +67,10 @@ export class DateTile {
   protected readonly month = computed(() => this.size() === 'large' || this.size() === 'full-large');
   protected readonly weeks = computed(() => monthGrid(this.at()));
   protected readonly week = computed(() => weekNumber(this.at()));
-  protected readonly monthName = computed(() => this.at().toLocaleDateString(undefined, { month: 'long', year: this.month() ? 'numeric' : undefined }));
-  protected readonly monthShort = computed(() => this.at().toLocaleDateString(undefined, { month: 'short' }));
-  protected readonly weekdayLong = computed(() => this.at().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric' }));
+  protected readonly monthName = computed(() => this.at().toLocaleDateString(formatTag(), { month: 'long', year: this.month() ? 'numeric' : undefined }));
+  protected readonly monthShort = computed(() => this.at().toLocaleDateString(formatTag(), { month: 'short' }));
+  protected readonly weekdayLong = computed(() => this.at().toLocaleDateString(formatTag(), { weekday: 'long', day: 'numeric' }));
   protected readonly weekdayShortOrLong = computed(() =>
-    this.at().toLocaleDateString(undefined, { weekday: this.size() === 'small' ? 'short' : 'long' }),
+    this.at().toLocaleDateString(formatTag(), { weekday: this.size() === 'small' ? 'short' : 'long' }),
   );
 }

@@ -1,12 +1,14 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TILE_SIZE_LABELS, TILE_SIZES, TileSize } from '@homey-dash/layout';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** The tile sizes; the ones the kind lacks or that do not fit are disabled, not hidden. */
 @Component({
   selector: 'hd-size-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
-    <div class="hd-sizes" role="group" aria-label="Size">
+    <div class="hd-sizes" role="group" [attr.aria-label]="'Size' | t">
       @for (size of sizes; track size) {
         <button
           type="button"

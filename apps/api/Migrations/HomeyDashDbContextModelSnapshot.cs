@@ -102,6 +102,9 @@ namespace HomeyDash.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Language")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTimeOffset?>("LastSeenAt")
                         .HasColumnType("TEXT");
 

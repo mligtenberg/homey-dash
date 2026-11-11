@@ -1,22 +1,23 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { SettingSelect } from '../core/setting-select';
 import { ClockTileSettings, DateTileSettings } from './time-data';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** Management's settings of a clock tile: its look, 12 or 24 hours, the seconds, and the date. */
 @Component({
   selector: 'hd-clock-tile-settings',
-  imports: [SettingSelect],
+  imports: [SettingSelect, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-setting-select
-      label="Look"
+      [label]="'Look' | t"
       selectId="clock-style"
       [options]="styles"
       [value]="settings().style ?? 'digital'"
       (picked)="changed.emit({ style: $event === 'analog' ? 'analog' : 'digital' })"
     />
     <hd-setting-select
-      label="Hours"
+      [label]="'Hours' | t"
       selectId="clock-hours"
       emptyLabel="Automatic"
       [options]="hours"
@@ -24,14 +25,14 @@ import { ClockTileSettings, DateTileSettings } from './time-data';
       (picked)="changed.emit({ hours: $event === '' ? undefined : $event === '12' ? 12 : 24 })"
     />
     <hd-setting-select
-      label="Seconds"
+      [label]="'Seconds' | t"
       selectId="clock-seconds"
       [options]="yesNo"
       [value]="settings().seconds ? 'yes' : 'no'"
       (picked)="changed.emit({ seconds: $event === 'yes' })"
     />
     <hd-setting-select
-      label="Date"
+      [label]="'Date' | t"
       selectId="clock-date"
       [options]="yesNo"
       [value]="settings().showDate === false ? 'no' : 'yes'"
@@ -60,11 +61,11 @@ export class ClockTileSettingsEditor {
 /** Management's settings of a date tile: whether a large tile numbers the weeks. */
 @Component({
   selector: 'hd-date-tile-settings',
-  imports: [SettingSelect],
+  imports: [SettingSelect, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-setting-select
-      label="Week numbers"
+      [label]="'Week numbers' | t"
       selectId="date-weeks"
       [options]="yesNo"
       [value]="settings().weekNumbers ? 'yes' : 'no'"

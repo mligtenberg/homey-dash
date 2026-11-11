@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * The question that replaces a Remove button until it is answered: what removing does, then Remove and Cancel. It lays
@@ -8,10 +9,11 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
   selector: 'hd-confirm-inline',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
+  imports: [TranslatePipe],
   template: `
     <span class="hd-muted">{{ message() }}</span>
     <button class="hd-btn hd-btn--danger" type="button" (click)="confirmed.emit()">{{ confirmLabel() }}</button>
-    <button class="hd-btn" type="button" (click)="cancelled.emit()">Cancel</button>
+    <button class="hd-btn" type="button" (click)="cancelled.emit()">{{ 'Cancel' | t }}</button>
   `,
 })
 export class ConfirmInline {

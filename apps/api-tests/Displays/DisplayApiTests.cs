@@ -359,6 +359,22 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task ALanguage_ReachesTheScreen_AndOnlyASupportedOneIsAccepted()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var put = (string? language) => _client.PutAsJsonAsync($"/api/displays/{display}/language", new { language });
+
+        Assert.Equal(HttpStatusCode.OK, (await put("nl")).StatusCode);
+        Assert.Equal("nl", (await ViewAsync(screen)).GetProperty("display").GetProperty("language").GetString());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await put("klingon")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await put(null)).StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await ViewAsync(screen)).GetProperty("display").GetProperty("language").ValueKind);
+    }
+
+    [Fact]
     public async Task ALightSource_ReachesTheScreen_AndOnlyADeviceCapabilityIsAccepted()
     {
         var screen = Guid.NewGuid();

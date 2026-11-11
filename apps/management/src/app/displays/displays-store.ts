@@ -4,6 +4,7 @@ import { alwaysRule, TileData } from '@homey-dash/tiles/data';
 import { DashboardsStore } from '../dashboards-store';
 import { SignalCatalogue } from '../editor/signal-catalogue';
 import { changedAt, clock, moved, removedAt, timeAgo } from '@homey-dash/design-system';
+import { t } from '@homey-dash/i18n';
 
 /** How many widgets a lock screen shows at most. */
 export const MAX_LOCK_WIDGETS = 8;
@@ -107,7 +108,7 @@ export class DisplaysStore {
 
   // Named after its dashboard when the display offers more than one.
   behind(version: DashboardVersion, named: boolean) {
-    const text = version.shownVersion ? `Shows version ${version.shownVersion} of ${version.latestVersion}` : 'Not showing it yet';
+    const text = version.shownVersion ? t('Shows version {shown} of {latest}', { shown: version.shownVersion, latest: version.latestVersion }) : t('Not showing it yet');
     if (!named) return text;
     return `${this.dashboardName(version.dashboardId)}: ${text[0].toLowerCase()}${text.slice(1)}`;
   }
@@ -178,7 +179,7 @@ export class DisplaysStore {
       const signals = (this.catalogue.signals() ?? []).filter(isCapabilitySignal);
       const signal = signals.find((s) => s.id.endsWith(':measure_temperature')) ?? signals[0];
       if (!signal) {
-        this.error.set('There is no device value to show yet. Set up a Homey account first.');
+        this.error.set(t('There is no device value to show yet. Set up a Homey account first.'));
         return;
       }
       widget = { kind, spot, signal: signal.id };
@@ -229,6 +230,11 @@ export class DisplaysStore {
   // A device in Homey that measures the light for the display, or null to have the screen measure it.
   setLightSource(display: DisplayInfo, signal: string | null) {
     this.api.setLightSource(display.id, signal).subscribe({ next: (d) => this.replace(d), error: () => this.fail('set the light source of') });
+  }
+
+  // The language the display's screen speaks, or null for its browser's.
+  setLanguage(display: DisplayInfo, language: string | null) {
+    this.api.setLanguage(display.id, language).subscribe({ next: (d) => this.replace(d), error: () => this.fail('set the language of') });
   }
 
   setLockSignal(display: DisplayInfo, index: number, signal: string) {

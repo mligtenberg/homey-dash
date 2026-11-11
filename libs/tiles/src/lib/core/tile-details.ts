@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { LucideX } from '@homey-dash/design-system';
 import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** How long the detail view stays open untouched; nobody may be there to close it on a wall tablet. */
 export const DETAILS_IDLE_MS = 60_000;
@@ -12,7 +13,7 @@ export const DETAILS_IDLE_MS = 60_000;
  */
 @Component({
   selector: 'hd-tile-details',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // Not a box of its own, so it does not take part in the tile's layout.
   host: { style: 'display: contents' },
@@ -23,7 +24,7 @@ export const DETAILS_IDLE_MS = 60_000;
       [class.hd-details--fill]="fill()"
       [class.hd-details--screen]="screen()"
       tabindex="-1"
-      [attr.aria-label]="name()"
+      [attr.aria-label]="name() | t"
       (close)="onClose()"
       (pointerdown)="onPointerDown($event)"
       (keydown)="keepOpen()"
@@ -35,11 +36,11 @@ export const DETAILS_IDLE_MS = 60_000;
             <ng-content select="[hdDetailsMark]" />
             <svg class="hd-icon" [lucideIcon]="icon()" />
             <div class="hd-details__titles">
-              <h2 class="hd-details__name">{{ name() }}</h2>
-              <div class="hd-details__sub">{{ subtitle() }}</div>
+              <h2 class="hd-details__name">{{ name() | t }}</h2>
+              <div class="hd-details__sub">{{ subtitle() | t }}</div>
             </div>
             <ng-content select="[hdDetailsHead]" />
-            <button type="button" class="hd-round-btn hd-details__close" aria-label="Close" autofocus (click)="close()">
+            <button type="button" class="hd-round-btn hd-details__close" [attr.aria-label]="'Close' | t" autofocus (click)="close()">
               <svg [lucideIcon]="closeIcon" />
             </button>
           </div>

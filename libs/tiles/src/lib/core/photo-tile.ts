@@ -6,6 +6,7 @@ import { LucideDynamicIcon } from '@lucide/angular';
 import { TileSettings } from '../tile-data';
 import { PhotoViewer, takenOn } from './photo-viewer';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 export interface PhotoTileSettings extends TileSettings {
   /** Seconds between photos; 30 when absent. */
@@ -44,7 +45,7 @@ export { takenOn };
  */
 @Component({
   selector: 'hd-photo-tile',
-  imports: [PhotoViewer, LucideDynamicIcon],
+  imports: [PhotoViewer, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     ...TILE_FACE_HOST,
@@ -76,8 +77,8 @@ export { takenOn };
     } @else {
       <svg class="hd-icon" [lucideIcon]="icon" />
       <div>
-        <div class="hd-tile__name">{{ face().name }}</div>
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__name">{{ face().name | t }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
     }
     @if (set(); as set) {
@@ -287,11 +288,11 @@ interface PhotoLayer {
 /** Management's choice of how long a photo tile shows each photo. */
 @Component({
   selector: 'hd-photo-tile-settings',
-  imports: [SettingSelect],
+  imports: [SettingSelect, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-setting-select
-      label="Next photo every"
+      [label]="'Next photo every' | t"
       selectId="tile-interval"
       [options]="intervals"
       [value]="settings().interval ?? 30"

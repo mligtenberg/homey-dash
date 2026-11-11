@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { AlbumGroup, albumLabel, albumValue, loadAlbums, parseAlbumValue } from './immich-albums';
 import { defaultSelection, PhotoSelectionForm, selectionSummary } from './photo-selection-form';
 import { clock, timeAgo } from '@homey-dash/design-system';
+import { TranslatePipe, t } from '@homey-dash/i18n';
 
 /**
  * One photo set (ADR-0008), kept current over the realtime connection: its name, the Immich album it follows or the
@@ -16,11 +17,11 @@ import { clock, timeAgo } from '@homey-dash/design-system';
  */
 @Component({
   selector: 'hd-photo-set-page',
-  imports: [RouterLink, PhotoSelectionForm, PhotoViewer],
+  imports: [RouterLink, PhotoSelectionForm, PhotoViewer, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="hd-page__header">
-      <ol class="hd-crumbs" aria-label="You are here"><li><a routerLink="/photo-sets">Photo sets</a></li></ol>
+      <ol class="hd-crumbs" [attr.aria-label]="'You are here' | t"><li><a routerLink="/photo-sets">{{ 'Photo sets' | t }}</a></li></ol>
       @if (set(); as set) {
         <input
           class="hd-input name"
@@ -34,12 +35,12 @@ import { clock, timeAgo } from '@homey-dash/design-system';
     </header>
     <div class="hd-page__body">
       @if (set(); as set) {
-        <section class="hd-panel panel" aria-label="Source">
+        <section class="hd-panel panel" [attr.aria-label]="'Source' | t">
           @if (set.selection; as selection) {
             <p class="hd-muted">{{ summary(selection) }}</p>
           }
           <p class="hd-muted">
-            {{ set.photos.length }} {{ set.photos.length === 1 ? 'photo' : 'photos' }}
+            {{ set.photos.length }} {{ (set.photos.length === 1 ? 'photo' : 'photos') | t }}
             @if (set.albumName) {
               from {{ set.albumName }}
             }
@@ -47,10 +48,10 @@ import { clock, timeAgo } from '@homey-dash/design-system';
               in {{ set.accountName }}
             }
             @if (set.syncedAt) {
-              · {{ set.selection ? 'drawn' : 'synced' }} {{ ago(set.syncedAt) }}
+              · {{ (set.selection ? 'drawn' : 'synced') | t }} {{ ago(set.syncedAt) }}
             }
             @if (set.skippedVideos) {
-              · {{ set.skippedVideos }} {{ set.skippedVideos === 1 ? 'video' : 'videos' }} left out
+              · {{ set.skippedVideos }} {{ (set.skippedVideos === 1 ? 'video' : 'videos') | t }} left out
             }
           </p>
           <p class="hd-muted">
@@ -61,7 +62,7 @@ import { clock, timeAgo } from '@homey-dash/design-system';
             }
           </p>
           @if (busy()) {
-            <p class="status" role="status">{{ set.selection ? 'Drawing photos…' : 'Syncing with Immich…' }}</p>
+            <p class="status" role="status">{{ (set.selection ? 'Drawing photos…' : 'Syncing with Immich…') | t }}</p>
           } @else if (set.syncError; as syncError) {
             <p class="status failed" role="status">{{ syncError }}</p>
           }
@@ -74,9 +75,9 @@ import { clock, timeAgo } from '@homey-dash/design-system';
               (keydown.escape)="changingAlbum.set(false)"
             >
               @if (!groups()) {
-                <option value="" selected>Loading albums…</option>
+                <option value="" selected>{{ 'Loading albums…' | t }}</option>
               } @else if (set.accountId === null) {
-                <option value="" selected>Choose an album</option>
+                <option value="" selected>{{ 'Choose an album' | t }}</option>
               }
               @for (group of groups(); track group.account.id) {
                 @if (groups()!.length > 1) {
@@ -97,10 +98,10 @@ import { clock, timeAgo } from '@homey-dash/design-system';
             <form class="rules" (submit)="saveSelection($event, set)">
               @if (accounts().length > 1 || set.accountId === null) {
                 <div class="hd-field">
-                  <label class="hd-field__label" for="rules-account">Immich account</label>
+                  <label class="hd-field__label" for="rules-account">{{ 'Immich account' | t }}</label>
                   <select id="rules-account" class="hd-select" (change)="editedAccount.set(+$any($event.target).value || null)">
                     @if (editedAccount() === null) {
-                      <option value="" selected>Choose an account</option>
+                      <option value="" selected>{{ 'Choose an account' | t }}</option>
                     }
                     @for (account of accounts(); track account.id) {
                       <option [value]="account.id" [selected]="account.id === editedAccount()">{{ account.name }}</option>
@@ -110,41 +111,41 @@ import { clock, timeAgo } from '@homey-dash/design-system';
               }
               <hd-photo-selection-form [(selection)]="editedSelection" [accountId]="editedAccount()" />
               <div class="actions">
-                <button class="hd-btn hd-btn--primary" type="submit">Save and draw</button>
-                <button class="hd-btn" type="button" (click)="editing.set(false)">Cancel</button>
+                <button class="hd-btn hd-btn--primary" type="submit">{{ 'Save and draw' | t }}</button>
+                <button class="hd-btn" type="button" (click)="editing.set(false)">{{ 'Cancel' | t }}</button>
               </div>
             </form>
           }
           <div class="actions">
             @if (removing()) {
-              <span class="hd-muted">{{ set.dashboards.length ? 'Its tiles show as missing.' : 'The album stays in Immich.' }}</span>
-              <button class="hd-btn hd-btn--danger" type="button" (click)="remove(set)">Delete</button>
-              <button class="hd-btn" type="button" (click)="removing.set(false)">Cancel</button>
+              <span class="hd-muted">{{ (set.dashboards.length ? 'Its tiles show as missing.' : 'The album stays in Immich.') | t }}</span>
+              <button class="hd-btn hd-btn--danger" type="button" (click)="remove(set)">{{ 'Delete' | t }}</button>
+              <button class="hd-btn" type="button" (click)="removing.set(false)">{{ 'Cancel' | t }}</button>
             } @else {
               <button class="hd-btn hd-btn--primary" type="button" [disabled]="busy()" (click)="sync(set)">
                 @if (set.selection) {
-                  {{ busy() ? 'Drawing…' : 'Draw again' }}
+                  {{ (busy() ? 'Drawing…' : 'Draw again') | t }}
                 } @else {
-                  {{ busy() ? 'Syncing…' : 'Sync now' }}
+                  {{ (busy() ? 'Syncing…' : 'Sync now') | t }}
                 }
               </button>
               @if (set.selection) {
                 @if (!editing()) {
-                  <button class="hd-btn" type="button" (click)="startEditing(set)">Edit rules</button>
+                  <button class="hd-btn" type="button" (click)="startEditing(set)">{{ 'Edit rules' | t }}</button>
                 }
               } @else if (changingAlbum()) {
-                <button class="hd-btn" type="button" (click)="changingAlbum.set(false)">Keep album</button>
+                <button class="hd-btn" type="button" (click)="changingAlbum.set(false)">{{ 'Keep album' | t }}</button>
               } @else {
-                <button class="hd-btn" type="button" (click)="startChangingAlbum()">Change album</button>
+                <button class="hd-btn" type="button" (click)="startChangingAlbum()">{{ 'Change album' | t }}</button>
               }
-              <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(true)">Delete photo set</button>
+              <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(true)">{{ 'Delete photo set' | t }}</button>
             }
           </div>
         </section>
 
         @if (set.photos.length) {
-          <section class="hd-panel panel" aria-label="Photos">
-            <h2 class="hd-section-title">Photos</h2>
+          <section class="hd-panel panel" [attr.aria-label]="'Photos' | t">
+            <h2 class="hd-section-title">{{ 'Photos' | t }}</h2>
             <ul class="photos">
               @for (photo of set.photos; track photo.id) {
                 <li>
@@ -160,9 +161,9 @@ import { clock, timeAgo } from '@homey-dash/design-system';
 
         @if (set.excluded.length) {
           <section class="hd-panel panel" [attr.aria-label]="'Excluded from ' + set.name">
-            <h2 class="hd-section-title">Excluded</h2>
+            <h2 class="hd-section-title">{{ 'Excluded' | t }}</h2>
             <p class="hd-muted">
-              {{ set.excluded.length }} {{ set.excluded.length === 1 ? 'photo' : 'photos' }} excluded on a display, which no
+              {{ set.excluded.length }} {{ (set.excluded.length === 1 ? 'photo' : 'photos') | t }} excluded on a display, which no
               sync brings back
               @if (set.selection) {
                 · one brought back can be drawn again
@@ -179,7 +180,7 @@ import { clock, timeAgo } from '@homey-dash/design-system';
                     [disabled]="restoring() === id"
                     (click)="restore(set, id)"
                   >
-                    Bring back
+                    {{ 'Bring back' | t }}
                   </button>
                 </li>
               }
@@ -188,14 +189,14 @@ import { clock, timeAgo } from '@homey-dash/design-system';
         }
       } @else if (data.photoSetsLoaded()) {
         <div class="hd-panel panel">
-          <p class="hd-muted">This photo set no longer exists. <a routerLink="/photo-sets">Back to photo sets</a></p>
+          <p class="hd-muted">{{ 'This photo set no longer exists.' | t }} <a routerLink="/photo-sets">{{ 'Back to photo sets' | t }}</a></p>
         </div>
       }
       @if (error(); as error) {
         <p class="hd-error" role="alert">
           {{ error }}
           @if (error.includes('Accounts')) {
-            <a routerLink="/accounts">Go to Accounts</a>
+            <a routerLink="/accounts">{{ 'Go to Accounts' | t }}</a>
           }
         </p>
       }
@@ -248,7 +249,7 @@ export class PhotoSetPage {
   constructor() {
     this.accountsApi.list().subscribe({
       next: ({ accounts }) => this.accounts.set(accounts),
-      error: (e) => this.error.set(apiProblem(e, 'Could not load the Immich accounts. Try again.')),
+      error: (e) => this.error.set(apiProblem(e, t('Could not load the Immich accounts. Try again.'))),
     });
     // A set that arrives syncing, such as one just added or changed, is polled until it is done.
     effect(() => {
@@ -292,7 +293,7 @@ export class PhotoSetPage {
     event.preventDefault();
     const accountId = this.editedAccount();
     if (accountId === null) {
-      this.error.set('Choose an Immich account for the photo set.');
+      this.error.set(t('Choose an Immich account for the photo set.'));
       return;
     }
     this.api.update(set.id, { selection: this.editedSelection(), accountId }).subscribe({
@@ -301,7 +302,7 @@ export class PhotoSetPage {
         this.error.set(null);
         if (changed.syncing) this.waitFor(changed.id);
       },
-      error: (e) => this.error.set(apiProblem(e, 'Could not save the rules. Try again.')),
+      error: (e) => this.error.set(apiProblem(e, t('Could not save the rules. Try again.'))),
     });
   }
 
@@ -320,7 +321,7 @@ export class PhotoSetPage {
       await this.poll(set.id);
       this.error.set(null);
     } catch (e) {
-      this.error.set(apiProblem(e, 'Could not sync the photo set. Try again.'));
+      this.error.set(apiProblem(e, t('Could not sync the photo set. Try again.')));
     } finally {
       this.syncing.set(false);
     }
@@ -333,7 +334,7 @@ export class PhotoSetPage {
     try {
       await this.poll(id);
     } catch (e) {
-      this.error.set(apiProblem(e, 'Could not sync the photo set. Try again.'));
+      this.error.set(apiProblem(e, t('Could not sync the photo set. Try again.')));
     } finally {
       this.syncing.set(false);
     }
@@ -350,7 +351,7 @@ export class PhotoSetPage {
       await firstValueFrom(this.api.restore(set, photoId));
       this.error.set(null);
     } catch (e) {
-      this.error.set(apiProblem(e, 'Could not bring the photo back. Try again.'));
+      this.error.set(apiProblem(e, t('Could not bring the photo back. Try again.')));
     } finally {
       this.restoring.set(null);
     }
@@ -363,19 +364,19 @@ export class PhotoSetPage {
     this.changingAlbum.set(false);
     this.api.update(set.id, album).subscribe({
       next: (changed) => changed.syncing && this.waitFor(changed.id),
-      error: (e) => this.error.set(apiProblem(e, 'Could not change the album. Try again.')),
+      error: (e) => this.error.set(apiProblem(e, t('Could not change the album. Try again.'))),
     });
   }
 
   protected rename(set: PhotoSet, name: string) {
     if (!name.trim() || name.trim() === set.name) return;
-    this.api.update(set.id, { name: name.trim() }).subscribe({ error: () => this.error.set('Could not rename the photo set. Try again.') });
+    this.api.update(set.id, { name: name.trim() }).subscribe({ error: () => this.error.set(t('Could not rename the photo set. Try again.')) });
   }
 
   protected remove(set: PhotoSet) {
     this.api.delete(set.id).subscribe({
       next: () => this.router.navigate(['/photo-sets']),
-      error: () => this.error.set('Could not delete the photo set. Try again.'),
+      error: () => this.error.set(t('Could not delete the photo set. Try again.')),
     });
   }
 }

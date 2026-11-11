@@ -6,16 +6,17 @@ import { backgroundStyle } from '@homey-dash/tiles';
 import { of } from 'rxjs';
 import { DashboardsStore } from '../dashboards-store';
 import { DisplaysStore } from './displays-store';
+import { TranslatePipe, t } from '@homey-dash/i18n';
 
 export type DisplayHealth = 'ok' | 'stale' | 'none' | 'lost';
 
 /** How a display is doing, in a word and a tone: connected, seen a while ago, never seen, or without a screen. */
 export function displayHealth(display: DisplayInfo, store: DisplaysStore): { tone: DisplayHealth; text: string } {
   const status = display.status;
-  if (!status.held) return { tone: 'lost', text: 'No screen' };
-  if (status.connected) return { tone: 'ok', text: 'Connected' };
-  if (!status.lastSeenAt) return { tone: 'none', text: 'Never connected' };
-  return { tone: 'stale', text: 'Last seen ' + store.ago(status.lastSeenAt) };
+  if (!status.held) return { tone: 'lost', text: t('No screen') };
+  if (status.connected) return { tone: 'ok', text: t('Connected') };
+  if (!status.lastSeenAt) return { tone: 'none', text: t('Never connected') };
+  return { tone: 'stale', text: t('Last seen {ago}', { ago: store.ago(status.lastSeenAt) }) };
 }
 
 /**
@@ -26,6 +27,7 @@ export function displayHealth(display: DisplayInfo, store: DisplaysStore): { ton
   selector: 'hd-display-sketch',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'sketch', '[class.is-empty]': '!first()', '[attr.data-tone]': 'health().tone' },
+  imports: [TranslatePipe],
   template: `
     <div class="screen" aria-hidden="true">
       <div class="glass" [class.mini]="!!miniature()" [style.background]="miniature() ? miniature()!.background : null">
@@ -46,7 +48,7 @@ export function displayHealth(display: DisplayInfo, store: DisplaysStore): { ton
             <span class="more">+{{ more() }} more</span>
           }
         } @else {
-          <span class="shows">No dashboard</span>
+          <span class="shows">{{ 'No dashboard' | t }}</span>
         }
         <span class="name">{{ display().name }}</span>
       </div>

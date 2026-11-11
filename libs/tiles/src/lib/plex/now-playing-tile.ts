@@ -9,6 +9,7 @@ import { PlexTileView } from './plex-tile-view';
 import { LivePlexSession, plexIdle, plexPosition, plexTime } from './plex-data';
 import { LucideTv, clock } from '@homey-dash/design-system';
 import { isLandscape } from '@homey-dash/layout';
+import { TranslatePipe, t } from '@homey-dash/i18n';
 
 /** How long a tile following any player shows one of several sessions before the next. */
 export const NOW_PLAYING_CYCLE_MS = 12_000;
@@ -21,7 +22,7 @@ export const NOW_PLAYING_CYCLE_MS = 12_000;
  */
 @Component({
   selector: 'hd-plex-now-playing-tile',
-  imports: [TileDetails, LucideDynamicIcon, Transport],
+  imports: [TileDetails, LucideDynamicIcon, Transport, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex', '[class.has-art]': '!!session()' },
   template: `
@@ -61,8 +62,8 @@ export const NOW_PLAYING_CYCLE_MS = 12_000;
     } @else {
       <svg class="hd-icon" [lucideIcon]="tvIcon" />
       <div>
-        <div class="hd-tile__name">{{ face().name }}</div>
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__name">{{ face().name | t }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
     }
     <hd-tile-details [screen]="true" [name]="face().name" [icon]="tvIcon" [subtitle]="detailsSubtitle()">
@@ -96,10 +97,10 @@ export const NOW_PLAYING_CYCLE_MS = 12_000;
             </div>
           </article>
         } @empty {
-          <p class="hd-details__label">Nothing playing</p>
+          <p class="hd-details__label">{{ 'Nothing playing' | t }}</p>
         }
         @if (flash() === 'error') {
-          <p class="hd-plex-details__error" role="alert">The player didn't take it. Turn on Advertise as player in its Plex settings.</p>
+          <p class="hd-plex-details__error" role="alert">{{ "The player didn't take it. Turn on Advertise as player in its Plex settings." | t }}</p>
         }
       </div>
     </hd-tile-details>
@@ -154,7 +155,7 @@ export class NowPlayingTile extends PlexTileView {
 
   protected readonly detailsSubtitle = computed(() => {
     const count = this.sessions().length;
-    return count === 1 ? '1 playing' : `${count} playing`;
+    return t('{count} playing', { count });
   });
 
   constructor() {

@@ -7,6 +7,7 @@ import { AlbumSelect } from './album-select';
 import { AlbumGroup, loadAlbums, parseAlbumValue } from './immich-albums';
 import { PageHeader } from './page-header';
 import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
+import { TranslatePipe, t } from '@homey-dash/i18n';
 
 /**
  * An overview of every photo set (ADR-0008), kept current over the realtime connection: a few of its photos, where they
@@ -16,29 +17,29 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
  */
 @Component({
   selector: 'hd-photo-sets-page',
-  imports: [RouterLink, AlbumSelect, PhotoSelectionForm, PageHeader],
+  imports: [RouterLink, AlbumSelect, PhotoSelectionForm, PageHeader, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <hd-page-header section="photos" title="Photo sets">
+    <hd-page-header section="photos" [title]="'Photo sets' | t">
       @if (!adding()) {
-        <button class="hd-btn hd-btn--primary" type="button" (click)="startAdding()">New photo set</button>
+        <button class="hd-btn hd-btn--primary" type="button" (click)="startAdding()">{{ 'New photo set' | t }}</button>
       }
     </hd-page-header>
     <div class="hd-page__body">
       @if (adding()) {
         <div class="hd-panel new-panel">
-          <div class="source" role="radiogroup" aria-label="Photos from">
+          <div class="source" role="radiogroup" [attr.aria-label]="'Photos from' | t">
             <button type="button" class="hd-btn" role="radio" [attr.aria-checked]="source() === 'album'" [class.hd-btn--primary]="source() === 'album'" (click)="source.set('album')">
-              An album
+              {{ 'An album' | t }}
             </button>
             <button type="button" class="hd-btn" role="radio" [attr.aria-checked]="source() === 'rules'" [class.hd-btn--primary]="source() === 'rules'" (click)="startRules()">
-              At random, by rules
+              {{ 'At random, by rules' | t }}
             </button>
           </div>
           @if (source() === 'album') {
             <form class="new" (submit)="create($event, chosenAlbum(), newName.value)">
               <div class="hd-field">
-                <label class="hd-field__label" for="new-album">Immich album</label>
+                <label class="hd-field__label" for="new-album">{{ 'Immich album' | t }}</label>
                 <hd-album-select
                   #album
                   selectId="new-album"
@@ -49,23 +50,23 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
                 />
               </div>
               <div class="hd-field">
-                <label class="hd-field__label" for="new-set">Name</label>
+                <label class="hd-field__label" for="new-set">{{ 'Name' | t }}</label>
                 <input #newName id="new-set" class="hd-input" [placeholder]="namePlaceholder()" (keydown.escape)="adding.set(false)" />
               </div>
               <div class="actions">
-                <button class="hd-btn hd-btn--primary" type="submit" [disabled]="!chosenAlbum() || busy()">Add photo set</button>
-                <button class="hd-btn" type="button" (click)="adding.set(false)">Cancel</button>
+                <button class="hd-btn hd-btn--primary" type="submit" [disabled]="!chosenAlbum() || busy()">{{ 'Add photo set' | t }}</button>
+                <button class="hd-btn" type="button" (click)="adding.set(false)">{{ 'Cancel' | t }}</button>
               </div>
             </form>
           } @else {
             <form class="rules" (submit)="createSelection($event, ruleName.value)">
               <div class="hd-field">
-                <label class="hd-field__label" for="new-rules-set">Name</label>
-                <input #ruleName id="new-rules-set" class="hd-input" placeholder="Such as Family or Landscapes" (keydown.escape)="adding.set(false)" />
+                <label class="hd-field__label" for="new-rules-set">{{ 'Name' | t }}</label>
+                <input #ruleName id="new-rules-set" class="hd-input" [placeholder]="'Such as Family or Landscapes' | t" (keydown.escape)="adding.set(false)" />
               </div>
               @if (accounts().length > 1) {
                 <div class="hd-field">
-                  <label class="hd-field__label" for="new-rules-account">Immich account</label>
+                  <label class="hd-field__label" for="new-rules-account">{{ 'Immich account' | t }}</label>
                   <select id="new-rules-account" class="hd-select" (change)="ruleAccount.set(+$any($event.target).value)">
                     @for (account of accounts(); track account.id) {
                       <option [value]="account.id" [selected]="account.id === ruleAccount()">{{ account.name }}</option>
@@ -75,8 +76,8 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
               }
               <hd-photo-selection-form [(selection)]="newSelection" [accountId]="ruleAccount()" />
               <div class="actions start">
-                <button class="hd-btn hd-btn--primary" type="submit" [disabled]="busy()">{{ busy() ? 'Adding…' : 'Add photo set' }}</button>
-                <button class="hd-btn" type="button" (click)="adding.set(false)">Cancel</button>
+                <button class="hd-btn hd-btn--primary" type="submit" [disabled]="busy()">{{ (busy() ? 'Adding…' : 'Add photo set') | t }}</button>
+                <button class="hd-btn" type="button" (click)="adding.set(false)">{{ 'Cancel' | t }}</button>
               </div>
             </form>
           }
@@ -84,10 +85,9 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
       }
       @if (data.photoSetsLoaded() && sets().length === 0 && !adding()) {
         <div class="hd-empty hd-panel">
-          <h2 class="hd-panel__title">No photo sets yet</h2>
+          <h2 class="hd-panel__title">{{ 'No photo sets yet' | t }}</h2>
           <p>
-            A photo set follows an album in Immich, or draws photos at random from Immich by rules, such as who is in them
-            and what they show. Photo tiles show its photos.
+            {{ 'A photo set follows an album in Immich, or draws photos at random from Immich by rules, such as who is in them and what they show. Photo tiles show its photos.' | t }}
           </p>
         </div>
       }
@@ -104,7 +104,7 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
                 <div class="info">
                   <span class="name">{{ set.name }}</span>
                   <span class="hd-muted">
-                    {{ set.photos.length }} {{ set.photos.length === 1 ? 'photo' : 'photos' }}
+                    {{ set.photos.length }} {{ (set.photos.length === 1 ? 'photo' : 'photos') | t }}
                     @if (set.selection) {
                       at random, by rules
                     } @else if (set.albumName) {
@@ -122,9 +122,9 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
                     }
                   </span>
                   @if (set.syncing) {
-                    <span class="status">{{ set.selection ? 'Drawing photos…' : 'Syncing…' }}</span>
+                    <span class="status">{{ (set.selection ? 'Drawing photos…' : 'Syncing…') | t }}</span>
                   } @else if (set.syncError) {
-                    <span class="status failed">{{ set.selection ? 'Drawing' : 'Syncing' }} failed</span>
+                    <span class="status failed">{{ (set.selection ? 'Drawing' : 'Syncing') | t }} failed</span>
                   }
                 </div>
                 <span class="chevron" aria-hidden="true">›</span>
@@ -137,7 +137,7 @@ import { defaultSelection, PhotoSelectionForm } from './photo-selection-form';
         <p class="hd-error" role="alert">
           {{ error }}
           @if (error.includes('Accounts')) {
-            <a routerLink="/accounts">Go to Accounts</a>
+            <a routerLink="/accounts">{{ 'Go to Accounts' | t }}</a>
           }
         </p>
       }
@@ -219,12 +219,12 @@ export class PhotoSetsPage {
   protected async createSelection(event: Event, name: string) {
     event.preventDefault();
     if (!name.trim()) {
-      this.error.set('Give the photo set a name.');
+      this.error.set(t('Give the photo set a name.'));
       return;
     }
     const accountId = this.ruleAccount();
     if (accountId === null) {
-      this.error.set('Set up Immich under Accounts first.');
+      this.error.set(t('Set up Immich under Accounts first.'));
       return;
     }
     this.busy.set(true);
@@ -234,7 +234,7 @@ export class PhotoSetsPage {
       this.router.navigate(['/photo-sets', set.id]);
       this.error.set(null);
     } catch (e) {
-      this.error.set(apiProblem(e, 'Could not add the photo set. Try again.'));
+      this.error.set(apiProblem(e, t('Could not add the photo set. Try again.')));
     } finally {
       this.busy.set(false);
     }
@@ -251,7 +251,7 @@ export class PhotoSetsPage {
       this.router.navigate(['/photo-sets', set.id]);
       this.error.set(null);
     } catch (e) {
-      this.error.set(apiProblem(e, 'Could not add the photo set. Try again.'));
+      this.error.set(apiProblem(e, t('Could not add the photo set. Try again.')));
     } finally {
       this.busy.set(false);
     }
@@ -269,7 +269,7 @@ export class PhotoSetsPage {
         this.accounts.set(accounts);
         if (this.ruleAccount() === null) this.ruleAccount.set(accounts[0]?.id ?? null);
       },
-      error: (e) => this.error.set(apiProblem(e, 'Could not load the Immich accounts. Try again.')),
+      error: (e) => this.error.set(apiProblem(e, t('Could not load the Immich accounts. Try again.'))),
     });
   }
 }

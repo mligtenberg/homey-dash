@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { section, SectionId } from './sections';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 export interface Crumb {
   label: string;
@@ -14,25 +15,25 @@ export interface Crumb {
  */
 @Component({
   selector: 'hd-page-header',
-  imports: [RouterLink, LucideDynamicIcon],
+  imports: [RouterLink, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-page__header', '[style.--sec]': '"var(--sec-" + section() + ")"' },
   template: `
     @if (crumbs().length) {
-      <ol class="hd-crumbs" aria-label="You are here">
+      <ol class="hd-crumbs" [attr.aria-label]="'You are here' | t">
         @for (crumb of crumbs(); track $index) {
-          <li><a [routerLink]="crumb.link">{{ crumb.label }}</a></li>
+          <li><a [routerLink]="crumb.link">{{ crumb.label | t }}</a></li>
         }
       </ol>
     }
     <span class="hd-mark hd-mark--lg" aria-hidden="true"><svg [lucideIcon]="place().icon" /></span>
     <div class="titles">
       <div class="title-row">
-        <h1 class="hd-page__title">{{ title() }}</h1>
+        <h1 class="hd-page__title">{{ title() | t }}</h1>
         <ng-content select="[status]" />
       </div>
       @if (purpose() !== null) {
-        <p class="purpose">{{ purpose() ?? place().purpose }}</p>
+        <p class="purpose">{{ (purpose() ?? place().purpose) | t }}</p>
       }
     </div>
     <div class="actions"><ng-content /></div>

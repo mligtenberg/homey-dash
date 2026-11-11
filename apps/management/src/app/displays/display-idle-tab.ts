@@ -8,25 +8,25 @@ import { DisplayContext } from './display-context';
 import { DisplaysStore } from './displays-store';
 import { LucideChevronDown, LucidePlus, ReorderButtons } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** What a display does when left alone: the first idle rule whose rule holds decides what it shows. */
 @Component({
   selector: 'hd-display-idle-tab',
-  imports: [RuleEditor, RouterLink, ReorderButtons, LucideDynamicIcon],
+  imports: [RuleEditor, RouterLink, ReorderButtons, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
       @if (!display.dashboardIds.length) {
-        <p class="hd-hint">Offer a dashboard on the <a routerLink="../dashboards">Dashboards</a> page first.</p>
+        <p class="hd-hint">{{ 'Offer a dashboard on the' | t }} <a routerLink="../dashboards">{{ 'Dashboards' | t }}</a> {{ 'page first.' | t }}</p>
       } @else {
         <div class="idle">
           <p class="hd-lead">
-            After a minute without a touch, the display goes through these rules from the top and does the first one whose
-            condition holds. If none does, it stays as it is. A touch brings it back.
+            {{ 'After a minute without a touch, the display goes through these rules from the top and does the first one whose condition holds. If none does, it stays as it is. A touch brings it back.' | t }}
           </p>
           @if (!kiosk(display)) {
             <p class="hd-hint note">
-              Turning the screen off needs Fully Kiosk Browser with its JavaScript interface on; this display doesn't report it.
+              {{ "Turning the screen off needs Fully Kiosk Browser with its JavaScript interface on; this display doesn't report it." | t }}
             </p>
           }
           @for (idle of display.idleRules; track $index; let i = $index, last = $last) {
@@ -37,34 +37,34 @@ import { LucideDynamicIcon } from '@lucide/angular';
                 <hd-reorder-buttons [label]="'rule ' + (i + 1)" [first]="i === 0" [last]="last" (moved)="move(display, i, $event)" (removed)="remove(display, i)" />
               </div>
               <div class="line">
-                <span class="line__label">Then show</span>
+                <span class="line__label">{{ 'Then show' | t }}</span>
                 <div class="line__body">
               <select
                 class="hd-select"
                 [attr.aria-label]="'What rule ' + (i + 1) + ' does'"
                 (change)="store.setIdleAction(display, i, $any($event.target).value)"
               >
-                <optgroup label="Show dashboard">
+                <optgroup [label]="'Show dashboard' | t">
                   @for (id of display.dashboardIds; track id) {
                     <option [value]="'dashboard:' + id" [selected]="id === idle.dashboardId">{{ store.dashboardName(id) }}</option>
                   }
                 </optgroup>
                 @if (idle.photoSetId || store.photoSets().length) {
-                  <optgroup label="Play photo set">
+                  <optgroup [label]="'Play photo set' | t">
                     @if (idle.photoSetId && !store.photoSetName(idle.photoSetId)) {
-                      <option selected disabled>Photo set not found</option>
+                      <option selected disabled>{{ 'Photo set not found' | t }}</option>
                     }
                     @for (set of store.photoSets(); track set.id) {
                       <option [value]="'photos:' + set.id" [selected]="set.id === idle.photoSetId">{{ set.name }}</option>
                     }
                   </optgroup>
                 }
-                <optgroup label="Fill with colour">
-                  <option value="color" [selected]="!!idle.color">Colour</option>
+                <optgroup [label]="'Fill with colour' | t">
+                  <option value="color" [selected]="!!idle.color">{{ 'Colour' | t }}</option>
                 </optgroup>
-                <optgroup label="Screen">
+                <optgroup [label]="'Screen' | t">
                   <option value="screen-off" [selected]="!!idle.screenOff" [disabled]="!kiosk(display) && !idle.screenOff">
-                    Turn screen off{{ kiosk(display) ? '' : ' (Fully Kiosk Browser only)' }}
+                    Turn screen off{{ (kiosk(display) ? '' : ' (Fully Kiosk Browser only)') | t }}
                   </option>
                 </optgroup>
               </select>
@@ -83,7 +83,7 @@ import { LucideDynamicIcon } from '@lucide/angular';
                   [attr.aria-label]="'Where a touch goes back to for rule ' + (i + 1)"
                   (change)="store.setIdleReturn(display, i, $any($event.target).value)"
                 >
-                  <option value="" [selected]="!idle.returnDashboardId">Back to the last used</option>
+                  <option value="" [selected]="!idle.returnDashboardId">{{ 'Back to the last used' | t }}</option>
                   @for (id of display.dashboardIds; track id) {
                     <option [value]="id" [selected]="id === idle.returnDashboardId">Back to {{ store.dashboardName(id) }}</option>
                   }
@@ -92,7 +92,7 @@ import { LucideDynamicIcon } from '@lucide/angular';
                 </div>
               </div>
               <div class="line">
-                <span class="line__label">When</span>
+                <span class="line__label">{{ 'When' | t }}</span>
                 <button type="button" class="rule" [attr.aria-expanded]="isOpen(display, i)" (click)="toggleRule(display, i)">
                   <span class="rule__text">{{ describe(idle.rule) }}</span>
                   <svg class="rule__chevron" [lucideIcon]="chevron" aria-hidden="true" />
@@ -103,7 +103,7 @@ import { LucideDynamicIcon } from '@lucide/angular';
               }
             </div>
           }
-          <button type="button" class="hd-btn idle-add" (click)="add(display)"><svg [lucideIcon]="plus" aria-hidden="true" />Add a rule</button>
+          <button type="button" class="hd-btn idle-add" (click)="add(display)"><svg [lucideIcon]="plus" aria-hidden="true" />{{ 'Add a rule' | t }}</button>
         </div>
       }
     }

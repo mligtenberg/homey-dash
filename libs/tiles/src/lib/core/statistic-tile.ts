@@ -25,6 +25,7 @@ import { Segmented } from './segmented';
 import { StatisticReadings } from './statistic-readings';
 import { TileDetails } from './tile-details';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 // The chart and what is computed for it live in their own file, so the device's detail view can show them too.
 export * from './statistic-chart';
@@ -44,7 +45,7 @@ function logHue(log: HomeyInsightLog, ownerHue: KindHue): KindHue {
 
 @Component({
   selector: 'hd-statistic-tile',
-  imports: [LucideDynamicIcon, Segmented, StatisticChart, StatisticReadings, TileDetails, DeviceDetails],
+  imports: [LucideDynamicIcon, Segmented, StatisticChart, StatisticReadings, TileDetails, DeviceDetails, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     ...TILE_FACE_HOST,
@@ -55,8 +56,8 @@ function logHue(log: HomeyInsightLog, ownerHue: KindHue): KindHue {
     @if (face().state === 'ok' || face().state === 'unavailable') {
       <div class="hd-stat__head">
         <div>
-          <div class="hd-tile__name">{{ face().name }}</div>
-          <div class="hd-tile__detail">{{ face().detail }}</div>
+          <div class="hd-tile__name">{{ face().name | t }}</div>
+          <div class="hd-tile__detail">{{ face().detail | t }}</div>
         </div>
         @if (current(); as current) {
           <!-- Beside the name, a large tile only has room for a medium value. -->
@@ -65,13 +66,13 @@ function logHue(log: HomeyInsightLog, ownerHue: KindHue): KindHue {
       </div>
       <hd-statistic-chart [entries]="entries()" [window]="window()" />
       @if (face().state === 'unavailable') {
-        <span class="hd-badge">Unavailable</span>
+        <span class="hd-badge">{{ 'Unavailable' | t }}</span>
       }
     } @else {
       <svg class="hd-icon" [lucideIcon]="face().icon" />
       <div>
-        <div class="hd-tile__name">{{ face().name }}</div>
-        <div class="hd-tile__detail">{{ face().detail }}</div>
+        <div class="hd-tile__name">{{ face().name | t }}</div>
+        <div class="hd-tile__detail">{{ face().detail | t }}</div>
       </div>
     }
     @if (ownerDevice(); as device) {
@@ -91,7 +92,7 @@ function logHue(log: HomeyInsightLog, ownerHue: KindHue): KindHue {
         [icon]="face().icon"
         [subtitle]="face().detail"
       >
-        <hd-segmented hdDetailsHead label="Time window" [options]="windows" [value]="shownWindow()" (picked)="viewWindow.set($event)" />
+        <hd-segmented hdDetailsHead [label]="'Time window' | t" [options]="windows" [value]="shownWindow()" (picked)="viewWindow.set($event)" />
         <div class="hd-stat__pane" [attr.data-tone]="tone()">
           <hd-statistic-readings [entries]="shownEntries()" [window]="shownWindowInfo()" [units]="log()?.units ?? null" />
         </div>
@@ -259,11 +260,11 @@ export class StatisticTile extends TileView<StatisticTileSettings> {
 /** Management's choice of the time window a statistic tile shows. */
 @Component({
   selector: 'hd-statistic-tile-settings',
-  imports: [SettingSelect],
+  imports: [SettingSelect, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-setting-select
-      label="Time window"
+      [label]="'Time window' | t"
       selectId="tile-window"
       [options]="windows"
       [value]="settings().window ?? 'last24Hours'"

@@ -1,4 +1,5 @@
 import { DestroyRef, inject, Signal, signal } from '@angular/core';
+import { formatTag, t } from '@homey-dash/i18n';
 
 /**
  * The time now (ms), updated every `ms` while `active` holds, so what depends on it, such as a playbar or "5 min ago",
@@ -28,9 +29,9 @@ export function minuteClock(): Signal<Date> {
 /** How long ago an ISO time was, roughly, as of `now` (ms). */
 export function timeAgo(iso: string, now: number): string {
   const minutes = Math.floor((now - Date.parse(iso)) / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return t('just now');
+  if (minutes < 60) return t('{count} min ago', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  if (hours < 24) return t('{count} h ago', { count: hours });
+  return new Date(iso).toLocaleDateString(formatTag(), { day: 'numeric', month: 'short', year: 'numeric' });
 }

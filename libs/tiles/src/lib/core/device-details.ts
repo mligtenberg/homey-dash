@@ -15,6 +15,7 @@ import { StatisticHistory } from './statistic-history';
 import { TileDetails } from './tile-details';
 import { flasher } from './tile-view';
 import { LucideLock, LucideLockOpen, LucideVolume2, LucideVolumeX, clock } from '@homey-dash/design-system';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 
 const ON_OFF_STATES = [
@@ -34,17 +35,17 @@ const LOCK_STATES = [
  */
 @Component({
   selector: 'hd-device-details',
-  imports: [LucideDynamicIcon, NgTemplateOutlet, Segmented, Transport, DeviceApps, DeviceRemote, DeviceSegments, DeviceSlider, DeviceStepper, StatisticHistory, TileDetails],
+  imports: [LucideDynamicIcon, NgTemplateOutlet, Segmented, Transport, DeviceApps, DeviceRemote, DeviceSegments, DeviceSlider, DeviceStepper, StatisticHistory, TileDetails, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // Not a box of its own, so it does not take part in the tile's layout.
   host: { style: 'display: contents' },
   template: `
     <hd-tile-details #dialog [screen]="true" [name]="name()" [icon]="icon()" [subtitle]="view()?.room ?? ''" (closed)="page.set('device')">
       @if (pages().length > 1) {
-        <hd-segmented hdDetailsHead label="Show" [options]="pages()" [value]="page()" (picked)="page.set($event)" />
+        <hd-segmented hdDetailsHead [label]="'Show' | t" [options]="pages()" [value]="page()" (picked)="page.set($event)" />
       }
       @if (probing()) {
-        <div class="hd-details__label">Loading…</div>
+        <div class="hd-details__label">{{ 'Loading…' | t }}</div>
       } @else if (page() === 'history' && graphable().length) {
         <hd-statistic-history [logs]="graphable()" [account]="account()" [initial]="log()" [initialWindow]="window()" />
       } @else if (page() === 'apps' && appList().length) {
@@ -59,7 +60,7 @@ const LOCK_STATES = [
                   @if (c.dim; as dim) {
                     {{ c.on ? drive.percent(dim) : 0 }}<span class="hd-unit">%</span>
                   } @else {
-                    {{ c.on ? 'On' : 'Off' }}
+                    {{ (c.on ? 'On' : 'Off') | t }}
                   }
                 </div>
               }
@@ -97,7 +98,7 @@ const LOCK_STATES = [
               }
               @case ('lock') {
                 <div class="hd-dev__disc"><svg class="hd-dev__glyph" [lucideIcon]="c.locked ? lockIcon : unlockIcon" /></div>
-                <div class="hd-dev__big">{{ c.locked ? 'Locked' : 'Unlocked' }}</div>
+                <div class="hd-dev__big">{{ (c.locked ? 'Locked' : 'Unlocked') | t }}</div>
               }
               @default {
                 <div class="hd-dev__disc"><svg class="hd-dev__glyph" [lucideIcon]="icon()" /></div>
@@ -131,12 +132,12 @@ const LOCK_STATES = [
             @if (c.volume; as volume) {
               <div class="hd-dev__level">
                 <svg class="hd-dev__level-icon" [lucideIcon]="volumeIcon" />
-                <hd-device-slider [capability]="volume" label="Volume" [disabled]="!ok()" [driver]="drive" />
+                <hd-device-slider [capability]="volume" [label]="'Volume' | t" [disabled]="!ok()" [driver]="drive" />
                 @if (c.mute; as mute) {
                   <button
                     type="button"
                     class="hd-round-btn hd-dev__mute"
-                    aria-label="Mute"
+                    [attr.aria-label]="'Mute' | t"
                     [attr.aria-pressed]="mute.value === true"
                     [disabled]="!ok()"
                     (click)="drive.press(mute)"
@@ -158,7 +159,7 @@ const LOCK_STATES = [
             }
             @if (c.dim; as dim) {
               <div class="hd-dev__level">
-                <span class="hd-details__label">Brightness</span>
+                <span class="hd-details__label">{{ 'Brightness' | t }}</span>
                 <hd-device-slider [capability]="dim" [label]="brightnessLabel()" [disabled]="!ok()" [driver]="drive" />
                 @if (c.mode !== 'light') {
                   <span class="hd-details__label">{{ drive.percent(dim) }}%</span>
@@ -175,8 +176,8 @@ const LOCK_STATES = [
             }
             @if (c.position; as position) {
               <div class="hd-dev__level">
-                <span class="hd-details__label">Open</span>
-                <hd-device-slider [capability]="position" label="Open" [disabled]="!ok()" [driver]="drive" />
+                <span class="hd-details__label">{{ 'Open' | t }}</span>
+                <hd-device-slider [capability]="position" [label]="'Open' | t" [disabled]="!ok()" [driver]="drive" />
                 <span class="hd-details__label">{{ drive.percent(position) }}%</span>
               </div>
             }
@@ -210,10 +211,10 @@ const LOCK_STATES = [
             <div class="hd-dev__artist">{{ c.artist }}</div>
           }
           @if (c.track && c.state) {
-            <div class="hd-details__state">{{ c.playing ? 'Playing' : 'Not playing' }}</div>
+            <div class="hd-details__state">{{ (c.playing ? 'Playing' : 'Not playing') | t }}</div>
           }
           @if (progress) {
-            <div class="hd-dev__progress" role="progressbar" aria-label="Playback" aria-valuemin="0" [attr.aria-valuemax]="progress.duration" [attr.aria-valuenow]="progress.position">
+            <div class="hd-dev__progress" role="progressbar" [attr.aria-label]="'Playback' | t" aria-valuemin="0" [attr.aria-valuemax]="progress.duration" [attr.aria-valuenow]="progress.position">
               <div class="hd-progress"><div class="hd-progress__bar" [style.width.%]="progress.fraction * 100"></div></div>
               <div class="hd-dev__progress-times"><span>{{ progress.elapsed }}</span><span>{{ progress.total }}</span></div>
             </div>

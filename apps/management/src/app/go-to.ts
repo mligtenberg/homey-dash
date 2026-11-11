@@ -6,6 +6,7 @@ import { LucideDynamicIcon } from '@lucide/angular';
 import { DashboardsStore } from './dashboards-store';
 import { DisplaysStore } from './displays/displays-store';
 import { section, SECTIONS, SectionId, TASKS } from './sections';
+import { t, TranslatePipe } from '@homey-dash/i18n';
 
 interface Hit {
   label: string;
@@ -25,17 +26,17 @@ interface Hit {
  */
 @Component({
   selector: 'hd-go-to',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', style: 'display: contents' },
   template: `
     <button type="button" class="trigger" (click)="open()" aria-haspopup="dialog">
       <svg [lucideIcon]="icons.search" aria-hidden="true" />
-      <span>Go to…</span>
-      <kbd>{{ mac ? '⌘K' : 'Ctrl K' }}</kbd>
+      <span>{{ 'Go to…' | t }}</span>
+      <kbd>{{ (mac ? '⌘K' : 'Ctrl K') | t }}</kbd>
     </button>
 
-    <dialog #dialog class="hd-panel goto" aria-label="Go to" closedby="any" (close)="query.set('')">
+    <dialog #dialog class="hd-panel goto" [attr.aria-label]="'Go to' | t" closedby="any" (close)="query.set('')">
       <div class="head">
         <svg [lucideIcon]="icons.search" aria-hidden="true" />
         <input
@@ -46,15 +47,15 @@ interface Hit {
           aria-controls="goto-list"
           aria-autocomplete="list"
           [attr.aria-activedescendant]="hits().length ? 'goto-' + active() : null"
-          placeholder="A dashboard, a display, or what you want to do"
-          aria-label="Search Management"
+          [placeholder]="'A dashboard, a display, or what you want to do' | t"
+          [attr.aria-label]="'Search Management' | t"
           [value]="query()"
           (input)="query.set($any($event.target).value); active.set(0)"
           (keydown)="onSearchKey($event)"
         />
-        <kbd>Esc</kbd>
+        <kbd>{{ 'Esc' | t }}</kbd>
       </div>
-      <ul id="goto-list" class="list" role="listbox" aria-label="Results">
+      <ul id="goto-list" class="list" role="listbox" [attr.aria-label]="'Results' | t">
         @for (hit of hits(); track $index; let i = $index) {
           @if (i === 0 || hit.group !== hits()[i - 1].group) {
             <li class="group" role="presentation">{{ hit.group }}</li>
@@ -70,7 +71,7 @@ interface Hit {
             (pointermove)="active.set(i)"
           >
             <span class="hd-mark"><svg [lucideIcon]="hit.icon" /></span>
-            <span class="text"><span class="label">{{ hit.label }}</span><span class="sub">{{ hit.sub }}</span></span>
+            <span class="text"><span class="label">{{ hit.label | t }}</span><span class="sub">{{ hit.sub | t }}</span></span>
             <svg class="enter" [lucideIcon]="i === active() ? icons.enter : icons.arrow" aria-hidden="true" />
           </li>
         } @empty {
@@ -133,14 +134,14 @@ export class GoTo {
   private readonly all = computed(() => {
     const icon = (id: SectionId) => section(id).icon;
     const places: Hit[] = SECTIONS.map((s) => ({ label: s.label, sub: s.purpose, section: s.id, icon: s.icon, link: [s.path] }));
-    const tasks: Hit[] = TASKS.map((t) => ({
-      label: t.question,
-      sub: t.route.join(' › '),
-      section: t.section,
-      icon: icon(t.section),
-      link: [t.path ?? section(t.section).path],
-      query: t.tab ? { then: t.tab } : undefined,
-      words: t.tab === 'idle' ? 'idle screen off photo frame rules' : t.tab === 'lock' ? 'lock widgets clock' : t.section === 'dashboards' ? 'tiles edit publish' : '',
+    const tasks: Hit[] = TASKS.map((task) => ({
+      label: task.question,
+      sub: task.route.map((step) => t(step)).join(' › '),
+      section: task.section,
+      icon: icon(task.section),
+      link: [task.path ?? section(task.section).path],
+      query: task.tab ? { then: task.tab } : undefined,
+      words: task.tab === 'idle' ? 'idle screen off photo frame rules' : task.tab === 'lock' ? 'lock widgets clock' : task.section === 'dashboards' ? 'tiles edit publish' : '',
     }));
     const dashboards: Hit[] = this.dashboards.list().map((d) => ({
       label: d.name,

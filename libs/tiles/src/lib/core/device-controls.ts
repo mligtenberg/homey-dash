@@ -4,6 +4,7 @@ import { LucideArrowLeft, LucideChevronDown, LucideChevronLeft, LucideChevronRig
 import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 import { ChannelKeys, clamp, RemoteKeys, VolumeKeys } from './device-view';
 import { SliderDrag } from './slider-drag';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** The states a cover without a position moves between, as segments to press. */
 export const COVER_STATES = [
@@ -122,6 +123,7 @@ export class DeviceSlider {
   selector: 'hd-device-segments',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
+  imports: [TranslatePipe],
   template: `
     <div class="hd-segmented">
       @for (option of options(); track option.value) {
@@ -131,7 +133,7 @@ export class DeviceSlider {
           [disabled]="disabled()"
           (click)="driver().set(capability().id, option.value)"
         >
-          {{ option.label }}
+          {{ option.label | t }}
         </button>
       }
     </div>
@@ -149,10 +151,11 @@ export class DeviceSegments {
   selector: 'hd-device-stepper',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
+  imports: [TranslatePipe],
   template: `
     <div class="hd-round-btns">
-      <button type="button" class="hd-round-btn" aria-label="Lower target" [disabled]="disabled()" (click)="driver().adjust(capability(), -1)">−</button>
-      <button type="button" class="hd-round-btn" aria-label="Raise target" [disabled]="disabled()" (click)="driver().adjust(capability(), 1)">+</button>
+      <button type="button" class="hd-round-btn" [attr.aria-label]="'Lower target' | t" [disabled]="disabled()" (click)="driver().adjust(capability(), -1)">−</button>
+      <button type="button" class="hd-round-btn" [attr.aria-label]="'Raise target' | t" [disabled]="disabled()" (click)="driver().adjust(capability(), 1)">+</button>
     </div>
   `,
 })
@@ -208,7 +211,7 @@ const VOLUME: readonly RemoteKey[] = [
  */
 @Component({
   selector: 'hd-device-remote',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
@@ -234,7 +237,7 @@ const VOLUME: readonly RemoteKey[] = [
         </div>
       }
       @if (hasPad()) {
-        <div class="hd-remote__pad" role="group" aria-label="Navigation">
+        <div class="hd-remote__pad" role="group" [attr.aria-label]="'Navigation' | t">
           @for (k of pad; track k.key) {
             @if (padKey(k); as button) {
               <button
@@ -258,7 +261,7 @@ const VOLUME: readonly RemoteKey[] = [
         </div>
       }
       @if (channels().length) {
-        <div class="hd-remote__volume hd-remote__channel" role="group" aria-label="Channel">
+        <div class="hd-remote__volume hd-remote__channel" role="group" [attr.aria-label]="'Channel' | t">
           @for (k of channels(); track k.key) {
             <button type="button" class="hd-round-btn" [attr.aria-label]="k.label" [disabled]="disabled()" (click)="driver().press(k.button)">
               <svg [lucideIcon]="k.icon!" />
@@ -267,7 +270,7 @@ const VOLUME: readonly RemoteKey[] = [
         </div>
       }
       @if (volumes().length) {
-        <div class="hd-remote__volume" role="group" aria-label="Volume">
+        <div class="hd-remote__volume" role="group" [attr.aria-label]="'Volume' | t">
           @for (k of volumes(); track k.key) {
             <button
               type="button"
@@ -289,7 +292,7 @@ const VOLUME: readonly RemoteKey[] = [
     @if (extras().length) {
       <div class="hd-remote__extras">
         @for (k of extras(); track k.key) {
-          <button type="button" class="hd-remote__extra" [disabled]="disabled()" (click)="driver().press(k.button)">{{ k.label }}</button>
+          <button type="button" class="hd-remote__extra" [disabled]="disabled()" (click)="driver().press(k.button)">{{ k.label | t }}</button>
         }
       </div>
     }

@@ -4,11 +4,12 @@ import { PageHeader } from '../page-header';
 import { DisplayContext } from './display-context';
 import { DisplayStatus } from './display-status';
 import { DisplaysStore } from './displays-store';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** One display: its name and status, and its details, and a page for each part of its setup. */
 @Component({
   selector: 'hd-display-page',
-  imports: [PageHeader, RouterLink, RouterLinkActive, RouterOutlet, DisplayStatus],
+  imports: [PageHeader, RouterLink, RouterLinkActive, RouterOutlet, DisplayStatus, TranslatePipe],
   providers: [DisplayContext],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -16,7 +17,7 @@ import { DisplaysStore } from './displays-store';
       <hd-page-header section="displays" [title]="display.name" [crumbs]="crumbs" [purpose]="null">
         <hd-display-status status [display]="display" />
       </hd-page-header>
-      <nav class="tabs" aria-label="Display pages">
+      <nav class="tabs" [attr.aria-label]="'Display pages' | t">
         @for (tab of tabs; track tab.path) {
           <a class="tab" [routerLink]="tab.path" routerLinkActive ariaCurrentWhenActive="page"><span class="tab__label">{{ tab.label }}</span><small>{{ tab.hint }}</small></a>
         }
@@ -28,7 +29,7 @@ import { DisplaysStore } from './displays-store';
         }
       </div>
     } @else if (store.loaded()) {
-      <hd-page-header section="displays" title="Display not found" [crumbs]="crumbs" [purpose]="null" />
+      <hd-page-header section="displays" [title]="'Display not found' | t" [crumbs]="crumbs" [purpose]="null" />
     }
   `,
   styles: `

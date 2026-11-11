@@ -2,6 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { DisplayInfo, FULLY_FUNCTIONS } from '@homey-dash/api-client';
+import { LOCALES, LOCALE_NAMES, t, TranslatePipe } from '@homey-dash/i18n';
 import { describeUserAgent } from './browser-text';
 import { DisplayContext } from './display-context';
 import { DisplayScreenshot } from './display-screenshot';
@@ -11,85 +12,94 @@ import { DisplaysStore, isLuminanceSignal } from './displays-store';
 /** A display's name, a screenshot of it and what its screen and browser say about themselves; removing it too. */
 @Component({
   selector: 'hd-display-details-tab',
-  imports: [DecimalPipe, DisplayScreenshot, SignalPicker],
+  imports: [DecimalPipe, DisplayScreenshot, SignalPicker, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
       <section class="hd-panel wide name">
         <div class="hd-field">
-          <label class="hd-field__label" for="display-name">Name</label>
+          <label class="hd-field__label" for="display-name">{{ 'Name' | t }}</label>
           <input class="hd-input" id="display-name" [value]="display.name" (change)="store.rename(display, name.value)" (keydown.enter)="name.blur()" #name />
+        </div>
+        <div class="hd-field">
+          <label class="hd-field__label" for="display-language">{{ 'Language' | t }}</label>
+          <select class="hd-input" id="display-language" (change)="store.setLanguage(display, language.value || null)" #language>
+            <option value="" [selected]="!display.language">{{ 'Same as its browser' | t }}</option>
+            @for (l of locales; track l) {
+              <option [value]="l" [selected]="display.language === l">{{ names[l] }}</option>
+            }
+          </select>
         </div>
       </section>
       <section class="hd-panel wide">
-        <h2 class="hd-section-title">What it shows now</h2>
+        <h2 class="hd-section-title">{{ 'What it shows now' | t }}</h2>
         <hd-display-screenshot [display]="display" />
       </section>
       <section class="hd-panel">
-        <h2 class="hd-section-title">Light</h2>
+        <h2 class="hd-section-title">{{ 'Light' | t }}</h2>
         <dl>
-          <dt>Now</dt>
+          <dt>{{ 'Now' | t }}</dt>
           <dd>
             @if (display.status.lux !== null) {
               {{ display.status.lux | number: '1.0-0' }} lx
               @if (!display.status.connected) {
-                <span class="hd-hint">as last measured</span>
+                <span class="hd-hint">{{ 'as last measured' | t }}</span>
               }
             } @else {
               Not measured yet
             }
           </dd>
-          <dt>Measured with</dt>
+          <dt>{{ 'Measured with' | t }}</dt>
           <dd>{{ lightSource() }}</dd>
-          <dt>Source</dt>
+          <dt>{{ 'Source' | t }}</dt>
           <dd class="source">
             <hd-signal-picker [value]="display.lightSignal ?? ''" [only]="isLuminance" (picked)="store.setLightSource(display, $event)" />
             @if (display.lightSignal) {
-              <button type="button" class="hd-btn hd-btn--sm" (click)="store.setLightSource(display, null)">Use the screen</button>
+              <button type="button" class="hd-btn hd-btn--sm" (click)="store.setLightSource(display, null)">{{ 'Use the screen' | t }}</button>
             }
           </dd>
         </dl>
         @if (display.status.details?.secureContext === false) {
-          <p class="hd-hint">The camera and light sensor need https or localhost. Pick a luminance sensor from Homey instead.</p>
+          <p class="hd-hint">{{ 'The camera and light sensor need https or localhost. Pick a luminance sensor from Homey instead.' | t }}</p>
         }
       </section>
       @if (display.status.details; as d) {
         <section class="hd-panel">
-          <h2 class="hd-section-title">Screen</h2>
+          <h2 class="hd-section-title">{{ 'Screen' | t }}</h2>
           <dl>
-            <dt>Resolution</dt>
+            <dt>{{ 'Resolution' | t }}</dt>
             <dd>{{ size(d.screenWidth, d.screenHeight) }}&ngsp;@if (physical(); as p) { <span class="hd-hint">({{ p }} pixels)</span> }</dd>
-            <dt>Browser</dt>
+            <dt>{{ 'Browser' | t }}</dt>
             <dd>{{ browser() }}</dd>
-            <dt>Battery</dt>
+            <dt>{{ 'Battery' | t }}</dt>
             <dd>{{ battery() }}</dd>
-            <dt>Last seen</dt>
-            <dd>{{ display.status.connected ? 'Connected now' : display.status.lastSeenAt ? store.ago(display.status.lastSeenAt) : 'Never' }}</dd>
+            <dt>{{ 'Last seen' | t }}</dt>
+            <dd>{{ display.status.connected ? t('Connected now') : display.status.lastSeenAt ? store.ago(display.status.lastSeenAt) : t('Never') }}</dd>
           </dl>
           <details class="more">
-            <summary>More</summary>
+            <summary>{{ 'More' | t }}</summary>
             <dl>
-              <dt>Page size</dt>
+              <dt>{{ 'Page size' | t }}</dt>
               <dd>{{ size(d.viewportWidth, d.viewportHeight) }}</dd>
-              <dt>Pixel ratio</dt>
-              <dd>{{ d.pixelRatio ?? 'Unknown' }}</dd>
-              <dt>Orientation</dt>
+              <dt>{{ 'Pixel ratio' | t }}</dt>
+              <dd>{{ d.pixelRatio ?? t('Unknown') }}</dd>
+              <dt>{{ 'Orientation' | t }}</dt>
               <dd>{{ orientation(d.orientation) }}</dd>
-              <dt>Touch</dt>
-              <dd>{{ d.touchPoints ? d.touchPoints + ' points' : 'No touch' }}</dd>
-              <dt>Language</dt>
-              <dd>{{ d.language ?? 'Unknown' }}</dd>
-              <dt>Time zone</dt>
-              <dd>{{ d.timeZone ?? 'Unknown' }}</dd>
-              <dt>Connection</dt>
-              <dd>{{ d.connection ?? 'Unknown' }}</dd>
-              <dt>Page loaded</dt>
-              <dd>{{ d.loadedAt ? store.ago(d.loadedAt) : 'Unknown' }}</dd>
+              <dt>{{ 'Touch' | t }}</dt>
+              <dd>{{ d.touchPoints ? t('{count} points', { count: d.touchPoints }) : t('No touch') }}</dd>
+              <dt>{{ 'Language' | t }}</dt>
+              <dd>{{ d.language ?? t('Unknown') }}</dd>
+              <dt>{{ 'Time zone' | t }}</dt>
+              <dd>{{ d.timeZone ?? t('Unknown') }}</dd>
+              <dt>{{ 'Connection' | t }}</dt>
+              <dd>{{ d.connection ?? t('Unknown') }}</dd>
+              <dt>{{ 'Page loaded' | t }}</dt>
+              <dd>{{ d.loadedAt ? store.ago(d.loadedAt) : t('Unknown') }}</dd>
               @if (d.userAgent) {
-                <dt>User agent</dt>
+                <dt>{{ 'User agent' | t }}</dt>
                 <dd class="ua">{{ d.userAgent }}</dd>
               }
-              <dt>Fully Kiosk</dt>
+              <dt>{{ 'Fully Kiosk' | t }}</dt>
               <dd>
                 @if (d.fully; as fully) {
                   {{ fully.version ?? 'Supported' }}
@@ -107,7 +117,7 @@ import { DisplaysStore, isLuminanceSignal } from './displays-store';
         </section>
       } @else {
         <div class="hd-panel hd-empty">
-          <h2 class="hd-section-title">No details yet</h2>
+          <h2 class="hd-section-title">{{ 'No details yet' | t }}</h2>
           <p class="hd-hint">
             A screen tells HomeyDash about itself when it connects. @if (display.status.held) { Open or reload the display page on it. } @else {
               This display has no screen; take it over from setup on a screen.
@@ -117,14 +127,14 @@ import { DisplaysStore, isLuminanceSignal } from './displays-store';
       }
       <div class="hd-danger wide">
         @if (removing()) {
-          <p>Remove <strong>{{ display.name }}</strong>? Its screen goes back to setup.</p>
+          <p>{{ 'Remove' | t }} <strong>{{ display.name }}</strong>{{ '? Its screen goes back to setup.' | t }}</p>
           <div class="hd-actions">
-            <button class="hd-btn hd-btn--primary" type="button" (click)="remove(display)">Remove</button>
-            <button class="hd-btn" type="button" (click)="removing.set(false)">Cancel</button>
+            <button class="hd-btn hd-btn--primary" type="button" (click)="remove(display)">{{ 'Remove' | t }}</button>
+            <button class="hd-btn" type="button" (click)="removing.set(false)">{{ 'Cancel' | t }}</button>
           </div>
         } @else {
-          <p class="hd-hint">Removing a display sends its screen back to setup.</p>
-          <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(true)">Remove display</button>
+          <p class="hd-hint">{{ 'Removing a display sends its screen back to setup.' | t }}</p>
+          <button class="hd-btn hd-btn--danger" type="button" (click)="removing.set(true)">{{ 'Remove display' | t }}</button>
         }
       </div>
     }
@@ -134,6 +144,7 @@ import { DisplaysStore, isLuminanceSignal } from './displays-store';
     :host { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--space-3); align-items: stretch; }
     section { padding: var(--space-4); }
     .wide { grid-column: 1 / -1; }
+    .name { display: flex; flex-wrap: wrap; gap: var(--space-4); }
     .name .hd-input { max-width: 360px; }
     .source { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
     .more { margin-top: var(--space-3); }
@@ -156,6 +167,9 @@ export class DisplayDetailsTab {
   private readonly router = inject(Router);
   protected readonly removing = signal(false);
   protected readonly isLuminance = isLuminanceSignal;
+  protected readonly t = t;
+  protected readonly locales = LOCALES;
+  protected readonly names = LOCALE_NAMES;
 
   protected readonly text = computed(() => describeUserAgent(this.context.display()?.status.details?.userAgent ?? null));
 
@@ -174,21 +188,21 @@ export class DisplayDetailsTab {
   });
 
   protected readonly lightSource = computed(() => {
-    if (this.context.display()?.lightSignal) return 'A device in Homey';
+    if (this.context.display()?.lightSignal) return t('A device in Homey');
     const light = this.context.display()?.status.details?.light;
-    if (!light?.available) return "This screen can't measure light";
-    if (light.source === 'sensor') return 'Light sensor';
-    if (light.source === 'camera') return 'Camera (an estimate)';
-    return 'Not measured yet';
+    if (!light?.available) return t("This screen can't measure light");
+    if (light.source === 'sensor') return t('Light sensor');
+    if (light.source === 'camera') return t('Camera (an estimate)');
+    return t('Not measured yet');
   });
 
-  protected readonly browser = computed(() => [this.text().browser, this.text().system].filter(Boolean).join(' on ') || 'Unknown');
+  protected readonly browser = computed(() => [this.text().browser, this.text().system].filter(Boolean).join(' on ') || t('Unknown'));
 
   protected readonly battery = computed(() => {
     const battery = this.context.display()?.status.details?.battery;
-    if (battery?.level == null) return 'Unknown';
+    if (battery?.level == null) return t('Unknown');
     const level = `${Math.round(battery.level * 100)}%`;
-    return battery.charging ? `${level}, charging` : level;
+    return battery.charging ? t('{level}, charging', { level }) : level;
   });
 
   protected remove(display: DisplayInfo) {
@@ -196,12 +210,12 @@ export class DisplayDetailsTab {
   }
 
   protected size(width: number | null, height: number | null) {
-    return width && height ? `${width} × ${height}` : 'Unknown';
+    return width && height ? `${width} × ${height}` : t('Unknown');
   }
 
   protected orientation(type: string | null) {
-    if (!type) return 'Unknown';
-    return `${type.startsWith('portrait') ? 'Portrait' : 'Landscape'}`;
+    if (!type) return t('Unknown');
+    return type.startsWith('portrait') ? t('Portrait') : t('Landscape');
   }
 
   protected fullyText(name: string) {

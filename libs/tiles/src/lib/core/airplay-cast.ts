@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { LucideAirplay, LucidePause, LucidePlay, LucideSquare } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { reason } from '../plex/hub-reason';
+import { TranslatePipe, t } from '@homey-dash/i18n';
 
 /**
  * Choosing an Apple TV to play on (ADR-0012): looks for the paired ones and offers each, with a way to add another (it asks the
@@ -13,35 +14,36 @@ import { reason } from '../plex/hub-reason';
   selector: 'hd-airplay-receivers',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-cast hd-cast--receivers' },
+  imports: [TranslatePipe],
   template: `
     @switch (step()) {
       @case ('searching') {
-        <div class="hd-cast__note">Looking for Apple TVs…</div>
+        <div class="hd-cast__note">{{ 'Looking for Apple TVs…' | t }}</div>
       }
       @case ('choosing') {
-        <div class="hd-cast__note">Play on</div>
+        <div class="hd-cast__note">{{ 'Play on' | t }}</div>
         <div class="hd-cast__receivers">
           @for (d of devices(); track d.id) {
             <button type="button" class="hd-cast__button hd-cast__button--quiet hd-cast__receiver" (click)="chosen.emit(d)">{{ d.name }}</button>
           } @empty {
-            <div class="hd-cast__note">No paired Apple TV yet.</div>
+            <div class="hd-cast__note">{{ 'No paired Apple TV yet.' | t }}</div>
           }
-          <button type="button" class="hd-cast__button hd-cast__button--quiet hd-cast__add" (click)="findNew()">Add Apple TV</button>
-          <button type="button" class="hd-cast__cancel" (click)="cancelled.emit()">Cancel</button>
+          <button type="button" class="hd-cast__button hd-cast__button--quiet hd-cast__add" (click)="findNew()">{{ 'Add Apple TV' | t }}</button>
+          <button type="button" class="hd-cast__cancel" (click)="cancelled.emit()">{{ 'Cancel' | t }}</button>
         </div>
       }
       @case ('finding') {
-        <div class="hd-cast__note">Looking for Apple TVs to add…</div>
+        <div class="hd-cast__note">{{ 'Looking for Apple TVs to add…' | t }}</div>
       }
       @case ('adding') {
-        <div class="hd-cast__note">Pair</div>
+        <div class="hd-cast__note">{{ 'Pair' | t }}</div>
         <div class="hd-cast__receivers">
           @for (d of unpaired(); track d.id) {
             <button type="button" class="hd-cast__button hd-cast__button--quiet hd-cast__unpaired" (click)="startPairing(d)">{{ d.name }}</button>
           } @empty {
-            <div class="hd-cast__note">No other Apple TV found on the network.</div>
+            <div class="hd-cast__note">{{ 'No other Apple TV found on the network.' | t }}</div>
           }
-          <button type="button" class="hd-cast__cancel" (click)="back()">Back</button>
+          <button type="button" class="hd-cast__cancel" (click)="back()">{{ 'Back' | t }}</button>
         </div>
       }
       @case ('starting') {
@@ -51,8 +53,8 @@ import { reason } from '../plex/hub-reason';
         <form class="hd-cast__pin" (submit)="finishPairing($event, pin.value)">
           <label class="hd-cast__note" for="hd-airplay-pin">PIN shown on {{ pairing()?.name }}</label>
           <input #pin id="hd-airplay-pin" class="hd-cast__input" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
-          <button type="submit" class="hd-cast__button">Pair</button>
-          <button type="button" class="hd-cast__cancel" (click)="back()">Back</button>
+          <button type="submit" class="hd-cast__button">{{ 'Pair' | t }}</button>
+          <button type="button" class="hd-cast__cancel" (click)="back()">{{ 'Back' | t }}</button>
         </form>
       }
       @case ('finishing') {
@@ -87,7 +89,7 @@ export class AirPlayReceivers {
     try {
       const info = await this.realtime.airPlayDevices();
       if (!info.available) {
-        this.error.set('AirPlay is not set up in HomeyDash yet.');
+        this.error.set(t('AirPlay is not set up in HomeyDash yet.'));
         return this.step.set('choosing');
       }
       this.error.set('');
@@ -110,7 +112,7 @@ export class AirPlayReceivers {
       const status = await firstValueFrom(this.api.status());
       this.unpaired.set(status.devices.filter((d) => d.kind === 'tv' && !d.paired));
     } catch (error) {
-      this.error.set(apiProblem(error, 'Could not look for Apple TVs. Try again.'));
+      this.error.set(apiProblem(error, t('Could not look for Apple TVs. Try again.')));
       this.unpaired.set([]);
     }
     this.step.set('adding');
@@ -140,7 +142,7 @@ export class AirPlayReceivers {
       await this.load();
     } catch (error) {
       // The Apple TV forgets the PIN it showed after a wrong try, so pairing starts over.
-      this.error.set(apiProblem(error, 'Could not pair. Try again.'));
+      this.error.set(apiProblem(error, t('Could not pair. Try again.')));
       this.step.set('adding');
     }
   }
@@ -214,19 +216,19 @@ export class AirPlayCast {
  */
 @Component({
   selector: 'hd-airplay-now',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-cast hd-cast__now', role: 'group', '[attr.aria-label]': "'Playing on ' + playing().deviceName" },
   template: `
     <svg class="hd-cast__icon" [lucideIcon]="airPlayIcon" aria-hidden="true" />
     <div class="hd-cast__text">
       <strong>{{ playing().title }}</strong>
-      <span>{{ playing().paused ? 'Paused on' : 'Playing on' }} {{ playing().deviceName }}@if (playing().detail) { · {{ playing().detail }} }</span>
+      <span>{{ (playing().paused ? 'Paused on' : 'Playing on') | t }} {{ playing().deviceName }}@if (playing().detail) { · {{ playing().detail }} }</span>
     </div>
     <button type="button" class="hd-cast__button hd-cast__button--quiet" (click)="togglePause()">
-      <svg [lucideIcon]="playing().paused ? playIcon : pauseIcon" aria-hidden="true" />{{ playing().paused ? 'Resume' : 'Pause' }}
+      <svg [lucideIcon]="playing().paused ? playIcon : pauseIcon" aria-hidden="true" />{{ (playing().paused ? 'Resume' : 'Pause') | t }}
     </button>
-    <button type="button" class="hd-cast__button hd-cast__button--quiet" (click)="stop()"><svg [lucideIcon]="stopIcon" aria-hidden="true" />Stop</button>
+    <button type="button" class="hd-cast__button hd-cast__button--quiet" (click)="stop()"><svg [lucideIcon]="stopIcon" aria-hidden="true" />{{ 'Stop' | t }}</button>
     @if (error(); as error) {
       <div class="hd-cast__error" role="alert">{{ error }}</div>
     }

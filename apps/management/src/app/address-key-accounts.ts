@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import { fieldErrors } from '@homey-dash/api-client';
 import { Observable } from 'rxjs';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** An account of a service HomeyDash reaches at an address with an API key, such as a Homey Pro or an Immich server. */
 export interface AddressKeyAccount {
@@ -93,10 +94,11 @@ export function addressKeyAccounts<T extends AddressKeyAccount, I extends Addres
   selector: 'hd-address-key-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
+  imports: [TranslatePipe],
   template: `
     <form class="form" (submit)="submit($event, name.value, address.value, apiKey.value)">
       <div class="hd-field">
-        <label class="hd-field__label" [for]="idPrefix() + '-name'">Name</label>
+        <label class="hd-field__label" [for]="idPrefix() + '-name'">{{ 'Name' | t }}</label>
         <input
           #name
           [id]="idPrefix() + '-name'"
@@ -112,7 +114,7 @@ export function addressKeyAccounts<T extends AddressKeyAccount, I extends Addres
         }
       </div>
       <div class="hd-field">
-        <label class="hd-field__label" [for]="idPrefix() + '-address'">Address</label>
+        <label class="hd-field__label" [for]="idPrefix() + '-address'">{{ 'Address' | t }}</label>
         <input
           #address
           [id]="idPrefix() + '-address'"
@@ -147,7 +149,7 @@ export function addressKeyAccounts<T extends AddressKeyAccount, I extends Addres
         <button class="hd-btn hd-btn--primary" type="submit" [disabled]="saving()">
           {{ saving() && checkingLabel() ? checkingLabel() : account() ? 'Save' : addLabel() }}
         </button>
-        <button class="hd-btn" type="button" (click)="cancelled.emit()">Cancel</button>
+        <button class="hd-btn" type="button" (click)="cancelled.emit()">{{ 'Cancel' | t }}</button>
       </div>
     </form>
   `,

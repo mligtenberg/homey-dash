@@ -13,6 +13,7 @@ import {
 import { describeRule } from './rule-text';
 import { SignalCatalogue } from './signal-catalogue';
 import { moved, RemoveButton, removedAt, ReorderButtons } from '@homey-dash/design-system';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** Which of a logic tile's tiles is open in the panel: an entry's index, or its fallback. */
 export type OpenEntry = number | 'fallback';
@@ -23,12 +24,12 @@ export type OpenEntry = number | 'fallback';
  */
 @Component({
   selector: 'hd-logic-panel',
-  imports: [ReorderButtons, RemoveButton],
+  imports: [ReorderButtons, RemoveButton, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="hd-field">
-      <span class="hd-field__label">Tiles</span>
-      <p class="hd-hint">It shows the first whose rule holds.</p>
+      <span class="hd-field__label">{{ 'Tiles' | t }}</span>
+      <p class="hd-hint">{{ 'It shows the first whose rule holds.' | t }}</p>
       @for (entry of settings().entries; track $index; let i = $index, last = $last) {
         <div class="entry">
           <button type="button" class="entry__open" (click)="opened.emit(i)">
@@ -38,8 +39,8 @@ export type OpenEntry = number | 'fallback';
           <hd-reorder-buttons [label]="name(entry.tile)" [first]="i === 0" [last]="last" (moved)="move(i, $event)" (removed)="remove(i)" />
         </div>
       }
-      <select class="hd-select" aria-label="Add a tile" (change)="add($any($event.target))">
-        <option value="" selected>Add a tile…</option>
+      <select class="hd-select" [attr.aria-label]="'Add a tile' | t" (change)="add($any($event.target))">
+        <option value="" selected>{{ 'Add a tile…' | t }}</option>
         @for (kind of holdable(); track kind.id) {
           <option [value]="kind.id">{{ kind.label }}</option>
         }
@@ -47,19 +48,19 @@ export type OpenEntry = number | 'fallback';
     </div>
 
     <div class="hd-field">
-      <span class="hd-field__label">Fallback</span>
+      <span class="hd-field__label">{{ 'Fallback' | t }}</span>
       @if (settings().fallback; as fallback) {
         <div class="entry">
           <button type="button" class="entry__open" (click)="opened.emit('fallback')">
             <span class="entry__name" [class.missing]="!find(fallback)">{{ name(fallback) }}</span>
-            <span class="entry__rule">When no rule holds</span>
+            <span class="entry__rule">{{ 'When no rule holds' | t }}</span>
           </button>
-          <hd-remove-button label="the fallback" (removed)="patch({ fallback: null })" />
+          <hd-remove-button [label]="'the fallback' | t" (removed)="patch({ fallback: null })" />
         </div>
       } @else {
-        <p class="hd-hint">Without one, it shows nothing when no rule holds.</p>
-        <select class="hd-select" aria-label="Add a fallback tile" (change)="addFallback($any($event.target))">
-          <option value="" selected>Add a fallback tile…</option>
+        <p class="hd-hint">{{ 'Without one, it shows nothing when no rule holds.' | t }}</p>
+        <select class="hd-select" [attr.aria-label]="'Add a fallback tile' | t" (change)="addFallback($any($event.target))">
+          <option value="" selected>{{ 'Add a fallback tile…' | t }}</option>
           @for (kind of holdable(); track kind.id) {
             <option [value]="kind.id">{{ kind.label }}</option>
           }
@@ -68,7 +69,7 @@ export type OpenEntry = number | 'fallback';
     </div>
 
     <div class="hd-field">
-      <label class="hd-field__label" for="logic-min-show">Minimum show time</label>
+      <label class="hd-field__label" for="logic-min-show">{{ 'Minimum show time' | t }}</label>
       <div class="seconds">
         <input
           id="logic-min-show"
@@ -76,13 +77,13 @@ export type OpenEntry = number | 'fallback';
           type="number"
           min="0"
           step="1"
-          placeholder="Off"
+          [placeholder]="'Off' | t"
           [value]="settings().minShowSeconds || ''"
           (change)="setMinShow($any($event.target).value)"
         />
-        <span>seconds</span>
+        <span>{{ 'seconds' | t }}</span>
       </div>
-      <p class="hd-hint">Keeps a tile it switched to on screen at least this long, so it doesn't flicker.</p>
+      <p class="hd-hint">{{ "Keeps a tile it switched to on screen at least this long, so it doesn't flicker." | t }}</p>
     </div>
   `,
   styles: `

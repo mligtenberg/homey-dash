@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { SettingSelect } from '../core/setting-select';
 import { TileData, TileSettings } from '../tile-data';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 export interface SonosTileSettings extends TileSettings {
   /** The id of the room the tile is locked to; absent leaves the tile free to switch rooms. */
@@ -10,11 +11,11 @@ export interface SonosTileSettings extends TileSettings {
 /** Management's choice of the room a Sonos tile is locked to. */
 @Component({
   selector: 'hd-sonos-tile-settings',
-  imports: [SettingSelect],
+  imports: [SettingSelect, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-setting-select
-      label="Locked to"
+      [label]="'Locked to' | t"
       selectId="tile-lock"
       emptyLabel="Not locked (pick a room on the tile)"
       [options]="rooms()"

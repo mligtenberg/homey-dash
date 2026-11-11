@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, ElementRef, input, output, signal, viewChild } from '@angular/core';
 import { LucideChevronLeft, LucideChevronRight } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * Where a strip of items scrolls to when an arrow is tapped, so the item cut off on that side comes fully into view
@@ -39,12 +40,12 @@ export interface StripOption<T> {
  */
 @Component({
   selector: 'hd-segmented-strip',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'hd-strip' },
   template: `
     @if (overflow()) {
-      <button type="button" class="hd-round-btn" aria-label="Earlier" [disabled]="!edges().start" (click)="step(-1)">
+      <button type="button" class="hd-round-btn" [attr.aria-label]="'Earlier' | t" [disabled]="!edges().start" (click)="step(-1)">
         <svg [lucideIcon]="previousIcon" />
       </button>
     }
@@ -62,12 +63,12 @@ export interface StripOption<T> {
           @if (o.marked) {
             <span class="hd-strip__mark" aria-hidden="true"></span>
           }
-          {{ o.label }}
+          {{ o.label | t }}
         </button>
       }
     </div>
     @if (overflow()) {
-      <button type="button" class="hd-round-btn" aria-label="More" [disabled]="!edges().end" (click)="step(1)">
+      <button type="button" class="hd-round-btn" [attr.aria-label]="'More' | t" [disabled]="!edges().end" (click)="step(1)">
         <svg [lucideIcon]="nextIcon" />
       </button>
     }

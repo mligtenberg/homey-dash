@@ -5,6 +5,7 @@ import { gridArea } from '@homey-dash/layout';
 import { TileData, TileSettings } from './tile-data';
 import { isHomeyTarget, TileKind } from './tile-kind';
 import { TileKindRegistry } from './tile-kind-registry';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * Whether a tile shows what only a Homey that HomeyDash can't reach tells (`TileData.homeyLost`): something in it, or its
@@ -21,7 +22,7 @@ export function homeyLost(tile: Tile, kind: TileKind | undefined, data: TileData
  */
 @Component({
   selector: 'hd-tile-host',
-  imports: [NgComponentOutlet],
+  imports: [NgComponentOutlet, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   // Not encapsulated, so the rule reaches the kind's component, which the outlet creates.
   encapsulation: ViewEncapsulation.None,
@@ -42,7 +43,7 @@ export function homeyLost(tile: Tile, kind: TileKind | undefined, data: TileData
       <div class="hd-tile is-missing" [attr.data-size]="tile().size">
         <span></span>
         <div>
-          <div class="hd-tile__name">Unknown tile</div>
+          <div class="hd-tile__name">{{ 'Unknown tile' | t }}</div>
           <div class="hd-tile__detail">Kind "{{ tile().kind }}" is not installed</div>
         </div>
       </div>

@@ -11,6 +11,7 @@ import { LucideCar, LucideChevronDown, LucideClock, LucideCloud, LucideNewspaper
 import { LucideDynamicIcon } from '@lucide/angular';
 import { describeRule } from '../editor/rule-text';
 import { SignalCatalogue } from '../editor/signal-catalogue';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 interface Placed {
   widget: LockWidget;
@@ -36,16 +37,16 @@ const KIND_NAMES = { clock: 'Time and date', weather: 'Weather', value: 'Device 
 /** The widgets a display's lock screen shows over a photo set or colour while an idle rule plays it. */
 @Component({
   selector: 'hd-display-lock-tab',
-  imports: [AccountSelect, RuleEditor, SignalPicker, ReorderButtons, RemoveButton, TrafficRouteField, LucideDynamicIcon],
+  imports: [AccountSelect, RuleEditor, SignalPicker, ReorderButtons, RemoveButton, TrafficRouteField, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
       <div class="lock">
         <p class="hd-hint intro">
-          These sit on top of a photo set or colour while an idle rule plays it. Pick a spot on the screen to add a widget, or choose one to change it.
+          {{ 'These sit on top of a photo set or colour while an idle rule plays it. Pick a spot on the screen to add a widget, or choose one to change it.' | t }}
         </p>
 
-        <div class="screen" role="group" aria-label="Preview of the lock screen">
+        <div class="screen" role="group" [attr.aria-label]="'Preview of the lock screen' | t">
           @for (spot of spots; track spot) {
             @let items = placedAt(display, spot);
             <div class="slot slot--{{ spot }}" [class.slot--empty]="!items.length">
@@ -77,7 +78,7 @@ const KIND_NAMES = { clock: 'Time and date', weather: 'Weather', value: 'Device 
             <h3 class="spot__name">
               {{ spotName(group.spot) }}
               @if (group.items.length > 1) {
-                <span class="spot__note">stacked top to bottom</span>
+                <span class="spot__note">{{ 'stacked top to bottom' | t }}</span>
               }
             </h3>
             @for (item of group.items; track item.index; let first = $first, last = $last) {
@@ -87,7 +88,7 @@ const KIND_NAMES = { clock: 'Time and date', weather: 'Weather', value: 'Device 
                 <div class="widget__head">
                   <span class="badge" aria-hidden="true"><svg [lucideIcon]="icon(widget)" /></span>
                   <label class="field kind">
-                    <span class="field__label">Shows</span>
+                    <span class="field__label">{{ 'Shows' | t }}</span>
                     <select class="hd-select" [attr.aria-label]="'What widget ' + (i + 1) + ' shows'" (change)="store.setLockKind(display, i, $any($event.target).value)">
                       @for (kind of kinds; track kind) {
                         <option [value]="kind" [selected]="widget.kind === kind">{{ kindName(kind) }}</option>
@@ -95,7 +96,7 @@ const KIND_NAMES = { clock: 'Time and date', weather: 'Weather', value: 'Device 
                     </select>
                   </label>
                   <div class="field">
-                    <span class="field__label" [id]="'lock-spot-' + i">Position</span>
+                    <span class="field__label" [id]="'lock-spot-' + i">{{ 'Position' | t }}</span>
                     <div class="spots" role="radiogroup" [attr.aria-labelledby]="'lock-spot-' + i">
                       @for (spot of spots; track spot) {
                         <button
@@ -147,11 +148,11 @@ const KIND_NAMES = { clock: 'Time and date', weather: 'Weather', value: 'Device 
                 }
 
                 <div class="when">
-                  <span class="field__label" [id]="'lock-when-' + i">Visible</span>
+                  <span class="field__label" [id]="'lock-when-' + i">{{ 'Visible' | t }}</span>
                   <div class="seg" role="radiogroup" [attr.aria-labelledby]="'lock-when-' + i">
                     @for (choice of choices; track choice.value) {
                       <button type="button" role="radio" class="seg__btn" [attr.aria-checked]="visibility(widget) === choice.value" (click)="setVisibility(display, i, choice.value)">
-                        {{ choice.label }}
+                        {{ choice.label | t }}
                       </button>
                     }
                   </div>
@@ -173,7 +174,7 @@ const KIND_NAMES = { clock: 'Time and date', weather: 'Weather', value: 'Device 
         <div class="foot">
           <button type="button" class="hd-btn lock__add" [disabled]="full(display)" (click)="add(display)">
             <svg [lucideIcon]="plus" aria-hidden="true" />
-            Add a widget
+            {{ 'Add a widget' | t }}
           </button>
           @if (full(display)) {
             <span class="hd-hint">That's the most a lock screen holds ({{ maxLock }}).</span>

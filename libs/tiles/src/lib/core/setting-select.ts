@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** An option of a setting's select. */
 export interface SettingOption {
@@ -14,6 +15,7 @@ export interface SettingOption {
 @Component({
   selector: 'hd-setting-select',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="hd-field">
       <label class="hd-field__label" [for]="selectId()">{{ label() }}</label>
@@ -22,7 +24,7 @@ export interface SettingOption {
           <option value="" [selected]="value() === '' || value() === undefined">{{ empty }}</option>
         }
         @for (option of options(); track option.value) {
-          <option [value]="option.value" [selected]="option.value === value()">{{ option.label }}</option>
+          <option [value]="option.value" [selected]="option.value === value()">{{ option.label | t }}</option>
         }
       </select>
     </div>

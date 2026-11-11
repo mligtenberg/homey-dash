@@ -5,6 +5,7 @@ import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 import { LucideCar, LucideNewspaper, LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideSun, minuteClock } from '@homey-dash/design-system';
 
 import { Backdrop, css, inkOver, inverseOf, luminance, Rgb } from './lock-ink';
+import { formatTag, t } from '@homey-dash/i18n';
 /** What a widget shows now; a weather Homey hasn't told, or a value whose device is gone, shows nothing. */
 type Shown =
   | { kind: 'clock'; time: string; date: string }
@@ -26,7 +27,7 @@ const WEATHER: [RegExp, LucideIconInput, string][] = [
 
 export function weatherLook(state: string | null): { icon: LucideIconInput; label: string } {
   const found = WEATHER.find(([match]) => state && match.test(state));
-  return found ? { icon: found[1], label: found[2] } : { icon: LucideCloudSun, label: state ?? '' };
+  return found ? { icon: found[1], label: t(found[2]) } : { icon: LucideCloudSun, label: state ?? '' };
 }
 
 /**
@@ -322,8 +323,8 @@ export class LockScreen {
         const now = this.now();
         return {
           kind: 'clock',
-          time: now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
-          date: now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }),
+          time: now.toLocaleTimeString(formatTag(), { hour: '2-digit', minute: '2-digit' }),
+          date: now.toLocaleDateString(formatTag(), { weekday: 'long', day: 'numeric', month: 'long' }),
         };
       }
       case 'weather':

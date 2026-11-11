@@ -1,4 +1,5 @@
 import { Condition, ConditionValue, isGroup, Operator, OPERATORS, Rule, SignalInfo, SpanUnit, Weekday } from '@homey-dash/api-client';
+import { formatTag } from '@homey-dash/i18n';
 
 export const WEEKDAYS: readonly { id: Weekday; label: string }[] = [
   { id: 'monday', label: 'Mon' },
@@ -111,7 +112,7 @@ function valueText(condition: Condition, signal?: SignalInfo): string {
   const value = condition.value;
   if (value == null) return '';
   if (typeof value === 'string') {
-    if (condition.operator === 'before' || condition.operator === 'after') return new Date(value).toLocaleString();
+    if (condition.operator === 'before' || condition.operator === 'after') return new Date(value).toLocaleString(formatTag());
     return `"${signal?.allowedValues?.find((v) => v.value === value)?.label ?? value}"`;
   }
   if (typeof value === 'number') return `${value}${signal?.unit ? ` ${signal.unit}` : ''}`;

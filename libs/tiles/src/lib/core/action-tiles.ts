@@ -4,6 +4,7 @@ import { LucidePlay, LucideSparkles, LucideWorkflow } from '@homey-dash/design-s
 import { LucideDynamicIcon } from '@lucide/angular';
 import { moodTint } from './mood-tint';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 // The corner button runs the target. There is no detail view: it could only repeat that button.
 const ACTION_TEMPLATE = `
@@ -16,8 +17,8 @@ const ACTION_TEMPLATE = `
     }
   </div>
   <div>
-    <div class="hd-tile__name">{{ face().name }}</div>
-    <div class="hd-tile__detail">{{ face().detail }}</div>
+    <div class="hd-tile__name">{{ face().name | t }}</div>
+    <div class="hd-tile__detail">{{ face().detail | t }}</div>
   </div>
 `;
 
@@ -46,7 +47,7 @@ abstract class ActionTile extends TileView {
 
 @Component({
   selector: 'hd-flow-tile',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: TILE_FACE_HOST,
   template: ACTION_TEMPLATE,
@@ -70,7 +71,7 @@ export class FlowTile extends ActionTile {
 /** The tile is washed in its mood's colours, and glows in them while it confirms; its kind has no detail view. */
 @Component({
   selector: 'hd-mood-tile',
-  imports: [LucideDynamicIcon],
+  imports: [LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     ...TILE_FACE_HOST,

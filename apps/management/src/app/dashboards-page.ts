@@ -8,45 +8,46 @@ import { map } from 'rxjs';
 import { DashboardsStore } from './dashboards-store';
 import { DisplaysStore } from './displays/displays-store';
 import { PageHeader } from './page-header';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** Every dashboard, with whether it is published and which displays show it; and where new ones are made. */
 @Component({
   selector: 'hd-dashboards-page',
-  imports: [RouterLink, PageHeader, LucideDynamicIcon],
+  imports: [RouterLink, PageHeader, LucideDynamicIcon, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'sec-dashboards' },
   template: `
-    <hd-page-header section="dashboards" title="Dashboards">
+    <hd-page-header section="dashboards" [title]="'Dashboards' | t">
       @if (!naming()) {
         <button class="hd-btn hd-btn--primary new" type="button" (click)="naming.set(true)">
-          <svg [lucideIcon]="plus" aria-hidden="true" />New dashboard
+          <svg [lucideIcon]="plus" aria-hidden="true" />{{ 'New dashboard' | t }}
         </button>
       }
     </hd-page-header>
     <div class="hd-page__body">
       @if (picking()) {
-        <p class="hint" role="status">Pick the dashboard whose tiles you want to change.</p>
+        <p class="hint" role="status">{{ 'Pick the dashboard whose tiles you want to change.' | t }}</p>
       }
       @if (naming()) {
         <form class="hd-panel new-form" (submit)="create($event, name.value)">
           <div class="hd-field">
-            <label class="hd-field__label" for="new-dashboard">Name of the new dashboard</label>
-            <input #name id="new-dashboard" class="hd-input" placeholder="Such as Hallway or Living room" (keydown.escape)="naming.set(false)" />
+            <label class="hd-field__label" for="new-dashboard">{{ 'Name of the new dashboard' | t }}</label>
+            <input #name id="new-dashboard" class="hd-input" [placeholder]="'Such as Hallway or Living room' | t" (keydown.escape)="naming.set(false)" />
           </div>
           <div class="hd-actions">
-            <button class="hd-btn hd-btn--primary" type="submit">Create dashboard</button>
-            <button class="hd-btn" type="button" (click)="naming.set(false)">Cancel</button>
+            <button class="hd-btn hd-btn--primary" type="submit">{{ 'Create dashboard' | t }}</button>
+            <button class="hd-btn" type="button" (click)="naming.set(false)">{{ 'Cancel' | t }}</button>
           </div>
         </form>
       }
       @if (store.loaded() && !store.list().length) {
         <div class="hd-panel hd-empty">
-          <h2 class="hd-panel__title">Build your first dashboard</h2>
-          <p>A dashboard is a layout of tiles that one or more displays show. Choose New dashboard to start one.</p>
+          <h2 class="hd-panel__title">{{ 'Build your first dashboard' | t }}</h2>
+          <p>{{ 'A dashboard is a layout of tiles that one or more displays show. Choose New dashboard to start one.' | t }}</p>
         </div>
       } @else {
-        <section class="hd-panel" aria-label="Dashboards">
-          <div class="cols" aria-hidden="true"><span>Dashboard</span><span>Shown on</span><span>State</span></div>
+        <section class="hd-panel" [attr.aria-label]="'Dashboards' | t">
+          <div class="cols" aria-hidden="true"><span>{{ 'Dashboard' | t }}</span><span>{{ 'Shown on' | t }}</span><span>{{ 'State' | t }}</span></div>
           <ul class="hd-rows">
             @for (row of rows(); track row.id) {
               <li>
@@ -61,11 +62,11 @@ import { PageHeader } from './page-header';
                   <span class="on">{{ row.shownOn || 'No display yet' }}</span>
                   <span class="state">
                     @if (row.hasUnpublishedChanges) {
-                      <span class="hd-pill hd-pill--warn hd-pill--dot">Unpublished changes</span>
+                      <span class="hd-pill hd-pill--warn hd-pill--dot">{{ 'Unpublished changes' | t }}</span>
                     } @else if (row.publishedVersion) {
                       <span class="hd-pill">Version {{ row.publishedVersion }}</span>
                     } @else {
-                      <span class="hd-pill">Not published</span>
+                      <span class="hd-pill">{{ 'Not published' | t }}</span>
                     }
                   </span>
                   <svg class="hd-row-link__go" [lucideIcon]="chevron" aria-hidden="true" />

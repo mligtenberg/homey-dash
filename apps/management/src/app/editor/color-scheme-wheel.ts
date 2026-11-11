@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal } from '@angular/core';
 import { ColorScheme, hexToOklch, oklchToHex, SCHEME_LIGHTNESS, SCHEME_MAX_CHROMA } from '@homey-dash/tiles';
+import { TranslatePipe } from '@homey-dash/i18n';
 
 /** Where a hue and chroma (as a share of the most, 0–1) sit on the wheel: hue clockwise from the top, chroma outwards. */
 const point = (hue: number, saturation: number, r = 50) => {
@@ -16,6 +17,7 @@ const point = (hue: number, saturation: number, r = 50) => {
 @Component({
   selector: 'hd-color-scheme-wheel',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="wheel" (pointerdown)="grab($event)" (pointermove)="drag($event)" (pointerup)="release()" (pointercancel)="release()">
       <svg viewBox="0 0 100 100" aria-hidden="true">
@@ -43,12 +45,12 @@ const point = (hue: number, saturation: number, r = 50) => {
       }
     </div>
     <div class="row">
-      <input type="color" class="hd-color-input color" aria-label="First colour" [value]="colors()[0]" (change)="pick($any($event.target).value)" />
+      <input type="color" class="hd-color-input color" [attr.aria-label]="'First colour' | t" [value]="colors()[0]" (change)="pick($any($event.target).value)" />
       @for (c of colors().slice(1); track $index) {
         <span class="swatch" [style.background]="c" aria-hidden="true"></span>
       }
       <label class="angle">
-        <input type="number" class="hd-input" min="0" max="359" aria-label="Angle to the second colour" [value]="angle()" (change)="setAngle(+$any($event.target).value)" />°
+        <input type="number" class="hd-input" min="0" max="359" [attr.aria-label]="'Angle to the second colour' | t" [value]="angle()" (change)="setAngle(+$any($event.target).value)" />°
       </label>
     </div>
   `,
