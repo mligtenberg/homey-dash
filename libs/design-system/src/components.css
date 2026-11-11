@@ -1718,12 +1718,13 @@ a.hd-btn { text-decoration: none; }
 .hd-timer-panel__unit { display: flex; flex-direction: column; align-items: center; gap: calc(var(--cell) * .08); }
 .hd-timer-panel__unit .hd-round-btn { width: calc(var(--cell) * .44); height: calc(var(--cell) * .44); }
 .hd-timer-panel__unit .hd-dev__big { font-size: calc(var(--cell) * .5); white-space: nowrap; overflow-wrap: normal; }
-.hd-timer-panel__new .hd-segmented { width: min(100%, calc(var(--cell) * 4)); }
 .hd-timer-panel__name {
   box-sizing: border-box; width: min(100%, calc(var(--cell) * 4)); min-height: 44px; padding: 0 calc(var(--cell) * .2);
   border: 0; border-radius: var(--radius-pill); background: color-mix(in oklab, var(--k-ink) 10%, transparent); color: var(--ink);
   font: 600 max(16px, calc(var(--cell) * var(--t-sub)))/1 var(--font-sans); text-align: center;
 }
+.hd-timer-panel__sound { cursor: pointer; text-align-last: center; }
+.hd-timer-panel__sound option { color: var(--ink); background: var(--tile-surface, Canvas); }
 .hd-timer-panel__name::placeholder { color: var(--ink-muted); }
 .hd-timer-panel__name:focus-visible { outline: 3px solid var(--k-ink); outline-offset: 3px; }
 .hd-timer-panel__new .hd-segmented button[aria-pressed="true"] { background-color: var(--k-ink); color: var(--on-kind); }

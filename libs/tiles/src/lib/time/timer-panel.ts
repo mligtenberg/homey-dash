@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { LucideMinus, LucidePause, LucidePlay, LucidePlus, LucideRotateCcw, LucideX } from '@homey-dash/design-system';
 import { TranslatePipe } from '@homey-dash/i18n';
 import { LucideDynamicIcon } from '@lucide/angular';
-import { Segmented } from '../core/segmented';
 import { timerText } from './time-data';
 import { TIMER_SOUNDS, TimerDraft, timerLeft, Timers, TimerSound } from './timers';
 
@@ -14,7 +13,10 @@ const UNITS: readonly { unit: Unit; label: string; max: number; step: number }[]
   { unit: 'seconds', label: 'Seconds', max: 59, step: 5 },
 ];
 
-const SOUND_LABELS: Record<TimerSound, string> = { beep: 'Beep', bell: 'Bell', chime: 'Chime', none: 'Silent' };
+const SOUND_LABELS: Record<TimerSound, string> = {
+  beep: 'Beep', bell: 'Bell', chime: 'Chime', kitchen: 'Kitchen timer', pulse: 'Pulse', siren: 'Siren', musicbox: 'Music box',
+  piano: 'Piano', marimba: 'Marimba', flute: 'Flute', harp: 'Harp', none: 'Silent',
+};
 
 /**
  * The timer tile's detail view, built like the device views: the dial for a new timer as the hero, the running timers beside it. In it you set a new timer's length, name and sound, and manage the running ones (pause, add a minute, restart, cancel).
@@ -22,7 +24,7 @@ const SOUND_LABELS: Record<TimerSound, string> = { beep: 'Beep', bell: 'Bell', c
 @Component({
   selector: 'hd-timer-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, LucideDynamicIcon, Segmented],
+  imports: [TranslatePipe, LucideDynamicIcon],
   host: { class: 'hd-dev', 'data-mode': 'timer' },
   template: `
     <section class="hd-dev__hero hd-timer-panel__new" [attr.aria-label]="'New timer' | t">
@@ -45,7 +47,11 @@ const SOUND_LABELS: Record<TimerSound, string> = { beep: 'Beep', bell: 'Bell', c
         [value]="draft().name"
         (input)="timers.setDraft({ name: $any($event.target).value })"
       />
-      <hd-segmented [label]="'Sound' | t" [options]="soundOptions" [value]="draft().sound" (picked)="timers.setDraft({ sound: $event })" />
+      <select class="hd-timer-panel__name hd-timer-panel__sound" [attr.aria-label]="'Sound' | t" (change)="timers.setDraft({ sound: $any($event.target).value })">
+        @for (option of soundOptions; track option.id) {
+          <option [value]="option.id" [selected]="option.id === draft().sound">{{ option.label | t }}</option>
+        }
+      </select>
       <button type="button" class="hd-timer__stop hd-timer-panel__start" [disabled]="!seconds()" (click)="timers.start()">{{ 'Start' | t }}</button>
     </section>
 

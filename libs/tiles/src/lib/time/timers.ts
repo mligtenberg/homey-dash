@@ -1,10 +1,11 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { Realtime, TimerView } from '@homey-dash/api-client';
+import { renderSound, roomImpulse, SOUND_LEVEL, SOUND_REPEAT, SOUND_ROOM } from './timer-sounds';
 
 /** What a timer plays while it rings. */
-export type TimerSound = 'beep' | 'bell' | 'chime' | 'none';
+export type TimerSound = 'beep' | 'bell' | 'chime' | 'kitchen' | 'pulse' | 'siren' | 'musicbox' | 'piano' | 'marimba' | 'flute' | 'harp' | 'none';
 
-export const TIMER_SOUNDS: readonly TimerSound[] = ['beep', 'bell', 'chime', 'none'];
+export const TIMER_SOUNDS: readonly TimerSound[] = ['beep', 'bell', 'chime', 'kitchen', 'pulse', 'siren', 'musicbox', 'piano', 'marimba', 'flute', 'harp', 'none'];
 
 /** A timer: running, it ends at `end` (ms since the epoch), so it survives a reload; paused, `paused` is what is left (ms). */
 export interface Timer {
@@ -31,6 +32,9 @@ export interface TimerDraft {
   sound: TimerSound;
 }
 
+/** How much louder than the sounds are rendered they are played. */
+const LOUDER_DB = 5;
+
 const KEY = 'hd-timers';
 const SOUND_KEY = 'hd-timer-sound';
 
@@ -40,6 +44,12 @@ function read<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+/** The sound last picked on this screen, kept in its browser; a beep until one is, or if it is no longer a sound. */
+function lastSound(): TimerSound {
+  const sound = read<TimerSound>(SOUND_KEY, 'beep');
+  return TIMER_SOUNDS.includes(sound) ? sound : 'beep';
 }
 
 function write(key: string, value: unknown) {
@@ -86,10 +96,14 @@ export class Timers {
   /** The time now (ms), ticking each second while any timer exists. */
   readonly now = signal(Date.now());
   /** What the modal starts a new timer with; the sound is the one last picked. */
-  readonly draft = signal<TimerDraft>({ hours: 0, minutes: 5, seconds: 0, name: '', sound: read<TimerSound>(SOUND_KEY, 'beep') });
+  readonly draft = signal<TimerDraft>({ hours: 0, minutes: 5, seconds: 0, name: '', sound: lastSound() });
 
   private readonly realtime = inject(Realtime);
   private audio?: AudioContext;
+  private room?: ConvolverNode;
+  private out?: GainNode;
+  private rung = 0;
+  private readonly buffers = new Map<TimerSound, AudioBuffer>();
   private tick?: ReturnType<typeof setInterval>;
 
   constructor() {
@@ -181,7 +195,13 @@ export class Timers {
   private onTick() {
     this.now.set(Date.now());
     const ringing = this.timers().filter((t) => t.paused === undefined && t.end <= this.now());
-    for (const sound of new Set(ringing.map((t) => t.sound))) this.play(sound);
+    if (!ringing.length) {
+      this.rung = 0;
+      return;
+    }
+    // A bell rings on for a few seconds, so it strikes less often than a beep.
+    for (const sound of new Set(ringing.map((t) => t.sound))) if (this.rung % SOUND_REPEAT[sound] === 0) this.play(sound);
+    this.rung++;
   }
 
   /** A touch lets the browser play sounds later, so what starts or sets a timer asks for it. */
@@ -190,29 +210,51 @@ export class Timers {
     void this.audio?.resume();
   }
 
+  /** Everything goes out through here: 5 dB louder, with a limiter so the peaks it lifts don't distort. */
+  private master(ctx: AudioContext): AudioNode {
+    if (!this.out) {
+      const gain = ctx.createGain();
+      gain.gain.value = 10 ** (LOUDER_DB / 20);
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -3;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.002;
+      limiter.release.value = 0.15;
+      gain.connect(limiter).connect(ctx.destination);
+      this.out = gain;
+    }
+    return this.out;
+  }
+
   private play(sound: TimerSound) {
     const ctx = this.audio;
     if (!ctx || ctx.state !== 'running' || sound === 'none') return;
-    // [seconds after now, hertz, seconds it sounds, type]
-    const notes: readonly [number, number, number, OscillatorType][] =
-      sound === 'beep'
-        ? [[0, 880, 0.12, 'square'], [0.2, 880, 0.12, 'square'], [0.4, 880, 0.12, 'square']]
-        : sound === 'bell'
-          ? [[0, 660, 0.9, 'sine'], [0, 1320, 0.5, 'sine']]
-          : [[0, 523, 0.45, 'sine'], [0.25, 784, 0.7, 'sine']];
-    for (const [at, hz, length, type] of notes) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const start = ctx.currentTime + at;
-      osc.type = type;
-      osc.frequency.value = hz;
-      // A short attack and a fall to silence, so it never clicks.
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(type === 'square' ? 0.12 : 0.25, start + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + length + 0.02);
+    let buffer = this.buffers.get(sound);
+    if (!buffer) {
+      const samples = renderSound(sound, ctx.sampleRate);
+      buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+      buffer.copyToChannel(samples, 0);
+      this.buffers.set(sound, buffer);
     }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const dry = ctx.createGain();
+    dry.gain.value = SOUND_LEVEL[sound];
+    source.connect(dry).connect(this.master(ctx));
+    if (SOUND_ROOM[sound]) {
+      if (!this.room) {
+        const impulse = roomImpulse(ctx.sampleRate);
+        const room = ctx.createBuffer(2, impulse[0].length, ctx.sampleRate);
+        impulse.forEach((channel, i) => room.copyToChannel(channel, i));
+        this.room = ctx.createConvolver();
+        this.room.buffer = room;
+        this.room.connect(this.master(ctx));
+      }
+      const wet = ctx.createGain();
+      wet.gain.value = SOUND_ROOM[sound] * SOUND_LEVEL[sound];
+      source.connect(wet).connect(this.room);
+    }
+    source.start();
   }
 }

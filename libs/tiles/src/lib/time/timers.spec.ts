@@ -35,6 +35,17 @@ describe('Timers', () => {
     expect(timers.timers().length).toBe(2);
   });
 
+  it('remembers the sound last picked on this screen, and beeps when it is unknown', () => {
+    timers.setDraft({ sound: 'piano' });
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [{ provide: Realtime, useValue: new FakeRealtime() }] });
+    expect(TestBed.inject(Timers).draft().sound).toBe('piano');
+    window.localStorage.setItem('hd-timer-sound', '"gone"');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [{ provide: Realtime, useValue: new FakeRealtime() }] });
+    expect(TestBed.inject(Timers).draft().sound).toBe('beep');
+  });
+
   it('starts from the draft and clears its name', () => {
     timers.setDraft({ hours: 1, minutes: 30, seconds: 0, name: 'Roast' });
     timers.start();

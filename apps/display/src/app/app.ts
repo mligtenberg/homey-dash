@@ -16,7 +16,7 @@ import { LucideDynamicIcon } from '@lucide/angular';
 import { capabilitySignal, IdleRule, Realtime, ScreenView, ShownDashboard } from '@homey-dash/api-client';
 import { browserLocale, setLocale, TranslatePipe } from '@homey-dash/i18n';
 import { fittedCellSize } from '@homey-dash/layout';
-import { DashboardView, homeyLost, PhotoTile, ruleAnswersOf, TileData, TileKindRegistry } from '@homey-dash/tiles';
+import { DashboardView, homeyLost, PhotoTile, ruleAnswersOf, TileData, TileKindRegistry, TimerAlert } from '@homey-dash/tiles';
 import { screenId, safeStorage } from './screen-id';
 import { BRIGHTNESS_MS, LightMeter } from './light-meter';
 import { Theme, themeFor } from './auto-theme';
@@ -57,7 +57,7 @@ const TAPE_KEY = 'homeydash.tape';
  * to the rule's dashboard or the one shown before; its lock screen widgets, such as a clock, lie over either.
  */
 @Component({
-  imports: [DashboardView, LockScreen, LucideDynamicIcon, People, PhotoTile, ScreenSettings, Setup, TranslatePipe],
+  imports: [DashboardView, LockScreen, LucideDynamicIcon, People, PhotoTile, ScreenSettings, Setup, TimerAlert, TranslatePipe],
   selector: 'hd-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -137,6 +137,7 @@ const TAPE_KEY = 'homeydash.tape';
     }
     <!-- Over everything, so the taps that open the screen settings press nothing beneath. -->
     <span class="corner" aria-hidden="true" (pointerdown)="cornerTap()"></span>
+    <hd-timer-alert />
     <hd-screen-settings (cameraChanged)="remeasure()" />
   `,
   styles: `

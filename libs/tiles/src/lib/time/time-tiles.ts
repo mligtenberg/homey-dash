@@ -8,6 +8,7 @@ export * from './clock-tile';
 export * from './date-tile';
 export * from './time-data';
 export * from './time-settings';
+export * from './timer-alert';
 export * from './timer-tile';
 export * from './timers';
 export * from './timer-panel';
