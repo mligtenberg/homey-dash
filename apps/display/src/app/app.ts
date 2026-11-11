@@ -173,9 +173,9 @@ const TAPE_KEY = 'homeydash.tape';
         var(--inverse, none) var(--bx, 0) var(--by, 0) / var(--inverse-size, 100vw 100vh) no-repeat,
         linear-gradient(var(--ink), var(--ink)) !important;
       image-rendering: auto;
-      /* A twentieth see-through; as a filter, so it stacks with the opacity of the widget itself rather than replacing it. */
+      /* Fifteen percent see-through; as a filter, so it stacks with the opacity of the widget itself rather than replacing it. */
       /* And a small neutral blur around it, a grey that is neither light nor dark. A drop-shadow, since a text-shadow would be painted over the cut-out. */
-      filter: opacity(.95) drop-shadow(0 0 .35vh rgb(128 128 128 / .3));
+      filter: opacity(.85) drop-shadow(0 0 .35vh rgb(128 128 128 / .3));
     }
     ::ng-deep .hd-ink {
       -webkit-background-clip: text !important; background-clip: text !important;

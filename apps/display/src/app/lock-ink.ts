@@ -103,3 +103,35 @@ export function inkOver({ average }: Backdrop): Rgb {
 export function css([r, g, b]: Rgb): string {
   return `rgb(${r} ${g} ${b})`;
 }
+
+/**
+ * The most prominent colour among the pixels of an image under some rectangles (in the image's own pixels): colours are
+ * grouped 4 bits to a channel, and the group with the most pixels wins, as the average of the pixels in it. Null when
+ * the rectangles cover none of the image.
+ */
+export function prominentColour(data: Uint8ClampedArray, width: number, height: number, rects: readonly DOMRectReadOnly[]): Rgb | null {
+  const groups = new Map<number, { count: number; sum: [number, number, number] }>();
+  const seen = new Uint8Array(width * height);
+  for (const rect of rects) {
+    const x0 = Math.max(0, Math.floor(rect.left));
+    const x1 = Math.min(width, Math.ceil(rect.right));
+    const y0 = Math.max(0, Math.floor(rect.top));
+    const y1 = Math.min(height, Math.ceil(rect.bottom));
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        // Overlapping rectangles count a pixel once.
+        if (seen[y * width + x]) continue;
+        seen[y * width + x] = 1;
+        const i = (y * width + x) * 4;
+        const key = ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4);
+        const group = groups.get(key) ?? { count: 0, sum: [0, 0, 0] };
+        group.count++;
+        for (let c = 0; c < 3; c++) group.sum[c] += data[i + c];
+        groups.set(key, group);
+      }
+    }
+  }
+  let best: { count: number; sum: [number, number, number] } | null = null;
+  for (const group of groups.values()) if (!best || group.count > best.count) best = group;
+  return best ? [Math.round(best.sum[0] / best.count), Math.round(best.sum[1] / best.count), Math.round(best.sum[2] / best.count)] : null;
+}

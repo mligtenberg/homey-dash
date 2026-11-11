@@ -4,7 +4,7 @@ import { ago, capabilityText, delayLevel, delayText, duration, NewsData, ruleAns
 import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
 import { LucideCar, LucideNewspaper, LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideSun, minuteClock } from '@homey-dash/design-system';
 
-import { Backdrop, css, inkOver, inverseOf, luminance, Rgb } from './lock-ink';
+import { Backdrop, css, inkOver, inverseOf, luminance, prominentColour, Rgb } from './lock-ink';
 import { formatTag, t } from '@homey-dash/i18n';
 /** What a widget shows now; a weather Homey hasn't told, or a value whose device is gone, shows nothing. */
 type Shown =
@@ -152,6 +152,7 @@ export class LockScreen {
         clearInterval(timer);
         document.documentElement.style.removeProperty('--inverse');
         document.documentElement.style.removeProperty('--inverse-size');
+        document.querySelectorAll<HTMLElement>('.slideshow :is(.hd-photo__text, .hd-photo__people)').forEach((e) => e.style.removeProperty('--inverse'));
         if (this.image) URL.revokeObjectURL(this.image);
       });
     });
@@ -159,6 +160,8 @@ export class LockScreen {
 
   private busy = false;
   private previous: Uint8ClampedArray | null = null;
+  // The inverse picture's pixels, which each area's one colour is taken from.
+  private inverted: Uint8ClampedArray | null = null;
   private image: string | null = null;
 
   /**
@@ -228,11 +231,45 @@ export class LockScreen {
           icon.classList.add('hd-ink-icon');
         }
       }
+      this.flatten(frame, scale, canvas.width, canvas.height);
     } catch {
       // A picture the browser won't let it read: the type stays white.
       this.clear(widgets);
     } finally {
       this.busy = false;
+    }
+  }
+
+  /**
+   * Each area (top left, centre, ..., and the photo's caption on each side) has its type in one colour: the most prominent of the inverse under its rendered
+   * type and icons. It replaces the picture the type is cut out of, so that the type no longer changes along a line.
+   */
+  private flatten(frame: DOMRect, scale: number, width: number, height: number) {
+    const data = this.inverted;
+    if (!data) return;
+    // The widgets' areas, and the photo's caption: its words on the left, and the people on the right.
+    const areas = [...this.host.querySelectorAll<HTMLElement>('.spot'), ...document.querySelectorAll<HTMLElement>('.slideshow :is(.hd-photo__text, .hd-photo__people)')];
+    for (const area of areas) {
+      const rects: DOMRect[] = [];
+      for (const widget of [area, ...area.querySelectorAll<HTMLElement>('.hd-ink')].filter((e) => e.classList.contains('hd-ink'))) {
+        const walker = document.createTreeWalker(widget, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if (!node.textContent?.trim()) continue;
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          rects.push(...Array.from(range.getClientRects()));
+        }
+        for (const icon of widget.querySelectorAll('svg')) rects.push(icon.getBoundingClientRect());
+      }
+      const colour = prominentColour(
+        data,
+        width,
+        height,
+        rects.map((r) => new DOMRect((r.x - frame.x) * scale, (r.y - frame.y) * scale, r.width * scale, r.height * scale)),
+      );
+      if (!colour) continue;
+      // The picture is replaced by a plain fill of the colour, for the area and so for everything in it.
+      area.style.setProperty('--inverse', `linear-gradient(${css(colour)}, ${css(colour)})`);
     }
   }
 
@@ -298,6 +335,7 @@ export class LockScreen {
     if (this.image) URL.revokeObjectURL(this.image);
     this.image = url;
     this.previous = data;
+    this.inverted = out.data;
   }
 
   // The widgets shown now: not the hidden ones, and those with a rule only while HomeyDash says it holds. One whose

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Backdrop, contrast, inkOver, inverseOf, luminance, Rgb } from './lock-ink';
+import { Backdrop, contrast, inkOver, inverseOf, luminance, prominentColour, Rgb } from './lock-ink';
 
 const even = (colour: Rgb): Backdrop => ({ average: colour, lightest: colour, darkest: colour });
 
@@ -41,5 +41,22 @@ describe('inverseOf', () => {
     for (const colour of [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]] as Rgb[]) {
       expect(inverseOf(colour).every((c) => c >= 0 && c <= 255)).toBe(true);
     }
+  });
+});
+
+describe('prominentColour', () => {
+  // 4 x 1 pixels: three reddish, one blue.
+  const data = new Uint8ClampedArray([200, 10, 10, 255, 204, 12, 8, 255, 198, 9, 11, 255, 10, 10, 220, 255]);
+
+  it('is the colour most of the covered pixels are, averaged', () => {
+    expect(prominentColour(data, 4, 1, [new DOMRect(0, 0, 4, 1)])).toEqual([201, 10, 10]);
+  });
+
+  it('only looks under the given rectangles, counting overlaps once', () => {
+    expect(prominentColour(data, 4, 1, [new DOMRect(3, 0, 1, 1), new DOMRect(3, 0, 1, 1)])).toEqual([10, 10, 220]);
+  });
+
+  it('is null when the rectangles are off the image', () => {
+    expect(prominentColour(data, 4, 1, [new DOMRect(10, 10, 2, 2)])).toBeNull();
   });
 });
