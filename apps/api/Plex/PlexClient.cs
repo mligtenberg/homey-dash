@@ -259,6 +259,9 @@ public sealed class PlexClient(IHttpClientFactory httpFactory, TimeProvider time
         Genres = m.TryGetProperty("Genre", out var genres) && genres.ValueKind == JsonValueKind.Array
             ? genres.EnumerateArray().Select(g => Str(g, "tag")).OfType<string>().Take(3).ToList()
             : [],
+        Cast = m.TryGetProperty("Role", out var roles) && roles.ValueKind == JsonValueKind.Array
+            ? roles.EnumerateArray().Select(r => Str(r, "tag") is { Length: > 0 } name ? new PlexActor(name, Str(r, "role"), Str(r, "thumb")) : null).OfType<PlexActor>().Take(40).ToList()
+            : [],
         Art = Str(m, "grandparentArt") ?? Str(m, "art"),
         Watched = Str(m, "type") switch
         {

@@ -632,6 +632,11 @@ public sealed class LocalHomey(
         {
             throw new HomeyUnavailableException("Homey cannot be reached", e);
         }
+        // The read timeout, as opposed to the caller giving up.
+        catch (OperationCanceledException e) when (!ct.IsCancellationRequested)
+        {
+            throw new HomeyUnavailableException("Homey took too long to answer", e);
+        }
     }
 
     public async Task<(byte[] Content, string ContentType)?> GetImageAsync(string imageId, CancellationToken ct)
@@ -648,6 +653,11 @@ public sealed class LocalHomey(
         {
             throw new HomeyUnavailableException("Homey cannot be reached", e);
         }
+        // The read timeout, as opposed to the caller giving up.
+        catch (OperationCanceledException e) when (!ct.IsCancellationRequested)
+        {
+            throw new HomeyUnavailableException("Homey took too long to answer", e);
+        }
     }
 
     private HttpClient Http()
@@ -659,10 +669,17 @@ public sealed class LocalHomey(
 
     private async Task<JsonElement> GetJsonAsync(string path, CancellationToken ct)
     {
-        using var read = ReadCancellation(ct);
-        using var response = await Http().GetAsync(path, read.Token);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<JsonElement>(read.Token);
+        try
+        {
+            using var read = ReadCancellation(ct);
+            using var response = await Http().GetAsync(path, read.Token);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<JsonElement>(read.Token);
+        }
+        catch (OperationCanceledException e) when (!ct.IsCancellationRequested)
+        {
+            throw new HomeyUnavailableException("Homey took too long to answer", e);
+        }
     }
 
     private async Task SendAsync(HttpMethod method, string path, object? body, CancellationToken ct)

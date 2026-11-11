@@ -4,7 +4,7 @@ import { AirPlayInfo, AirPlayPlayback } from './airplay';
 import { DashboardSummary } from './dashboards';
 import { DisplayInfo, ScreenDetails, ScreenView } from './displays';
 import { PhotoSet } from './photos';
-import { PlexCommand, PlexItem, PlexOverview, PlexPage, PlexProfileList, PlexSession, PlexSnapshot, PlexTracks } from './plex';
+import { PlexActor, PlexCommand, PlexItem, PlexOverview, PlexPage, PlexProfileList, PlexSession, PlexSnapshot, PlexTracks } from './plex';
 import { Rule, RuleAnswer, RuleAnswers } from './rules';
 import { NewsFeed } from './news';
 import { RouteTraffic } from './traffic';
@@ -187,6 +187,11 @@ export class Realtime {
   /** What is under a Plex item, in order: a show's seasons, a season's episodes, an album's tracks. */
   plexChildren(accountId: number, itemId: string) {
     return this.hub.invoke<PlexItem[]>('PlexChildren', accountId, itemId);
+  }
+
+  /** The actors of a Plex item with their pictures, which a list of items doesn't carry. */
+  plexCast(accountId: number, itemId: string) {
+    return this.hub.invoke<PlexActor[]>('PlexCast', accountId, itemId);
   }
 
   /** The profiles of the Plex Home an account belongs to; none when it has no home. */

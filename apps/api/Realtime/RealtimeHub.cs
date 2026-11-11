@@ -124,6 +124,20 @@ public sealed class RealtimeHub(
         }
     }
 
+    // The actors of an item with their pictures, which Plex gives only for the one item, not in a list.
+    public async Task<IReadOnlyList<PlexActor>> PlexCast(int accountId, string itemId)
+    {
+        if (plexAccounts.Find(accountId)?.Connection is not { } server) throw new HubException("Sign in with Plex under Accounts first.");
+        try
+        {
+            return (await plex.ItemAsync(server, itemId, Context.ConnectionAborted))?.Cast ?? [];
+        }
+        catch (PlexException e)
+        {
+            throw new HubException(e.Message);
+        }
+    }
+
     // Plays or pauses what plays on one of the account's players, or skips; the player must allow remote control.
     public async Task ControlPlex(int accountId, string playerId, PlexCommand command)
     {

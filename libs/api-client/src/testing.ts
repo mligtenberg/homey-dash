@@ -12,6 +12,7 @@ import {
   HomeySnapshot,
   PhotoSet,
   PlexCommand,
+  PlexActor,
   PlexItem,
   PlexSnapshot,
   PlexProfileList,
@@ -157,6 +158,14 @@ export class FakeRealtime implements Partial<Realtime> {
   async plexChildren(accountId: number, itemId: string) {
     this.commands.push(['plexChildren', accountId, itemId]);
     return this.plexChildrenList;
+  }
+
+  /** The actors of any item, whatever is asked. */
+  plexCastList: PlexActor[] = [];
+
+  async plexCast(accountId: number, itemId: string) {
+    this.commands.push(['plexCast', accountId, itemId]);
+    return this.plexCastList;
   }
 
   /** The profiles of the Plex Home, as an account first asks for them. */

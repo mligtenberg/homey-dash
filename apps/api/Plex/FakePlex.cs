@@ -94,7 +94,7 @@ public sealed class FakePlex(TimeProvider time) : IPlex
             new($"{n}", kind, title, subtitle, $"/library/metadata/{n}/thumb", now.AddDays(-n % 100))
             {
                 Summary = summary, Year = year, DurationMs = minutes * 60_000, Rating = rating, ContentRating = contentRating,
-                Genres = genres, Art = $"/library/metadata/{n}/art", Watched = Seen.Contains($"{n}"),
+                Genres = genres, Cast = kind is "movie" or "show" ? [new("Ada Lovelace", "The Engineer", $"/library/metadata/{n}/thumb"), new("Grace Hopper", "The Captain", null)] : [], Art = $"/library/metadata/{n}/art", Watched = Seen.Contains($"{n}"),
             };
         return
         [

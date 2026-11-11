@@ -98,6 +98,8 @@ public sealed record PlexItem(string Id, string Kind, string Title, string? Subt
     public double? Rating { get; init; }
     public string? ContentRating { get; init; }
     public IReadOnlyList<string> Genres { get; init; } = [];
+    // The actors, in billing order, with the part each plays.
+    public IReadOnlyList<PlexActor> Cast { get; init; } = [];
     // The wide artwork behind it.
     public string? Art { get; init; }
     // A film or episode that was played, or a season or series whose episodes all were, for this Plex account.
@@ -105,6 +107,9 @@ public sealed record PlexItem(string Id, string Kind, string Title, string? Subt
     // An episode's, a season's or a track's number within its season or album; only on what ChildrenAsync lists.
     public int? Index { get; init; }
 }
+
+// An actor of a film or show: Image is a picture path or Plex's own https://metadata-static.plex.tv one, for /api/plex/image.
+public sealed record PlexActor(string Name, string? Role, string? Image);
 
 // An audio or subtitle track of an item. Label says language, format and channels (English (AC3 5.1)); Selected is the one
 // Plex plays when asked for none in particular.

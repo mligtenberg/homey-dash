@@ -1,3 +1,4 @@
+import { AirPlayReceivers } from '../core/airplay-cast';
 import { Segmented } from '../core/segmented';
 import { reason } from './hub-reason';
 import { PlexAirPlayControls } from './plex-airplay-controls';
@@ -5,7 +6,7 @@ import { PlexLocalPlayer } from './plex-local-player';
 import { PlexProfilePicker } from './plex-profile-picker';
 import { PlexTileView } from './plex-tile-view';
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, untracked, viewChild } from '@angular/core';
-import { AirPlayDevice, ALL_PLEX_LIBRARIES, PlexItem, PlexLibrary, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
+import { AirPlayDevice, ALL_PLEX_LIBRARIES, PlexActor, PlexItem, PlexLibrary, plexAudioUrl, plexImageUrl, plexVideoUrl } from '@homey-dash/api-client';
 import { cells } from '@homey-dash/layout';
 import { LucideAirplay, LucideCheck, LucideChevronLeft, LucideClapperboard, LucideLibrary, LucideLock, LucidePause, LucidePlay, LucideSquare, LucideTv, LucideStar, LucideVolume2 } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
@@ -35,15 +36,14 @@ interface Pages {
 
 /** Where choosing a receiver for a cover is: the button, looking for receivers, choosing one, starting. Once it plays, every screen shows it from `AirPlayData`. */
 interface Cast {
-  step: 'idle' | 'searching' | 'choosing' | 'starting';
+  step: 'idle' | 'choosing' | 'starting';
   /** The cover it is for. */
   itemId?: string;
-  devices: AirPlayDevice[];
   device?: AirPlayDevice;
   error?: string;
 }
 
-const IDLE: Cast = { step: 'idle', devices: [] };
+const IDLE: Cast = { step: 'idle' };
 
 /** What is under a show, season or album: nothing while it loads. */
 interface Under {
@@ -141,10 +141,10 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
         <hd-plex-airplay-controls [playing]="p" />
       }
       @if (selected(); as item) {
+        @if (item.art) {
+          <img class="hd-plex-recent__backdrop" [src]="artUrl(item.art)" alt="" draggable="false" />
+        }
         <div class="hd-plex-recent__detail">
-          @if (item.art) {
-            <img class="hd-plex-recent__backdrop" [src]="artUrl(item.art)" alt="" draggable="false" />
-          }
           <button type="button" class="hd-round-btn hd-plex-recent__back" [attr.aria-label]="trail().length > 1 ? 'Back' : 'Back to the covers'" (click)="back()">
             <svg [lucideIcon]="backIcon" />
           </button>
@@ -199,18 +199,8 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
                       <svg [lucideIcon]="item.kind === 'movie' || item.kind === 'episode' ? tvIcon : speakerIcon" />{{ item.kind === 'album' ? 'Play album here' : 'Play here' }}
                     </button>
                   }
-                  @case ('searching') {
-                    <div class="hd-details__label">Looking for Apple TVs…</div>
-                  }
                   @case ('choosing') {
-                    <div class="hd-details__label">Play on</div>
-                    <div class="hd-plex-recent__receivers">
-                      @for (d of c.devices; track d.id) {
-                        <button type="button" class="hd-plex-recent__receiver" (click)="playOn(item, d)">{{ d.name }}</button>
-                      } @empty {
-                        <div class="hd-details__label">No paired Apple TV. Pair one in Management under Accounts.</div>
-                      }
-                    </div>
+                    <hd-airplay-receivers (chosen)="playOn(item, $event)" (cancelled)="cancelCast()" />
                   }
                 }
                 @if (c.error) {
@@ -222,6 +212,28 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
               </div>
             }
           </div>
+          @if (castOf(item); as people) {
+            <div class="hd-plex-recent__children">
+              <h4 class="hd-plex-recent__section">Cast</h4>
+              <ul class="hd-plex-recent__people">
+                @for (person of people; track $index) {
+                  <li>
+                    <div class="hd-plex-recent__face">
+                      @if (person.image) {
+                        <img [src]="faceUrl(person.image)" alt="" loading="lazy" draggable="false" />
+                      } @else {
+                        {{ initials(person.name) }}
+                      }
+                    </div>
+                    <div class="hd-plex-recent__card-title">{{ person.name }}</div>
+                    @if (person.role) {
+                      <div class="hd-plex-recent__card-sub">{{ person.role }}</div>
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
+          }
           @if (hasChildren(item)) {
             @let under = childrenOf(item);
             <div class="hd-plex-recent__children">
@@ -336,7 +348,7 @@ export const PLEX_BROWSER_TEMPLATE = `    @if (shown().length) {
  */
 @Component({
   selector: 'hd-plex-recent-tile',
-  imports: [TileDetails, LucideDynamicIcon, PlexAirPlayControls, PlexProfilePicker, Segmented],
+  imports: [TileDetails, LucideDynamicIcon, AirPlayReceivers, PlexAirPlayControls, PlexProfilePicker, Segmented],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { ...TILE_FACE_HOST, class: 'hd-tile hd-plex-recent', '[class.has-art]': 'shown().length > 0' },
   template: PLEX_BROWSER_TEMPLATE,
@@ -399,6 +411,8 @@ export class RecentlyAddedTile extends PlexTileView {
   protected readonly selected = computed(() => this.trail()[this.trail().length - 1] ?? null);
   /** What is under the shows, seasons and albums opened so far, by id: loading until it arrives. */
   private readonly under = signal<Record<string, Under>>({});
+  /** The actors with their pictures, which Plex gives for the one item and not in a list; until then the list's names. */
+  private readonly casts = signal<Record<string, PlexActor[]>>({});
   private readonly cast = signal<Cast>(IDLE);
 
   /** What plays on AirPlay now for this account, wherever it was started: its controls stay on show. */
@@ -560,6 +574,20 @@ export class RecentlyAddedTile extends PlexTileView {
     return !this.browse && new Date(item.addedAt).getTime() > 0 ? addedOn(item.addedAt) : '';
   }
 
+  protected castOf(item: PlexItem) {
+    const people = this.casts()[item.id] ?? item.cast;
+    return people?.length ? people : null;
+  }
+
+  protected faceUrl(path: string) {
+    return plexImageUrl(this.accountId(), path, 200, 200);
+  }
+
+  /** What a face shows when Plex has no picture of the person. */
+  protected initials(name: string) {
+    return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+  }
+
   protected artUrl(path: string) {
     return plexImageUrl(this.accountId(), path, 1280, 720);
   }
@@ -643,7 +671,18 @@ export class RecentlyAddedTile extends PlexTileView {
     }
   }
 
+  private async loadCast(item: PlexItem) {
+    if (this.casts()[item.id] || !['movie', 'show', 'episode'].includes(item.kind)) return;
+    try {
+      const people = await this.realtime.plexCast(this.accountId(), item.id);
+      this.casts.update((all) => ({ ...all, [item.id]: people }));
+    } catch {
+      // The names from the list stay.
+    }
+  }
+
   private async loadChildren(item: PlexItem) {
+    void this.loadCast(item);
     if (!this.hasChildren(item) || this.under()[item.id]?.items) return;
     this.under.update((all) => ({ ...all, [item.id]: {} }));
     try {
@@ -660,19 +699,17 @@ export class RecentlyAddedTile extends PlexTileView {
     return cast.itemId === item.id ? cast : IDLE;
   }
 
-  protected async findReceivers(item: PlexItem) {
-    this.cast.set({ step: 'searching', itemId: item.id, devices: [] });
-    try {
-      const info = await this.realtime.airPlayDevices();
-      if (!info.available) return this.cast.set({ ...IDLE, itemId: item.id, error: 'AirPlay is not set up in HomeyDash yet.' });
-      this.cast.set({ step: 'choosing', itemId: item.id, devices: info.devices.filter((d) => d.kind === 'tv') });
-    } catch (error) {
-      this.cast.set({ ...IDLE, itemId: item.id, error: reason(error, 'Could not look for Apple TVs.') });
-    }
+  /** Back from choosing an Apple TV to the Play buttons. */
+  protected cancelCast() {
+    this.cast.set(IDLE);
+  }
+
+  protected findReceivers(item: PlexItem) {
+    this.cast.set({ step: 'choosing', itemId: item.id });
   }
 
   protected async playOn(item: PlexItem, device: AirPlayDevice) {
-    this.cast.set({ step: 'starting', itemId: item.id, devices: [], device });
+    this.cast.set({ step: 'starting', itemId: item.id, device });
     try {
       const account = this.accountId();
       // A track chosen from its album goes on with the album's next tracks, an episode with the season's next episodes.

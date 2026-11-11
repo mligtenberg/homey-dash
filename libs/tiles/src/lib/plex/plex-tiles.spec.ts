@@ -1,5 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationRef, Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { AirPlayPlayback, PlexItem, PlexOverview, PlexSession, Realtime } from '@homey-dash/api-client';
@@ -263,6 +263,51 @@ describe('Plex tiles', () => {
       await settle();
     };
 
+    it('pairs another Apple TV from the choice of where to play, then offers it', async () => {
+      prepare();
+      const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
+      const http = TestBed.inject(HttpTestingController);
+      const click = (selector: string) => (tile.querySelector(selector) as HTMLElement).click();
+
+      tile.click();
+      await settle();
+      click('.hd-plex-recent__card');
+      await settle();
+      click('.hd-plex-recent__play');
+      await settle();
+
+      click('.hd-cast__add');
+      http.expectOne('/api/accounts/airplay').flush({
+        configured: true, fake: false, reachable: true, error: null,
+        devices: [
+          { id: 'tv', name: 'Living room TV', kind: 'tv', paired: true },
+          { id: 'bedroom', name: 'Bedroom TV', kind: 'tv', paired: false },
+        ],
+      });
+      await settle();
+      expect([...tile.querySelectorAll('.hd-cast__unpaired')].map((b) => b.textContent?.trim())).toEqual(['Bedroom TV']);
+
+      click('.hd-cast__unpaired');
+      http.expectOne('/api/accounts/airplay/bedroom/pair').flush(null);
+      await settle();
+      const pin = tile.querySelector('.hd-cast__input') as HTMLInputElement;
+      pin.value = '1234';
+      pin.form?.dispatchEvent(new Event('submit', { cancelable: true }));
+      const finish = http.expectOne('/api/accounts/airplay/bedroom/pair/finish');
+      expect(finish.request.body).toEqual({ pin: '1234' });
+      realtime.airPlay = {
+        available: true,
+        devices: [
+          { id: 'tv', name: 'Living room TV', kind: 'tv', paired: true },
+          { id: 'bedroom', name: 'Bedroom TV', kind: 'tv', paired: true },
+        ],
+      };
+      finish.flush(null);
+      await settle();
+
+      expect([...tile.querySelectorAll('.hd-cast__receiver')].map((b) => b.textContent?.trim())).toEqual(['Living room TV', 'Bedroom TV']);
+    });
+
     it('plays a cover on an Apple TV through AirPlay, and shows it from what the server says plays', async () => {
       prepare();
       const tile = await render(RecentlyAddedTile, 'plex-library:all', 'wide');
@@ -273,8 +318,14 @@ describe('Plex tiles', () => {
       await press('.hd-plex-recent__card');
       await press('.hd-plex-recent__play');
 
-      expect([...tile.querySelectorAll('.hd-plex-recent__receiver')].map((b) => b.textContent?.trim())).toEqual(['Living room TV']);
-      await press('.hd-plex-recent__receiver');
+      expect([...tile.querySelectorAll('.hd-cast__receiver')].map((b) => b.textContent?.trim())).toEqual(['Living room TV']);
+      // Not meant to cast after all: back to the Play buttons.
+      await press('.hd-cast__cancel');
+      expect(tile.querySelector('.hd-cast__cancel')).toBeNull();
+      expect(tile.querySelector('.hd-plex-recent__play')).not.toBeNull();
+      await press('.hd-plex-recent__play');
+
+      await press('.hd-cast__receiver');
       expect(realtime.commands).toContainEqual(['playOnAirPlay', 1, '3', 'tv']);
 
       // The server tells every screen, this one included; until then nothing claims to play.
@@ -455,7 +506,7 @@ describe('Plex tiles', () => {
         expect(text(tile, '.hd-plex-recent__headline')).toBe('Hands');
         expect(text(tile, '.hd-plex-recent__added')).toBe('The Bear › Season 1');
         await press('.hd-plex-recent__play');
-        await press('.hd-plex-recent__receiver');
+        await press('.hd-cast__receiver');
         // An episode chosen from its season goes on with the season's next episodes.
         expect(realtime.commands).toContainEqual(['playAlbumOnAirPlay', 1, '91', '912', 'tv']);
 
@@ -483,14 +534,14 @@ describe('Plex tiles', () => {
         ]);
         expect(text(tile, '.hd-plex-recent__play')).toBe('Play album on AirPlay');
         await press('.hd-plex-recent__play');
-        await press('.hd-plex-recent__receiver');
+        await press('.hd-cast__receiver');
         expect(realtime.commands).toContainEqual(['playOnAirPlay', 1, '8', 'tv']);
 
         await press('.hd-plex-recent__row', 'Second');
         expect(text(tile, '.hd-plex-recent__added')).toBe('The Album');
         expect(tile.querySelector('.hd-plex-recent__children')).toBeNull();
         await press('.hd-plex-recent__play');
-        await press('.hd-plex-recent__receiver');
+        await press('.hd-cast__receiver');
         expect(realtime.commands).toContainEqual(['playAlbumOnAirPlay', 1, '8', '82', 'tv']);
       });
 
@@ -920,7 +971,7 @@ describe('Plex tiles', () => {
       (tile.querySelector('.hd-plex-recent__play') as HTMLElement).click();
       await settle();
 
-      expect(tile.querySelector('.hd-plex-recent__cast-error')?.textContent).toContain('not set up');
+      expect(tile.querySelector('.hd-cast__error')?.textContent).toContain('not set up');
     });
   });
 

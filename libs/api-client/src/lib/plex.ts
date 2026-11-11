@@ -45,12 +45,21 @@ export interface PlexItem {
   rating?: number | null;
   contentRating?: string | null;
   genres?: string[];
+  /** The actors, in billing order. */
+  cast?: PlexActor[];
   /** The wide artwork behind it. */
   art?: string | null;
   /** A film or episode that was played, or a season or series whose episodes all were. */
   watched?: boolean;
   /** An episode's, season's or track's number in its season, show or album; only on what `plexChildren` lists. */
   index?: number | null;
+}
+
+/** An actor of a movie or show: `image` is for `plexImageUrl`. */
+export interface PlexActor {
+  name: string;
+  role: string | null;
+  image: string | null;
 }
 
 /** An audio or subtitle track of a movie or episode: `label` says language, format and channels. */
