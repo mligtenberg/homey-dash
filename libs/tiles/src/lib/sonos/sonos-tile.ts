@@ -37,8 +37,8 @@ interface Room {
 /**
  * Sonos multiroom on one tile (several speakers, picked in Management): what the lead room plays over its album art, with
  * buttons to skip back, play or pause, and skip on, and one volume for the whole group. A press opens the detail view
- * with every room, its own volume and a button that adds the room to the lead's group or takes it out again; a full
- * tall tile lists them on the tile too. The lead is the
+ * with every room, its own volume and a button that adds the room to the lead's group or takes it out again; the
+ * large tiles list them on the tile too. The lead is the
  * first room that plays, else the first. Speakers are in a group when Homey's `sonos_group` is the same for them.
  */
 @Component({
@@ -188,7 +188,7 @@ interface Room {
     @if (size() !== 'small') {
       <ng-container *ngTemplateOutlet="groupRow" />
     }
-    @if (size() === 'full-tall') {
+    @if (size() === 'large' || size() === 'full-large' || size() === 'full-tall') {
       <ng-container *ngTemplateOutlet="roomList" />
     }
     <hd-tile-details
@@ -203,9 +203,13 @@ interface Room {
         @if (lead(); as lead) {
           <div class="hd-sonos__now">
             <span class="hd-sonos__now-name">
-              {{ lead.name }}
-              @if (locked()) {
-                <svg class="hd-sonos__lock" [attr.aria-label]="'Locked' | t" [lucideIcon]="lockIcon" />
+              @if (canPick()) {
+                <ng-container *ngTemplateOutlet="picker" />
+              } @else {
+                {{ lead.name }}
+                @if (locked()) {
+                  <svg class="hd-sonos__lock" [attr.aria-label]="'Locked' | t" [lucideIcon]="lockIcon" />
+                }
               }
             </span>
             <ng-container *ngTemplateOutlet="transport; context: { $implicit: true }" />

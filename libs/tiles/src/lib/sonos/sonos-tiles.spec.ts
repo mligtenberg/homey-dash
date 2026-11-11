@@ -216,6 +216,14 @@ describe('Sonos tile', () => {
     expect(realtime.commands.filter((c) => c[0] === 'speakerMusic')).toHaveLength(1);
   });
 
+  it('lists every room with its link button on the large sizes only', async () => {
+    const rooms = [speaker('a', 'Living room', 'Living room'), speaker('b', 'Kitchen', 'Kitchen')];
+    for (const [size, listed] of [['wide', false], ['full', false], ['large', true], ['full-large', true], ['full-tall', true]] as const) {
+      const tile = await render(rooms, size);
+      expect(tile.querySelectorAll('.hd-sonos__rooms .hd-sonos__row').length, size).toBe(listed ? 2 : 0);
+    }
+  });
+
   it('stays on the locked room even when another plays', async () => {
     const tile = await render(
       [
@@ -273,7 +281,12 @@ describe('Sonos tile', () => {
     const dialog = tile.querySelector('dialog') as HTMLElement;
     for (const label of ['Previous', 'Play', 'Next'])
       expect(button(dialog, label)).toBeTruthy();
-    expect(dialog.querySelector('select')).toBeNull();
+    const pick = dialog.querySelector('select.hd-sonos__pick') as HTMLSelectElement;
+    expect(pick).toBeTruthy();
+    pick.value = 'b';
+    pick.dispatchEvent(new Event('change'));
+    await settle();
+    expect(pick.value).toBe('b');
     (Array.from(dialog.querySelectorAll('.hd-sonos__room')).find((b) =>
       b.textContent?.includes('Kitchen'),
     ) as HTMLElement).click();

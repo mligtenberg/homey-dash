@@ -1394,6 +1394,7 @@ a.hd-btn { text-decoration: none; }
 .hd-sonos__titles .hd-tile__detail { margin: 0; }
 .hd-sonos__pick { max-width: 100%; margin: 0; padding: 0 calc(var(--cell) * .04) 0 0; border: 0; outline: 0; background: transparent; color: inherit; font: 700 calc(var(--cell) * .12)/1.15 var(--font-sans); text-overflow: ellipsis; cursor: pointer; }
 .hd-sonos__pick:focus-visible { outline: 3px solid var(--k-ink); outline-offset: 2px; border-radius: 4px; }
+.hd-sonos__now-name .hd-sonos__pick { font-size: inherit; }
 .hd-sonos__pick option { color: var(--ink); background: var(--tile-surface, Canvas); }
 .hd-sonos__now { flex: none; display: flex; align-items: center; justify-content: space-between; gap: calc(var(--cell) * .12); }
 .hd-sonos__now-name { min-width: 0; font: 700 calc(var(--cell) * .16)/1.15 var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
