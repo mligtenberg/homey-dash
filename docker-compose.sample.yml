@@ -24,6 +24,8 @@ services:
       # Playing Plex covers on Apple TVs through AirPlay finds them with multicast DNS, which reaches your network from a
       # container only with host networking (Linux): add `network_mode: host` and drop `ports` (ADR-0012).
       # Voice commands (optional): forwards /voice/... to the homey-voice service below. Remove with the service.
+      # With `network_mode: host` the dashboard cannot resolve container names: publish the voice port below on 127.0.0.1
+      # and use Voice__Address: "http://localhost:8765" instead.
       Voice__Address: "http://homey-voice:8765"
       # Defaults, only change if you move things:
       # ConnectionStrings__HomeyDash: "Data Source=/data/homey-dash.db"
@@ -46,6 +48,7 @@ services:
     environment:
       TZ: Europe/Amsterdam
       # Rooms and devices come from HomeyDash itself, so there is no second list to keep up to date.
+      # With the dashboard on the host network, use the host's address and its http port instead (http://192.168.1.23:8081).
       HOMEY_DASH_URL: "http://homey-dash:8080"
       # Spoken wake word (spellings Whisper may write, comma-separated) and the Whisper size.
       # VOICE_WAKE: "homey,homie,homi"

@@ -17,25 +17,50 @@ const VOICE_BASE = '/voice/';
 const WAKE_THRESHOLD = 0.5;
 const PREROLL = 16000 * 2;
 const SESSION_MS = 12_000;
+/** Below this loudness (and 3 times the room's own) the detector rests; it keeps going for GATE_TAIL blocks of 80 ms after the sound, and starts from GATE_PREROLL blocks before it. */
+const GATE_MIN = 0.012;
+const GATE_TAIL = 20;
+const GATE_PREROLL = 24;
 
-interface WakeWordInstance {
-  feed(samples: Float32Array): Promise<number>;
-  reset(): void;
-}
-interface WakeWordClass {
-  create(ort: unknown): Promise<WakeWordInstance>;
-}
+/** The wake word detector, which runs in a worker so that listening does not slow the page down. */
+class WakeDetector {
+  private readonly waiting: ((score: number) => void)[] = [];
 
-let ortLoading: Promise<unknown> | undefined;
-/** onnxruntime-web, from the voice service, as the global `ort` its script defines. */
-function loadOrt(): Promise<unknown> {
-  return (ortLoading ??= new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = VOICE_BASE + 'vendor/ort/ort.wasm.min.js';
-    script.onload = () => resolve((window as unknown as { ort: unknown }).ort);
-    script.onerror = () => (ortLoading = undefined, reject(new Error('The voice service is not reachable')));
-    document.head.append(script);
-  }));
+  constructor(private readonly worker: Worker) {
+    worker.onmessage = ({ data }) => data.type === 'score' && this.waiting.shift()?.(data.score);
+  }
+
+  /** The worker once it has loaded the models, or why it could not. */
+  static async start(): Promise<WakeDetector> {
+    const worker = new Worker(VOICE_BASE + 'wakeword-worker.js');
+    await new Promise<void>((resolve, reject) => {
+      worker.onmessage = ({ data }) => (data.type === 'ready' ? resolve() : data.type === 'error' && reject(new Error(data.message)));
+      worker.onerror = (e) => reject(new Error(`The wake word could not be loaded: ${e.message || VOICE_BASE + 'wakeword-worker.js'}`));
+      worker.postMessage({ type: 'init' });
+    });
+    return new WakeDetector(worker);
+  }
+
+  /** How many blocks are being worked on. */
+  get busy() {
+    return this.waiting.length;
+  }
+
+  /** The highest score of what was fed; the samples are handed over to the worker. */
+  feed(samples: Float32Array): Promise<number> {
+    return new Promise((resolve) => {
+      this.waiting.push(resolve);
+      this.worker.postMessage({ type: 'feed', samples }, [samples.buffer]);
+    });
+  }
+
+  reset() {
+    this.worker.postMessage({ type: 'reset' });
+  }
+
+  stop() {
+    this.worker.terminate();
+  }
 }
 
 /** What HomeyDash answers to a command it heard, once it has carried it out (the fields a screen shows). */
@@ -119,6 +144,7 @@ export class Voice {
   private ws?: WebSocket;
   private ctx?: AudioContext;
   private mic?: MediaStream;
+  private detector?: WakeDetector;
   private session?: ReturnType<typeof setTimeout>;
   private clear?: ReturnType<typeof setTimeout>;
   private stopped = true;
@@ -153,9 +179,7 @@ export class Voice {
   private async start() {
     this.stopped = false;
     try {
-      const ort = await loadOrt();
-      const { WakeWord } = (await import(/* @vite-ignore */ VOICE_BASE + 'wakeword.js')) as { WakeWord: WakeWordClass };
-      const ww = await WakeWord.create(ort);
+      this.detector = await WakeDetector.start();
       this.mic = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, noiseSuppression: true, echoCancellation: true },
       });
@@ -168,7 +192,7 @@ export class Voice {
       URL.revokeObjectURL(url);
       const node = new AudioWorkletNode(this.ctx, 'pcm');
       this.ctx.createMediaStreamSource(this.mic).connect(node);
-      this.listen(node, ww);
+      this.listen(node, this.detector);
     } catch (e) {
       this.error.set(e instanceof Error ? `${e.name}: ${e.message}` : String(e));
       this.stop(); // no microphone, no permission or no voice service: the screen stays as it was
@@ -177,13 +201,20 @@ export class Voice {
     }
   }
 
-  private listen(node: AudioWorkletNode, ww: WakeWordInstance) {
+  private listen(node: AudioWorkletNode, ww: WakeDetector) {
     const ring: Int16Array[] = []; // the last PREROLL samples, to replay the wake word and what follows it
     let ringLen = 0;
     let block: Float32Array[] = [];
     let n = 0;
-    let busy = 0;
     let cool = 0;
+    const quiet: Float32Array[] = []; // the blocks of the last couple of seconds, while the detector rests
+    let open = false;
+    let tail = 0;
+    let floor = 0.005; // how loud the room is when nobody speaks
+    const detect = (samples: Float32Array) =>
+      void ww.feed(samples).then((score) => {
+        if (!this.stopped && !this.ws && score >= WAKE_THRESHOLD && performance.now() > cool) trigger();
+      });
     const toPcm = (f: Float32Array) => {
       const pcm = new Int16Array(f.length);
       for (let i = 0; i < f.length; i++) pcm[i] = Math.max(-1, Math.min(1, f[i])) * 32767;
@@ -235,12 +266,26 @@ export class Voice {
         if (this.ws.readyState === WebSocket.OPEN) this.ws.send(toPcm(f).buffer);
         return;
       }
-      if (busy > 4) return; // too slow for real time: drop rather than fall further behind
-      busy++;
-      void ww.feed(f).then((score) => {
-        busy--;
-        if (!this.stopped && !this.ws && score >= WAKE_THRESHOLD && performance.now() > cool) trigger();
-      });
+      // Most of the time nobody speaks, and then there is nothing to detect: the detector runs while there is sound, and
+      // for a moment after, and is first given the last two seconds, which hold the start of what made the sound.
+      let sum = 0;
+      for (const v of f) sum += v * v;
+      const rms = Math.sqrt(sum / f.length);
+      const loud = rms > Math.max(GATE_MIN, 3 * floor);
+      if (!open) floor = 0.95 * floor + 0.05 * rms;
+      if (loud) tail = GATE_TAIL;
+      if (!open && loud) {
+        open = true;
+        ww.reset();
+        for (const b of quiet.splice(0)) detect(b);
+      }
+      if (open) {
+        if (!loud && --tail <= 0) open = false;
+        if (ww.busy < 40) detect(f); // far too slow for real time: drop rather than fall further behind
+      } else {
+        quiet.push(f);
+        if (quiet.length > GATE_PREROLL) quiet.shift();
+      }
     };
   }
 
@@ -252,7 +297,8 @@ export class Voice {
     this.ws?.close();
     void this.ctx?.close();
     this.mic?.getTracks().forEach((track) => track.stop());
-    this.ws = this.ctx = this.mic = undefined;
+    this.detector?.stop();
+    this.ws = this.ctx = this.mic = this.detector = undefined;
   }
 }
 
