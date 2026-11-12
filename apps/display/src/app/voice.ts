@@ -22,8 +22,59 @@ const GATE_MIN = 0.012;
 const GATE_TAIL = 20;
 const GATE_PREROLL = 24;
 
+/** What listening needs of a wake word detector. */
+interface Detector {
+  /** How many blocks are being worked on. */
+  readonly busy: number;
+  /** The highest score of what was fed (0 to 1). */
+  feed(samples: Float32Array): Promise<number>;
+  reset(): void;
+  stop(): void;
+}
+
+let ortLoading: Promise<unknown> | undefined;
+/** onnxruntime-web, from the voice service, as the global `ort` its script defines. */
+function loadOrt(): Promise<unknown> {
+  return (ortLoading ??= new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = VOICE_BASE + 'vendor/ort/ort.wasm.min.js';
+    script.onload = () => resolve((window as unknown as { ort: unknown }).ort);
+    script.onerror = async () => {
+      ortLoading = undefined;
+      // Say what the address answered, which tells a service that is down (502) from one that is not forwarded to (404).
+      const status = await fetch(script.src, { method: 'HEAD' }).then((r) => `HTTP ${r.status}`, () => 'no answer');
+      reject(new Error(`The voice service is not reachable: ${script.src} gave ${status}`));
+    };
+    document.head.append(script);
+  }));
+}
+
+/** The same detector on the page's own thread, for a browser whose workers cannot run it. */
+class InlineDetector implements Detector {
+  busy = 0;
+
+  constructor(private readonly ww: { feed(samples: Float32Array): Promise<number>; reset(): void }) {}
+
+  static async start(): Promise<InlineDetector> {
+    const ort = await loadOrt();
+    const { WakeWord } = (await import(/* @vite-ignore */ VOICE_BASE + 'wakeword.js')) as { WakeWord: { create(ort: unknown): Promise<InlineDetector['ww']> } };
+    return new InlineDetector(await WakeWord.create(ort));
+  }
+
+  feed(samples: Float32Array) {
+    this.busy++;
+    return this.ww.feed(samples).finally(() => this.busy--);
+  }
+
+  reset() {
+    this.ww.reset();
+  }
+
+  stop() {}
+}
+
 /** The wake word detector, which runs in a worker so that listening does not slow the page down. */
-class WakeDetector {
+class WakeDetector implements Detector {
   private readonly waiting: ((score: number) => void)[] = [];
 
   constructor(private readonly worker: Worker) {
@@ -144,7 +195,7 @@ export class Voice {
   private ws?: WebSocket;
   private ctx?: AudioContext;
   private mic?: MediaStream;
-  private detector?: WakeDetector;
+  private detector?: Detector;
   private session?: ReturnType<typeof setTimeout>;
   private clear?: ReturnType<typeof setTimeout>;
   private stopped = true;
@@ -179,7 +230,11 @@ export class Voice {
   private async start() {
     this.stopped = false;
     try {
-      this.detector = await WakeDetector.start();
+      this.detector = await WakeDetector.start().catch((e) => {
+        // Some browsers (an older Android WebView, such as Fully Kiosk's) cannot run the models in a worker.
+        console.warn('Wake word worker failed, running it on the page instead:', e);
+        return InlineDetector.start();
+      });
       this.mic = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, noiseSuppression: true, echoCancellation: true },
       });
@@ -201,7 +256,7 @@ export class Voice {
     }
   }
 
-  private listen(node: AudioWorkletNode, ww: WakeDetector) {
+  private listen(node: AudioWorkletNode, ww: Detector) {
     const ring: Int16Array[] = []; // the last PREROLL samples, to replay the wake word and what follows it
     let ringLen = 0;
     let block: Float32Array[] = [];
