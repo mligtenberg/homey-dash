@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice PoC</title>
+<style>
+  body { font: 18px system-ui, sans-serif; background: #111; color: #eee; margin: 0; padding: 24px; max-width: 640px; margin-inline: auto; }
+  button { font: inherit; padding: 28px; width: 100%; border: 0; border-radius: 16px; background: #2d6cdf; color: #fff; }
+  button.alt { background: #3a3a3a; margin-bottom: 8px; }
+  button.alt.on { background: #1f7a3d; }
+  #wakestate { min-height: 1.4em; margin: 4px 0 16px; color: #aaa; }
+  button.rec { background: #d33; }
+  select { font: inherit; padding: 8px; margin: 0 0 16px 8px; background: #222; color: #eee; border-radius: 8px; border: 1px solid #444; }
+  input { font: inherit; width: 100%; box-sizing: border-box; padding: 12px; margin-top: 16px; border-radius: 8px; border: 1px solid #444; background: #222; color: #eee; }
+  pre { background: #1c1c1c; padding: 12px; border-radius: 8px; overflow: auto; font-size: 14px; }
+  .ok { color: #6c6; } .bad { color: #e66; }
+</style>
+</head>
+<body>
+<h1>Voice PoC</h1>
+<label>Engine <select id="engine"><option value="rules">rules (deterministisch)</option><option value="needle">Needle 3</option><option value="hybrid-needle">hybrid (rules, dan Needle)</option><option value="functiongemma">FunctionGemma 270M</option><option value="hybrid-functiongemma">hybrid (rules, dan FunctionGemma)</option></select></label>
+<label>Ruimte <select id="zone"></select></label>
+<button id="local" class="alt">Wake word op apparaat (hey jarvis)</button>
+<button id="listen" class="alt">Luister continu (wake word)</button>
+<p id="wakestate"></p>
+<button id="talk">Tik om te spreken</button>
+<input id="txt" placeholder="of typ een commando en druk Enter">
+<h2 id="status"></h2>
+<pre id="out"></pre>
+<script src="vendor/ort/ort.wasm.min.js"></script>
+<script type="module">import { WakeWord } from './wakeword.js'; window.WakeWord = WakeWord;</script>
+<script>
+const zone = document.getElementById('zone');
+fetch('api/catalog').then(r => r.json()).then(c => zone.innerHTML = c.zones.map(z => `<option>${z}</option>`).join(''));
+const qs = () => `engine=${engine.value}&zone=${zone.value}`;
+const engine = document.getElementById('engine');
+const talk = document.getElementById('talk'), out = document.getElementById('out'), status = document.getElementById('status');
+const ACTIONS = { lights_on: 'lichten aan', lights_off: 'lichten uit', lights_dim: 'lichten dim', warmer: 'warmer', colder: 'kouder' };
+let rec = null, chunks = [];
+
+function show(r) {
+  status.className = r.ok ? 'ok' : 'bad';
+  status.textContent = r.ok
+    ? `${ACTIONS[r.action]}${r.value != null ? ' ' + Math.round(r.value * 100) + '%' : ''} · ${r.zones.join(', ')} · ${r.commands.map(c => c.name).join(' + ')}`
+    : r.reason + (r.zones.length ? ` · ruimte: ${r.zones.join(', ')}` : '');
+  status.textContent += `  [${r.engine}${r.model_ms ? ' ' + r.model_ms + 'ms' : ''}]`;
+  out.textContent = JSON.stringify(r, null, 2);
+  if (r.command_text) out.textContent = `commando: "${r.command_text}"\n` + out.textContent;
+}
+
+talk.onclick = async () => {
+  if (rec) { rec.stop(); return; }
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, noiseSuppression: true, echoCancellation: true } });
+  rec = new MediaRecorder(stream);
+  chunks = [];
+  rec.ondataavailable = e => chunks.push(e.data);
+  rec.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    talk.classList.remove('rec'); talk.textContent = 'Bezig…';
+    const fd = new FormData();
+    fd.append('audio', new Blob(chunks, { type: rec.mimeType }), 'cmd.webm');
+    rec = null;
+    try { show(await (await fetch('api/voice?' + qs(), { method: 'POST', body: fd })).json()); }
+    finally { talk.textContent = 'Tik om te spreken'; }
+  };
+  rec.start();
+  talk.classList.add('rec'); talk.textContent = 'Luisteren… tik om te stoppen';
+  setTimeout(() => rec && rec.state === 'recording' && rec.stop(), 8000);
+};
+
+document.getElementById('txt').onkeydown = async e => {
+  if (e.key !== 'Enter') return;
+  show(await (await fetch('api/text?' + qs(), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: e.target.value }) })).json());
+};
+
+// --- continuous listening with a wake phrase --------------------------------------------------------------
+const listenBtn = document.getElementById('listen'), wakestate = document.getElementById('wakestate');
+const STATES = { idle: 'wacht op', speech: 'hoort spraak…', thinking: 'verwerkt…', awake: 'luistert naar je commando…' };
+let ws = null, ctx = null, mic = null;
+
+async function stopListening() {
+  if (ws) ws.close();
+  if (ctx) await ctx.close();
+  if (mic) mic.getTracks().forEach(t => t.stop());
+  ws = ctx = mic = null;
+  listenBtn.classList.remove('on'); listenBtn.textContent = 'Luister continu (wake word)'; wakestate.textContent = '';
+}
+
+async function startListening() {
+  mic = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, noiseSuppression: true, echoCancellation: true } });
+  ctx = new AudioContext({ sampleRate: 16000 });
+  const code = `class P extends AudioWorkletProcessor { process(i) { if (i[0][0]) this.port.postMessage(i[0][0].slice()); return true; } }
+                registerProcessor('pcm', P);`;
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+  const node = new AudioWorkletNode(ctx, 'pcm');
+  ctx.createMediaStreamSource(mic).connect(node);
+  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${location.pathname.replace(/[^/]*$/, '')}ws/listen?` + qs());
+  let wake = '';
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'state') { wake = m.wake; wakestate.textContent = m.state === 'idle' ? `zeg "${wake}"…` : STATES[m.state]; }
+    else if (m.type === 'heard') out.textContent = `gehoord: "${m.text}" (${m.stt_ms} ms)${m.wake || m.armed ? '' : '\n— geen wake word, genegeerd'}`;
+    else if (m.type === 'result') show(m);
+  };
+  ws.onclose = () => ws && stopListening();
+  // 128-sample blocks -> ~100 ms int16 chunks
+  let pending = [], n = 0;
+  node.port.onmessage = ({ data }) => {
+    pending.push(data); n += data.length;
+    if (n < 1600 || ws.readyState !== 1) return;
+    const pcm = new Int16Array(n); let o = 0;
+    for (const b of pending) for (let i = 0; i < b.length; i++) pcm[o++] = Math.max(-1, Math.min(1, b[i])) * 32767;
+    ws.send(pcm.buffer); pending = []; n = 0;
+  };
+  listenBtn.classList.add('on'); listenBtn.textContent = 'Stop met luisteren';
+}
+
+listenBtn.onclick = () => ws ? stopListening() : startListening().catch(e => { wakestate.textContent = 'fout: ' + e.message; stopListening(); });
+[engine, zone].forEach(el => el.onchange = () => { if (ws) stopListening().then(startListening); });
+
+// --- wake word on the device (openWakeWord "hey jarvis" in the browser); audio goes to the server only afterwards ---
+const localBtn = document.getElementById('local');
+const THRESHOLD = 0.5, WAKE_SPELLINGS = 'hey jarvis,jarvis,jervis,jarvas', PREROLL = 16000 * 2;
+let L = null;
+
+async function stopLocal() {
+  if (!L) return;
+  const s = L; L = null;
+  if (s.ws) s.ws.close();
+  s.mic.getTracks().forEach(t => t.stop()); await s.ctx.close();
+  localBtn.classList.remove('on'); localBtn.textContent = 'Wake word op apparaat (hey jarvis)'; wakestate.textContent = '';
+}
+
+function endSession(s) {            // back to listening for the wake word
+  if (s.ws) { s.ws.close(); s.ws = null; }
+  s.ww.reset(); s.cool = performance.now() + 1500;
+  wakestate.textContent = 'zeg "hey jarvis"…';
+}
+
+function trigger(s, score) {
+  wakestate.textContent = `wake word! (${score.toFixed(2)}) — zeg je commando…`;
+  const ws = s.ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${location.pathname.replace(/[^/]*$/, '')}ws/listen?${qs()}&wake=${encodeURIComponent(WAKE_SPELLINGS)}`);
+  ws.onopen = () => {                // arm, then replay the last 2 s (the wake word and anything said right after it)
+    ws.send(JSON.stringify({ type: 'arm' }));
+    const pre = new Int16Array(s.ring.reduce((n, b) => n + b.length, 0)); let o = 0;
+    for (const b of s.ring) { pre.set(b, o); o += b.length; }
+    ws.send(pre.buffer);
+  };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'heard') out.textContent = `gehoord: "${m.text}" (${m.stt_ms} ms)`;
+    else if (m.type === 'result') { show(m); endSession(s); }
+  };
+  setTimeout(() => { if (s.ws === ws) endSession(s); }, 12000);
+}
+
+async function startLocal() {
+  const mic = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, noiseSuppression: true, echoCancellation: true } });
+  const ctx = new AudioContext({ sampleRate: 16000 });
+  const code = `class P extends AudioWorkletProcessor { process(i) { if (i[0][0]) this.port.postMessage(i[0][0].slice()); return true; } }
+                registerProcessor('pcm', P);`;
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+  wakestate.textContent = 'laadt wake word model…';
+  const ww = await WakeWord.create(ort);
+  const node = new AudioWorkletNode(ctx, 'pcm');
+  ctx.createMediaStreamSource(mic).connect(node);
+  const s = L = { mic, ctx, ww, ws: null, ring: [], ringLen: 0, cool: 0, block: [], n: 0, busy: 0 };
+  node.port.onmessage = ({ data }) => {
+    const pcm = new Int16Array(data.length);
+    for (let i = 0; i < data.length; i++) pcm[i] = Math.max(-1, Math.min(1, data[i])) * 32767;
+    s.ring.push(pcm); s.ringLen += pcm.length;
+    while (s.ringLen > PREROLL) s.ringLen -= s.ring.shift().length;
+    s.block.push(data); s.n += data.length;
+    if (s.n < 1280) return;
+    const f = new Float32Array(s.n); let o = 0;
+    for (const b of s.block) { f.set(b, o); o += b.length; }
+    s.block = []; s.n = 0;
+    if (s.ws) { if (s.ws.readyState === 1) { const q = new Int16Array(f.length); for (let i = 0; i < f.length; i++) q[i] = Math.max(-1, Math.min(1, f[i])) * 32767; s.ws.send(q.buffer); } return; }
+    if (s.busy > 4) return;          // too slow for real time: drop instead of lagging further behind
+    s.busy++;
+    ww.feed(f).then(score => {
+      s.busy--;
+      if (!L || s.ws) return;
+      if (score > 0.05) wakestate.textContent = `hey jarvis: ${score.toFixed(2)}`;
+      if (score >= THRESHOLD && performance.now() > s.cool) trigger(s, score);
+    });
+  };
+  localBtn.classList.add('on'); localBtn.textContent = 'Stop (wake word op apparaat)'; wakestate.textContent = 'zeg "hey jarvis"…';
+}
+
+localBtn.onclick = () => L ? stopLocal() : (ws ? stopListening() : 0, startLocal().catch(e => { wakestate.textContent = 'fout: ' + e.message; stopLocal(); }));
+
+// test hook: run a wav through the detector, `await wwTest('/_test/x.wav')` -> {max, at}
+window.wwTest = async url => {
+  const a = await new OfflineAudioContext(1, 1, 16000).decodeAudioData(await (await fetch(url)).arrayBuffer());
+  const f = a.getChannelData(0), ww = await WakeWord.create(ort); let max = 0, at = 0;
+  for (let i = 0; i + 1280 <= f.length; i += 1280) { const s = await ww.feed(f.subarray(i, i + 1280)); if (s > max) { max = s; at = i / 16000; } }
+  return { max: +max.toFixed(3), at: +at.toFixed(2), seconds: +(f.length / 16000).toFixed(1) };
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+[project]
+name = "voice"
+version = "0.0.1"
+description = "PoC: Dutch voice -> smart-home command (STT + deterministic matcher)"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+    "faster-whisper>=1.1",
+    "rapidfuzz>=3.9",
+    "numpy",
+    "av>=16,<17",
+    "websockets>=16.1.1",
+]
+
+[project.optional-dependencies]
+model = ["transformers>=4.56", "torch", "accelerate"]
+needle = ["cactus-compute>=4"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -167,6 +167,19 @@
         ".claude/proxy-b.json"
       ],
       "port": 4303
+    },
+    {
+      "name": "voice",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NX_WORKSPACE_DATA_DIRECTORY=tmp/claude/nx",
+        "NX_DAEMON=false",
+        "npx",
+        "nx",
+        "serve",
+        "voice"
+      ],
+      "port": 8765
     }
   ]
 }

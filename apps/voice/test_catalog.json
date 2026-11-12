@@ -1,0 +1,118 @@
+{
+  "zones": [
+    "woonkamer",
+    "keuken",
+    "slaapkamer",
+    "bijkeuken",
+    "hal",
+    "tuin"
+  ],
+  "devices": [
+    {
+      "id": "d1",
+      "name": "bank lamp",
+      "zone": "woonkamer",
+      "kind": "light",
+      "caps": [
+        "onoff",
+        "dim",
+        "light_temperature"
+      ]
+    },
+    {
+      "id": "d2",
+      "name": "plafondlamp",
+      "zone": "woonkamer",
+      "kind": "light",
+      "caps": [
+        "onoff",
+        "dim",
+        "light_temperature"
+      ]
+    },
+    {
+      "id": "d3",
+      "name": "leeslamp",
+      "zone": "slaapkamer",
+      "kind": "light",
+      "caps": [
+        "onoff",
+        "dim"
+      ]
+    },
+    {
+      "id": "d4",
+      "name": "keukenlamp",
+      "zone": "keuken",
+      "kind": "light",
+      "caps": [
+        "onoff",
+        "dim"
+      ]
+    },
+    {
+      "id": "d5",
+      "name": "wasmachine",
+      "zone": "bijkeuken",
+      "kind": "appliance",
+      "caps": [
+        "onoff"
+      ]
+    },
+    {
+      "id": "d6",
+      "name": "thermostaat",
+      "zone": "woonkamer",
+      "kind": "thermostat",
+      "caps": [
+        "target_temperature"
+      ]
+    },
+    {
+      "id": "d7",
+      "name": "rolgordijn",
+      "zone": "woonkamer",
+      "kind": "cover",
+      "caps": [
+        "windowcoverings_set"
+      ]
+    },
+    {
+      "id": "d8",
+      "name": "tuinverlichting",
+      "zone": "tuin",
+      "kind": "light",
+      "caps": [
+        "onoff"
+      ]
+    },
+    {
+      "id": "d9",
+      "name": "hal lamp",
+      "zone": "hal",
+      "kind": "light",
+      "caps": [
+        "onoff",
+        "dim"
+      ]
+    },
+    {
+      "id": "d10",
+      "name": "radiator slaapkamer",
+      "zone": "slaapkamer",
+      "kind": "thermostat",
+      "caps": [
+        "target_temperature"
+      ]
+    },
+    {
+      "id": "d11",
+      "name": "radiator keuken",
+      "zone": "keuken",
+      "kind": "thermostat",
+      "caps": [
+        "target_temperature"
+      ]
+    }
+  ]
+}

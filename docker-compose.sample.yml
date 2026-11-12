@@ -23,7 +23,32 @@ services:
       # SelfSignedCertificateHosts: "192.168.1.23,nas.local"
       # Playing Plex covers on Apple TVs through AirPlay finds them with multicast DNS, which reaches your network from a
       # container only with host networking (Linux): add `network_mode: host` and drop `ports` (ADR-0012).
+      # Voice commands (optional): forwards /voice/... to the homey-voice service below. Remove with the service.
+      Voice__Address: "http://homey-voice:8765"
       # Defaults, only change if you move things:
       # ConnectionStrings__HomeyDash: "Data Source=/data/homey-dash.db"
       # ASPNETCORE_HTTP_PORTS: "8080"
       # Logging__LogLevel__Default: Information
+
+  # Voice control (optional, separate container: Python, ffmpeg, speech-to-text). Open it at http://<host>:8080/voice/
+  # (the microphone needs HTTPS or localhost, see ASPNETCORE_HTTPS_PORTS above).
+  homey-voice:
+    image: ghcr.io/mligtenberg/homey-voice:latest
+    container_name: homey-voice
+    restart: unless-stopped
+    # Speech recognition is bursty: keep it from starving the dashboard on a small NAS.
+    cpus: 3
+    mem_limit: 3g
+    volumes:
+      # Whisper and Needle download once to here (~0.6 GB). Must be writable by UID 1654:
+      #   mkdir -p ./voice-models && chown 1654:1654 ./voice-models
+      - ./voice-models:/models
+    environment:
+      TZ: Europe/Amsterdam
+      # Rooms and devices come from HomeyDash itself, so there is no second list to keep up to date.
+      HOMEY_DASH_URL: "http://homey-dash:8080"
+      # Spoken wake word (spellings Whisper may write, comma-separated) and the Whisper size.
+      # VOICE_WAKE: "homey,homie,homi"
+      # VOICE_MODEL: small
+    depends_on:
+      - homey-dash

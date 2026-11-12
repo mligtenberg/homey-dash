@@ -1,0 +1,5 @@
+static/models/
+static/vendor/
+.venv/
+__pycache__/
+static/_test/
