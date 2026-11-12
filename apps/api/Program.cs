@@ -14,9 +14,12 @@ using HomeyDash.Api.Realtime;
 using HomeyDash.Api.Rules;
 using HomeyDash.Api.News;
 using HomeyDash.Api.Traffic;
+using HomeyDash.Api.Voice;
 using HomeyDash.Api.Weather;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using System.Net;
+using Yarp.ReverseProxy.Forwarder;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -87,6 +90,27 @@ else
 {
     frontends = null;
 }
+
+// Optional voice service (apps/voice, its own container, Voice:Address). Spoken commands go through /api/voice/listen, which
+// is the only way a screen talks to it; /voice/... is forwarded with the prefix removed for what the screens load from it
+// (the wake word model and its runtime), through the one address (and certificate) they already use.
+var voiceAddress = builder.Configuration["Voice:Address"];
+if (!string.IsNullOrWhiteSpace(voiceAddress))
+{
+    var forwarder = app.Services.GetRequiredService<IHttpForwarder>();
+    var voiceClient = new HttpMessageInvoker(new SocketsHttpHandler
+    {
+        UseProxy = false,
+        AllowAutoRedirect = false,
+        AutomaticDecompression = DecompressionMethods.None,
+        UseCookies = false,
+        ConnectTimeout = TimeSpan.FromSeconds(5),
+    });
+    app.Map("/voice", branch => branch.Run(context =>
+        forwarder.SendAsync(context, voiceAddress, voiceClient, ForwarderRequestConfig.Empty).AsTask()));
+}
+
+app.UseWebSockets();
 app.UseRouting();
 
 if (app.Environment.IsDevelopment())
@@ -110,6 +134,7 @@ api.MapBackgrounds();
 api.MapPresetBackgrounds();
 api.MapDisplays();
 api.MapRules();
+api.MapVoice();
 app.MapHub<RealtimeHub>(RealtimeHub.Path);
 app.MapMcp(ManagementTools.Path);
 // Everything outside /api and /mcp is a frontend: Management under /admin, the display app at the root.
