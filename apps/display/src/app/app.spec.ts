@@ -175,6 +175,19 @@ describe('App', () => {
       );
     });
 
+    it('collapses the tape when a press lands outside it, but not on it', async () => {
+      const root = await startOpen(several);
+
+      tape(root)[0].dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      await stable();
+      expect(tape(root).length).toBe(3);
+
+      root.querySelector('hd-dashboard-view')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      await stable();
+      expect(tape(root)).toEqual([]);
+      expect(localStorage.getItem('homeydash.tape')).toBeNull();
+    });
+
     it('stays on the one picked once left alone, when no idle rule holds', async () => {
       const root = await startOpen(several);
       tape(root)[2].click();

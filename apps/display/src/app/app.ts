@@ -52,7 +52,7 @@ const TAPE_KEY = 'homeydash.tape';
 /**
  * A screen: setup until it is a display, then its dashboards' published versions, or waiting for one. A display
  * that offers more than one dashboard floats a tape of pills over its left edge to switch between them, which
- * starts collapsed to a single button and collapses again once one is picked. It starts on its first dashboard;
+ * starts collapsed to a single button and collapses again once one is picked, or a press lands anywhere else. It starts on its first dashboard;
  * left alone, it does what the first idle rule that holds says, and stays where it is while none does. A rule can
  * show a dashboard, or play a photo set or fill the screen with a colour, over the dashboard, until a touch goes back
  * to the rule's dashboard or the one shown before; its lock screen widgets, such as a clock, lie over either.
@@ -66,7 +66,7 @@ const TAPE_KEY = 'homeydash.tape';
     '[class.is-connection-lost]': '!realtime.connected()',
     '[style.--cell.px]': 'cell()',
     '(window:resize)': 'onResize()',
-    '(pointerdown)': 'touched()',
+    '(pointerdown)': 'touched($event)',
     '(keydown)': 'wake()',
     '(wheel)': 'wake()',
   },
@@ -345,7 +345,9 @@ export class App {
   }
 
   // Any touch keeps the display where it is; left alone for a while, it follows its idle rules again.
-  protected touched() {
+  protected touched(event?: Event) {
+    // A press anywhere but on the open tape closes it.
+    if (!this.collapsed() && event?.target instanceof Element && !event.target.closest('.hd-tape')) this.collapse(true);
     clearTimeout(this.idle);
     this.alone.set(false);
     this.idle = setTimeout(() => this.alone.set(true), IDLE_MS);
