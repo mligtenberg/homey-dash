@@ -73,11 +73,11 @@ public static class ArticlePage
         :root[data-theme="dark"] { color-scheme: dark; --bg: #262626; --ink: #fff; --muted: #b3b3b3; --line: #3a3a3a; --accent: #ff5247; }
         * { box-sizing: border-box; }
         html { background: var(--bg); }
-        body { margin: 0; padding: clamp(20px, 5vw, 56px) clamp(20px, 5vw, 56px) 96px; color: var(--ink); font: 500 clamp(19px, 2.4vw, 24px)/1.6 "Rubik Variable", Rubik, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+        body { margin: 0; padding: clamp(20px, 5vw, 56px) clamp(20px, 5vw, 56px) 96px; color: var(--ink); font: 500 clamp(15px, 1.8vw, 18px)/1.55 "Rubik Variable", Rubik, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
         article { max-width: 44em; margin: 0 auto; }
         .meta { display: flex; align-items: center; gap: .6em; margin: 0 0 1em; color: var(--muted); font-size: .72em; font-weight: 700; letter-spacing: .02em; }
         .logo { height: 1.5em; width: auto; color: light-dark(#a69b9c, #fff); }
-        h1 { margin: 0 0 .5em; font-size: clamp(30px, 4.6vw, 48px); line-height: 1.12; font-weight: 800; text-wrap: balance; }
+        h1 { margin: 0 0 .5em; font-size: clamp(22px, 3.2vw, 32px); line-height: 1.12; font-weight: 800; text-wrap: balance; }
         h2 { margin: 1.7em 0 .4em; font-size: 1.25em; line-height: 1.25; font-weight: 800; text-wrap: balance; }
         p { margin: 0 0 1em; text-wrap: pretty; }
         .intro { font-size: 1.12em; font-weight: 600; color: var(--muted); line-height: 1.45; }

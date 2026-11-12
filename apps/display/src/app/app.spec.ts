@@ -575,6 +575,12 @@ describe('App', () => {
     const corner = (root: HTMLElement) =>
       root.querySelector('.corner')?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     const settings = (root: HTMLElement) => root.querySelector<HTMLDialogElement>('hd-screen-settings dialog');
+    // The cameras are on the Light tab, the second of the sheet's tabs.
+    const lightTab = async (root: HTMLElement) => {
+      root.querySelector<HTMLButtonElement>('hd-screen-settings .hd-segmented button:nth-child(2)')?.click();
+      await stable();
+    };
+    const cameras = (root: HTMLElement) => [...root.querySelectorAll<HTMLButtonElement>('hd-screen-settings [role=radio]')];
 
     it('opens the screen settings after quick taps in the top-right corner, not slow ones', async () => {
       const root = await start(published(1));
@@ -587,8 +593,8 @@ describe('App', () => {
       await vi.advanceTimersByTimeAsync(0);
       await stable();
       expect(settings(root)?.open).toBe(true);
-      const select = root.querySelector('#screen-camera') as HTMLSelectElement;
-      expect([...select.options].map((o) => o.textContent?.trim())).toEqual(['Automatic', 'FaceTime HD Camera', 'iPhone Camera']);
+      await lightTab(root);
+      expect(cameras(root).map((o) => o.textContent?.trim())).toEqual(['Automatic', 'FaceTime HD Camera', 'iPhone Camera']);
     });
 
     it('measures again at once with the camera picked there', async () => {
@@ -599,9 +605,8 @@ describe('App', () => {
       await vi.advanceTimersByTimeAsync(0);
       await stable();
 
-      const select = root.querySelector('#screen-camera') as HTMLSelectElement;
-      select.value = 'i';
-      select.dispatchEvent(new Event('change'));
+      await lightTab(root);
+      cameras(root)[2].click();
       await stable();
 
       expect(picked).toEqual(['i']);

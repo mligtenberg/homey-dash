@@ -14,7 +14,7 @@ export const RESULT_MS = 6_000;
 /** Where the voice service's pages and assets are reached, through HomeyDash. */
 const VOICE_BASE = '/voice/';
 /** The score (0 to 1) from which the wake word counts as said; how much of the audio before it goes with it; how long a command may take to come. */
-const WAKE_THRESHOLD = 0.5;
+export const WAKE_THRESHOLD = 0.5;
 const PREROLL = 16000 * 2;
 const SESSION_MS = 12_000;
 /** Below this loudness (and 3 times the room's own) the detector rests; it keeps going for GATE_TAIL blocks of 80 ms after the sound, and starts from GATE_PREROLL blocks before it. */
@@ -22,8 +22,39 @@ const GATE_MIN = 0.012;
 const GATE_TAIL = 20;
 const GATE_PREROLL = 24;
 
+/**
+ * What this browser can do that the wake word depends on, as lines of text, for a screen that cannot say why it does
+ * not listen (a tablet has no console): the shared memory the runtime asks for, SIMD, workers, and which runtime the
+ * voice service hands out.
+ */
+export async function diagnose(): Promise<string> {
+  const memory = (maximum: number, shared: boolean) => {
+    try {
+      new WebAssembly.Memory({ initial: 256, maximum, shared });
+      return 'ok';
+    } catch (e) {
+      return e instanceof Error ? e.name : 'failed';
+    }
+  };
+  // The smallest module that uses a SIMD instruction.
+  const simd = WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]));
+  const runtime = await fetch(VOICE_BASE + 'vendor/ort/ort-wasm-simd-threaded.mjs')
+    .then((r) => (r.ok ? r.text() : `HTTP ${r.status}`), () => 'no answer')
+    .then((text) => (text.includes('maximum:1024,shared:!0') ? 'small memory' : text.includes('maximum:65536,shared:!0') ? 'OLD (4 GB memory)' : text));
+  const nav = navigator as Navigator & { deviceMemory?: number };
+  return [
+    `shared memory 4 GB: ${memory(65536, true)}, 256 MB: ${memory(4096, true)}, 64 MB: ${memory(1024, true)}`,
+    `own memory 4 GB: ${memory(65536, false)}`,
+    `SIMD: ${simd}, workers: ${typeof Worker !== 'undefined'}, secure: ${window.isSecureContext}, RAM: ${nav.deviceMemory ?? '?'} GB`,
+    `runtime from the voice service: ${runtime}`,
+    nav.userAgent,
+  ].join('\n');
+}
+
 /** What listening needs of a wake word detector. */
-interface Detector {
+export interface Detector {
+  /** Where it runs: in a worker, or on the page itself. */
+  readonly kind: 'worker' | 'page';
   /** How many blocks are being worked on. */
   readonly busy: number;
   /** The highest score of what was fed (0 to 1). */
@@ -51,6 +82,7 @@ function loadOrt(): Promise<unknown> {
 
 /** The same detector on the page's own thread, for a browser whose workers cannot run it. */
 class InlineDetector implements Detector {
+  readonly kind = 'page';
   busy = 0;
 
   constructor(private readonly ww: { feed(samples: Float32Array): Promise<number>; reset(): void }) {}
@@ -75,6 +107,7 @@ class InlineDetector implements Detector {
 
 /** The wake word detector, which runs in a worker so that listening does not slow the page down. */
 class WakeDetector implements Detector {
+  readonly kind = 'worker';
   private readonly waiting: ((score: number) => void)[] = [];
 
   constructor(private readonly worker: Worker) {
@@ -112,6 +145,39 @@ class WakeDetector implements Detector {
   stop() {
     this.worker.terminate();
   }
+}
+
+/** Starts the wake word detector: in a worker, or on the page where the browser cannot run it in one. */
+export function startDetector(): Promise<Detector> {
+  return WakeDetector.start().catch((e) => {
+    // Some browsers (an older Android WebView, such as Fully Kiosk's) cannot run the models in a worker.
+    console.warn('Wake word worker failed, running it on the page instead:', e);
+    return InlineDetector.start();
+  });
+}
+
+/** The microphone as 16 kHz mono blocks of 128 samples (floats, -1 to 1), which is what the wake word and the voice service take. */
+export async function openMicrophone(onBlock: (samples: Float32Array) => void) {
+  const mic = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, noiseSuppression: true, echoCancellation: true },
+  });
+  const ctx = new AudioContext({ sampleRate: 16000 });
+  const worklet = `class P extends AudioWorkletProcessor { process(i) { if (i[0][0]) this.port.postMessage(i[0][0].slice()); return true; } }
+    registerProcessor('pcm', P);`;
+  const url = URL.createObjectURL(new Blob([worklet], { type: 'text/javascript' }));
+  await ctx.audioWorklet.addModule(url);
+  URL.revokeObjectURL(url);
+  const node = new AudioWorkletNode(ctx, 'pcm');
+  ctx.createMediaStreamSource(mic).connect(node);
+  node.port.onmessage = ({ data }: MessageEvent<Float32Array>) => onBlock(data);
+  return {
+    mic,
+    ctx,
+    stop: () => {
+      mic.getTracks().forEach((track) => track.stop());
+      void ctx.close();
+    },
+  };
 }
 
 /** What HomeyDash answers to a command it heard, once it has carried it out (the fields a screen shows). */
@@ -217,6 +283,16 @@ export class Voice {
     else this.stop();
   }
 
+  /** Stops listening for a while without forgetting that this screen listens, so the microphone and the processor are free to test. */
+  suspend() {
+    if (this.enabled() && !this.stopped) this.stop();
+  }
+
+  /** Listens again after `suspend`. */
+  resume() {
+    if (this.enabled() && this.stopped) void this.start();
+  }
+
   /** Takes an event the way HomeyDash sends it; also how a screen is tried without a microphone. */
   receive(event: VoiceEvent) {
     clearTimeout(this.clear);
@@ -230,33 +306,24 @@ export class Voice {
   private async start() {
     this.stopped = false;
     try {
-      this.detector = await WakeDetector.start().catch((e) => {
-        // Some browsers (an older Android WebView, such as Fully Kiosk's) cannot run the models in a worker.
-        console.warn('Wake word worker failed, running it on the page instead:', e);
-        return InlineDetector.start();
-      });
-      this.mic = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, noiseSuppression: true, echoCancellation: true },
-      });
+      this.detector = await startDetector();
       if (this.stopped) return this.stop();
-      this.ctx = new AudioContext({ sampleRate: 16000 });
-      const worklet = `class P extends AudioWorkletProcessor { process(i) { if (i[0][0]) this.port.postMessage(i[0][0].slice()); return true; } }
-        registerProcessor('pcm', P);`;
-      const url = URL.createObjectURL(new Blob([worklet], { type: 'text/javascript' }));
-      await this.ctx.audioWorklet.addModule(url);
-      URL.revokeObjectURL(url);
-      const node = new AudioWorkletNode(this.ctx, 'pcm');
-      this.ctx.createMediaStreamSource(this.mic).connect(node);
-      this.listen(node, this.detector);
+      const blocks: ((samples: Float32Array) => void)[] = [];
+      const opened = await openMicrophone((samples) => blocks[0]?.(samples));
+      this.mic = opened.mic;
+      this.ctx = opened.ctx;
+      if (this.stopped) return this.stop();
+      blocks[0] = this.listen(this.detector);
     } catch (e) {
-      this.error.set(e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+      this.error.set((e instanceof Error ? `${e.name}: ${e.message}` : String(e)) + '\n' + (await diagnose().catch(() => '')));
       this.stop(); // no microphone, no permission or no voice service: the screen stays as it was
       this.enabled.set(false);
       this.storage?.removeItem(VOICE_KEY);
     }
   }
 
-  private listen(node: AudioWorkletNode, ww: Detector) {
+  /** Gives the handler of what the microphone sends: the wake word is listened for, and once heard the audio goes on to HomeyDash. */
+  private listen(ww: Detector) {
     const ring: Int16Array[] = []; // the last PREROLL samples, to replay the wake word and what follows it
     let ringLen = 0;
     let block: Float32Array[] = [];
@@ -304,7 +371,7 @@ export class Voice {
       ws.onclose = () => this.ws === ws && end();
       this.session = setTimeout(end, SESSION_MS);
     };
-    node.port.onmessage = ({ data }: MessageEvent<Float32Array>) => {
+    return (data: Float32Array) => {
       const pcm = toPcm(data);
       ring.push(pcm);
       ringLen += pcm.length;
