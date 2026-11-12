@@ -131,7 +131,7 @@ public sealed class PhotoSync(
         List<(Guid Id, int? AccountId, string[] PhotoIds)> unread;
         using (var scope = scopes.CreateScope())
             unread = (await scope.ServiceProvider.GetRequiredService<HomeyDashDbContext>().PhotoSets.AsNoTracking().ToListAsync(ct))
-                .Select(s => (s.Id, s.AccountId, PhotoIds: s.Photos.Where(p => p.Faces is null).Select(p => p.Id).Distinct().ToArray()))
+                .Select(s => (s.Id, s.AccountId, PhotoIds: s.Photos.Where(p => p.FacesUnread).Select(p => p.Id).Distinct().ToArray()))
                 .Where(s => s.PhotoIds.Length > 0)
                 .ToList();
         foreach (var set in unread)
@@ -160,7 +160,7 @@ public sealed class PhotoSync(
             using var scope = scopes.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<HomeyDashDbContext>();
             if (await db.PhotoSets.FindAsync([setId], ct) is not { } set) return false;
-            set.Photos = set.Photos.Select(p => p.Faces is null && read.TryGetValue(p.Id, out var faces) ? p with { Faces = faces } : p).ToList();
+            set.Photos = set.Photos.Select(p => p.FacesUnread && read.TryGetValue(p.Id, out var faces) ? p with { Faces = faces } : p).ToList();
             await db.SaveChangesAsync(ct);
             return true;
         }

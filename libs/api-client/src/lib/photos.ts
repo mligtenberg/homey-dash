@@ -26,6 +26,8 @@ export interface Faces {
   focus: Focus;
   /** The names of the people they are, from left to right. */
   people: string[];
+  /** Their birth dates in Immich (2021-03-04), in the same order; null where it has none, or before they were read. */
+  born?: (string | null)[] | null;
 }
 
 /**

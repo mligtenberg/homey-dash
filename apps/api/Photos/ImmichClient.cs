@@ -258,23 +258,24 @@ public sealed class ImmichClient(IHttpClientFactory httpFactory, Random? random 
             return null;
         }
         double left = 1, top = 1, right = 0, bottom = 0;
-        List<(double X, string Name)> people = [];
+        List<(double X, string Name, string? Born)> people = [];
         foreach (var face in faces.EnumerateArray())
         {
             double width = face.GetProperty("imageWidth").GetDouble(), height = face.GetProperty("imageHeight").GetDouble();
             if (width <= 0 || height <= 0) continue;
             if (face.TryGetProperty("person", out var person) && Str(person, "name") is { Length: > 0 } name
                 && !(person.TryGetProperty("isHidden", out var hidden) && hidden.GetBoolean()))
-                people.Add((face.GetProperty("boundingBoxX1").GetDouble() / width, name));
+                people.Add((face.GetProperty("boundingBoxX1").GetDouble() / width, name, Str(person, "birthDate") is { Length: >= 10 } born ? born[..10] : null));
             left = Math.Min(left, face.GetProperty("boundingBoxX1").GetDouble() / width);
             top = Math.Min(top, face.GetProperty("boundingBoxY1").GetDouble() / height);
             right = Math.Max(right, face.GetProperty("boundingBoxX2").GetDouble() / width);
             bottom = Math.Max(bottom, face.GetProperty("boundingBoxY2").GetDouble() / height);
         }
         if (right <= left || bottom <= top) return Faces.None;
+        var named = people.OrderBy(p => p.X).DistinctBy(p => p.Name).ToList();
         return new Faces(
             new Focus(Math.Round(Math.Clamp((left + right) / 2, 0, 1), 3), Math.Round(Math.Clamp((top + bottom) / 2, 0, 1), 3)),
-            people.OrderBy(p => p.X).Select(p => p.Name).Distinct().ToList());
+            named.Select(p => p.Name).ToList(), named.Select(p => p.Born).ToList());
     }
 
     public async Task<ImmichPhoto?> PhotoAsync(ImmichAccount account, string photoId, CancellationToken ct)

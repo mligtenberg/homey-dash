@@ -11,6 +11,25 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
   return photo.takenAt ? new Date(photo.takenAt).toLocaleDateString(formatTag(), { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 }
 
+/** The age of someone born on `born` (2021-03-04) on `on`: whole years, or months in their first year; '' if unknown. */
+function ageOn(born: string | null | undefined, on: string | null): string {
+  const b = born?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!b || !on) return '';
+  const d = new Date(on);
+  const months = (d.getFullYear() - +b[1]) * 12 + d.getMonth() - (+b[2] - 1) - (d.getDate() < +b[3] ? 1 : 0);
+  if (months < 0) return '';
+  return months < 12 ? `${months} m` : `${Math.floor(months / 12)}`;
+}
+
+/** Who is on a photo, left to right, each with their age at the time when Immich has their birth date: Anna (6), Bram. */
+export function peopleOn(photo: Pick<Photo, 'takenAt' | 'faces'>): string {
+  const faces = photo.faces;
+  return (faces?.people ?? []).map((name, i) => {
+    const age = ageOn(faces?.born?.[i], photo.takenAt);
+    return age ? `${name} (${age})` : name;
+  }).join(', ');
+}
+
 /**
  * A photo whole, taking the whole screen, with when and where it was taken and who is on it. A swipe, the arrows or the
  * arrow keys move through the photos it is given, a photo can be rotated in Immich (a partner's only with a key of
@@ -50,7 +69,7 @@ export function takenOn(photo: Pick<Photo, 'takenAt'>): string {
                 <span><svg [lucideIcon]="placeIcon" [attr.aria-label]="'Where' | t" />{{ place }}</span>
               }
               @if (photo.photo.faces?.people?.length) {
-                <span><svg [lucideIcon]="peopleIcon" [attr.aria-label]="'Who' | t" />{{ photo.photo.faces!.people.join(', ') }}</span>
+                <span><svg [lucideIcon]="peopleIcon" [attr.aria-label]="'Who' | t" />{{ peopleOn(photo.photo) }}</span>
               }
             </div>
           }
@@ -102,6 +121,7 @@ export class PhotoViewer {
   protected readonly nextIcon = LucideChevronRight;
   protected readonly placeIcon = LucideMapPin;
   protected readonly peopleIcon = LucideUsers;
+  protected readonly peopleOn = peopleOn;
   protected readonly excludeIcon = LucideImageOff;
   protected readonly favoriteIcon = LucideHeart;
   protected readonly rotateLeftIcon = LucideRotateCcw;

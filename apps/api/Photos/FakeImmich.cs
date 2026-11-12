@@ -91,7 +91,7 @@ public sealed class FakeImmich(TimeProvider time, ImmichOptions? options = null)
     {
         if (Album(photoId) is not { } album || Number(photoId) is not { } n) return Task.FromResult<Faces?>(null);
         var people = People(album, n).Select(id => Names[id]).ToList();
-        return Task.FromResult<Faces?>(Face(photoId) is { } focus ? new Faces(Turn(focus, Turned(photoId)), people) : Faces.None);
+        return Task.FromResult<Faces?>(Face(photoId) is { } focus ? new Faces(Turn(focus, Turned(photoId)), people, people.Select(name => name == "Anna" ? "2019-05-10" : (string?)null).ToList()) : Faces.None);
     }
 
     public Task<RotatedPhoto?> RotateAsync(ImmichAccount account, string photoId, int degrees, CancellationToken ct)

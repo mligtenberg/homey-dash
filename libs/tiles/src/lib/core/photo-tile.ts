@@ -4,7 +4,7 @@ import { Photo, photoUrl, Realtime } from '@homey-dash/api-client';
 import { LucideImage } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { TileSettings } from '../tile-data';
-import { PhotoViewer, takenOn } from './photo-viewer';
+import { PhotoViewer, peopleOn, takenOn } from './photo-viewer';
 import { TILE_FACE_HOST, TileFace, TileView } from './tile-view';
 import { TranslatePipe } from '@homey-dash/i18n';
 
@@ -144,7 +144,8 @@ export class PhotoTile extends TileView<PhotoTileSettings> {
     if (!this.people()) return '';
     const layers = this.layers();
     const id = layers[layers.length - 1]?.id;
-    return (id === undefined ? undefined : this.photosById().get(id))?.faces?.people.join(', ') ?? '';
+    const photo = id === undefined ? undefined : this.photosById().get(id);
+    return photo ? peopleOn(photo) : '';
   });
 
   /** The photo shown and, while the next fades in over it, the one before; with their ratios once loaded. */

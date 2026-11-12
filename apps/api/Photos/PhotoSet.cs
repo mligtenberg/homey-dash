@@ -107,11 +107,16 @@ public sealed record PhotoSelection(IReadOnlyList<PersonRef> With, IReadOnlyList
 // Immich, such as rotated, so displays fetch it again; null when Immich gives none. OwnerId is the Immich user whose
 // photo it is, such as a partner of the account; null when synced before HomeyDash read it.
 public sealed record Photo(
-    string Id, DateTimeOffset? TakenAt, string? Place = null, Faces? Faces = null, string? Version = null, string? OwnerId = null);
+    string Id, DateTimeOffset? TakenAt, string? Place = null, Faces? Faces = null, string? Version = null, string? OwnerId = null)
+{
+    // Not read yet, or read before HomeyDash kept the birth dates of the people on it.
+    public bool FacesUnread => Faces is null || Faces is { People.Count: > 0, Born: null };
+}
 
 // The faces Immich found in a photo: their middle, which a tile keeps in view when it crops the photo, and the names of
-// the people they are, from left to right.
-public sealed record Faces(Focus Focus, IReadOnlyList<string> People)
+// the people they are, from left to right. Born holds, in the same order, the birth date Immich has of each, such as
+// "2021-03-04", or null when it has none; it is null itself until the faces are read again.
+public sealed record Faces(Focus Focus, IReadOnlyList<string> People, IReadOnlyList<string?>? Born = null)
 {
     public static readonly Faces None = new(Focus.Middle, []);
 }
