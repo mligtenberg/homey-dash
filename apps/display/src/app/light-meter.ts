@@ -113,6 +113,12 @@ export class LightMeter {
     return cameras.map((c, i) => ({ deviceId: c.deviceId, label: c.label || `Camera ${i + 1}` }));
   }
 
+  /** A live picture from the camera this screen measures with, for the screen settings; the caller stops it. */
+  async preview(): Promise<MediaStream> {
+    const video = cameraOf(await navigator.mediaDevices.enumerateDevices().catch(() => []), this.camera());
+    return navigator.mediaDevices.getUserMedia({ audio: false, video: { ...video, width: { ideal: 640 }, height: { ideal: 480 } } });
+  }
+
   /**
    * The lux falling on the screen now; null when this screen can't measure, such as without a light sensor or camera,
    * or when refused. A light sensor that fails once, such as one the browser offers but the tablet lacks, is passed

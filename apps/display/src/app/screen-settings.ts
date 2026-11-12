@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, output, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, ElementRef, inject, output, signal, viewChild } from '@angular/core';
 import { LucideMonitorCog } from '@homey-dash/design-system';
 import { TileDetails } from '@homey-dash/tiles';
 import { Camera, LightMeter } from './light-meter';
@@ -15,7 +15,7 @@ import { TranslatePipe } from '@homey-dash/i18n';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents' },
   template: `
-    <hd-tile-details name="Screen settings" [closeOnBackdrop]="false" subtitle="This screen only" [icon]="icon">
+    <hd-tile-details name="Screen settings" [closeOnBackdrop]="false" (closed)="previewing.set(false)" subtitle="This screen only" [icon]="icon">
       <div class="hd-details__row">
         <label class="hd-details__label" for="screen-camera">{{ 'Camera for light' | t }}</label>
         @if (meter.hasCamera) {
@@ -29,6 +29,20 @@ import { TranslatePipe } from '@homey-dash/i18n';
           <span class="hd-details__state">{{ 'Needs https' | t }}</span>
         }
       </div>
+      @if (meter.hasCamera) {
+        <div class="hd-details__row">
+          <span class="hd-details__label">{{ 'Camera preview' | t }}</span>
+          <button type="button" class="hd-btn" (click)="previewing.set(!previewing())">
+            {{ (previewing() ? 'Hide' : 'Show') | t }}
+          </button>
+        </div>
+        @if (previewing()) {
+          <video #preview class="preview" muted playsinline autoplay></video>
+          @if (previewError(); as error) {
+            <span class="hd-details__state">{{ error }}</span>
+          }
+        }
+      }
       <div class="hd-details__row">
         <label class="hd-details__label" for="screen-scale">{{ 'Camera reads too high' | t }}</label>
         <select id="screen-scale" class="hd-select" (change)="calibrate($any($event.target).value)">
@@ -51,6 +65,7 @@ import { TranslatePipe } from '@homey-dash/i18n';
   `,
   styles: `
     .hd-select { min-width: 0; max-width: 60%; font-size: var(--text-touch); }
+    .preview { width: 100%; max-height: 40vh; border-radius: var(--radius-md, 12px); background: #000; object-fit: contain; }
     .level { font-variant-numeric: tabular-nums; }
   `,
 })
@@ -68,7 +83,36 @@ export class ScreenSettings {
     { value: 0.05, label: '1/20' },
   ];
   protected readonly icon = LucideMonitorCog;
+  protected readonly previewing = signal(false);
+  protected readonly previewError = signal('');
   private readonly details = viewChild.required(TileDetails);
+  private readonly video = viewChild<ElementRef<HTMLVideoElement>>('preview');
+  private stream: MediaStream | null = null;
+
+  constructor() {
+    // Runs the camera only while the preview is showing, and again when another camera is picked.
+    effect(() => {
+      const video = this.video()?.nativeElement;
+      this.meter.camera();
+      this.stopPreview();
+      if (!video) return;
+      this.previewError.set('');
+      void this.meter.preview().then(
+        (stream) => {
+          if (this.video()?.nativeElement !== video) return stream.getTracks().forEach((t) => t.stop());
+          this.stream = stream;
+          video.srcObject = stream;
+        },
+        (e) => this.previewError.set(e instanceof Error ? e.message : 'No camera picture'),
+      );
+    });
+    inject(DestroyRef).onDestroy(() => this.stopPreview());
+  }
+
+  private stopPreview() {
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+  }
 
   async open() {
     this.details().open();
