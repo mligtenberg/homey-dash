@@ -4,6 +4,7 @@ import { LucideMonitorCog } from '@homey-dash/design-system';
 import { TileDetails } from '@homey-dash/tiles';
 import { Camera, LightMeter } from './light-meter';
 import { TranslatePipe } from '@homey-dash/i18n';
+import { Voice } from './voice';
 
 /**
  * Screen settings: what is set on this screen itself rather than in Management, such as the camera it estimates the
@@ -16,6 +17,20 @@ import { TranslatePipe } from '@homey-dash/i18n';
   host: { style: 'display: contents' },
   template: `
     <hd-tile-details name="Screen settings" [closeOnBackdrop]="false" (closed)="previewing.set(false)" subtitle="This screen only" [icon]="icon">
+      <div class="hd-details__row">
+        <span class="hd-details__label">{{ 'Listen for voice commands' | t }}</span>
+        @if (voice.available) {
+          <button id="screen-voice" type="button" class="switch" role="switch" [attr.aria-checked]="voice.enabled()" [attr.aria-label]="'Listen for voice commands' | t" (click)="voice.set(!voice.enabled())">
+            <span class="switch__state">{{ (voice.enabled() ? 'On' : 'Off') | t }}</span>
+            <span class="switch__track"><span class="switch__thumb"></span></span>
+          </button>
+        } @else {
+          <span class="hd-details__state">{{ 'Needs https' | t }}</span>
+        }
+      </div>
+      @if (voice.error(); as error) {
+        <span class="hd-details__state">{{ error }}</span>
+      }
       <div class="hd-details__row">
         <label class="hd-details__label" for="screen-camera">{{ 'Camera for light' | t }}</label>
         @if (meter.hasCamera) {
@@ -66,6 +81,16 @@ import { TranslatePipe } from '@homey-dash/i18n';
   styles: `
     .hd-select { min-width: 0; max-width: 60%; font-size: var(--text-touch); }
     .preview { width: 100%; max-height: 40vh; border-radius: var(--radius-md, 12px); background: #000; object-fit: contain; }
+    /* A switch shows what is, by its colour and where its knob sits, and says it in words beside it. */
+    .switch { display: flex; align-items: center; gap: var(--space-3); min-height: 48px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+    .switch__state { font-weight: 700; min-width: 2.5ch; text-align: right; color: var(--ink-muted); }
+    .switch[aria-checked='true'] .switch__state { color: var(--kind-neutral-ink); }
+    .switch__track { position: relative; width: 56px; height: 32px; border-radius: 999px; background: var(--state-off-bg); box-shadow: inset 0 0 0 2px var(--line); transition: background-color .2s; }
+    .switch[aria-checked='true'] .switch__track { background: var(--kind-neutral-ink); box-shadow: none; }
+    .switch__thumb { position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--ink-muted); transition: translate .2s, background-color .2s; }
+    .switch[aria-checked='true'] .switch__thumb { translate: 24px 0; background: var(--on-kind); }
+    .switch:focus-visible { outline: 3px solid var(--brand); outline-offset: 4px; border-radius: 999px; }
+    @media (prefers-reduced-motion: reduce) { .switch__track, .switch__thumb { transition: none; } }
     .level { font-variant-numeric: tabular-nums; }
   `,
 })
@@ -74,6 +99,7 @@ export class ScreenSettings {
   readonly cameraChanged = output<void>();
 
   protected readonly meter = inject(LightMeter);
+  protected readonly voice = inject(Voice);
   protected readonly cameras = signal<Camera[]>([]);
   protected readonly scales = [
     { value: 1, label: 'No' },

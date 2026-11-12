@@ -27,6 +27,7 @@ import { ScreenCapture } from './screen-capture';
 import { screenDetails } from './screen-details';
 import { People, PEOPLE_GUTTER } from './people';
 import { Setup } from './setup';
+import { VoiceFeedback } from './voice';
 
 type ScreenState = { kind: 'loading' } | { kind: 'setup' } | { kind: 'display'; view: ScreenView };
 
@@ -57,7 +58,7 @@ const TAPE_KEY = 'homeydash.tape';
  * to the rule's dashboard or the one shown before; its lock screen widgets, such as a clock, lie over either.
  */
 @Component({
-  imports: [DashboardView, LockScreen, LucideDynamicIcon, People, PhotoTile, ScreenSettings, Setup, TimerAlert, TranslatePipe],
+  imports: [DashboardView, LockScreen, LucideDynamicIcon, People, PhotoTile, ScreenSettings, Setup, TimerAlert, TranslatePipe, VoiceFeedback],
   selector: 'hd-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -137,6 +138,7 @@ const TAPE_KEY = 'homeydash.tape';
     }
     <!-- Over everything, so the taps that open the screen settings press nothing beneath. -->
     <span class="corner" aria-hidden="true" (pointerdown)="cornerTap()"></span>
+    <hd-voice />
     <hd-timer-alert />
     <hd-screen-settings (cameraChanged)="remeasure()" />
   `,
