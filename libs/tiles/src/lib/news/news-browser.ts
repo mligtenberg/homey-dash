@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, DestroyRef, ElementRef, i
 import { DomSanitizer } from '@angular/platform-browser';
 import { firstValueFrom } from 'rxjs';
 import { AirPlayDevice, NEWS_SOURCES, NewsApi, Realtime, NewsFeed, NewsItem, NewsLive, NewsVideo, newsArticleUrl } from '@homey-dash/api-client';
-import { LucideChevronLeft } from '@homey-dash/design-system';
+import { LucideChevronLeft, LucideMaximize2, LucideMinimize2 } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { AirPlayCast, AirPlayNowControls } from '../core/airplay-cast';
 import { SegmentedStrip, StripOption } from '../core/segmented-strip';
@@ -78,7 +78,12 @@ function clock(iso: string | null): string {
     @if (view(); as open) {
       @switch (open.kind) {
         @case ('article') {
-          <iframe #reader class="hd-news__reader" [src]="readerUrl()" sandbox="allow-scripts" [title]="open.item.title"></iframe>
+          <div class="hd-news__page" [class.is-expanded]="expanded()">
+            <iframe #reader class="hd-news__reader" [src]="readerUrl()" sandbox="allow-scripts" [title]="open.item.title"></iframe>
+            <button type="button" class="hd-news__expand" [attr.aria-label]="(expanded() ? 'Make smaller' : 'Expand') | t" [attr.aria-pressed]="expanded()" (click)="expanded.set(!expanded())">
+              <svg [lucideIcon]="expanded() ? shrinkIcon : expandIcon" aria-hidden="true" />
+            </button>
+          </div>
         }
         @default {
           <div class="hd-news__watch">
@@ -175,6 +180,10 @@ export class NewsBrowser {
   protected readonly live = LIVE;
   protected readonly videosTab = VIDEOS;
   protected readonly backIcon = LucideChevronLeft;
+  protected readonly expandIcon = LucideMaximize2;
+  protected readonly shrinkIcon = LucideMinimize2;
+  /** Whether the open story fills the whole screen. */
+  protected readonly expanded = signal(false);
   protected readonly duration = duration;
   protected readonly clock = clock;
 
@@ -293,6 +302,7 @@ export class NewsBrowser {
   }
 
   protected close() {
+    this.expanded.set(false);
     this.view.set(null);
   }
 

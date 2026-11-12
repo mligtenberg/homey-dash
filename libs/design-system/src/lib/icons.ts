@@ -14,6 +14,8 @@ import {
   Car,
   ChartLine,
   Check,
+  Maximize2,
+  Minimize2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -128,6 +130,8 @@ export const LucideCamera = /* @__PURE__ */ icon('camera', Camera);
 export const LucideCar = /* @__PURE__ */ icon('car', Car);
 export const LucideNewspaper = /* @__PURE__ */ icon('newspaper', Newspaper);
 export const LucideChartLine = /* @__PURE__ */ icon('chart-line', ChartLine);
+export const LucideMaximize2 = /* @__PURE__ */ icon('maximize-2', Maximize2);
+export const LucideMinimize2 = /* @__PURE__ */ icon('minimize-2', Minimize2);
 export const LucideCheck = /* @__PURE__ */ icon('check', Check);
 export const LucideChevronDown = /* @__PURE__ */ icon(
   'chevron-down',

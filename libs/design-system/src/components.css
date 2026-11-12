@@ -1619,6 +1619,15 @@ a.hd-btn { text-decoration: none; }
 /* The detail view's one column: the tabs (or the way back) over a pane of stories, a story's frame or a player. */
 .hd-news__browser { display: flex; flex-direction: column; gap: calc(var(--cell) * .12); min-height: 0; }
 .hd-news__browser > .hd-news__pane, .hd-news__browser > .hd-news__watch { flex: 1; min-height: 0; }
+.hd-news__page { position: relative; display: flex; flex: 1; min-height: 0; }
+.hd-news__page.is-expanded { position: fixed; inset: 0; z-index: 50; }
+.hd-news__page.is-expanded .hd-news__reader { border-radius: 0; }
+.hd-news__expand {
+  position: absolute; top: calc(var(--cell) * .08); right: calc(var(--cell) * .08); display: grid; place-items: center; width: calc(var(--cell) * .32); height: calc(var(--cell) * .32); padding: 0;
+  border: 0; border-radius: 999px; background: color-mix(in oklab, var(--ink) 10%, var(--tile-surface)); color: var(--ink); cursor: pointer;
+}
+.hd-news__expand svg { width: calc(var(--cell) * .18); height: calc(var(--cell) * .18); }
+.hd-news__expand:active { transform: scale(var(--press-scale)); }
 .hd-news__bar { display: flex; align-items: center; gap: calc(var(--cell) * .12); min-height: calc(var(--cell) * var(--control-size)); }
 /* In NOS's news the open item is a dark pill, as on nos.nl, and the dot says something is live. */
 .hd-news__bar .hd-segmented { background: transparent; }
