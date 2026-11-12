@@ -7,6 +7,10 @@ import { safeStorage, screenId } from './screen-id';
 
 /** Where a screen remembers that it listens, switched in its screen settings. */
 const VOICE_KEY = 'homeydash.voice';
+/** Whether this screen leaves hearing the wake word to the voice service, because it is too slow to do it itself. */
+const SERVER_KEY = 'homeydash.voice.server';
+/** Set when this screen listens without the browser's own echo and noise filters, which cost a slow tablet processing time. */
+const RAW_KEY = 'homeydash.voice.raw';
 
 /** How long a result stays up after it arrives. */
 export const RESULT_MS = 6_000;
@@ -21,6 +25,8 @@ const SESSION_MS = 12_000;
 const GATE_MIN = 0.012;
 const GATE_TAIL = 20;
 const GATE_PREROLL = 24;
+/** How many blocks of 80 ms may wait for the detector: a longer queue means the wake word is heard that much later. */
+const MAX_BACKLOG = 5;
 
 /**
  * What this browser can do that the wake word depends on, as lines of text, for a screen that cannot say why it does
@@ -156,13 +162,21 @@ export function startDetector(): Promise<Detector> {
   });
 }
 
-/** The microphone as 16 kHz mono blocks of 128 samples (floats, -1 to 1), which is what the wake word and the voice service take. */
-export async function openMicrophone(onBlock: (samples: Float32Array) => void) {
+/** The microphone as 16 kHz mono blocks of 1280 samples (80 ms) (floats, -1 to 1), which is what the wake word and the voice service take. */
+export async function openMicrophone(onBlock: (samples: Float32Array) => void, filters = true) {
   const mic = await navigator.mediaDevices.getUserMedia({
-    audio: { channelCount: 1, noiseSuppression: true, echoCancellation: true },
+    audio: { channelCount: 1, noiseSuppression: filters, echoCancellation: filters },
   });
   const ctx = new AudioContext({ sampleRate: 16000 });
-  const worklet = `class P extends AudioWorkletProcessor { process(i) { if (i[0][0]) this.port.postMessage(i[0][0].slice()); return true; } }
+  // The browser hands the worklet 128 samples at a time; 1280 (80 ms) go to the page at once, a tenth of the messages.
+  const worklet = `class P extends AudioWorkletProcessor {
+      b = new Float32Array(1280); n = 0;
+      process(i) {
+        const c = i[0][0];
+        if (c) { this.b.set(c, this.n); this.n += c.length; if (this.n >= 1280) { this.port.postMessage(this.b.slice()); this.n = 0; } }
+        return true;
+      }
+    }
     registerProcessor('pcm', P);`;
   const url = URL.createObjectURL(new Blob([worklet], { type: 'text/javascript' }));
   await ctx.audioWorklet.addModule(url);
@@ -252,6 +266,10 @@ export class Voice {
   readonly phase = signal<VoicePhase>({ kind: 'off' });
   /** Whether this screen listens; a setting of this screen alone, kept in its own storage. */
   readonly enabled = signal(false);
+  /** Whether the wake word is heard by the voice service: the screen then streams all it hears. */
+  readonly server = signal(false);
+  /** Whether the browser filters echo and noise out of the microphone; off saves a slow screen some work. */
+  readonly filters = signal(true);
   /** Why listening could not start, as the browser says it, until it is tried again. */
   readonly error = signal('');
   /** Whether this browser can listen at all: it needs a microphone, which browsers give only to pages on https. */
@@ -268,7 +286,37 @@ export class Voice {
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.stop());
+    this.server.set(this.storage?.getItem(SERVER_KEY) === 'on');
+    this.filters.set(this.storage?.getItem(RAW_KEY) !== 'on');
     if (this.storage?.getItem(VOICE_KEY) === 'on') this.set(true);
+  }
+
+  /** Listens with or without the browser's echo and noise filters; restarts listening to change over. */
+  setFilters(on: boolean) {
+    if (on === this.filters()) return;
+    this.filters.set(on);
+    if (on) this.storage?.removeItem(RAW_KEY);
+    else this.storage?.setItem(RAW_KEY, 'on');
+    this.restart();
+  }
+
+  private restart() {
+    if (this.enabled() && !this.stopped) {
+      this.stop();
+      void this.start();
+    }
+  }
+
+  /** Has the wake word heard here on the screen, or by the voice service; restarts listening to change over. */
+  setServer(on: boolean) {
+    if (on === this.server()) return;
+    this.server.set(on);
+    if (on) this.storage?.setItem(SERVER_KEY, 'on');
+    else this.storage?.removeItem(SERVER_KEY);
+    if (this.enabled() && !this.stopped) {
+      this.stop();
+      void this.start();
+    }
   }
 
   /** Starts or stops listening, and remembers which. */
@@ -306,10 +354,11 @@ export class Voice {
   private async start() {
     this.stopped = false;
     try {
+      if (this.server()) return await this.startRemote();
       this.detector = await startDetector();
       if (this.stopped) return this.stop();
       const blocks: ((samples: Float32Array) => void)[] = [];
-      const opened = await openMicrophone((samples) => blocks[0]?.(samples));
+      const opened = await openMicrophone((samples) => blocks[0]?.(samples), this.filters());
       this.mic = opened.mic;
       this.ctx = opened.ctx;
       if (this.stopped) return this.stop();
@@ -320,6 +369,40 @@ export class Voice {
       this.enabled.set(false);
       this.storage?.removeItem(VOICE_KEY);
     }
+  }
+
+  /** Streams everything the microphone hears to HomeyDash, which has the voice service listen for the wake word. */
+  private async startRemote() {
+    const blocks: ((samples: Float32Array) => void)[] = [];
+    const opened = await openMicrophone((samples) => blocks[0]?.(samples), this.filters());
+    this.mic = opened.mic;
+    this.ctx = opened.ctx;
+    if (this.stopped) return this.stop();
+    let block: Float32Array[] = [];
+    let n = 0;
+    const connect = () => {
+      const ws = (this.ws = new WebSocket(
+        `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/voice/listen?screen=${screenId()}&detect=1`,
+      ));
+      ws.onmessage = (e) => this.receive(JSON.parse(e.data as string) as VoiceEvent);
+      ws.onclose = () => {
+        if (this.ws !== ws) return;
+        this.ws = undefined;
+        if (!this.stopped) this.session = setTimeout(connect, 3000); // the service restarted, or the network blinked
+      };
+    };
+    connect();
+    blocks[0] = (data) => {
+      block.push(data);
+      n += data.length;
+      if (n < 1280) return;
+      const pcm = new Int16Array(n);
+      let o = 0;
+      for (const b of block) for (const v of b) pcm[o++] = Math.max(-1, Math.min(1, v)) * 32767;
+      block = [];
+      n = 0;
+      if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(pcm.buffer); // while it reconnects, that audio is lost
+    };
   }
 
   /** Gives the handler of what the microphone sends: the wake word is listened for, and once heard the audio goes on to HomeyDash. */
@@ -403,7 +486,7 @@ export class Voice {
       }
       if (open) {
         if (!loud && --tail <= 0) open = false;
-        if (ww.busy < 40) detect(f); // far too slow for real time: drop rather than fall further behind
+        if (ww.busy < MAX_BACKLOG) detect(f); // too slow for real time: drop rather than hear the wake word seconds late
       } else {
         quiet.push(f);
         if (quiet.length > GATE_PREROLL) quiet.shift();

@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from fastapi import FastAPI, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -28,6 +28,7 @@ from matcher import Matcher, Result, norm
 import engines
 import timer
 import wake
+from wakeword import WakeWord
 
 HERE = Path(__file__).parent
 log = logging.getLogger("voice")
@@ -49,6 +50,8 @@ def get_matcher() -> Matcher:
 # A sentence that ends on one of these, or is a timer without a length, is not finished: the speaker paused to think.
 DANGLING = {"voor", "van", "op", "naar", "met", "in", "een", "de", "het", "en", "tot", "om", "over", "na", "bij"}
 RATE_GAP = 3200  # 0.2 s of silence between the two halves
+WAKE_THRESHOLD = 0.5
+PREROLL_BYTES = 16000 * 2 * 2  # two seconds of int16
 HOLD_S = 5.0  # how long a half sentence waits for the rest
 
 
@@ -135,6 +138,18 @@ class Text(BaseModel):
     text: str
 
 
+@app.post("/api/wake")
+async def wake_test(request: Request):
+    """The wake word over a recording (16 kHz int16 PCM as the body): the best score, when it came (s) and the time it took."""
+    pcm = await request.body()
+    t0 = time.time()
+    det, best, at = WakeWord(), 0.0, 0.0
+    for i in range(0, len(pcm) - 2559, 2560):  # 1280 samples at a time
+        if (s := det.feed(pcm[i:i + 2560])) > best:
+            best, at = s, i / 32000
+    return {"score": best, "at": at, "ms": round((time.time() - t0) * 1000)}
+
+
 @app.get("/api/catalog")
 def get_catalog():
     try:
@@ -172,16 +187,22 @@ async def voice(audio: UploadFile, engine: str = "rules", zone: str | None = Non
 
 
 @app.websocket("/ws/listen")
-async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, wake_words: str | None = Query(None, alias="wake")):
+async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, wake_words: str | None = Query(None, alias="wake"), detect: bool = False):
     """Continuous listening. Client sends 16 kHz mono int16 PCM; server sends JSON events:
     state(idle|speech|awake|thinking), heard(text, wake), result(...).
     `wake` overrides the spoken wake phrase (comma-separated spellings). A client that detects the wake word itself
-    (openWakeWord in the page) sends {"type": "arm"} first; the next utterance is then a command, wake phrase or not."""
+    (openWakeWord in the page) sends {"type": "arm"} first; the next utterance is then a command, wake phrase or not.
+    With `detect`, the client is too slow for that and streams everything: openWakeWord runs here, and only after it
+    fires does the audio (with the last two seconds before it) go to the segmenter and Whisper."""
     phrase = wake_words or WAKE
     await ws.accept()
     seg, awake_until = wake.Segmenter(), 0.0
     held, held_until = None, 0.0
     last = None
+    detector = WakeWord() if detect else None
+    active = not detect  # false while the detector waits for the wake word
+    ring = b""
+    cool = 0.0
 
     async def state(s: str):
         nonlocal last
@@ -200,7 +221,16 @@ async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, 
                     awake_until = time.time() + wake.AWAKE_S
                     await state("awake")
                 continue
-            for utt in seg.feed(msg.get("bytes") or b""):
+            pcm = msg.get("bytes") or b""
+            if not active:
+                ring = (ring + pcm)[-PREROLL_BYTES:]
+                if detector.feed(pcm) < WAKE_THRESHOLD or time.time() < cool:
+                    continue
+                log.info("wake word heard")
+                active, pcm, ring = True, ring, b""
+                seg, awake_until = wake.Segmenter(), time.time() + wake.AWAKE_S
+                await state("awake")
+            for utt in seg.feed(pcm):
                 if held is not None and time.time() < held_until:  # the rest of a sentence that was paused in
                     utt = np.concatenate([held, np.zeros(RATE_GAP, np.float32), utt])
                 held = None
@@ -233,6 +263,10 @@ async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, 
             elif time.time() < awake_until:
                 await state("awake")
             elif last == "awake":
+                await state("idle")
+            if detector and active and not seg.speaking and held is None and time.time() >= awake_until:
+                active, cool = False, time.time() + 1.5
+                detector.reset()
                 await state("idle")
     except WebSocketDisconnect:
         pass

@@ -5,7 +5,7 @@ import { openMicrophone, startDetector, Voice, WAKE_THRESHOLD } from './voice';
 /** What a test of the microphone found out about a recording. */
 export interface Recording {
   samples: Float32Array;
-  /** How many 128 sample blocks the microphone delivered, and how many it should have in that time; a shortfall is audio that was lost. */
+  /** How many 1280 sample blocks the microphone delivered, and how many it should have in that time; a shortfall is audio that was lost. */
   blocks: number;
   expected: number;
   /** Loudness in dB below full scale: of the whole recording and of its loudest sample. */
@@ -29,7 +29,7 @@ export function measure(samples: Float32Array, blocks: number, seconds: number):
   return {
     samples,
     blocks,
-    expected: Math.round((seconds * 16000) / 128),
+    expected: Math.round((seconds * 16000) / 1280),
     averageDb: db(Math.sqrt(sum / Math.max(1, samples.length))),
     peakDb: db(peak),
     clipped: clipped / Math.max(1, samples.length),
@@ -41,7 +41,7 @@ export interface WakeRun {
   /** The highest score (0 to 1) and when in the recording (s) it came. */
   score: number;
   at: number;
-  detector: 'worker' | 'page';
+  detector: 'worker' | 'page' | 'server';
   loadMs: number;
   /** Time to work on 80 ms of sound: on average and at the slowest; above 80 the screen cannot keep up with its microphone. */
   averageMs: number;
@@ -76,6 +76,17 @@ export async function runWake(samples: Float32Array): Promise<WakeRun> {
   } finally {
     detector.stop();
   }
+}
+
+/** The same over a recording sent to the voice service, which has its own detector: then `averageMs` is its time per 80 ms of sound and `slowestMs` the whole round trip. */
+export async function runWakeOnServer(samples: Float32Array): Promise<WakeRun> {
+  const padded = new Int16Array(samples.length + 8000);
+  samples.forEach((v, i) => (padded[i] = Math.max(-1, Math.min(1, v)) * 32767));
+  const started = performance.now();
+  const response = await fetch('/voice/api/wake', { method: 'POST', body: padded.buffer });
+  if (!response.ok) throw new Error(`/voice/api/wake: HTTP ${response.status}`);
+  const { score, at, ms } = (await response.json()) as { score: number; at: number; ms: number };
+  return { score, at, detector: 'server', loadMs: 0, averageMs: ms / Math.max(1, padded.length / 1280), slowestMs: performance.now() - started };
 }
 
 /** A recording shipped with the voice service, as 16 kHz samples. */
@@ -185,7 +196,7 @@ export class VoiceTest implements OnDestroy {
         let sum = 0;
         for (const v of block) sum += v * v;
         this.level.set(Math.min(100, Math.round(Math.sqrt(sum / block.length) * 400)));
-      });
+      }, this.voice.filters());
       const track = opened.mic.getAudioTracks()[0];
       const started = performance.now();
       await new Promise((resolve) => setTimeout(resolve, RECORD_S * 1000));
@@ -263,7 +274,7 @@ export class VoiceTest implements OnDestroy {
       let last: WakeRun | undefined;
       for (const [name, samples, shouldHear] of subjects) {
         this.report.set([...lines, t('Testing…')]);
-        last = await runWake(samples);
+        last = await (this.voice.server() ? runWakeOnServer(samples) : runWake(samples));
         const heard = last.score >= WAKE_THRESHOLD;
         const verdict = shouldHear === undefined ? '' : heard === shouldHear ? ` ${t('✓ as expected')}` : ` ${t('✗ not as expected')}`;
         lines.push(
@@ -272,7 +283,13 @@ export class VoiceTest implements OnDestroy {
           }),
         );
       }
-      if (last) {
+      if (last?.detector === 'server') {
+        lines.push(
+          t('Detector on the server: {avg} ms for 80 ms of sound, {total} ms for the whole recording including the network.', {
+            avg: last.averageMs.toFixed(1), total: Math.round(last.slowestMs),
+          }),
+        );
+      } else if (last) {
         const share = last.averageMs / 80;
         lines.push(
           t('Detector {kind}, loaded in {load} ms; {avg} ms on average and {max} ms at the slowest for 80 ms of sound.', {

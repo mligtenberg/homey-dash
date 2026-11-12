@@ -42,6 +42,30 @@ import { VoiceTest } from './voice-test';
                 </button>
               }
             </div>
+            @if (voice.available) {
+              <div class="setting">
+                <div class="setting__text">
+                  <span id="voice-server-label" class="setting__label">{{ 'Wake word on the server' | t }}</span>
+                  <span class="setting__hint">{{ 'For a screen that is too slow to hear it itself' | t }}</span>
+                </div>
+                <button id="screen-voice-server" type="button" class="switch" role="switch" [attr.aria-checked]="voice.server()" aria-labelledby="voice-server-label" (click)="voice.setServer(!voice.server())">
+                  <span class="switch__state">{{ (voice.server() ? 'On' : 'Off') | t }}</span>
+                  <span class="switch__track"><span class="switch__thumb"></span></span>
+                </button>
+              </div>
+            }
+            @if (voice.available) {
+              <div class="setting">
+                <div class="setting__text">
+                  <span id="voice-filters-label" class="setting__label">{{ 'Noise and echo filters' | t }}</span>
+                  <span class="setting__hint">{{ 'Off saves a slow screen some work' | t }}</span>
+                </div>
+                <button id="screen-voice-filters" type="button" class="switch" role="switch" [attr.aria-checked]="voice.filters()" aria-labelledby="voice-filters-label" (click)="voice.setFilters(!voice.filters())">
+                  <span class="switch__state">{{ (voice.filters() ? 'On' : 'Off') | t }}</span>
+                  <span class="switch__track"><span class="switch__thumb"></span></span>
+                </button>
+              </div>
+            }
             @if (voice.error(); as error) {
               <p class="diagnosis">{{ error }}</p>
             }

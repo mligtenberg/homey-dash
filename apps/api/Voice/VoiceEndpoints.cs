@@ -40,7 +40,8 @@ public static class VoiceEndpoints
             ? homeys.For(display.ZoneAccountId)?.State.Zones.FirstOrDefault(z => z.Id == zoneId)?.Name
             : null;
 
-        var upstreamUri = new UriBuilder(address) { Path = "/ws/listen", Query = $"wake={Uri.EscapeDataString(WakeSpellings)}" + (zone is null ? "" : $"&zone={Uri.EscapeDataString(zone)}") };
+        var upstreamUri = new UriBuilder(address) { Path = "/ws/listen", Query = $"wake={Uri.EscapeDataString(WakeSpellings)}" + (zone is null ? "" : $"&zone={Uri.EscapeDataString(zone)}")
+            + (context.Request.Query["detect"] == "1" ? "&detect=true" : "") };
         upstreamUri.Scheme = upstreamUri.Scheme == Uri.UriSchemeHttps ? "wss" : "ws";
         using var upstream = new ClientWebSocket();
         try
