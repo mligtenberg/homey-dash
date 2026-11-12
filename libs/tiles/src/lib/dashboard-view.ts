@@ -6,8 +6,10 @@ import {
   computed,
   DestroyRef,
   ElementRef,
+  effect,
   inject,
   input,
+  linkedSignal,
   signal,
   untracked,
   viewChild,
@@ -38,7 +40,7 @@ import { chunk } from '@homey-dash/design-system';
     <div #pager class="hd-dashboard__pages" (scroll)="scroll.onScroll()">
       @for (page of pages(); track $index) {
         <div class="hd-dashboard__page">
-          @for (section of page; track section.id) {
+          @for (section of mounted($index) ? page : []; track section.id) {
             <div class="hd-section">
               <div class="hd-section__title">{{ section.title }}</div>
               <div class="hd-section__grid" [style.--rows]="layout().rows">
@@ -76,6 +78,10 @@ export class DashboardView {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly pager = viewChild.required<ElementRef<HTMLElement>>('pager');
 
+  // Tiles are costly to create on a slow tablet, so a dashboard opens with the page in view; its neighbours follow once
+  // that has painted, and a page stays once it has been made.
+  private readonly made = linkedSignal<DashboardLayout, ReadonlySet<number>>({ source: this.layout, computation: () => new Set() });
+
   private readonly shown = shownSections(() => this.layout().sections);
   private readonly perPage = signal(1);
   private readonly scroll = pager(() => this.pager().nativeElement);
@@ -88,6 +94,13 @@ export class DashboardView {
   });
 
   constructor() {
+    effect((onCleanup) => {
+      this.layout(); // a new dashboard starts over
+      const near = [this.current() - 1, this.current(), this.current() + 1];
+      const timer = setTimeout(() => this.made.update((made) => new Set([...made, ...near])), 60);
+      onCleanup(() => clearTimeout(timer));
+    });
+
     // The width and --cell both change with the window, and both decide how many sections fit (and the size, how large a
     // built-in background is rendered). Without a
     // ResizeObserver (as in tests) a page holds one section.
@@ -113,6 +126,10 @@ export class DashboardView {
         pager.scrollTo({ left: page * pager.clientWidth, behavior: 'instant' });
       }
     });
+  }
+
+  protected mounted(page: number) {
+    return page === this.current() || this.made().has(page);
   }
 
   private measurePerPage() {
