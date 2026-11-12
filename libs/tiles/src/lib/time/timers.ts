@@ -106,9 +106,14 @@ export class Timers {
   private readonly buffers = new Map<TimerSound, AudioBuffer>();
   private readonly loading = new Map<TimerSound, Promise<void>>();
   private tick?: ReturnType<typeof setInterval>;
+  /** The sounds playing now, by sound, so stopping a timer can cut them off instead of letting them play out. */
+  private readonly playing = new Map<TimerSound, Set<AudioBufferSourceNode>>();
 
   constructor() {
     this.sync();
+    // Any touch of the screen lets the browser play sounds later, so a timer that arrives from elsewhere (set by voice, or
+    // on another screen) can still ring here without anyone having started one on this screen.
+    for (const event of ['pointerdown', 'keydown']) window.addEventListener(event, () => this.unlock(), { capture: true, passive: true });
     // What was missed while the connection was down arrives with the list again.
     this.realtime.on('Timers', (timers) => this.replace(normalizeAll(timers)));
     this.realtime.whenConnected(() => void this.realtime.timers().then((timers) => this.replace(normalizeAll(timers)), () => undefined));
@@ -183,6 +188,31 @@ export class Timers {
     this.timers.set(timers);
     write(KEY, timers);
     this.sync();
+    this.prepare(timers);
+    this.silence(timers);
+  }
+
+  /** Cuts off the sound of every timer that no longer rings, at once: stopped, restarted, paused or given more time. */
+  private silence(timers: Timer[]) {
+    const now = Date.now();
+    const ringing = new Set(timers.filter((t) => t.paused === undefined && t.end <= now).map((t) => t.sound));
+    for (const [sound, sources] of this.playing) {
+      if (ringing.has(sound)) continue;
+      for (const source of sources) source.stop();
+      this.playing.delete(sound);
+    }
+  }
+
+  /**
+   * Gets ready to ring what this screen did not start itself: the audio is made (and resumed where the browser lets it,
+   * as it does a page that is listening with the microphone or that was touched before) and the sounds are fetched, so a
+   * timer that arrives from elsewhere rings when it runs out.
+   */
+  private prepare(timers: Timer[]) {
+    if (!timers.length) return;
+    this.audio ??= typeof AudioContext === 'undefined' ? undefined : new AudioContext();
+    void this.audio?.resume().catch(() => undefined);
+    for (const sound of new Set(timers.map((t) => t.sound))) void this.load(sound);
   }
 
   private sync() {
@@ -202,6 +232,7 @@ export class Timers {
       this.rung = 0;
       return;
     }
+    void this.audio?.resume().catch(() => undefined);
     // A bell rings on for a few seconds, so it strikes less often than a beep.
     for (const sound of new Set(ringing.map((t) => t.sound))) if (this.rung % SOUND_REPEAT[sound] === 0) this.play(sound);
     this.rung++;
@@ -244,6 +275,10 @@ export class Timers {
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
+    const sources = this.playing.get(sound) ?? new Set<AudioBufferSourceNode>();
+    this.playing.set(sound, sources);
+    sources.add(source);
+    source.onended = () => sources.delete(source);
     source.start();
   }
 }

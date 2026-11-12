@@ -104,6 +104,15 @@ describe('Timers', () => {
     expect(timers.timers()).toMatchObject([{ id: 'kept', paused: 20_000, name: 'Roast', sound: 'beep' }]);
   });
 
+  it('cuts off the sound at once when the timer that rings is stopped', () => {
+    timers.add(1, 'Tea', 'bell');
+    vi.advanceTimersByTime(1500);
+    const source = { stop: vi.fn() };
+    (timers as unknown as { playing: Map<string, Set<unknown>> }).playing.set('bell', new Set([source]));
+    timers.remove(only().id);
+    expect(source.stop).toHaveBeenCalled();
+  });
+
   it('writes a length in words', () => {
     expect(timerLength(300)).toBe('5 min');
     expect(timerLength(5400)).toBe('1 h 30 min');
