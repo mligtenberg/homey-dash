@@ -89,6 +89,11 @@ export interface DisplaySummary {
   lightSignal?: string | null;
   /** The language its screen speaks, `en` or `nl`; null follows the screen's browser. */
   language?: string | null;
+  /** The zone in Homey the screen is in (its Homey's account and the zone's id), for what it hears; null when it is not placed. */
+  zoneAccountId?: number | null;
+  zoneId?: string | null;
+  /** What timers started by voice on this display ring with (a timer sound's id); null for a beep. */
+  timerSound?: string | null;
 }
 
 /**
@@ -218,6 +223,16 @@ export class DisplaysApi {
   /** Sets the language its screen speaks (`en` or `nl`); null has it follow the screen's browser. */
   setLanguage(id: string, language: string | null) {
     return this.http.put<DisplayInfo>(`/api/displays/${id}/language`, { language });
+  }
+
+  /** Sets what timers started by voice on this display ring with; null for a beep. */
+  setTimerSound(id: string, sound: string | null) {
+    return this.http.put<DisplayInfo>(`/api/displays/${id}/timer-sound`, { sound });
+  }
+
+  /** Places the screen in a zone of a Homey, so a voice command without a room means that zone; null takes it out. */
+  setZone(id: string, zone: { accountId: number; zoneId: string } | null) {
+    return this.http.put<DisplayInfo>(`/api/displays/${id}/zone`, { accountId: zone?.accountId ?? null, zoneId: zone?.zoneId ?? null });
   }
 
   delete(id: string) {

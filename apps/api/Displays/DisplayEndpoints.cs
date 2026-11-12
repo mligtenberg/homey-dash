@@ -28,6 +28,8 @@ public static partial class DisplayEndpoints
     // A capability of a device in Homey whose lux the screen reports as its brightness; null to measure itself.
     public sealed record LightSource(string? Signal);
     public sealed record DisplayLanguage(string? Language);
+    public sealed record DisplayTimerSound(string? Sound);
+    public sealed record DisplayZone(int? AccountId, string? ZoneId);
 
     private const int MaxScreenshotBytes = 8 * 1024 * 1024;
 
@@ -109,6 +111,29 @@ public static partial class DisplayEndpoints
                     return Task.FromResult<IResult?>(Results.ValidationProblem(
                         new Dictionary<string, string[]> { ["language"] = ["That language is not supported."] }));
                 display.Language = body.Language;
+                return Task.FromResult<IResult?>(null);
+            }));
+
+        // What timers started by voice on this display ring with; null for a beep.
+        displays.MapPut("/{id:guid}/timer-sound", (Guid id, DisplayTimerSound body, [AsParameters] Services services, CancellationToken ct) =>
+            Change(id, services, ct, display =>
+            {
+                if (body.Sound is { } sound && !Timers.TimerView.Sounds.Contains(sound))
+                    return Task.FromResult<IResult?>(Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["sound"] = ["That is not a timer sound."] }));
+                display.TimerSound = body.Sound;
+                return Task.FromResult<IResult?>(null);
+            }));
+
+        // The zone in Homey the screen is in; both null takes it out of its zone.
+        displays.MapPut("/{id:guid}/zone", (Guid id, DisplayZone body, [AsParameters] Services services, CancellationToken ct) =>
+            Change(id, services, ct, display =>
+            {
+                if (body.AccountId is null != string.IsNullOrWhiteSpace(body.ZoneId))
+                    return Task.FromResult<IResult?>(Results.ValidationProblem(
+                        new Dictionary<string, string[]> { ["zoneId"] = ["A zone needs the account of its Homey and its id."] }));
+                display.ZoneAccountId = body.AccountId;
+                display.ZoneId = body.AccountId is null ? null : body.ZoneId;
                 return Task.FromResult<IResult?>(null);
             }));
 

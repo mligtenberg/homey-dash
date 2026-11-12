@@ -237,6 +237,16 @@ export class DisplaysStore {
     this.api.setLanguage(display.id, language).subscribe({ next: (d) => this.replace(d), error: () => this.fail('set the language of') });
   }
 
+  // What timers started by voice on the display ring with, or null for a beep.
+  setTimerSound(display: DisplayInfo, sound: string | null) {
+    this.api.setTimerSound(display.id, sound).subscribe({ next: (d) => this.replace(d), error: () => this.fail('set the timer sound of') });
+  }
+
+  // The zone in Homey the display's screen is in, or null for none.
+  setZone(display: DisplayInfo, zone: { accountId: number; zoneId: string } | null) {
+    this.api.setZone(display.id, zone).subscribe({ next: (d) => this.replace(d), error: () => this.fail('set the zone of') });
+  }
+
   setLockSignal(display: DisplayInfo, index: number, signal: string) {
     this.saveLock(display, display.lockWidgets.map((w, i) => (i === index && w.kind === 'value' ? { ...w, signal } : w)));
   }

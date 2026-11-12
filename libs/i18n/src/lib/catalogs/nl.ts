@@ -779,6 +779,8 @@ export const NL: Record<string, string> = {
   'Text': 'Tekst',
   'Date and time': 'Datum en tijd',
   "Homey isn't set up yet. Set it up under Accounts.": 'Homey is nog niet ingesteld. Stel hem in onder Accounts.',
+  'Timer sound for voice': 'Timergeluid voor spraak',
+  'Not in a zone': 'Niet in een zone',
   'Uploading…': 'Uploaden…',
   'Choose another image': 'Kies een andere afbeelding',
   'Choose an image': 'Kies een afbeelding',

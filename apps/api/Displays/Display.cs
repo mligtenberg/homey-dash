@@ -31,6 +31,14 @@ public sealed class Display
     // The language its screen speaks, one of Languages.Supported; null to follow the screen's browser.
     public string? Language { get; set; }
 
+    // What the timers started by voice on this display ring with, one of TimerView.Sounds; null for a beep.
+    public string? TimerSound { get; set; }
+
+    // The zone in Homey the screen is in, for what it hears: "turn off the lights" means the lights of this zone. Both
+    // set or both null; null when it is not placed.
+    public int? ZoneAccountId { get; set; }
+    public string? ZoneId { get; set; }
+
     // The id the holding screen keeps in its localStorage. Null once no screen holds this display.
     public Guid? ScreenId { get; set; }
 
@@ -47,7 +55,7 @@ public sealed class Display
         .Select(r => r.ReturnDashboardId is { } back && !DashboardIds.Contains(back) ? r with { ReturnDashboardId = null } : r)
         .ToList();
 
-    public DisplaySummary ToSummary() => new(Id, Name, DashboardIds, OfferedIdleRules(), LockWidgets, LightSignal, Language);
+    public DisplaySummary ToSummary() => new(Id, Name, DashboardIds, OfferedIdleRules(), LockWidgets, LightSignal, Language, ZoneAccountId, ZoneId, TimerSound);
 
     // The published version of each dashboard the screen reports it shows; one it leaves out it doesn't show yet.
     public void Showing(IReadOnlyDictionary<Guid, int> versions)
@@ -124,7 +132,7 @@ public sealed record LockWidget(string Kind, string Spot, string? Signal = null,
 /// A display, the dashboards it offers in that order, the rules that choose what it shows when left alone, and what
 /// its lock screen shows.
 /// </summary>
-public sealed record DisplaySummary(Guid Id, string Name, List<Guid> DashboardIds, List<IdleRule> IdleRules, List<LockWidget> LockWidgets, string? LightSignal = null, string? Language = null);
+public sealed record DisplaySummary(Guid Id, string Name, List<Guid> DashboardIds, List<IdleRule> IdleRules, List<LockWidget> LockWidgets, string? LightSignal = null, string? Language = null, int? ZoneAccountId = null, string? ZoneId = null, string? TimerSound = null);
 
 /// <summary>
 /// Which published version of one of its dashboards a display shows. It is on the latest version when
@@ -140,7 +148,7 @@ public sealed record DisplayStatus(bool Connected, bool Held, DateTimeOffset? La
 
 /// <summary>A display as Management lists it.</summary>
 public sealed record DisplayInfo(
-    Guid Id, string Name, List<Guid> DashboardIds, List<IdleRule> IdleRules, List<LockWidget> LockWidgets, DisplayStatus Status, string? LightSignal = null, string? Language = null);
+    Guid Id, string Name, List<Guid> DashboardIds, List<IdleRule> IdleRules, List<LockWidget> LockWidgets, DisplayStatus Status, string? LightSignal = null, string? Language = null, int? ZoneAccountId = null, string? ZoneId = null, string? TimerSound = null);
 
 /// <summary>The published version a display shows.</summary>
 public sealed record ShownDashboard(Guid Id, string Name, int Version, DashboardLayout Layout);

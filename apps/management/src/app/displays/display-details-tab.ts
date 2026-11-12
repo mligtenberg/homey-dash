@@ -2,6 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { DisplayInfo, FULLY_FUNCTIONS } from '@homey-dash/api-client';
+import { SOUND_LABELS, TIMER_SOUNDS } from '@homey-dash/tiles';
 import { LOCALES, LOCALE_NAMES, t, TranslatePipe } from '@homey-dash/i18n';
 import { describeUserAgent } from './browser-text';
 import { DisplayContext } from './display-context';
@@ -27,6 +28,23 @@ import { DisplaysStore, isLuminanceSignal } from './displays-store';
             <option value="" [selected]="!display.language">{{ 'Same as its browser' | t }}</option>
             @for (l of locales; track l) {
               <option [value]="l" [selected]="display.language === l">{{ names[l] }}</option>
+            }
+          </select>
+        </div>
+        <div class="hd-field">
+          <label class="hd-field__label" for="display-zone">{{ 'Zone' | t }}</label>
+          <select class="hd-input" id="display-zone" (change)="chooseZone(display, zone.value)" #zone>
+            <option value="" [selected]="display.zoneId == null">{{ 'Not in a zone' | t }}</option>
+            @for (z of zones(); track z.value) {
+              <option [value]="z.value" [selected]="z.value === zoneValue(display)">{{ z.label }}</option>
+            }
+          </select>
+        </div>
+        <div class="hd-field">
+          <label class="hd-field__label" for="display-timer-sound">{{ 'Timer sound for voice' | t }}</label>
+          <select class="hd-input" id="display-timer-sound" (change)="store.setTimerSound(display, sound.value || null)" #sound>
+            @for (s of sounds; track s.id) {
+              <option [value]="s.id" [selected]="s.id === (display.timerSound ?? 'beep')">{{ s.label | t }}</option>
             }
           </select>
         </div>
@@ -170,6 +188,24 @@ export class DisplayDetailsTab {
   protected readonly t = t;
   protected readonly locales = LOCALES;
   protected readonly names = LOCALE_NAMES;
+  protected readonly sounds = TIMER_SOUNDS.map((id) => ({ id, label: SOUND_LABELS[id] }));
+
+  // Every zone of every Homey, by name; the name of its Homey goes with it where there is more than one.
+  protected readonly zones = computed(() => {
+    const homeys = this.store.homeys();
+    return homeys
+      .flatMap((h) => [...h.zones.values()].map((z) => ({ value: `${h.accountId}|${z.id}`, label: homeys.length > 1 ? `${z.name} · ${h.accountName}` : z.name })))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  });
+
+  protected zoneValue(display: DisplayInfo) {
+    return display.zoneId == null ? '' : `${display.zoneAccountId}|${display.zoneId}`;
+  }
+
+  protected chooseZone(display: DisplayInfo, value: string) {
+    const [accountId, ...zoneId] = value.split('|');
+    this.store.setZone(display, value ? { accountId: Number(accountId), zoneId: zoneId.join('|') } : null);
+  }
 
   protected readonly text = computed(() => describeUserAgent(this.context.display()?.status.details?.userAgent ?? null));
 

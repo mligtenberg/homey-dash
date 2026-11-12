@@ -123,6 +123,15 @@ namespace HomeyDash.Api.Migrations
                     b.Property<Guid?>("ScreenId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("TimerSound")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ZoneAccountId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ZoneId")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ScreenId")

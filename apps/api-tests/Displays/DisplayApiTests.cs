@@ -375,6 +375,25 @@ public class DisplayApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task AZone_ReachesTheScreen_AndNeedsItsAccountAndItsId()
+    {
+        var screen = Guid.NewGuid();
+        var display = await SetUpAsync(screen);
+        var put = (int? accountId, string? zoneId) => _client.PutAsJsonAsync($"/api/displays/{display}/zone", new { accountId, zoneId });
+
+        Assert.Equal(HttpStatusCode.OK, (await put(1, "zone-kitchen")).StatusCode);
+        var shown = (await ViewAsync(screen)).GetProperty("display");
+        Assert.Equal(1, shown.GetProperty("zoneAccountId").GetInt32());
+        Assert.Equal("zone-kitchen", shown.GetProperty("zoneId").GetString());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await put(1, null)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await put(null, "zone-kitchen")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await put(null, null)).StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await ViewAsync(screen)).GetProperty("display").GetProperty("zoneId").ValueKind);
+    }
+
+    [Fact]
     public async Task ALightSource_ReachesTheScreen_AndOnlyADeviceCapabilityIsAccepted()
     {
         var screen = Guid.NewGuid();
