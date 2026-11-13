@@ -307,4 +307,4 @@ async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, 
 
 
 # Static assets (wake word models, onnxruntime-web, wakeword.js). Last, so the routes above win.
-app.mount("/", StaticFiles(directory=HERE / "static", html=True), name="static")
+app.mount("/", StaticFiles(directory=HERE / "static"), name="static")

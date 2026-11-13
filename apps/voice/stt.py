@@ -1,7 +1,7 @@
 """Speech-to-text models: which ones there are, which is in use, downloading them ahead of time.
 
-The choice is kept in `<VOICE_DATA>/settings.json` (the /models volume), so it survives restarts and is made in the admin
-page (/admin.html). Until someone chooses, VOICE_MODEL (default "small") decides; it may also be a Hugging Face repository
+The choice is kept in `<VOICE_DATA>/settings.json` (the /models volume), so it survives restarts and is made in Management
+page under Accounts. Until someone chooses, VOICE_MODEL (default "small") decides; it may also be a Hugging Face repository
 of a CTranslate2 Whisper model (a fine-tune), which then shows up on the page. Models are faster-whisper (CTranslate2,
 int8, CPU), downloaded into HF_HOME; `download` fetches one ahead of time so the first spoken command doesn't wait.
 Only models that fit the 3 GB the container is given are offered.

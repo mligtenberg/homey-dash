@@ -4,6 +4,7 @@ import { PageHeader } from './page-header';
 import { HomeyAccountPanel } from './homey-account-panel';
 import { ImmichAccountPanel } from './immich-account-panel';
 import { PlexAccountPanel } from './plex-account-panel';
+import { SpeechPanel } from './speech-panel';
 import { TomTomAccountPanel } from './tomtom-account-panel';
 import { TranslatePipe } from '@homey-dash/i18n';
 
@@ -14,7 +15,7 @@ import { TranslatePipe } from '@homey-dash/i18n';
  */
 @Component({
   selector: 'hd-accounts-page',
-  imports: [PageHeader, AirPlayPanel, HomeyAccountPanel, ImmichAccountPanel, PlexAccountPanel, TomTomAccountPanel, TranslatePipe],
+  imports: [PageHeader, AirPlayPanel, HomeyAccountPanel, ImmichAccountPanel, PlexAccountPanel, TomTomAccountPanel, SpeechPanel, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-page-header section="accounts" [title]="'Accounts' | t" />
@@ -23,6 +24,7 @@ import { TranslatePipe } from '@homey-dash/i18n';
       <hd-immich-account-panel />
       <hd-plex-account-panel />
       <hd-tomtom-account-panel />
+      <hd-speech-panel />
       <hd-airplay-panel />
     </div>
   `
