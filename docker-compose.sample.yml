@@ -52,6 +52,10 @@ services:
       HOMEY_DASH_URL: "http://homey-dash:8080"
       # Spoken wake word (spellings Whisper may write, comma-separated) and the Whisper size.
       # VOICE_WAKE: "homey,homie,homi"
+      # The speech model is chosen (and downloaded ahead of time) at http://<host>:8080/voice/admin.html; VOICE_MODEL only
+      # sets the first choice. VOICE_THREADS: CPU threads for Whisper (an N100 has 4).
       # VOICE_MODEL: small
+      # VOICE_THREADS: 3
+      # VOICE_MODEL may also be a Hugging Face repository of a CTranslate2 Whisper model (e.g. a Dutch fine-tune).
     depends_on:
       - homey-dash
