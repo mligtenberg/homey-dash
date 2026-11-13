@@ -75,7 +75,10 @@ class Segmenter:
                 self.speaking, self._speech, self._silent = True, list(self._pre), 0
             return None
         self._speech.append(f)
-        self._silent = 0 if loud else self._silent + 1
+        # Hysteresis: speech starts above 3x the room's noise but only ends below 1.5x. A tablet's quieter, noisier
+        # microphone puts speech barely over the start bar, and the dips between words must not count as silence.
+        # (The floor is frozen while speaking, so the speech itself does not raise it.)
+        self._silent = 0 if rms > max(0.006, 1.5 * self._floor) else self._silent + 1
         if self._silent >= END_SILENCE_FRAMES or len(self._speech) >= MAX_FRAMES:
             speech, self._speech, self.speaking, self._loud, self._pre = self._speech, [], False, 0, []
             if len(speech) - self._silent < MIN_SPEECH_FRAMES:
