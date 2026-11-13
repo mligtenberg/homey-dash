@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, Injectable, input, signal } from '@angular/core';
 import { timerLength } from '@homey-dash/tiles';
-import { LucideCheck, LucideMic, LucideTriangleAlert } from '@homey-dash/design-system';
+import { LucideCheck, LucideMic, LucideMicOff, LucideTriangleAlert } from '@homey-dash/design-system';
 import { t, tr, TranslatePipe } from '@homey-dash/i18n';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { safeStorage, screenId } from './screen-id';
@@ -17,8 +17,9 @@ export const RESULT_MS = 6_000;
 
 /** Where the voice service's pages and assets are reached, through HomeyDash. */
 const VOICE_BASE = '/voice/';
-/** The score (0 to 1) from which the wake word counts as said; how much of the audio before it goes with it; how long a command may take to come. */
-export const WAKE_THRESHOLD = 0.5;
+/** The score (0 to 1) from which the voice service counts the wake word as said, when it hears it for a screen (`WAKE_THRESHOLD` in its app.py); the detector on a screen has its own. */
+export const SERVER_WAKE_THRESHOLD = 0.5;
+/** How much of the audio before the wake word goes with it; how long a command may take to come. */
 const PREROLL = 16000 * 2;
 const SESSION_MS = 12_000;
 /** Below this loudness (and 3 times the room's own) the detector rests; it keeps going for GATE_TAIL blocks of 80 ms after the sound, and starts from GATE_PREROLL blocks before it. */
@@ -30,29 +31,14 @@ const MAX_BACKLOG = 5;
 
 /**
  * What this browser can do that the wake word depends on, as lines of text, for a screen that cannot say why it does
- * not listen (a tablet has no console): the shared memory the runtime asks for, SIMD, workers, and which runtime the
- * voice service hands out.
+ * not listen (a tablet has no console): WebAssembly, workers, and whether the voice service hands out the module.
  */
 export async function diagnose(): Promise<string> {
-  const memory = (maximum: number, shared: boolean) => {
-    try {
-      new WebAssembly.Memory({ initial: 256, maximum, shared });
-      return 'ok';
-    } catch (e) {
-      return e instanceof Error ? e.name : 'failed';
-    }
-  };
-  // The smallest module that uses a SIMD instruction.
-  const simd = WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]));
-  const runtime = await fetch(VOICE_BASE + 'vendor/ort/ort-wasm-simd-threaded.mjs')
-    .then((r) => (r.ok ? r.text() : `HTTP ${r.status}`), () => 'no answer')
-    .then((text) => (text.includes('maximum:1024,shared:!0') ? 'small memory' : text.includes('maximum:65536,shared:!0') ? 'OLD (4 GB memory)' : text));
+  const module = await fetch(VOICE_BASE + 'mww/mww.wasm', { method: 'HEAD' }).then((r) => (r.ok ? 'ok' : `HTTP ${r.status}`), () => 'no answer');
   const nav = navigator as Navigator & { deviceMemory?: number };
   return [
-    `shared memory 4 GB: ${memory(65536, true)}, 256 MB: ${memory(4096, true)}, 64 MB: ${memory(1024, true)}`,
-    `own memory 4 GB: ${memory(65536, false)}`,
-    `SIMD: ${simd}, workers: ${typeof Worker !== 'undefined'}, secure: ${window.isSecureContext}, RAM: ${nav.deviceMemory ?? '?'} GB`,
-    `runtime from the voice service: ${runtime}`,
+    `WebAssembly: ${typeof WebAssembly !== 'undefined'}, workers: ${typeof Worker !== 'undefined'}, secure: ${window.isSecureContext}, RAM: ${nav.deviceMemory ?? '?'} GB`,
+    `wake word module from the voice service: ${module}`,
     nav.userAgent,
   ].join('\n');
 }
@@ -63,45 +49,32 @@ export interface Detector {
   readonly kind: 'worker' | 'page';
   /** How many blocks are being worked on. */
   readonly busy: number;
+  /** The score (0 to 1) from which the wake word counts as said. */
+  readonly threshold: number;
   /** The highest score of what was fed (0 to 1). */
   feed(samples: Float32Array): Promise<number>;
   reset(): void;
   stop(): void;
 }
 
-let ortLoading: Promise<unknown> | undefined;
-/** onnxruntime-web, from the voice service, as the global `ort` its script defines. */
-function loadOrt(): Promise<unknown> {
-  return (ortLoading ??= new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = VOICE_BASE + 'vendor/ort/ort.wasm.min.js';
-    script.onload = () => resolve((window as unknown as { ort: unknown }).ort);
-    script.onerror = async () => {
-      ortLoading = undefined;
-      // Say what the address answered, which tells a service that is down (502) from one that is not forwarded to (404).
-      const status = await fetch(script.src, { method: 'HEAD' }).then((r) => `HTTP ${r.status}`, () => 'no answer');
-      reject(new Error(`The voice service is not reachable: ${script.src} gave ${status}`));
-    };
-    document.head.append(script);
-  }));
-}
-
 /** The same detector on the page's own thread, for a browser whose workers cannot run it. */
 class InlineDetector implements Detector {
   readonly kind = 'page';
-  busy = 0;
+  readonly busy = 0; // it answers at once, and the next block waits for it
 
-  constructor(private readonly ww: { feed(samples: Float32Array): Promise<number>; reset(): void }) {}
+  constructor(private readonly ww: { threshold: number; feed(samples: Float32Array): number; reset(): void }) {}
 
   static async start(): Promise<InlineDetector> {
-    const ort = await loadOrt();
-    const { WakeWord } = (await import(/* @vite-ignore */ VOICE_BASE + 'wakeword.js')) as { WakeWord: { create(ort: unknown): Promise<InlineDetector['ww']> } };
-    return new InlineDetector(await WakeWord.create(ort));
+    const { MicroWakeWord } = (await import(/* @vite-ignore */ VOICE_BASE + 'mww/mww.js')) as { MicroWakeWord: { create(): Promise<InlineDetector['ww']> } };
+    return new InlineDetector(await MicroWakeWord.create());
+  }
+
+  get threshold() {
+    return this.ww.threshold;
   }
 
   feed(samples: Float32Array) {
-    this.busy++;
-    return this.ww.feed(samples).finally(() => this.busy--);
+    return Promise.resolve(this.ww.feed(samples));
   }
 
   reset() {
@@ -116,19 +89,22 @@ class WakeDetector implements Detector {
   readonly kind = 'worker';
   private readonly waiting: ((score: number) => void)[] = [];
 
-  constructor(private readonly worker: Worker) {
+  constructor(
+    private readonly worker: Worker,
+    readonly threshold: number,
+  ) {
     worker.onmessage = ({ data }) => data.type === 'score' && this.waiting.shift()?.(data.score);
   }
 
-  /** The worker once it has loaded the models, or why it could not. */
+  /** The worker once it has loaded the wake word, or why it could not. */
   static async start(): Promise<WakeDetector> {
     const worker = new Worker(VOICE_BASE + 'wakeword-worker.js');
-    await new Promise<void>((resolve, reject) => {
-      worker.onmessage = ({ data }) => (data.type === 'ready' ? resolve() : data.type === 'error' && reject(new Error(data.message)));
+    const threshold = await new Promise<number>((resolve, reject) => {
+      worker.onmessage = ({ data }) => (data.type === 'ready' ? resolve(data.threshold) : data.type === 'error' && reject(new Error(data.message)));
       worker.onerror = (e) => reject(new Error(`The wake word could not be loaded: ${e.message || VOICE_BASE + 'wakeword-worker.js'}`));
       worker.postMessage({ type: 'init' });
     });
-    return new WakeDetector(worker);
+    return new WakeDetector(worker, threshold);
   }
 
   /** How many blocks are being worked on. */
@@ -156,7 +132,7 @@ class WakeDetector implements Detector {
 /** Starts the wake word detector: in a worker, or on the page where the browser cannot run it in one. */
 export function startDetector(): Promise<Detector> {
   return WakeDetector.start().catch((e) => {
-    // Some browsers (an older Android WebView, such as Fully Kiosk's) cannot run the models in a worker.
+    // Some browsers (an older Android WebView, such as Fully Kiosk's) cannot run it in a worker.
     console.warn('Wake word worker failed, running it on the page instead:', e);
     return InlineDetector.start();
   });
@@ -170,7 +146,7 @@ export async function openMicrophone(onBlock: (samples: Float32Array) => void, f
   const ctx = new AudioContext({ sampleRate: 16000 });
   // The browser hands the worklet 128 samples at a time; 1280 (80 ms) go to the page at once, a tenth of the messages.
   const worklet = `class P extends AudioWorkletProcessor {
-      b = new Float32Array(1280); n = 0;
+      constructor() { super(); this.b = new Float32Array(1280); this.n = 0; }
       process(i) {
         const c = i[0][0];
         if (c) { this.b.set(c, this.n); this.n += c.length; if (this.n >= 1280) { this.port.postMessage(this.b.slice()); this.n = 0; } }
@@ -268,6 +244,8 @@ export class Voice {
   readonly enabled = signal(false);
   /** Whether the wake word is heard by the voice service: the screen then streams all it hears. */
   readonly server = signal(false);
+  /** Whether the microphone is muted for now: not remembered, so a reload listens again. */
+  readonly muted = signal(false);
   /** Whether the browser filters echo and noise out of the microphone; off saves a slow screen some work. */
   readonly filters = signal(true);
   /** Why listening could not start, as the browser says it, until it is tried again. */
@@ -324,6 +302,7 @@ export class Voice {
     if (on && !this.available) return;
     if (on === this.enabled()) return;
     this.enabled.set(on);
+    this.muted.set(false);
     this.error.set('');
     if (on) this.storage?.setItem(VOICE_KEY, 'on');
     else this.storage?.removeItem(VOICE_KEY);
@@ -336,9 +315,18 @@ export class Voice {
     if (this.enabled() && !this.stopped) this.stop();
   }
 
+  /** Mutes the microphone, or listens again. */
+  toggleMute() {
+    if (!this.enabled()) return;
+    const mute = !this.muted();
+    this.muted.set(mute);
+    if (mute) this.stop();
+    else void this.start();
+  }
+
   /** Listens again after `suspend`. */
   resume() {
-    if (this.enabled() && this.stopped) void this.start();
+    if (this.enabled() && this.stopped && !this.muted()) void this.start();
   }
 
   /** Takes an event the way HomeyDash sends it; also how a screen is tried without a microphone. */
@@ -348,7 +336,7 @@ export class Voice {
     if (this.phase().kind === 'result') this.clear = setTimeout(() => this.phase.set({ kind: 'off' }), RESULT_MS);
   }
 
-  // The wake word is listened for here on the screen (openWakeWord's "hey jarvis", run in the browser), so no audio
+  // The wake word is listened for here on the screen (microWakeWord's "hey jarvis", run in the browser), so no audio
   // leaves the screen until it is said. Then the last two seconds and what follows go to HomeyDash, which has the command
   // understood and carried out, and answers with how it went.
   private async start() {
@@ -418,7 +406,7 @@ export class Voice {
     let floor = 0.005; // how loud the room is when nobody speaks
     const detect = (samples: Float32Array) =>
       void ww.feed(samples).then((score) => {
-        if (!this.stopped && !this.ws && score >= WAKE_THRESHOLD && performance.now() > cool) trigger();
+        if (!this.stopped && !this.ws && score >= ww.threshold && performance.now() > cool) trigger();
       });
     const toPcm = (f: Float32Array) => {
       const pcm = new Int16Array(f.length);
@@ -529,8 +517,24 @@ export class Voice {
         </span>
       </div>
     }
+    @if (enabled() && onDashboard()) {
+      <div class="mic">
+        <button type="button" class="mute" [attr.aria-pressed]="muted()" [attr.aria-label]="(muted() ? 'Unmute microphone' : 'Mute microphone') | t" (click)="voice.toggleMute()">
+          <svg [lucideIcon]="muted() ? micOff : mic" />
+        </button>
+        @if (!muted()) { <span class="hint">{{ 'Say: Hey Jarvis' | t }}</span> }
+      </div>
+    }
   `,
   styles: `
+    /* Bottom left, in the gutter beside the tiles (in line with the tape's toggle and the people above it). */
+    .mic { position: fixed; left: var(--space-3); bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-3); pointer-events: none; }
+    .hint { font-size: 12px; font-weight: 500; color: var(--ink-muted); white-space: nowrap; }
+    .mute { flex: none; pointer-events: auto; display: grid; place-items: center;
+      width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; color: var(--ink-muted); opacity: .7;
+      background: var(--tile-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 0 0 1.5px var(--glass-rim) inset; }
+    .mute[aria-pressed='true'] { color: var(--warn); opacity: 1; }
+    .mute svg { width: 22px; height: 22px; }
     :host { position: fixed; z-index: 15; left: 0; right: 0; bottom: var(--space-5); display: flex; justify-content: center; pointer-events: none; padding-inline: var(--space-4); }
     .strip { --tone-ink: var(--kind-neutral-ink); --tone-fill: var(--kind-neutral-fill);
       display: flex; align-items: center; gap: var(--space-4); max-width: min(92vw, 56rem); min-height: max(72px, 10vh);
@@ -555,8 +559,14 @@ export class Voice {
   `,
 })
 export class VoiceFeedback {
-  private readonly voice = inject(Voice);
+  protected readonly voice = inject(Voice);
+  /** Whether the dashboard is what the screen shows: the microphone control belongs there, and not over a photo or a lock screen. */
+  readonly onDashboard = input(true);
   protected readonly phase = this.voice.phase;
+  protected readonly enabled = this.voice.enabled;
+  protected readonly muted = this.voice.muted;
+  protected readonly mic = LucideMic;
+  protected readonly micOff = LucideMicOff;
 
   protected readonly shown = computed(() => {
     const phase = this.phase();

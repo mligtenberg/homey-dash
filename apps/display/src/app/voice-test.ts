@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, OnDestroy, signal } from '@angular/core';
 import { t, TranslatePipe } from '@homey-dash/i18n';
-import { openMicrophone, startDetector, Voice, WAKE_THRESHOLD } from './voice';
+import { openMicrophone, SERVER_WAKE_THRESHOLD, startDetector, Voice } from './voice';
 
 /** What a test of the microphone found out about a recording. */
 export interface Recording {
@@ -41,6 +41,8 @@ export interface WakeRun {
   /** The highest score (0 to 1) and when in the recording (s) it came. */
   score: number;
   at: number;
+  /** The score from which the detector that ran counts the wake word as said. */
+  threshold: number;
   detector: 'worker' | 'page' | 'server';
   loadMs: number;
   /** Time to work on 80 ms of sound: on average and at the slowest; above 80 the screen cannot keep up with its microphone. */
@@ -69,7 +71,7 @@ export async function runWake(samples: Float32Array): Promise<WakeRun> {
       }
     }
     return {
-      score, at, detector: detector.kind, loadMs,
+      score, at, threshold: detector.threshold, detector: detector.kind, loadMs,
       averageMs: times.reduce((a, b) => a + b, 0) / Math.max(1, times.length),
       slowestMs: Math.max(0, ...times),
     };
@@ -86,7 +88,7 @@ export async function runWakeOnServer(samples: Float32Array): Promise<WakeRun> {
   const response = await fetch('/voice/api/wake', { method: 'POST', body: padded.buffer });
   if (!response.ok) throw new Error(`/voice/api/wake: HTTP ${response.status}`);
   const { score, at, ms } = (await response.json()) as { score: number; at: number; ms: number };
-  return { score, at, detector: 'server', loadMs: 0, averageMs: ms / Math.max(1, padded.length / 1280), slowestMs: performance.now() - started };
+  return { score, at, threshold: SERVER_WAKE_THRESHOLD, detector: 'server', loadMs: 0, averageMs: ms / Math.max(1, padded.length / 1280), slowestMs: performance.now() - started };
 }
 
 /** A recording shipped with the voice service, as 16 kHz samples. */
@@ -275,11 +277,11 @@ export class VoiceTest implements OnDestroy {
       for (const [name, samples, shouldHear] of subjects) {
         this.report.set([...lines, t('Testing…')]);
         last = await (this.voice.server() ? runWakeOnServer(samples) : runWake(samples));
-        const heard = last.score >= WAKE_THRESHOLD;
+        const heard = last.score >= last.threshold;
         const verdict = shouldHear === undefined ? '' : heard === shouldHear ? ` ${t('✓ as expected')}` : ` ${t('✗ not as expected')}`;
         lines.push(
           t('{name}: score {score} at {at} s, {heard} (needs {limit}){verdict}', {
-            name, score: last.score.toFixed(2), at: last.at.toFixed(1), heard: heard ? t('heard') : t('not heard'), limit: WAKE_THRESHOLD, verdict,
+            name, score: last.score.toFixed(2), at: last.at.toFixed(1), heard: heard ? t('heard') : t('not heard'), limit: last.threshold, verdict,
           }),
         );
       }

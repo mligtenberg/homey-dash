@@ -200,6 +200,8 @@ async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, 
     held, held_until = None, 0.0
     last = None
     detector = WakeWord() if detect else None
+    if detect:
+        log.info("listening with the wake word detected here")
     active = not detect  # false while the detector waits for the wake word
     ring = b""
     cool = 0.0
@@ -224,7 +226,10 @@ async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, 
             pcm = msg.get("bytes") or b""
             if not active:
                 ring = (ring + pcm)[-PREROLL_BYTES:]
-                if detector.feed(pcm) < WAKE_THRESHOLD or time.time() < cool:
+                score = detector.feed(pcm)
+                if score > 0.15 and score < WAKE_THRESHOLD:
+                    log.info("wake score %.2f (needs %.2f)", score, WAKE_THRESHOLD)
+                if score < WAKE_THRESHOLD or time.time() < cool:
                     continue
                 log.info("wake word heard")
                 active, pcm, ring = True, ring, b""

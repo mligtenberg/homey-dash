@@ -34,7 +34,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "apps/voice",
-        "command": "uv run pytest -q"
+        "command": "uv run pytest -q && node --test mww/test.mjs"
       }
     },
     "assets": {

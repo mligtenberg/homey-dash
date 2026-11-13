@@ -138,7 +138,7 @@ const TAPE_KEY = 'homeydash.tape';
     }
     <!-- Over everything, so the taps that open the screen settings press nothing beneath. -->
     <span class="corner" aria-hidden="true" (pointerdown)="cornerTap()"></span>
-    <hd-voice />
+    <hd-voice [onDashboard]="!playing() && !!current()" />
     <hd-timer-alert />
     <hd-screen-settings (cameraChanged)="remeasure()" />
   `,

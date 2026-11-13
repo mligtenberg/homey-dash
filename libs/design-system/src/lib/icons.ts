@@ -58,6 +58,7 @@ import {
   MapPin,
   MapPinOff,
   Mic,
+  MicOff,
   Monitor,
   MonitorCog,
   Moon,
@@ -202,6 +203,7 @@ export const LucideLockOpen = /* @__PURE__ */ icon('lock-open', LockOpen);
 export const LucideMapPin = /* @__PURE__ */ icon('map-pin', MapPin);
 export const LucideMapPinOff = /* @__PURE__ */ icon('map-pin-off', MapPinOff);
 export const LucideMic = /* @__PURE__ */ icon('mic', Mic);
+export const LucideMicOff = /* @__PURE__ */ icon('mic-off', MicOff);
 export const LucideMonitor = /* @__PURE__ */ icon('monitor', Monitor);
 export const LucideMonitorCog = /* @__PURE__ */ icon('monitor-cog', MonitorCog);
 export const LucideMoon = /* @__PURE__ */ icon('moon', Moon);
