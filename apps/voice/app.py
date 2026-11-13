@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from catalog import CatalogSource, CatalogUnavailable
 from matcher import Matcher, Result, norm
 import engines
+import stt
 import timer
 import wake
 from wakeword import WakeWord
@@ -85,21 +86,7 @@ def prompt() -> str:
               " Maak het warmer. Het licht is te koud.")
 
 
-_model = None
-
-
-def whisper():
-    global _model
-    if _model is None:
-        from faster_whisper import WhisperModel
-
-        size = os.environ.get("VOICE_MODEL", "small")
-        t = time.time()
-        # cpu_threads=0 lets CTranslate2 pick; set VOICE_THREADS to the physical core count (N100: 4) if it over/undershoots
-        threads = int(os.environ.get("VOICE_THREADS", "0"))
-        _model = WhisperModel(size, device="cpu", compute_type="int8", cpu_threads=threads)
-        log.info("loaded whisper %s (threads=%s) in %.1fs", size, threads or "auto", time.time() - t)
-    return _model
+models = stt.Manager()
 
 
 def decode(path: str):
@@ -127,10 +114,7 @@ def transcribe_audio(audio) -> str:
 
 
 def _transcribe(audio) -> str:
-    segments, _ = whisper().transcribe(
-        audio, language="nl", initial_prompt=prompt(), beam_size=1, vad_filter=True, condition_on_previous_text=False
-    )
-    return " ".join(s.text.strip() for s in segments).strip()
+    return models.transcribe(audio, prompt())
 
 
 app = FastAPI()
@@ -150,6 +134,43 @@ async def wake_test(request: Request):
         if (s := det.feed(pcm[i:i + 2560])) > best:
             best, at = s, i / 32000
     return {"score": best, "at": at, "ms": round((time.time() - t0) * 1000)}
+
+
+class Choice(BaseModel):
+    id: str
+
+
+def _stt_call(fn, *args):
+    try:
+        return fn(*args)
+    except KeyError:
+        raise HTTPException(404, "unknown model")
+    except stt.Unavailable as e:
+        raise HTTPException(409, str(e))
+
+
+@app.get("/api/stt")
+def stt_state():
+    """The speech-to-text models: which one is in use, which are downloaded (or downloading, with progress)."""
+    return models.state()
+
+
+@app.post("/api/stt/select")
+def stt_select(body: Choice):
+    _stt_call(models.select, body.id)
+    return models.state()
+
+
+@app.post("/api/stt/{model_id}/download", status_code=202)
+def stt_download(model_id: str):
+    _stt_call(models.download, model_id)
+    return models.state()
+
+
+@app.delete("/api/stt/{model_id}")
+def stt_delete(model_id: str):
+    _stt_call(models.delete, model_id)
+    return models.state()
 
 
 @app.get("/api/catalog")
@@ -178,6 +199,8 @@ async def voice(audio: UploadFile, engine: str = "rules", zone: str | None = Non
         t0 = time.time()
         transcript = transcribe(f.name)
         t1 = time.time()
+    except stt.Unavailable as e:
+        raise HTTPException(503, str(e))
     finally:
         os.unlink(f.name)
     res, used = run_command(engine, transcript, zone)
@@ -243,7 +266,11 @@ async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, 
                 held = None
                 await state("thinking")
                 t0 = time.time()
-                text = await asyncio.to_thread(transcribe_audio, utt)
+                try:
+                    text = await asyncio.to_thread(transcribe_audio, utt)
+                except stt.Unavailable as e:  # no key, model gone, API down: say so in the log, keep the socket
+                    log.warning("transcription failed: %s", e)
+                    text = ""
                 stt_ms = round((time.time() - t0) * 1000)
                 woke, rest = wake.split_wake(text, phrase)
                 armed = time.time() < awake_until
