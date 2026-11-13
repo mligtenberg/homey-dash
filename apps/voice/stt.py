@@ -227,7 +227,7 @@ class Manager:
         if not self.installed(opt):
             log.warning("%s is not downloaded; fetching it now (use the admin page to do this ahead of time)", opt.id)
         segments, _ = self._whisper(opt).transcribe(
-            audio, language="nl", initial_prompt=prompt, beam_size=1, vad_filter=True, condition_on_previous_text=False
+            audio, language="nl", initial_prompt=prompt, beam_size=5, vad_filter=True, condition_on_previous_text=False
         )
         text = " ".join(s.text.strip() for s in segments).strip()
         self.last_ms[opt.id] = round((time.time() - t) * 1000)
