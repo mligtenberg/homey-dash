@@ -8,6 +8,7 @@ export * from './lib/weather/weather-tiles';
 export * from './lib/news/news-tiles';
 export * from './lib/traffic/traffic-tiles';
 export * from './lib/time/time-tiles';
+export * from './lib/voice/voice-tiles';
 export * from './lib/energy/energy-tiles';
 export * from './lib/sonos/sonos-tiles';
 export * from './lib/logic/logic-tile';

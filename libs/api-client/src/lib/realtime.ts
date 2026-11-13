@@ -59,6 +59,8 @@ export interface RealtimeMessages {
   Screen: ScreenView | null;
   /** Asks a joined screen to take a screenshot and post it under this request id. */
   Screenshot: string;
+  /** Asks a joined screen to post the voice memos it keeps under this request id. */
+  Memos: string;
   /** Every display with its status, for Management. */
   Displays: DisplayInfo[];
   /** Every dashboard, for Management's sidebar. */

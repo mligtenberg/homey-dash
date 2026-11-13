@@ -157,6 +157,25 @@ public static partial class DisplayEndpoints
             return screenshots.Complete(requestId, picture.ToArray()) ? Results.NoContent() : Results.NotFound();
         });
 
+        // Asks the display's screen for the voice memos it keeps (recordings and texts), as a zip. 409: nothing is connected; 504: it didn't answer.
+        displays.MapPost("/{id:guid}/memos", async (Guid id, HomeyDashDbContext db, DisplayPresence presence, MemoBroker memos, CancellationToken ct) =>
+        {
+            if (await db.Displays.FindAsync([id], ct) is not { } display) return NotFound(id);
+            if (display.ScreenId is not { } screenId || !presence.IsConnected(screenId))
+                return Results.Problem("This display is not connected.", statusCode: StatusCodes.Status409Conflict);
+            return await memos.RequestAsync(screenId, ct) is { } zip
+                ? Results.File(zip, "application/zip")
+                : Results.Problem("The display did not answer. Reload its page and try again.", statusCode: StatusCodes.Status504GatewayTimeout);
+        });
+
+        // A screen's answer to a request for its memos: the recordings and texts as form files.
+        api.MapPost("/memos/{requestId:guid}", async (Guid requestId, HttpRequest request, MemoBroker memos, CancellationToken ct) =>
+        {
+            if (!request.HasFormContentType) return Results.Problem("Send the memos as a form.", statusCode: StatusCodes.Status415UnsupportedMediaType);
+            var form = await request.ReadFormAsync(ct);
+            return await memos.CompleteAsync(requestId, form.Files, ct) ? Results.NoContent() : Results.NotFound();
+        }).DisableAntiforgery();
+
         displays.MapDelete("/{id:guid}", async (Guid id, HomeyDashDbContext db, RealtimeNotifier notifier, CancellationToken ct) =>
         {
             if (await db.Displays.FindAsync([id], ct) is not { } display) return NotFound(id);

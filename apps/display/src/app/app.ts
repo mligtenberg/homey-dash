@@ -23,6 +23,7 @@ import { Theme, themeFor } from './auto-theme';
 import { KioskScreen } from './kiosk-screen';
 import { LockScreen } from './lock-screen';
 import { ScreenSettings } from './screen-settings';
+import { MemoUpload } from './memo-upload';
 import { ScreenCapture } from './screen-capture';
 import { screenDetails } from './screen-details';
 import { People, PEOPLE_GUTTER } from './people';
@@ -304,6 +305,7 @@ export class App {
     const stops = [
       this.realtime.on('Screen', (view) => this.show(view)),
       inject(ScreenCapture).answer(),
+      inject(MemoUpload).answer(),
       this.realtime.whenConnected(() => this.join()),
     ];
     inject(DestroyRef).onDestroy(() => {

@@ -7,6 +7,7 @@ import {
   SONOS_TILES,
   TileKindRegistry,
   TIME_TILES,
+  VOICE_TILES,
   TRAFFIC_TILES,
   NEWS_TILES,
   WEATHER_TILES,
@@ -20,6 +21,6 @@ import {
  * the root injector, where there are none.
  */
 export const tileProviders = [
-  provideTileModules(CORE_TILES, PLEX_TILES, WEATHER_TILES, TRAFFIC_TILES, NEWS_TILES, TIME_TILES, ENERGY_TILES, SONOS_TILES, LOGIC_TILES),
+  provideTileModules(CORE_TILES, PLEX_TILES, WEATHER_TILES, TRAFFIC_TILES, NEWS_TILES, TIME_TILES, VOICE_TILES, ENERGY_TILES, SONOS_TILES, LOGIC_TILES),
   TileKindRegistry,
 ];

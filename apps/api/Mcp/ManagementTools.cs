@@ -71,6 +71,8 @@ public sealed class ManagementTools(
         - "timer" (wide, full, large, full-large): timers; buttons start a timer, any number run side by side and one that runs out
           beeps until dismissed. The timers belong to the screen, not the tile. settings.target is null; optional settings.minutes
           is the list of timer lengths in minutes on the buttons (default 1, 5, 10, 15).
+        - "voice-memo" (wide, full, large, full-large): records speech from the screen's microphone and has the voice service write
+          it down in Dutch. Recordings and texts stay on the screen; Management downloads them. settings.target is null.
         - "energy" (small, wide, full, large, full-large): Homey's own energy report; small shows the grid power now (import or
           export), wide and full add solar, home consumption and a flow bar, large and full-large add today's totals and a
           small history of the day. A press opens today in full. settings.target is "energy:home" (settings.account picks

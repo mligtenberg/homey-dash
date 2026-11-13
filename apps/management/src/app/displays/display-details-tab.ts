@@ -6,6 +6,7 @@ import { SOUND_LABELS, TIMER_SOUNDS } from '@homey-dash/tiles';
 import { LOCALES, LOCALE_NAMES, t, TranslatePipe } from '@homey-dash/i18n';
 import { describeUserAgent } from './browser-text';
 import { DisplayContext } from './display-context';
+import { DisplayMemos } from './display-memos';
 import { DisplayScreenshot } from './display-screenshot';
 import { SignalPicker } from '../editor/signal-picker';
 import { DisplaysStore, isLuminanceSignal } from './displays-store';
@@ -13,7 +14,7 @@ import { DisplaysStore, isLuminanceSignal } from './displays-store';
 /** A display's name, a screenshot of it and what its screen and browser say about themselves; removing it too. */
 @Component({
   selector: 'hd-display-details-tab',
-  imports: [DecimalPipe, DisplayScreenshot, SignalPicker, TranslatePipe],
+  imports: [DecimalPipe, DisplayMemos, DisplayScreenshot, SignalPicker, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.display(); as display) {
@@ -52,6 +53,11 @@ import { DisplaysStore, isLuminanceSignal } from './displays-store';
       <section class="hd-panel wide">
         <h2 class="hd-section-title">{{ 'What it shows now' | t }}</h2>
         <hd-display-screenshot [display]="display" />
+      </section>
+      <section class="hd-panel wide">
+        <h2 class="hd-section-title">{{ 'Voice memos' | t }}</h2>
+        <p class="hd-hint">{{ 'Recordings stay on the display until you download them here.' | t }}</p>
+        <hd-display-memos [display]="display" />
       </section>
       <section class="hd-panel">
         <h2 class="hd-section-title">{{ 'Light' | t }}</h2>

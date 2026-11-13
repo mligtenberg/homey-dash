@@ -13,6 +13,7 @@ public static class RealtimeSetup
         services.AddSingleton<DisplayPresence>();
         services.AddSingleton<RealtimeNotifier>();
         services.AddSingleton<ScreenshotBroker>();
+        services.AddSingleton<MemoBroker>();
         services.AddHostedService<HomeyBroadcaster>();
         return services;
     }

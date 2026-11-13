@@ -109,13 +109,13 @@ def transcribe(path: str) -> str:
     return transcribe_audio(decode(path))
 
 
-def transcribe_audio(audio) -> str:
+def transcribe_audio(audio, bias: str | None = None) -> str:
     with _stt_lock:
-        return _transcribe(audio)
+        return _transcribe(audio, bias)
 
 
-def _transcribe(audio) -> str:
-    return models.transcribe(audio, prompt())
+def _transcribe(audio, bias: str | None = None) -> str:
+    return models.transcribe(audio, prompt() if bias is None else bias)
 
 
 app = FastAPI()
@@ -210,6 +210,32 @@ async def voice(audio: UploadFile, engine: str = "rules", zone: str | None = Non
     r["timing_ms"] = {"stt": round((t1 - t0) * 1000), "match": round((time.time() - t1) * 1000)}
     log.info("voice %r -> %s %s", transcript, r["reason"] or (r["action"], r["value"], r["zones"]), r["timing_ms"])
     return r
+
+
+# A memo is free speech, so unlike a command it gets no vocabulary to lean on; this only tells Whisper it is Dutch prose.
+MEMO_PROMPT = "Dit is een gesproken notitie in het Nederlands."
+
+
+@app.post("/api/transcribe")
+async def memo(audio: UploadFile):
+    """A voice memo: the Dutch text of a recording, with no command matching. Returns {text, ms}."""
+    suffix = Path(audio.filename or "a.webm").suffix or ".webm"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+        f.write(await audio.read())
+    try:
+        t0 = time.time()
+        pcm = await asyncio.to_thread(decode, f.name)
+        text = await asyncio.to_thread(transcribe_audio, pcm, MEMO_PROMPT)
+    except stt.Unavailable as e:
+        raise HTTPException(503, str(e))
+    except Exception as e:  # ffmpeg could not read the recording
+        log.warning("memo could not be read: %s", e)
+        raise HTTPException(422, "the recording could not be read")
+    finally:
+        os.unlink(f.name)
+    ms = round((time.time() - t0) * 1000)
+    log.info("memo %d chars in %d ms", len(text), ms)
+    return {"text": text, "ms": ms}
 
 
 @app.websocket("/ws/listen")

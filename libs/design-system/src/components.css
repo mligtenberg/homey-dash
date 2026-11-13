@@ -1722,6 +1722,24 @@ a.hd-btn { text-decoration: none; }
 .hd-timer :is(button):focus-visible { outline: 3px solid var(--k-ink); outline-offset: 3px; }
 .hd-timer__digits.is-paused { opacity: .55; }
 /* The timer's full screen, built on `.hd-dev`: the dial for a new timer is the hero, the running timers the controls. */
+/* A voice memo: the standard anatomy (icon and corner mark above, name and detail line below); large sizes add the newest memo as text. */
+.hd-memo__text { margin: 0; min-height: 0; overflow: hidden; font-size: max(var(--t-title-min), calc(var(--cell) * var(--t-title))); line-height: 1.2; font-weight: 600; text-wrap: pretty; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; }
+.hd-memo[data-size="full-large"] .hd-memo__text { -webkit-line-clamp: 6; line-clamp: 6; }
+.hd-memo__older { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--cell) * .04); }
+.hd-memo__older li { display: flex; align-items: center; gap: calc(var(--cell) * .08); }
+.hd-memo__older .hd-tile__detail { flex: 1; min-width: 0; margin: 0; }
+.hd-memo__older .hd-round-btn { width: calc(var(--cell) * .3); height: calc(var(--cell) * .3); }
+.hd-memo__x { stroke-width: 2.5; }
+.hd-memo-panel__rec { gap: calc(var(--cell) * .12); }
+.hd-memo-panel__rec .hd-dev__big.is-recording { color: var(--k-ink); }
+/* The one solid control, as big as a timer's dial: ink to start, the neutral ink while it records. */
+.hd-memo-panel__btn { width: calc(var(--cell) * .8); height: calc(var(--cell) * .8); background: var(--k-ink); color: var(--on-kind); }
+.hd-memo-panel__btn.is-recording { background: var(--ink); color: var(--tile-surface); }
+.hd-memo-panel__btn > svg { width: 40%; height: 40%; }
+.hd-memo-panel__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: calc(var(--cell) * .12); }
+.hd-memo-panel__what { min-width: 0; display: flex; flex-direction: column; gap: calc(var(--cell) * .04); }
+.hd-memo-panel__text { margin: 0; font-size: max(var(--t-sub-min), calc(var(--cell) * var(--t-sub))); line-height: 1.25; text-wrap: pretty; }
+.hd-memo-panel__actions { display: flex; gap: calc(var(--cell) * .08); }
 .hd-timer-panel__new { gap: calc(var(--cell) * .14); }
 .hd-timer-panel__dial { display: grid; grid-template-columns: repeat(3, auto); gap: calc(var(--cell) * .24); justify-content: center; }
 .hd-timer-panel__unit { display: flex; flex-direction: column; align-items: center; gap: calc(var(--cell) * .08); }

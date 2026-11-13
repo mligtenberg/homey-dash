@@ -196,6 +196,16 @@ export class DisplaysApi {
     return this.http.post<void>(`/api/screenshots/${requestId}`, picture);
   }
 
+  /** Asks its screen for the voice memos it keeps, as a zip; fails with 409 while nothing is connected. */
+  memos(id: string) {
+    return this.http.post(`/api/displays/${id}/memos`, null, { responseType: 'blob' });
+  }
+
+  /** A screen's answer to the request it was sent: its memos' recordings and texts. */
+  sendMemos(requestId: string, files: FormData) {
+    return this.http.post<void>(`/api/memos/${requestId}`, files);
+  }
+
   rename(id: string, name: string) {
     return this.http.patch<DisplayInfo>(`/api/displays/${id}`, { name });
   }
