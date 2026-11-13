@@ -132,7 +132,7 @@ export class HomePage {
   protected readonly attention = computed<Attention[]>(() => {
     const items: Attention[] = [];
     if (this.homey.homeys()?.length === 0) {
-      items.push({ kind: 'Account', sec: 'accounts', name: 'Homey', problem: 'not set up, so tiles show no devices', action: 'Set up Homey', link: ['/accounts'] });
+      items.push({ kind: 'Account', sec: 'settings', name: 'Homey', problem: 'not set up, so tiles show no devices', action: 'Set up Homey', link: ['/settings/accounts'] });
     }
     for (const d of this.store.list()) {
       if (d.missingTiles > 0) {

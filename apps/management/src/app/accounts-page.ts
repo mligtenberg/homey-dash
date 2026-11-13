@@ -1,12 +1,9 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { AirPlayPanel } from './airplay-panel';
-import { PageHeader } from './page-header';
 import { HomeyAccountPanel } from './homey-account-panel';
 import { ImmichAccountPanel } from './immich-account-panel';
 import { PlexAccountPanel } from './plex-account-panel';
-import { SpeechPanel } from './speech-panel';
 import { TomTomAccountPanel } from './tomtom-account-panel';
-import { TranslatePipe } from '@homey-dash/i18n';
 
 /**
  * The accounts HomeyDash holds for the home (ADR-0007): Homeys, each with its address and local API key, Immich
@@ -15,18 +12,19 @@ import { TranslatePipe } from '@homey-dash/i18n';
  */
 @Component({
   selector: 'hd-accounts-page',
-  imports: [PageHeader, AirPlayPanel, HomeyAccountPanel, ImmichAccountPanel, PlexAccountPanel, TomTomAccountPanel, SpeechPanel, TranslatePipe],
+  imports: [AirPlayPanel, HomeyAccountPanel, ImmichAccountPanel, PlexAccountPanel, TomTomAccountPanel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <hd-page-header section="accounts" [title]="'Accounts' | t" />
-    <div class="hd-page__body hd-page__body--narrow">
+    <div class="panels">
       <hd-homey-account-panel />
       <hd-immich-account-panel />
       <hd-plex-account-panel />
       <hd-tomtom-account-panel />
-      <hd-speech-panel />
       <hd-airplay-panel />
     </div>
-  `
+  `,
+  styles: `
+    .panels { display: flex; flex-direction: column; gap: var(--space-4); }
+  `,
 })
 export class AccountsPage {}

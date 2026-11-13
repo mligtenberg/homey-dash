@@ -196,7 +196,7 @@ import { TranslatePipe, t } from '@homey-dash/i18n';
         <p class="hd-error" role="alert">
           {{ error }}
           @if (error.includes('Accounts')) {
-            <a routerLink="/accounts">{{ 'Go to Accounts' | t }}</a>
+            <a routerLink="/settings/accounts">{{ 'Go to Accounts' | t }}</a>
           }
         </p>
       }

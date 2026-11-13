@@ -2,14 +2,14 @@ import type { LucideIconData } from '@lucide/angular';
 import {
   LucideHouse,
   LucideImages,
-  LucideKeyRound,
   LucideLayoutDashboard,
   LucideMonitor,
+  LucideSettings,
 } from '@homey-dash/design-system';
 
-export type SectionId = 'overview' | 'dashboards' | 'displays' | 'photos' | 'accounts';
+export type SectionId = 'overview' | 'dashboards' | 'displays' | 'photos' | 'settings';
 
-/** One of the five places in Management, always listed in the same order with the same colour. */
+/** One of the five places in Management, always listed in the same order with the same colour. Settings is the odd one out: the sidebar pins it to the bottom. */
 export interface Section {
   id: SectionId;
   label: string;
@@ -49,11 +49,11 @@ export const SECTIONS: readonly Section[] = [
     purpose: 'Photos from Immich that photo tiles and idle displays show.',
   },
   {
-    id: 'accounts',
-    label: 'Accounts',
-    path: '/accounts',
-    icon: LucideKeyRound,
-    purpose: 'Homey, Immich, Plex, TomTom and AirPlay: the services HomeyDash talks to.',
+    id: 'settings',
+    label: 'Settings',
+    path: '/settings',
+    icon: LucideSettings,
+    purpose: 'The accounts HomeyDash talks to, the speech model, and the language Management speaks.',
   },
 ];
 
@@ -67,7 +67,7 @@ export function sectionOf(url: string): SectionId {
   if (path.startsWith('/dashboards')) return 'dashboards';
   if (path.startsWith('/displays')) return 'displays';
   if (path.startsWith('/photo-sets')) return 'photos';
-  if (path.startsWith('/accounts')) return 'accounts';
+  if (path.startsWith('/settings') || path.startsWith('/accounts')) return 'settings';
   return 'overview';
 }
 
@@ -92,5 +92,6 @@ export const TASKS: readonly Task[] = [
   { question: 'Set what a display does when idle', section: 'displays', route: ['Displays', 'pick one', 'When idle'], pick: 'display', tab: 'idle' },
   { question: 'Change a lock screen', section: 'displays', route: ['Displays', 'pick one', 'Lock screen'], pick: 'display', tab: 'lock' },
   { question: 'Add or change a photo set', section: 'photos', route: ['Photo sets'], path: '/photo-sets' },
-  { question: 'Connect an account', section: 'accounts', route: ['Accounts'], path: '/accounts' },
+  { question: 'Connect an account', section: 'settings', route: ['Settings', 'Accounts'], path: '/settings/accounts' },
+  { question: 'Change the language of Management', section: 'settings', route: ['Settings', 'Language'], path: '/settings/language' },
 ];

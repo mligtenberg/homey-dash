@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { LOCALES, LOCALE_NAMES, locale, t, TranslatePipe } from '@homey-dash/i18n';
+import { t, TranslatePipe } from '@homey-dash/i18n';
 import { RealtimeTileData } from '@homey-dash/tiles/data';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { filter, map } from 'rxjs';
@@ -9,11 +9,10 @@ import { DashboardsStore } from './dashboards-store';
 import { displayHealth } from './displays/display-sketch';
 import { DisplaysStore } from './displays/displays-store';
 import { GoTo } from './go-to';
-import { chooseManagementLocale } from './language';
-import { SECTIONS, SectionId, sectionOf } from './sections';
+import { SECTIONS, SectionId, section, sectionOf } from './sections';
 
 /**
- * Management's frame: a sidebar that always lists the same five places, in the same order and colours, with what is
+ * Management's frame: a sidebar that always lists the same four places, with Settings at its foot, in the same order and colours, with what is
  * in each; the place you are in opens to show its items. Go to searches everything.
  */
 @Component({
@@ -29,7 +28,7 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
       </a>
       <hd-go-to />
       <nav class="places" [attr.aria-label]="'Management' | t">
-        @for (place of sections; track place.id) {
+        @for (place of places; track place.id) {
           <a
             class="place sec-{{ place.id }}"
             [routerLink]="place.path"
@@ -86,20 +85,21 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
           }
         }
       </nav>
-      <label class="language">
-        <span class="hd-field__label">{{ 'Language' | t }}</span>
-        <select class="hd-input" [value]="locale()" (change)="chooseLocale(language.value)" #language>
-          @for (l of locales; track l) {
-            <option [value]="l" [selected]="locale() === l">{{ names[l] }}</option>
+      <div class="foot">
+        <a class="place sec-settings" routerLink="/settings" [attr.aria-current]="current() === 'settings' ? 'page' : null">
+          <span class="hd-mark"><svg [lucideIcon]="settings.icon" /></span>
+          <span class="place__label">{{ settings.label | t }}</span>
+          @if (marks()['settings']; as mark) {
+            <span class="attn" [title]="mark" role="img" [attr.aria-label]="mark"></span>
           }
-        </select>
-      </label>
+        </a>
+      </div>
     </aside>
     <main class="page sec-{{ current() }}">
-      @if (homeyNotSetUp() && current() !== 'accounts') {
+      @if (homeyNotSetUp() && current() !== 'settings') {
         <div class="setup" role="status">
           <span>{{ "Homey isn't set up yet, so tiles show no devices, flows or moods." | t }}</span>
-          <a class="hd-btn hd-btn--primary" routerLink="/accounts">{{ 'Set up Homey' | t }}</a>
+          <a class="hd-btn hd-btn--primary" routerLink="/settings/accounts">{{ 'Set up Homey' | t }}</a>
         </div>
       }
       <router-outlet />
@@ -142,7 +142,8 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); flex: none; }
     .dot[data-tone='ok'] { background: var(--ok); }
     .dot[data-tone='stale'], .dot[data-tone='lost'] { background: var(--warn); }
-    .language { margin-top: auto; display: flex; flex-direction: column; gap: 4px; padding: 0 6px; }
+    .places { flex: 1; }
+    .foot { margin-top: auto; padding-top: var(--space-3); border-top: 1px solid var(--line); display: flex; flex-direction: column; }
     .page { min-width: 0; }
     .setup { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-6); border-bottom: 1px solid var(--line); background: color-mix(in oklab, var(--warn) 9%, var(--panel)); color: var(--warn); font-weight: 600; }
     .setup .hd-btn { white-space: nowrap; }
@@ -151,6 +152,7 @@ import { SECTIONS, SectionId, sectionOf } from './sections';
       .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3) var(--space-4); border-right: 0; border-bottom: 1px solid var(--line); }
       hd-go-to { display: block; }
       .sidebar ::ng-deep .trigger { width: auto; }
+      .foot { margin-top: 0; padding-top: 0; border-top: 0; }
       .places { flex-basis: 100%; flex-direction: row; overflow-x: auto; scrollbar-width: none; }
       .items, .count { display: none; }
       .place { flex: none; }
@@ -164,11 +166,9 @@ export class Shell {
   private readonly router = inject(Router);
   private readonly homey = inject(RealtimeTileData);
 
-  protected readonly sections = SECTIONS;
-  protected readonly locale = locale;
-  protected readonly locales = LOCALES;
-  protected readonly names = LOCALE_NAMES;
-  protected readonly chooseLocale = chooseManagementLocale;
+  /** The four places that list their items, and Settings, which sits apart at the foot of the sidebar. */
+  protected readonly places = SECTIONS.filter((s) => s.id !== 'settings');
+  protected readonly settings = section('settings');
   protected readonly homeyNotSetUp = computed(() => this.homey.homeys()?.length === 0);
   protected readonly current = toSignal(
     this.router.events.pipe(
@@ -183,7 +183,7 @@ export class Shell {
     dashboards: this.store.loaded() ? this.store.list().length : null,
     displays: this.displays.loaded() ? this.displays.list().length : null,
     photos: this.displays.photoSets().length || null,
-    accounts: null,
+    settings: null,
   }));
 
   /** A dot beside a place where something needs you. */
@@ -193,7 +193,7 @@ export class Shell {
     return {
       dashboards: missing ? t('{count} dashboard has tiles not found in Homey|{count} dashboards have tiles not found in Homey', { count: missing }) : undefined,
       displays: idle ? t('{count} display needs attention|{count} displays need attention', { count: idle }) : undefined,
-      accounts: this.homeyNotSetUp() ? t('Homey is not set up') : undefined,
+      settings: this.homeyNotSetUp() ? t('Homey is not set up') : undefined,
     };
   });
 

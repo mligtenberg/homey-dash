@@ -1,6 +1,6 @@
 /*
  * Management's world: a quiet architect's drawing of the home. A pale blue-grey sheet, white panels drawn in hairlines,
- * small letter-spaced plan labels, and one colour per part of the home (Dashboards, Displays, Photo sets, Accounts)
+ * small letter-spaced plan labels, and one colour per part of the home (Dashboards, Displays, Photo sets, Settings)
  * on its marks, so you can tell where you are at a glance. Only Management loads this file; displays keep the shared
  * design system as it is.
  */
@@ -20,7 +20,7 @@
   --sec-dashboards: #6b4fc8;
   --sec-displays: #0b7d84;
   --sec-photos: #2a8350;
-  --sec-accounts: #a3367f;
+  --sec-settings: #a3367f;
   --wash: 11%;
 }
 
@@ -38,7 +38,7 @@
   --sec-dashboards: #b4a1ff;
   --sec-displays: #4ec8cf;
   --sec-photos: #6dcc94;
-  --sec-accounts: #f08fd2;
+  --sec-settings: #f08fd2;
   --wash: 16%;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { @include dark; } }
@@ -58,7 +58,7 @@ body {
 .sec-dashboards { --sec: var(--sec-dashboards); }
 .sec-displays { --sec: var(--sec-displays); }
 .sec-photos { --sec: var(--sec-photos); }
-.sec-accounts { --sec: var(--sec-accounts); }
+.sec-settings { --sec: var(--sec-settings); }
 
 /* A plan label: the small letter-spaced heading of a block, as on a drawing. */
 .hd-label {

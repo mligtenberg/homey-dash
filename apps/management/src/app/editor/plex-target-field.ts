@@ -35,7 +35,7 @@ import { TranslatePipe } from '@homey-dash/i18n';
         <span class="hd-hint">{{ 'Players show up here once they played something.' | t }}</span>
       }
       @if (status(); as status) {
-        <span class="hd-hint">{{ status }} <a routerLink="/accounts">{{ 'Go to Accounts' | t }}</a></span>
+        <span class="hd-hint">{{ status }} <a routerLink="/settings/accounts">{{ 'Go to Accounts' | t }}</a></span>
       }
     </div>
   `,
