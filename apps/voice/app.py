@@ -83,7 +83,8 @@ def prompt() -> str:
     return (WAKE.split(",")[0].capitalize() + ", zet de lichten aan. Commando's voor het huis: "
             + ", ".join(sorted(set(zones)))
             + ". Zet de lichten in de woonkamer aan. Doe het licht uit. Dim de lichten naar vijftig procent."
-              " Maak het warmer. Het licht is te koud.")
+              " Maak het warmer. Het licht is te koud."
+              " Zet een timer voor vijf seconden. Zet een timer voor tien minuten. Stop de timer.")
 
 
 models = stt.Manager()
