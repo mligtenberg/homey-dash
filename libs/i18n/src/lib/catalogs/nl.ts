@@ -380,6 +380,7 @@ export const NL: Record<string, string> = {
   'Date': 'Datum',
   'Week numbers': 'Weeknummers',
   'News': 'Nieuws',
+  'Clock': 'Klok',
   'Starting the stream…': 'Stream starten…',
   'Live': 'Live',
   'Switch': 'Schakelaar',
