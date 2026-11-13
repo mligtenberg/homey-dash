@@ -56,7 +56,6 @@ services:
       # sets the first choice. VOICE_THREADS: CPU threads for Whisper (an N100 has 4).
       # VOICE_MODEL: small
       # VOICE_THREADS: 3
-      # Mistral Voxtral in the cloud (listed on the admin page; the audio goes to Mistral):
-      # MISTRAL_API_KEY: ""
+      # VOICE_MODEL may also be a Hugging Face repository of a CTranslate2 Whisper model (e.g. a Dutch fine-tune).
     depends_on:
       - homey-dash

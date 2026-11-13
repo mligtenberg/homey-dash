@@ -1,6 +1,5 @@
 import json
 
-import numpy as np
 import pytest
 
 import stt
@@ -13,7 +12,6 @@ def mgr(tmp_path, monkeypatch):
     monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "hub"))
     from huggingface_hub import constants
     monkeypatch.setattr(constants, "HF_HUB_CACHE", str(tmp_path / "hub"))
-    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
     return stt.Manager(default="small")
 
 
@@ -32,7 +30,8 @@ def test_default_and_listing(mgr):
     s = mgr.state()
     assert s["selected"] == "small"
     assert [o["id"] for o in s["options"]][:2] == ["tiny", "base"]
-    assert row(mgr, "voxtral")["cloud"]
+    assert "voxtral" not in [o["id"] for o in s["options"]]
+    assert "large-v3" not in [o["id"] for o in s["options"]]
     assert not row(mgr, "small")["installed"]
 
 
@@ -49,14 +48,6 @@ def test_select_needs_the_model(mgr, tmp_path):
 def test_unknown_model(mgr):
     with pytest.raises(KeyError):
         mgr.select("nope")
-
-
-def test_voxtral_needs_a_key(mgr, monkeypatch):
-    with pytest.raises(stt.Unavailable, match="MISTRAL_API_KEY"):
-        mgr.select("voxtral")
-    monkeypatch.setenv("MISTRAL_API_KEY", "k")
-    mgr.select("voxtral")
-    assert mgr.selected == "voxtral"
 
 
 def test_incomplete_download_is_not_installed(mgr, tmp_path):
@@ -96,29 +87,6 @@ def test_download_runs_one_at_a_time_and_reports_errors(mgr, monkeypatch):
             t.join(5)
     r = row(mgr, "base")
     assert not r["downloading"] and "no network" in r["error"]
-    with pytest.raises(stt.Unavailable):
-        mgr.download("voxtral")
-
-
-def test_mistral_request(mgr, monkeypatch):
-    monkeypatch.setenv("MISTRAL_API_KEY", "secret")
-    seen = {}
-
-    class R:
-        def __enter__(self): return self
-        def __exit__(self, *a): pass
-        def read(self, *a): return b'{"text": " zet het licht aan "}'
-
-    def fake(req, timeout):
-        seen["auth"] = req.get_header("Authorization")
-        seen["body"] = req.data
-        return R()
-
-    monkeypatch.setattr(stt.urllib.request, "urlopen", fake)
-    mgr.select("voxtral")
-    assert mgr.transcribe(np.zeros(1600, np.float32), "") == "zet het licht aan"
-    assert seen["auth"] == "Bearer secret" and b'name="language"' in seen["body"] and b"RIFF" in seen["body"]
-    assert row(mgr, "voxtral")["last_ms"] is not None
 
 
 def test_api(mgr, monkeypatch, tmp_path):

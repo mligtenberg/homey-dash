@@ -38,8 +38,7 @@ function render(s) {
   list.innerHTML = s.options.map(o => {
     const tags = [
       o.selected ? '<span class="tag ok">in gebruik</span>' : '',
-      o.cloud ? '<span class="tag warn">cloud: audio gaat naar Mistral</span>' : '',
-      !o.cloud && o.installed ? '<span class="tag ok">gedownload</span>' : '',
+      o.installed ? '<span class="tag ok">gedownload</span>' : '',
       o.size_mb ? `<span class="tag">${size(o.size_mb)}</span>` : '',
       o.last_ms != null ? `<span class="tag">laatste: ${(o.last_ms / 1000).toFixed(1)} s</span>` : '',
     ].join(' ');
@@ -47,12 +46,12 @@ function render(s) {
     const prog = o.downloading ? `<progress max="100" value="${pct}"></progress> ${pct}%` : '';
     const buttons = [
       o.selected ? '' : `<button data-act="select" data-id="${esc(o.id)}" ${o.usable ? '' : 'disabled'}>Gebruiken</button>`,
-      !o.cloud && !o.installed && !o.downloading ? `<button class="alt" data-act="download" data-id="${esc(o.id)}">Downloaden</button>` : '',
-      !o.cloud && o.installed && !o.selected && o.size_mb ? `<button class="alt bad" data-act="delete" data-id="${esc(o.id)}">Verwijderen</button>` : '',
+      !o.installed && !o.downloading ? `<button class="alt" data-act="download" data-id="${esc(o.id)}">Downloaden</button>` : '',
+      o.installed && !o.selected && o.size_mb ? `<button class="alt bad" data-act="delete" data-id="${esc(o.id)}">Verwijderen</button>` : '',
     ].join(' ');
     return `<div class="m${o.selected ? ' sel' : ''}">
       <div class="head"><strong>${esc(o.label)}</strong> ${tags}</div>
-      <div class="note">${esc(o.note)}${o.cloud && o.unavailable ? ' <span class="err">' + esc(o.unavailable) + '.</span>' : ''}</div>
+      <div class="note">${esc(o.note)}</div>
       <div class="row">${buttons} ${prog}</div>
       ${o.error ? `<div class="err">Download mislukt: ${esc(o.error)}</div>` : ''}
     </div>`;
