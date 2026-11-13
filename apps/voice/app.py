@@ -95,8 +95,10 @@ def whisper():
 
         size = os.environ.get("VOICE_MODEL", "small")
         t = time.time()
-        _model = WhisperModel(size, device="cpu", compute_type="int8")
-        log.info("loaded whisper %s in %.1fs", size, time.time() - t)
+        # cpu_threads=0 lets CTranslate2 pick; set VOICE_THREADS to the physical core count (N100: 4) if it over/undershoots
+        threads = int(os.environ.get("VOICE_THREADS", "0"))
+        _model = WhisperModel(size, device="cpu", compute_type="int8", cpu_threads=threads)
+        log.info("loaded whisper %s (threads=%s) in %.1fs", size, threads or "auto", time.time() - t)
     return _model
 
 
