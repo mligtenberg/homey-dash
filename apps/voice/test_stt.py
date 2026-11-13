@@ -89,6 +89,25 @@ def test_download_runs_one_at_a_time_and_reports_errors(mgr, monkeypatch):
     assert not r["downloading"] and "no network" in r["error"]
 
 
+def test_download_counts_bytes_when_huggingface_disables_its_bars(mgr, monkeypatch):
+    # In a container huggingface turns its progress bars off; the byte counter must still work.
+    import huggingface_hub
+    from huggingface_hub.utils import disable_progress_bars
+
+    def fetch(repo, allow_patterns, tqdm_class):
+        bar = tqdm_class(total=100, unit="B")
+        bar.update(100)
+        bar.close()
+
+    disable_progress_bars()
+    monkeypatch.setattr(huggingface_hub, "snapshot_download", fetch)
+    mgr.download("base")
+    for t in __import__("threading").enumerate():
+        if t.name == "download-base":
+            t.join(5)
+    assert row(mgr, "base")["error"] is None
+
+
 def test_api(mgr, monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
     import app as voice_app

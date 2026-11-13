@@ -155,13 +155,18 @@ class Manager:
 
     def _download(self, opt: Option) -> None:
         from huggingface_hub import snapshot_download
-        from huggingface_hub.utils import tqdm as hf_tqdm
+        from tqdm import tqdm as plain_tqdm
 
         job = self._jobs[opt.id]
         lock = self._lock
+        sink = open(os.devnull, "w")
 
-        class Progress(hf_tqdm):  # the byte bars of the individual files; the "Fetching N files" bar counts items
+        class Progress(plain_tqdm):  # the byte bars of the individual files; the "Fetching N files" bar counts items
             def __init__(self, *a, **kw):
+                # Plain tqdm, not huggingface's: without a terminal (a container) its bars are disabled, and tqdm then
+                # skips setting `unit`. We only count bytes, so keep the bar on and print nothing.
+                kw["disable"] = False
+                kw["file"] = sink
                 super().__init__(*a, **kw)
                 if self.unit == "B":
                     with lock:
@@ -184,6 +189,8 @@ class Manager:
             log.warning("download of %s failed: %s", opt.id, e)
             with lock:
                 job.update(running=False, error=str(e) or type(e).__name__)
+        finally:
+            sink.close()
 
     def delete(self, id: str) -> None:
         with self._lock:
