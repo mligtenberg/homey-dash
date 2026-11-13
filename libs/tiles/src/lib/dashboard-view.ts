@@ -53,15 +53,13 @@ import { chunk } from '@homey-dash/design-system';
         </div>
       }
     </div>
-    @if (pages().length > 1) {
-      <hd-page-dots
-        class="hd-page-dots"
-        [count]="pages().length"
-        [current]="current()"
-        [labelOf]="pageLabel"
-        (picked)="go($event)"
-      />
-    }
+    <hd-page-dots
+      class="hd-page-dots"
+      [count]="pages().length"
+      [current]="current()"
+      [labelOf]="pageLabel"
+      (picked)="go($event)"
+    />
   `,
 })
 export class DashboardView {

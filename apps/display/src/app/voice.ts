@@ -7,6 +7,7 @@ import { safeStorage, screenId } from './screen-id';
 
 /** Where a screen remembers that it listens, switched in its screen settings. */
 const VOICE_KEY = 'homeydash.voice';
+const MUTE_KEY = 'homeydash.voice-muted';
 /** Whether this screen leaves hearing the wake word to the voice service, because it is too slow to do it itself. */
 const SERVER_KEY = 'homeydash.voice.server';
 /** Set when this screen listens without the browser's own echo and noise filters, which cost a slow tablet processing time. */
@@ -244,7 +245,7 @@ export class Voice {
   readonly enabled = signal(false);
   /** Whether the wake word is heard by the voice service: the screen then streams all it hears. */
   readonly server = signal(false);
-  /** Whether the microphone is muted for now: not remembered, so a reload listens again. */
+  /** Whether the microphone is muted; remembered across reloads. */
   readonly muted = signal(false);
   /** Whether the browser filters echo and noise out of the microphone; off saves a slow screen some work. */
   readonly filters = signal(true);
@@ -302,11 +303,11 @@ export class Voice {
     if (on && !this.available) return;
     if (on === this.enabled()) return;
     this.enabled.set(on);
-    this.muted.set(false);
+    this.muted.set(on && this.storage?.getItem(MUTE_KEY) === 'on');
     this.error.set('');
     if (on) this.storage?.setItem(VOICE_KEY, 'on');
     else this.storage?.removeItem(VOICE_KEY);
-    if (on) void this.start();
+    if (on && !this.muted()) void this.start();
     else this.stop();
   }
 
@@ -320,6 +321,8 @@ export class Voice {
     if (!this.enabled()) return;
     const mute = !this.muted();
     this.muted.set(mute);
+    if (mute) this.storage?.setItem(MUTE_KEY, 'on');
+    else this.storage?.removeItem(MUTE_KEY);
     if (mute) this.stop();
     else void this.start();
   }
@@ -519,17 +522,20 @@ export class Voice {
     }
     @if (enabled() && onDashboard()) {
       <div class="mic">
+        @if (!muted()) { <span class="hint">Hey Jarvis</span> }
         <button type="button" class="mute" [attr.aria-pressed]="muted()" [attr.aria-label]="(muted() ? 'Unmute microphone' : 'Mute microphone') | t" (click)="voice.toggleMute()">
           <svg [lucideIcon]="muted() ? micOff : mic" />
         </button>
-        @if (!muted()) { <span class="hint">{{ 'Say: Hey Jarvis' | t }}</span> }
       </div>
     }
   `,
   styles: `
     /* Bottom left, in the gutter beside the tiles (in line with the tape's toggle and the people above it). */
-    .mic { position: fixed; left: var(--space-3); bottom: var(--space-4); display: flex; align-items: center; gap: var(--space-3); pointer-events: none; }
-    .hint { font-size: 12px; font-weight: 500; color: var(--ink-muted); white-space: nowrap; }
+    .mic { position: fixed; left: var(--space-3); bottom: var(--space-4); display: flex; flex-direction: column; align-items: flex-start; gap: 12px; pointer-events: none; }
+    /* A speech bubble above the button, its tail pointing down at it. */
+    .hint { position: relative; padding: 8px 14px; border-radius: 16px; background: #fff; box-shadow: 0 2px 8px rgb(0 0 0 / .22);
+      font-size: 13px; font-weight: 600; color: #22252f; white-space: nowrap; }
+    .hint::after { content: ''; position: absolute; left: 14px; top: calc(100% - 1px); width: 16px; height: 10px; background: #fff; clip-path: polygon(0 0, 100% 0, 0 100%); }
     .mute { flex: none; pointer-events: auto; display: grid; place-items: center;
       width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; color: var(--ink-muted); opacity: .7;
       background: var(--tile-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 0 0 1.5px var(--glass-rim) inset; }

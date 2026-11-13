@@ -646,7 +646,6 @@ export const NL: Record<string, string> = {
   'Detector on the server: {avg} ms for 80 ms of sound, {total} ms for the whole recording including the network.': 'Detector op de server: {avg} ms voor 80 ms geluid, {total} ms voor de hele opname inclusief netwerk.',
   'Noise and echo filters': 'Ruis- en echofilters',
   'Off saves a slow screen some work': 'Uit scheelt een traag scherm rekenwerk',
-  'Say: Hey Jarvis': 'Zeg: Hey Jarvis',
   'Mute microphone': 'Microfoon dempen',
   'Unmute microphone': 'Microfoon aanzetten',
   'Wake word on the server': 'Wekwoord op de server',
