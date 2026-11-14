@@ -192,17 +192,19 @@ export class VoiceTest implements OnDestroy {
     this.busy.set('recording');
     this.report.set([]);
     const chunks: Float32Array[] = [];
+    let first = 0;
     try {
       const opened = await openMicrophone((block) => {
+        first ||= performance.now();
         chunks.push(block.slice());
         let sum = 0;
         for (const v of block) sum += v * v;
         this.level.set(Math.min(100, Math.round(Math.sqrt(sum / block.length) * 400)));
-      }, this.voice.filters());
+      }, this.voice.filters(), this.voice.gain());
       const track = opened.mic.getAudioTracks()[0];
-      const started = performance.now();
       await new Promise((resolve) => setTimeout(resolve, RECORD_S * 1000));
-      const seconds = (performance.now() - started) / 1000;
+      // From the first block: the microphone takes a moment to start, which is not audio lost.
+      const seconds = first ? (performance.now() - first) / 1000 : 0;
       opened.stop();
       const samples = new Float32Array(chunks.reduce((n, c) => n + c.length, 0));
       let o = 0;
@@ -211,14 +213,15 @@ export class VoiceTest implements OnDestroy {
         o += c.length;
       }
       const r = measure(samples, chunks.length, seconds);
+      // The block in progress when it stopped never arrives, so a block or two short is as it should be.
       this.recording.set(r);
-      const lost = Math.max(0, r.expected - r.blocks);
+      const lost = Math.max(0, r.expected + 1 - r.blocks);
       this.report.set([
         `${track.label || t('Microphone')} · ${track.getSettings().sampleRate ?? opened.ctx.sampleRate} Hz`,
         t('Level {average} dB on average, {peak} dB at the loudest, {clipped}% distorted', {
           average: r.averageDb, peak: r.peakDb, clipped: (r.clipped * 100).toFixed(1),
         }),
-        lost > r.expected * 0.02
+        lost > Math.max(1, r.expected * 0.02)
           ? t('Audio was lost: {got} of {expected} blocks arrived. The screen cannot keep up with its microphone.', { got: r.blocks, expected: r.expected })
           : t('No audio was lost ({got} of {expected} blocks).', { got: r.blocks, expected: r.expected }),
         r.peakDb < -30 ? t('Very quiet: speak closer, or turn the microphone up.') : r.clipped > 0.005 ? t('Too loud: it distorts.') : t('The level is fine.'),

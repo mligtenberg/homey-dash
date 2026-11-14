@@ -47,7 +47,8 @@
         "--Traffic:Fake=true",
         "--News:Fake=true",
         "--ReverseProxy:Clusters:display:Destinations:display:Address=http://localhost:4300",
-        "--ReverseProxy:Clusters:management:Destinations:management:Address=http://localhost:4301"
+        "--ReverseProxy:Clusters:management:Destinations:management:Address=http://localhost:4301",
+        "--Voice:Address=http://localhost:8767"
       ],
       "port": 5212
     },
@@ -180,6 +181,26 @@
         "voice"
       ],
       "port": 8765
+    },
+    {
+      "name": "voice-fake",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "HOMEY_DASH_URL=http://localhost:5212",
+        "VOICE_DATA=tmp/claude/voice-models",
+        "HF_HOME=tmp/claude/voice-models/hf",
+        "uv",
+        "run",
+        "--project",
+        "apps/voice",
+        "uvicorn",
+        "--app-dir",
+        "apps/voice",
+        "app:app",
+        "--port",
+        "8767"
+      ],
+      "port": 8767
     }
   ]
 }

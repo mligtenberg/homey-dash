@@ -12,6 +12,8 @@ const MUTE_KEY = 'homeydash.voice-muted';
 const SERVER_KEY = 'homeydash.voice.server';
 /** Set when this screen listens without the browser's own echo and noise filters, which cost a slow tablet processing time. */
 const RAW_KEY = 'homeydash.voice.raw';
+/** The level the microphone is turned down to, for a screen whose microphone comes in too loud to hear the wake word. */
+const GAIN_KEY = 'homeydash.voice.gain';
 
 /** How long a result stays up after it arrives. */
 export const RESULT_MS = 6_000;
@@ -140,7 +142,7 @@ export function startDetector(): Promise<Detector> {
 }
 
 /** The microphone as 16 kHz mono blocks of 1280 samples (80 ms) (floats, -1 to 1), which is what the wake word and the voice service take. */
-export async function openMicrophone(onBlock: (samples: Float32Array) => void, filters = true) {
+export async function openMicrophone(onBlock: (samples: Float32Array) => void, filters = true, gain = 1) {
   const mic = await navigator.mediaDevices.getUserMedia({
     audio: { channelCount: 1, noiseSuppression: filters, echoCancellation: filters },
   });
@@ -159,7 +161,9 @@ export async function openMicrophone(onBlock: (samples: Float32Array) => void, f
   await ctx.audioWorklet.addModule(url);
   URL.revokeObjectURL(url);
   const node = new AudioWorkletNode(ctx, 'pcm');
-  ctx.createMediaStreamSource(mic).connect(node);
+  const level = ctx.createGain();
+  level.gain.value = gain;
+  ctx.createMediaStreamSource(mic).connect(level).connect(node);
   node.port.onmessage = ({ data }: MessageEvent<Float32Array>) => onBlock(data);
   return {
     mic,
@@ -249,6 +253,8 @@ export class Voice {
   readonly muted = signal(false);
   /** Whether the browser filters echo and noise out of the microphone; off saves a slow screen some work. */
   readonly filters = signal(true);
+  /** How much of the microphone's level is used: 1 is all of it, less turns a microphone that comes in too loud down. */
+  readonly gain = signal(1);
   /** Why listening could not start, as the browser says it, until it is tried again. */
   readonly error = signal('');
   /** Whether this browser can listen at all: it needs a microphone, which browsers give only to pages on https. */
@@ -267,6 +273,8 @@ export class Voice {
     inject(DestroyRef).onDestroy(() => this.stop());
     this.server.set(this.storage?.getItem(SERVER_KEY) === 'on');
     this.filters.set(this.storage?.getItem(RAW_KEY) !== 'on');
+    const gain = Number(this.storage?.getItem(GAIN_KEY));
+    if (gain > 0 && gain <= 1) this.gain.set(gain);
     if (this.storage?.getItem(VOICE_KEY) === 'on') this.set(true);
   }
 
@@ -276,6 +284,15 @@ export class Voice {
     this.filters.set(on);
     if (on) this.storage?.removeItem(RAW_KEY);
     else this.storage?.setItem(RAW_KEY, 'on');
+    this.restart();
+  }
+
+  /** Turns the microphone down (or back up to 1); restarts listening to change over. */
+  setGain(gain: number) {
+    if (gain === this.gain()) return;
+    this.gain.set(gain);
+    if (gain === 1) this.storage?.removeItem(GAIN_KEY);
+    else this.storage?.setItem(GAIN_KEY, String(gain));
     this.restart();
   }
 
@@ -349,7 +366,7 @@ export class Voice {
       this.detector = await startDetector();
       if (this.stopped) return this.stop();
       const blocks: ((samples: Float32Array) => void)[] = [];
-      const opened = await openMicrophone((samples) => blocks[0]?.(samples), this.filters());
+      const opened = await openMicrophone((samples) => blocks[0]?.(samples), this.filters(), this.gain());
       this.mic = opened.mic;
       this.ctx = opened.ctx;
       if (this.stopped) return this.stop();
@@ -365,7 +382,7 @@ export class Voice {
   /** Streams everything the microphone hears to HomeyDash, which has the voice service listen for the wake word. */
   private async startRemote() {
     const blocks: ((samples: Float32Array) => void)[] = [];
-    const opened = await openMicrophone((samples) => blocks[0]?.(samples), this.filters());
+    const opened = await openMicrophone((samples) => blocks[0]?.(samples), this.filters(), this.gain());
     this.mic = opened.mic;
     this.ctx = opened.ctx;
     if (this.stopped) return this.stop();

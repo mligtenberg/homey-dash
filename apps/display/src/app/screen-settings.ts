@@ -66,6 +66,19 @@ import { VoiceTest } from './voice-test';
                 </button>
               </div>
             }
+            @if (voice.available) {
+              <div class="group">
+                <div class="setting__text">
+                  <span id="voice-gain-label" class="setting__label">{{ 'Microphone level' | t }}</span>
+                  <span class="setting__hint">{{ 'Turn it down when the wake word is not heard because the sound comes in too loud' | t }}</span>
+                </div>
+                <div class="hd-segmented scale" role="group" aria-labelledby="voice-gain-label">
+                  @for (option of gains; track option.value) {
+                    <button type="button" [attr.aria-pressed]="option.value === voice.gain()" (click)="voice.setGain(option.value)">{{ option.label | t }}</button>
+                  }
+                </div>
+              </div>
+            }
             @if (voice.error(); as error) {
               <p class="diagnosis">{{ error }}</p>
             }
@@ -192,6 +205,13 @@ export class ScreenSettings {
     { value: 1, label: 'No' },
     { value: 0.5, label: 'Halve it' },
     { value: 0.25, label: 'Quarter it' },
+    { value: 0.1, label: 'Tenth' },
+    { value: 0.05, label: '1/20' },
+  ];
+  protected readonly gains = [
+    { value: 1, label: 'Full' },
+    { value: 0.5, label: 'Half' },
+    { value: 0.25, label: 'Quarter' },
     { value: 0.1, label: 'Tenth' },
     { value: 0.05, label: '1/20' },
   ];
