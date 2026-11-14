@@ -4,6 +4,7 @@ import { LucideCheck, LucideMic, LucideMicOff, LucideTriangleAlert } from '@home
 import { t, tr, TranslatePipe } from '@homey-dash/i18n';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { safeStorage, screenId } from './screen-id';
+import { playCue } from './voice-cues';
 
 /** Where a screen remembers that it listens, switched in its screen settings. */
 const VOICE_KEY = 'homeydash.voice';
@@ -352,8 +353,12 @@ export class Voice {
   /** Takes an event the way HomeyDash sends it; also how a screen is tried without a microphone. */
   receive(event: VoiceEvent) {
     clearTimeout(this.clear);
+    const before = this.phase().kind;
     this.phase.update((phase) => nextPhase(phase, event));
-    if (this.phase().kind === 'result') this.clear = setTimeout(() => this.phase.set({ kind: 'off' }), RESULT_MS);
+    const after = this.phase().kind;
+    if (after === 'awake' && before === 'off') playCue('listen'); // HomeyDash heard the wake word (the screen's own detector plays it in `trigger`)
+    if (event.type === 'result') playCue(event.ok ? 'ok' : 'fail');
+    if (after === 'result') this.clear = setTimeout(() => this.phase.set({ kind: 'off' }), RESULT_MS);
   }
 
   // The wake word is listened for here on the screen (microWakeWord's "hey jarvis", run in the browser), so no audio
@@ -439,10 +444,15 @@ export class Voice {
       this.ws = undefined;
       ww.reset();
       cool = performance.now() + 1500;
-      if (this.phase().kind !== 'result') this.phase.set({ kind: 'off' });
+      if (this.phase().kind !== 'result') {
+        // The session ran out or broke off without an answer: nothing was understood.
+        if (this.phase().kind !== 'off') playCue('fail');
+        this.phase.set({ kind: 'off' });
+      }
     };
     const trigger = () => {
       this.phase.set({ kind: 'awake' });
+      playCue('listen');
       const ws = (this.ws = new WebSocket(
         `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/voice/listen?screen=${screenId()}`,
       ));
