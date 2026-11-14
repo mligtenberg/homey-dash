@@ -159,7 +159,7 @@ function flute(out: Float32Array, rate: number, at: number, hz: number, length: 
 
 /*
  * The adventure set: five original tunes in the manner of a fantasy adventure game's music (a clock-tower song on the ocarina, a brass
- * fanfare, a fairy's harp, a treasure jingle and a village dance). Their melodies are written for this app, not taken
+ * fanfare, a fairy's harp, a treasure jingle and a village jig). Their melodies are written for this app, not taken
  * from any game.
  */
 
@@ -251,18 +251,79 @@ const TIMPANI: readonly Mode[] = [[1, 1, 1.4], [1.504, 0.55, 1.0], [1.742, 0.25,
 /** A celesta: steel plates over wooden resonators, so a nearly pure, sweet ring with faint inharmonic overtones. */
 const CELESTA: readonly Mode[] = [[1, 1, 1.6], [2.756, 0.1, 0.35], [4, 0.06, 0.22], [5.404, 0.03, 0.12]];
 
-/** A lute string, plucked near the bridge: bright, a little inharmonic, its upper harmonics gone in a moment. */
-function luteModes(f: number): Mode[] {
-  return Array.from({ length: 14 }, (_, i): Mode => {
-    const k = i + 1;
-    return [k * Math.sqrt(1 + 0.0004 * k * k), (1 / k ** 0.8) * (0.15 + Math.abs(Math.sin((Math.PI * k) / 5.5))), (2.4 / (1 + 0.45 * i)) * (196 / f) ** 0.35];
-  });
+/**
+ * A plucked string by Karplus-Strong: a burst of noise, thinned where the pick strikes, circulating in a delay line one
+ * period long whose averaging filter takes the highs out a little more each time round, as a real string loses them.
+ * An allpass makes up the fractional part of the period, so it is in tune; a hold mutes it with the palm.
+ */
+function pluck(out: Float32Array, rate: number, at: number, hz: number, o: { velocity?: number; seed?: number; t60?: number; tone?: number; hold?: number } = {}) {
+  const { velocity = 1, seed = 1, t60 = 3, tone = 0.5, hold } = o;
+  const first = Math.floor(at * rate);
+  const period = rate / hz;
+  const n = Math.floor(period - 0.6);
+  const c = (1 - (period - 0.5 - n)) / (1 + (period - 0.5 - n));
+  const rand = noise(seed);
+  let lp = 0;
+  const burst = Array.from({ length: n }, () => (lp += (rand() - lp) * tone));
+  const pick = Math.max(1, Math.round(n * 0.13));
+  const line = new Float32Array(n).map((_, i) => burst[i] - (i >= pick ? burst[i - pick] : 0));
+  const mean = line.reduce((a, b) => a + b, 0) / n;
+  for (let i = 0; i < n; i++) line[i] -= mean;
+  const [loss, muted] = [10 ** (-3 / (t60 * hz)), 10 ** (-3 / (0.07 * hz))];
+  const total = Math.min(out.length - first, Math.floor((hold === undefined ? t60 : hold + 0.12) * rate));
+  let [read, prev, apIn, apOut, dcIn, dcOut] = [0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < total; i++) {
+    const x = line[read];
+    const avg = 0.5 * (x + prev);
+    prev = x;
+    const ap = c * avg + apIn - c * apOut;
+    [apIn, apOut] = [avg, ap];
+    line[read] = ap * (hold !== undefined && i > hold * rate ? muted : loss);
+    read = (read + 1) % n;
+    dcOut = x - dcIn + 0.995 * dcOut;
+    dcIn = x;
+    out[first + i] += velocity * dcOut;
+  }
 }
+
+/** A guitar chord strummed across its strings, downwards (low to high) or upwards. */
+function strum(out: Float32Array, rate: number, at: number, notes: readonly number[], o: { velocity: number; seed: number; up?: boolean; spread?: number; hold?: number; t60?: number }) {
+  const order = o.up ? [...notes].reverse() : notes;
+  order.forEach((note, n) =>
+    pluck(out, rate, at + n * (o.spread ?? 0.011), midi(note), { velocity: o.velocity * (1 - 0.06 * n), seed: o.seed * 17 + n, hold: o.hold, t60: o.t60 ?? 2.2, tone: o.up ? 0.55 : 0.45 }),
+  );
+}
+
+/**
+ * A tin whistle: brighter and breathier than the ocarina, and played the folk way, a long note started with a "cut", a
+ * flick of a higher note a few milliseconds long before it.
+ */
+function whistle(out: Float32Array, rate: number, at: number, hz: number, length: number, o: { velocity?: number; seed?: number; cut?: number } = {}) {
+  const { velocity = 1, seed = 1, cut } = o;
+  const grace = cut ? 0.032 : 0;
+  const first = Math.floor((at - grace) * rate);
+  const rand = noise(seed);
+  const release = 0.05;
+  let [phase, breath, air] = [0, 0, 0];
+  for (let i = Math.max(0, -first); i < Math.floor((length + grace + release * 6) * rate) && first + i < out.length; i++) {
+    const t = i / rate - grace;
+    const bloom = Math.min(1, Math.max(0, (t - 0.28) / 0.2));
+    const f = t < 0 && cut ? cut : hz * (1 - 0.006 * Math.exp(-Math.max(0, t) / 0.02) + 0.005 * bloom * Math.sin(2 * Math.PI * 5.8 * t));
+    phase += (2 * Math.PI * f) / rate;
+    breath += (rand() - breath) * 0.45;
+    air += (breath - air) * 0.45;
+    const env = (1 - Math.exp(-(i / rate) / 0.012)) * (t > length ? Math.exp(-(t - length) / release) : 1);
+    const tonal = Math.sin(phase) + 0.22 * Math.sin(2 * phase + 0.3) + 0.08 * Math.sin(3 * phase + 0.9) + 0.03 * Math.sin(4 * phase + 1.7);
+    const chiff = 0.09 + 0.5 * Math.exp(-(i / rate) / 0.02);
+    out[first + i] += velocity * env * (tonal + air * chiff * (1 + 0.8 * Math.sin(phase)) * 2.2);
+  }
+}
+
+/** A bodhrán, the frame drum of a folk band: a low, short, skin-heavy thump. */
+const BODHRAN: readonly Mode[] = [[1, 1, 0.28], [1.59, 0.5, 0.18], [2.14, 0.3, 0.11], [2.65, 0.18, 0.07], [3.16, 0.1, 0.05]];
 
 const harp = (out: Float32Array, rate: number, at: number, note: number, velocity: number, seed: number) =>
   voice(out, rate, at, midi(note), harpModes(midi(note)), { beat: 0.4, click: 0.1, velocity, seed });
-const lute = (out: Float32Array, rate: number, at: number, note: number, velocity: number, seed: number) =>
-  voice(out, rate, at, midi(note), luteModes(midi(note)), { beat: 0.5, click: 0.18, velocity, seed });
 const celesta = (out: Float32Array, rate: number, at: number, note: number, velocity: number, seed: number) =>
   voice(out, rate, at, midi(note), CELESTA, { beat: 0.6, click: 0.08, velocity, seed });
 
@@ -313,21 +374,24 @@ const FAIRY_CHORDS = [
   [48, 55, 59, 62, 64, 67, 71, 74, 76, 79], // Cmaj9, where it comes to rest
 ];
 
-/** A dance in 6/8 for the lute (quaver, MIDI note, quavers), four bars; and its chord on each half bar (bass, then the chord). */
-const VILLAGE_STEP = 0.17;
-const VILLAGE: Tune = [
-  [0, 74, 2], [2, 78, 1], [3, 81, 2], [5, 78, 1], [6, 79, 2], [8, 83, 1], [9, 81, 3],
-  [12, 78, 1], [13, 76, 1], [14, 74, 1], [15, 76, 1], [16, 78, 1], [17, 79, 1], [18, 76, 2], [20, 73, 1], [21, 74, 3],
+/** A jig in 6/8 for the tin whistle (quaver, MIDI note, quavers, the note it is cut from), four bars; and the guitar's chord on each half bar. */
+const JIG_STEP = 0.16;
+const JIG: readonly (readonly [at: number, note: number, length: number, cut?: number])[] = [
+  [0, 79, 2], [2, 83, 1], [3, 86, 2, 88], [5, 83, 1], [6, 84, 2, 86], [8, 81, 1], [9, 78, 2], [11, 81, 1],
+  [12, 79, 1], [13, 81, 1], [14, 83, 1], [15, 84, 2, 86], [17, 81, 1], [18, 83, 2], [20, 81, 1], [21, 79, 7, 81],
 ];
-const D = [50, [62, 66, 69]] as const;
-const G = [43, [62, 67, 71]] as const;
-const A7 = [45, [61, 64, 67]] as const;
-const VILLAGE_CHORDS = [D, [45, D[1]] as const, G, D, D, A7, A7];
+const GUITAR_G = [55, 59, 62, 67];
+const GUITAR_D = [57, 62, 66];
+const GUITAR_C = [55, 60, 64];
+/** Bass note and chord per half bar: G, G, D, D, G, C, D; the last half bar is the final G. */
+const JIG_CHORDS: readonly (readonly [bass: number, chord: readonly number[]])[] = [
+  [43, GUITAR_G], [50, GUITAR_G], [50, GUITAR_D], [45, GUITAR_D], [43, GUITAR_G], [48, GUITAR_C], [50, GUITAR_D],
+];
 
 /** How long each sound is, in seconds. */
 const LENGTH: Record<Exclude<TimerSound, 'none'>, number> = {
   beep: 0.9, bell: 3.4, chime: 3.2, kitchen: 1.4, pulse: 1.4, siren: 1.6, musicbox: 5, piano: 5, marimba: 4.2, flute: 6, harp: 4,
-  ocarina: 10.5, fanfare: 5, fairy: 5.5, treasure: 4, village: 5.8,
+  ocarina: 10.5, fanfare: 5, fairy: 5.5, treasure: 4, village: 6,
 };
 
 /** What a sound is, as samples at the given rate, scaled to peak at 0.9; empty for silence. */
@@ -434,19 +498,22 @@ export function renderSound(sound: TimerSound, rate: number): Float32Array<Array
       [[1.0, 91], [1.16, 96], [1.32, 88], [1.48, 100], [1.64, 93]].forEach(([at, note], n) => celesta(out, rate, at, note, 0.32, n + 40));
       break;
     case 'village': {
-      const step = VILLAGE_STEP;
-      VILLAGE.forEach(([at, note, steps = 1], n) => {
-        lute(out, rate, at * step, note, 0.85, n + 1);
-        ocarina(out, rate, at * step, midi(note), steps * step * 0.85, { velocity: 0.22, seed: n + 100 });
+      const step = JIG_STEP;
+      JIG.forEach(([at, note, length, cut], n) => whistle(out, rate, at * step, midi(note), length * step * 0.88, { velocity: 0.8, seed: n + 1, cut: cut && midi(cut) }));
+      // Boom-chick: the bass and a full down-strum on each dotted crotchet, a light, muted up-strum on its last quaver.
+      JIG_CHORDS.forEach(([bass, chord], half) => {
+        const at = half * 3 * step;
+        pluck(out, rate, at, midi(bass), { velocity: 0.7, seed: half + 200, hold: 2.6 * step, tone: 0.35 });
+        strum(out, rate, at + 0.008, chord, { velocity: 0.34, seed: half + 1, hold: 1.7 * step });
+        strum(out, rate, at + 2 * step, chord, { velocity: 0.2, seed: half + 50, up: true, spread: 0.008, hold: 0.7 * step });
+        voice(out, rate, at, 92, BODHRAN, { velocity: half % 2 ? 0.25 : 0.4, beat: 0, click: 0.35, seed: half + 300 });
+        voice(out, rate, at + 2 * step, 130, BODHRAN, { velocity: 0.12, beat: 0, click: 0.25, decay: 0.6, seed: half + 320 });
       });
-      // Oom-pah-pah: the bass on each dotted crotchet, the chord strummed on the two quavers after it.
-      VILLAGE_CHORDS.forEach(([bass, chord], half) => {
-        lute(out, rate, half * 3 * step, bass, 0.6, half + 200);
-        [1, 2].forEach((q) => chord.forEach((note, n) => lute(out, rate, (half * 3 + q) * step + n * 0.012, note, q === 1 ? 0.3 : 0.24, half * 10 + q * 3 + n + 300)));
-      });
-      // The last half bar is one full D chord, strummed slowly and let ring.
-      lute(out, rate, 21 * step, 38, 0.65, 400);
-      [50, 57, 62, 66, 69, 74].forEach((note, n) => lute(out, rate, 21 * step + n * 0.028, note, 0.38, n + 401));
+      // The last half bar: the whole G chord strummed slowly and left ringing, with a last drum stroke.
+      const end = 21 * step;
+      pluck(out, rate, end, midi(31), { velocity: 0.6, seed: 400, t60: 3, tone: 0.3 });
+      strum(out, rate, end, [43, 47, 50, 55, 59, 67], { velocity: 0.36, seed: 401, spread: 0.03, t60: 3 });
+      voice(out, rate, end, 92, BODHRAN, { velocity: 0.45, beat: 0, click: 0.35, seed: 410 });
       break;
     }
   }
