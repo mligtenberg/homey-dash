@@ -741,7 +741,7 @@ export const NL: Record<string, string> = {
   'Marimba': 'Marimba',
   'Flute': 'Fluit',
   'Harp': 'Harp',
-  'Ocarina lullaby': 'Ocarina-slaapliedje',
+  'Clock tower song': 'Klokkentorenlied',
   "Hero's fanfare": 'Heldenfanfare',
   'Fairy harp': 'Feeënharp',
   'Treasure found': 'Schat gevonden',

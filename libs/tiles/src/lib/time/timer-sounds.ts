@@ -158,7 +158,7 @@ function flute(out: Float32Array, rate: number, at: number, hz: number, length: 
 }
 
 /*
- * The adventure set: five original tunes in the manner of a fantasy adventure game's music (an ocarina lullaby, a brass
+ * The adventure set: five original tunes in the manner of a fantasy adventure game's music (a clock-tower song on the ocarina, a brass
  * fanfare, a fairy's harp, a treasure jingle and a village dance). Their melodies are written for this app, not taken
  * from any game.
  */
@@ -283,14 +283,16 @@ const MORNING: Tune = [
   [1.8, 71, 0.3], [2.1, 68, 0.3], [2.4, 66, 0.3], [2.7, 64, 0.3], [3.0, 66, 0.3], [3.3, 68, 0.3], [3.6, 71, 0.5], [4.15, 73, 0.8],
 ];
 
-/** A lullaby in 3/4 for the ocarina (beat, MIDI note, beats), eight bars long; and the harp's chord in each bar. */
-const LULLABY_BEAT = 0.3;
-const LULLABY: Tune = [
-  [0, 76, 1], [1, 79, 1], [2, 81, 1], [3, 83, 2], [5, 81, 1], [6, 79, 1], [7, 76, 1], [8, 74, 1], [9, 76, 3],
-  [12, 76, 1], [13, 79, 1], [14, 81, 1], [15, 86, 2], [17, 84, 1], [18, 83, 1], [19, 81, 1], [20, 78, 1], [21, 79, 3.6],
+/** A slow, solemn song in 3/4 and D minor for the ocarina (beat, MIDI note, beats), eight bars long; and the harp's chord in each bar. */
+const CLOCK_BEAT = 0.38;
+const CLOCK_SONG: Tune = [
+  [0, 77, 2], [2, 76, 1], [3, 74, 1], [4, 69, 2], [6, 70, 1], [7, 72, 1], [8, 74, 1], [9, 76, 3],
+  [12, 77, 2], [14, 79, 1], [15, 81, 1], [16, 79, 1], [17, 77, 1], [18, 76, 1], [19, 73, 1], [20, 76, 1], [21, 74, 3.6],
 ];
-/** C, G/B, Em7, Am, C, D7, D, G: root, fifth, octave, third. */
-const LULLABY_CHORDS = [[48, 55, 60, 64], [47, 55, 59, 62], [40, 52, 55, 59], [45, 52, 57, 60], [48, 55, 60, 64], [50, 57, 60, 66], [50, 57, 62, 66]];
+/** Dm, Dm, Bb, A, Dm, F, A7: root, fifth, octave (or seventh), third. */
+const CLOCK_CHORDS = [[50, 57, 62, 65], [50, 57, 62, 65], [46, 53, 58, 62], [45, 52, 57, 61], [50, 57, 62, 65], [41, 48, 53, 57], [45, 52, 55, 61]];
+/** A clock's tick and tock: a small, dry wooden knock. */
+const TICK: readonly Mode[] = [[1, 1, 0.06], [2.62, 0.45, 0.035], [4.4, 0.2, 0.02]];
 
 /** A fanfare for the brass (second, MIDI note, seconds): a triplet call, a rising answer and a high, held close. */
 const FANFARE: Tune = [
@@ -325,7 +327,7 @@ const VILLAGE_CHORDS = [D, [45, D[1]] as const, G, D, D, A7, A7];
 /** How long each sound is, in seconds. */
 const LENGTH: Record<Exclude<TimerSound, 'none'>, number> = {
   beep: 0.9, bell: 3.4, chime: 3.2, kitchen: 1.4, pulse: 1.4, siren: 1.6, musicbox: 5, piano: 5, marimba: 4.2, flute: 6, harp: 4,
-  ocarina: 9, fanfare: 5, fairy: 5.5, treasure: 4, village: 5.8,
+  ocarina: 10.5, fanfare: 5, fairy: 5.5, treasure: 4, village: 5.8,
 };
 
 /** What a sound is, as samples at the given rate, scaled to peak at 0.9; empty for silence. */
@@ -381,15 +383,22 @@ export function renderSound(sound: TimerSound, rate: number): Float32Array<Array
       break;
     }
     case 'ocarina': {
-      const beat = LULLABY_BEAT;
-      LULLABY.forEach(([at, note, beats = 1], n) => ocarina(out, rate, at * beat, midi(note), beats * beat * 0.94, { seed: n + 1 }));
+      const beat = CLOCK_BEAT;
+      CLOCK_SONG.forEach(([at, note, beats = 1], n) => ocarina(out, rate, at * beat, midi(note), beats * beat * 0.94, { seed: n + 1 }));
       // The harp rocks in quavers under it: root, fifth, octave, third, octave, fifth.
-      LULLABY_CHORDS.forEach((chord, bar) =>
+      CLOCK_CHORDS.forEach((chord, bar) =>
         [0, 1, 2, 3, 2, 1].forEach((i, q) => harp(out, rate, (bar * 3 + q / 2) * beat, chord[i], q ? 0.2 : 0.3, bar * 6 + q + 1)),
       );
-      // The last bar is one rolled G chord, let ring.
-      [43, 50, 55, 59, 62, 67, 71].forEach((note, n) => harp(out, rate, 21 * beat + n * 0.045, note, 0.26, n + 60));
-      strings(out, rate, 21 * beat, [55, 59, 62], 1.4, 0.05);
+      // Strings hold each half of the song, and a deep clock bell tolls at its start and halfway.
+      strings(out, rate, 0, [62, 65, 69], 12 * beat, 0.04);
+      strings(out, rate, 12 * beat, [62, 65, 69], 9 * beat, 0.04);
+      voice(out, rate, 0, midi(50), BELL, { velocity: 0.3, seed: 50 });
+      voice(out, rate, 12 * beat, midi(50), BELL, { velocity: 0.25, seed: 51 });
+      // Under it all a clock ticks on every beat.
+      for (let b = 0; b < 22; b++) voice(out, rate, b * beat, b % 2 ? 1500 : 1900, TICK, { velocity: 0.09, beat: 0, click: 0.3, seed: b + 90 });
+      // The last bar is one rolled D minor chord, let ring.
+      [38, 45, 50, 57, 62, 65, 69].forEach((note, n) => harp(out, rate, 21 * beat + n * 0.05, note, 0.26, n + 60));
+      strings(out, rate, 21 * beat, [50, 57, 62, 65], 1.6, 0.05);
       break;
     }
     case 'fanfare':

@@ -17,7 +17,7 @@ const UNITS: readonly { unit: Unit; label: string; max: number; step: number }[]
 export const SOUND_LABELS: Record<TimerSound, string> = {
   beep: 'Beep', bell: 'Bell', chime: 'Chime', kitchen: 'Kitchen timer', pulse: 'Pulse', siren: 'Siren', musicbox: 'Music box',
   piano: 'Piano', marimba: 'Marimba', flute: 'Flute', harp: 'Harp',
-  ocarina: 'Ocarina lullaby', fanfare: "Hero's fanfare", fairy: 'Fairy harp', treasure: 'Treasure found', village: 'Village dance', none: 'Silent',
+  ocarina: 'Clock tower song', fanfare: "Hero's fanfare", fairy: 'Fairy harp', treasure: 'Treasure found', village: 'Village dance', none: 'Silent',
 };
 
 /**

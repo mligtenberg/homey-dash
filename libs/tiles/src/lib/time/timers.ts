@@ -34,7 +34,7 @@ export interface TimerDraft {
 /** How often (in seconds) a ringing timer plays its sound again: a bell rings on for a few seconds, a beep is over at once. */
 const SOUND_REPEAT: Record<TimerSound, number> = {
   beep: 1, bell: 3, chime: 3, kitchen: 2, pulse: 2, siren: 2, musicbox: 6, piano: 6, marimba: 5, flute: 6, harp: 5,
-  ocarina: 10, fanfare: 6, fairy: 6, treasure: 5, village: 7, none: 1,
+  ocarina: 11, fanfare: 6, fairy: 6, treasure: 5, village: 7, none: 1,
 };
 
 const KEY = 'hd-timers';
