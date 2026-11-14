@@ -719,6 +719,7 @@ export const NL: Record<string, string> = {
   'Timer': 'Timer',
   '+{count} others': '+{count} andere',
   'Timers': 'Timers',
+  'Are there running timers?': 'Zijn er lopende timers?',
   '{count} timers': '{count} timers',
   'New timer': 'Nieuwe timer',
   'Name (optional)': 'Naam (optioneel)',

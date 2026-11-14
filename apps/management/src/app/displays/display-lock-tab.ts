@@ -7,7 +7,7 @@ import { RuleEditor } from '../editor/rule-editor';
 import { SignalPicker } from '../editor/signal-picker';
 import { DisplayContext } from './display-context';
 import { DisplaysStore, isCapabilitySignal, MAX_LOCK_WIDGETS } from './displays-store';
-import { LucideCar, LucideChevronDown, LucideClock, LucideCloud, LucideNewspaper, LucidePlus, LucideThermometer, RemoveButton, ReorderButtons } from '@homey-dash/design-system';
+import { LucideCar, LucideChevronDown, LucideClock, LucideCloud, LucideNewspaper, LucidePlus, LucideThermometer, LucideTimer, RemoveButton, ReorderButtons } from '@homey-dash/design-system';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { describeRule } from '../editor/rule-text';
 import { SignalCatalogue } from '../editor/signal-catalogue';
@@ -31,8 +31,8 @@ const SPOT_NAMES: Record<LockSpot, string> = {
   'bottom-right': 'Bottom right',
 };
 
-const KIND_ICONS = { clock: LucideClock, weather: LucideCloud, value: LucideThermometer, traffic: LucideCar, news: LucideNewspaper };
-const KIND_NAMES = { clock: 'Time and date', weather: 'Weather', value: 'Device value', traffic: 'Traffic', news: 'News' };
+const KIND_ICONS = { clock: LucideClock, weather: LucideCloud, value: LucideThermometer, traffic: LucideCar, news: LucideNewspaper, timers: LucideTimer };
+const KIND_NAMES = { clock: 'Time and date', weather: 'Weather', value: 'Device value', traffic: 'Traffic', news: 'News', timers: 'Timers' };
 
 /** The widgets a display's lock screen shows over a photo set or colour while an idle rule plays it. */
 @Component({
@@ -271,7 +271,7 @@ export class DisplayLockTab {
   protected readonly context = inject(DisplayContext);
   protected readonly store = inject(DisplaysStore);
   protected readonly spots = LOCK_SPOTS;
-  protected readonly kinds = ['clock', 'weather', 'value', 'traffic', 'news'] as const;
+  protected readonly kinds = ['clock', 'weather', 'value', 'traffic', 'news', 'timers'] as const;
   protected readonly newsSources = NEWS_SOURCES;
   protected readonly choices: { value: Visibility; label: string }[] = [
     { value: 'always', label: 'Always' },

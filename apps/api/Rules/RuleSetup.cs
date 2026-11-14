@@ -14,6 +14,8 @@ public static class RuleSetup
         services.AddSignalSource<ClockSignals>();
         services.AddSignalSource<DisplaySignals>();
         services.AddSignalSource<PlexSignals>();
+        services.AddSingleton<TimerSignals>();
+        services.AddSingleton<ISignalSource>(sp => sp.GetRequiredService<TimerSignals>());
         services.AddSingleton<RuleEngine>();
         services.AddSingleton<RuleSubscriptions>();
         return services;

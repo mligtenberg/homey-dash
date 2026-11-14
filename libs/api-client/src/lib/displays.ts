@@ -32,7 +32,7 @@ export const LOCK_SPOTS: readonly LockSpot[] = ['top-left', 'top-right', 'center
  * Something a display shows on its lock screen, over the photo set or colour an idle rule plays: the time and date,
  * the weather where a Homey is (of `account`, or the oldest), or the value of a device's capability, named by its
  * Homey signal (`homey:<account>:capability:<device>:<capability>`), or the car travel time on a route (of the TomTom
- * `account`, or the oldest; ADR-0015), which has nothing to show until a route is chosen, or the newest headline of a NOS `source` (ADR-0016). Widgets in the same spot stack
+ * `account`, or the oldest; ADR-0015), which has nothing to show until a route is chosen, or the newest headline of a NOS `source` (ADR-0016), or the timers that are running. Widgets in the same spot stack
  * in order. A hidden widget stays configured but the screen leaves it out; one with a rule is shown only while it holds
  * (ADR-0010).
  */
@@ -42,6 +42,7 @@ export type LockWidget = (
   | { kind: 'value'; spot: LockSpot; signal: string }
   | { kind: 'traffic'; spot: LockSpot; route?: TrafficRoute | null; account?: number | null }
   | { kind: 'news'; spot: LockSpot; source?: string | null }
+  | { kind: 'timers'; spot: LockSpot }
 ) & { hidden?: boolean; rule?: Rule | null };
 
 /** The device and capability a Homey capability signal names, `homey:<account>:capability:<device>:<capability>`. */

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HomeyDash.Api.Tests.Rules;
 
@@ -94,6 +95,25 @@ public sealed class RuleApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         Assert.Equal(new Dictionary<string, bool> { ["here"] = true, ["locked"] = true }, await asGarage.Content.ReadFromJsonAsync<Dictionary<string, bool>>());
         Assert.Equal(new Dictionary<string, bool> { ["here"] = false, ["locked"] = true }, await asNone.Content.ReadFromJsonAsync<Dictionary<string, bool>>());
+    }
+
+    [Fact]
+    public async Task RunningTimers_AreASignalThatHoldsWhileThereAreTimers()
+    {
+        var signals = factory.Services.GetRequiredService<HomeyDash.Api.Rules.TimerSignals>();
+        var rules = new Dictionary<string, object> { ["any"] = Rule(When("timers:running", "isTrue")) };
+        async Task<bool> HoldsAsync() =>
+            (await (await _client.PostAsJsonAsync("/api/rules/evaluate", new { rules })).Content.ReadFromJsonAsync<Dictionary<string, bool>>())!["any"];
+
+        signals.Set([]);
+        var without = await HoldsAsync();
+        signals.Set([new HomeyDash.Api.Timers.TimerView(Guid.NewGuid(), 60, 0, null, null, "beep")]);
+        var with = await HoldsAsync();
+        signals.Set([]);
+
+        Assert.Equal(("yesNo", "Are there running timers?"), ((await SignalAsync("timers:running")).GetProperty("type").GetString(), (await SignalAsync("timers:running")).GetProperty("name").GetString()));
+        Assert.False(without);
+        Assert.True(with);
     }
 
     [Fact]

@@ -1,8 +1,8 @@
 import { afterNextRender, ChangeDetectionStrategy, Component, computed, DestroyRef, ElementRef, inject, input } from '@angular/core';
 import { capabilitySignal, HomeyWeather, LOCK_SPOTS, LockWidget, Rule } from '@homey-dash/api-client';
-import { ago, capabilityText, delayLevel, delayText, duration, NewsData, ruleAnswersOf, TileData, TrafficData } from '@homey-dash/tiles';
+import { ago, capabilityText, delayLevel, delayText, duration, NewsData, ruleAnswersOf, TileData, timerLeft, timerLength, timerText, Timers, TrafficData } from '@homey-dash/tiles';
 import { LucideDynamicIcon, LucideIconInput } from '@lucide/angular';
-import { LucideCar, LucideNewspaper, LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideSun, minuteClock } from '@homey-dash/design-system';
+import { LucideCar, LucideNewspaper, LucideTimer, LucideCloud, LucideCloudDrizzle, LucideCloudFog, LucideCloudLightning, LucideCloudRain, LucideCloudSnow, LucideCloudSun, LucideSun, minuteClock } from '@homey-dash/design-system';
 
 import { Backdrop, css, inkOver, inverseOf, luminance, prominentColour, Rgb } from './lock-ink';
 import { formatTag, t } from '@homey-dash/i18n';
@@ -12,7 +12,8 @@ type Shown =
   | { kind: 'weather'; temperature: string; state: string; icon: LucideIconInput }
   | { kind: 'value'; name: string; value: string; units: string; unavailable: boolean }
   | { kind: 'traffic'; name: string; time: string; delay: string; level: 'none' | 'some' | 'heavy'; unavailable: boolean }
-  | { kind: 'news'; headline: string; name: string; age: string; unavailable: boolean };
+  | { kind: 'news'; headline: string; name: string; age: string; unavailable: boolean }
+  | { kind: 'timers'; time: string; name: string; others: string; done: boolean };
 
 // Homey's conditions, after OpenWeatherMap's main groups, by the start of the word.
 const WEATHER: [RegExp, LucideIconInput, string][] = [
@@ -70,6 +71,13 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
                 <span class="news__name">{{ widget.name }} · {{ widget.age }}</span>
               </div>
             }
+            @case ('timers') {
+              <div class="timers" role="group" [class.is-done]="widget.done" [attr.aria-label]="widget.name + ', ' + widget.time">
+                <svg class="timers__icon" [lucideIcon]="timer" />
+                <span class="timers__time">{{ widget.time }}</span>
+                <span class="timers__name">{{ widget.name }}{{ widget.others }}</span>
+              </div>
+            }
             @case ('value') {
               <div class="value" [class.is-unavailable]="widget.unavailable">
                 <span class="value__reading">{{ widget.value }}<span class="value__units">{{ widget.units }}</span></span>
@@ -95,7 +103,7 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
     /* Over a photo, the bottom spots stay above the caption line along its bottom (styled in the app, to the same margins): when and where it was taken, and who. */
     :host(.over-photo) { padding-bottom: calc(var(--edge) + 7vh); }
     .spot { position: relative; display: flex; flex-direction: column; gap: calc(3 * var(--u)); animation: spot-in .9s cubic-bezier(.2, .7, .2, 1) backwards; }
-    .clock, .weather, .traffic, .value, .news {
+    .clock, .weather, .traffic, .value, .news, .timers {
       color: var(--ink, #fff); transition: color .8s ease;
     }
     .spot--top-left { grid-area: tl; justify-self: start; align-items: flex-start; }
@@ -111,11 +119,15 @@ export function weatherLook(state: string | null): { icon: LucideIconInput; labe
     .clock__date { font-size: max(var(--text-floor), calc(2.3 * var(--u))); font-weight: 500; letter-spacing: .01em; margin-top: calc(1.4 * var(--u)); opacity: .9; }
 
     /* Everything else is a reading over its label, the same shape whatever it measures. */
-    .weather, .traffic { display: grid; grid-template-columns: auto auto; column-gap: calc(1.2 * var(--u)); align-items: center; }
-    .spot--center .weather, .spot--center .traffic { justify-content: center; }
-    .weather__icon, .traffic__icon { width: calc(4 * var(--u)); height: calc(4 * var(--u)); stroke-width: 1.6; }
-    .weather__temperature, .traffic__time, .value__reading { font-size: calc(4.6 * var(--u)); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-    .weather__state, .traffic__name, .value__name { grid-column: 1 / -1; font-size: max(var(--text-floor), calc(1.9 * var(--u))); font-weight: 500; letter-spacing: .01em; opacity: .82; white-space: nowrap; margin-top: calc(.7 * var(--u)); }
+    .weather, .traffic, .timers { display: grid; grid-template-columns: auto auto; column-gap: calc(1.2 * var(--u)); align-items: center; }
+    .spot--center .weather, .spot--center .traffic, .spot--center .timers { justify-content: center; }
+    .weather__icon, .traffic__icon, .timers__icon { width: calc(4 * var(--u)); height: calc(4 * var(--u)); stroke-width: 1.6; }
+    .weather__temperature, .traffic__time, .timers__time, .value__reading { font-size: calc(4.6 * var(--u)); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+    .weather__state, .traffic__name, .timers__name, .value__name { grid-column: 1 / -1; font-size: max(var(--text-floor), calc(1.9 * var(--u))); font-weight: 500; letter-spacing: .01em; opacity: .82; white-space: nowrap; margin-top: calc(.7 * var(--u)); }
+    /* A timer that ran out blinks, the one thing on the lock screen that asks to be noticed. */
+    .timers.is-done .timers__time { animation: timer-done 1s steps(1) infinite; }
+    @keyframes timer-done { 50% { opacity: .25; } }
+    @media (prefers-reduced-motion: reduce) { .timers.is-done .timers__time { animation: none; } }
     .traffic[data-delay='some'] .traffic__time, .traffic[data-delay='some'] .traffic__icon { color: var(--lock-warn); }
     .traffic[data-delay='heavy'] .traffic__time, .traffic[data-delay='heavy'] .traffic__icon { color: var(--lock-danger); }
     /* A headline is a sentence, not a reading: it wraps at a comfortable measure, never running into the middle of the screen. */
@@ -138,8 +150,10 @@ export class LockScreen {
   private readonly data = inject(TileData);
   private readonly traffic = inject(TrafficData);
   private readonly news = inject(NewsData);
+  private readonly timers = inject(Timers);
   protected readonly car = LucideCar;
   protected readonly newspaper = LucideNewspaper;
+  protected readonly timer = LucideTimer;
   // Ticks on every minute, for the clock.
   private readonly now = minuteClock();
 
@@ -172,7 +186,7 @@ export class LockScreen {
     if (this.busy) return;
     this.busy = true;
     const widgets = [
-      ...this.host.querySelectorAll<HTMLElement>('.clock, .weather, .traffic, .value, .news'),
+      ...this.host.querySelectorAll<HTMLElement>('.clock, .weather, .traffic, .value, .news, .timers'),
       ...document.querySelectorAll<HTMLElement>('.slideshow :is(.hd-photo__label, .hd-photo__about, .hd-photo__people)'),
     ];
     try {
@@ -386,6 +400,21 @@ export class LockScreen {
         const item = feed?.items[0];
         if (!feed || !item) return null;
         return { kind: 'news', headline: item.title, name: feed.name, age: ago(item.publishedAt, this.now().getTime()), unavailable: feed.status === 'disconnected' };
+      }
+      case 'timers': {
+        // Nothing to show while no timer is set. The one that ends first leads, as on the timer tile.
+        const now = this.timers.now();
+        const all = this.timers.timers().map((t) => ({ t, left: timerLeft(t, now) })).sort((a, b) => a.left - b.left);
+        const first = all[0];
+        if (!first) return null;
+        const more = all.length - 1;
+        return {
+          kind: 'timers',
+          time: timerText(first.left),
+          name: first.t.name || timerLength(first.t.seconds),
+          others: more > 0 ? ` · ${t('+{count} others', { count: more })}` : '',
+          done: first.left <= 0,
+        };
       }
       case 'value': {
         const named = capabilitySignal(widget.signal);

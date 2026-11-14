@@ -2,6 +2,7 @@ using HomeyDash.Api.Dashboards;
 using HomeyDash.Api.Data;
 using HomeyDash.Api.Displays;
 using HomeyDash.Api.Photos;
+using HomeyDash.Api.Rules;
 using HomeyDash.Api.Timers;
 using HomeyDash.Api.News;
 using HomeyDash.Api.Traffic;
@@ -12,7 +13,7 @@ namespace HomeyDash.Api.Realtime;
 
 /// <summary>Tells screens and Management that displays, dashboards or photo sets changed.</summary>
 public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresence presence, TargetCatalog targets, PhotoSync sync,
-    ImmichAccounts immich, DisplayDirectory directory, WeatherWatcher weather, TrafficWatcher traffic, NewsWatcher news)
+    ImmichAccounts immich, DisplayDirectory directory, WeatherWatcher weather, TrafficWatcher traffic, NewsWatcher news, TimerSignals timerSignals)
 {
     public const string ManagementGroup = "management";
 
@@ -52,6 +53,11 @@ public sealed class RealtimeNotifier(IHubContext<RealtimeHub> hub, DisplayPresen
         await hub.Clients.All.SendAsync("PhotoSets", await PhotoEndpoints.ListAsync(db, sync, immich, ct), ct);
 
     // Every shared timer, to every connection.
-    public async Task TimersChangedAsync(HomeyDashDbContext db, CancellationToken ct) =>
-        await hub.Clients.All.SendAsync("Timers", await TimerEndpoints.ListAsync(db, ct), ct);
+    public async Task TimersChangedAsync(HomeyDashDbContext db, CancellationToken ct)
+    {
+        var timers = await TimerEndpoints.ListAsync(db, ct);
+        // Rules on whether there are timers follow.
+        timerSignals.Set(timers);
+        await hub.Clients.All.SendAsync("Timers", timers, ct);
+    }
 }

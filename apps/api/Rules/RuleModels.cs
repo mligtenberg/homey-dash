@@ -12,7 +12,7 @@ public enum SignalType { Text, YesNo, Number, DateTime }
 public sealed record AllowedValue(string Value, string Label);
 
 /// <summary>
-/// A live value HomeyDash knows, as the signal catalogue lists it. Source is homey, clock, display or plex; Group is
+/// A live value HomeyDash knows, as the signal catalogue lists it. Source is homey, clock, display, plex or timers; Group is
 /// what the signal belongs to within it, such as its device. The rest only helps people write conditions.
 /// </summary>
 public sealed record SignalInfo(string Id, string Source, SignalType Type, string Name, string Group)

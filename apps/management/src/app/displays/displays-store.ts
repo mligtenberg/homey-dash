@@ -174,7 +174,7 @@ export class DisplaysStore {
   setLockKind(display: DisplayInfo, index: number, kind: LockWidget['kind']) {
     const { spot, hidden, rule } = display.lockWidgets[index];
     let widget: LockWidget = { kind: 'clock', spot };
-    if (kind === 'weather' || kind === 'traffic' || kind === 'news') widget = { kind, spot };
+    if (kind === 'weather' || kind === 'traffic' || kind === 'news' || kind === 'timers') widget = { kind, spot };
     if (kind === 'value') {
       const signals = (this.catalogue.signals() ?? []).filter(isCapabilitySignal);
       const signal = signals.find((s) => s.id.endsWith(':measure_temperature')) ?? signals[0];

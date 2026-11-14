@@ -13,6 +13,7 @@ using HomeyDash.Api.Plex;
 using HomeyDash.Api.Realtime;
 using HomeyDash.Api.Rules;
 using HomeyDash.Api.News;
+using HomeyDash.Api.Timers;
 using HomeyDash.Api.Traffic;
 using HomeyDash.Api.Voice;
 using HomeyDash.Api.Weather;
@@ -66,6 +67,8 @@ using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.LoadPhotoSets();
     scope.ServiceProvider.LoadPlex();
     scope.ServiceProvider.LoadTraffic();
+    scope.ServiceProvider.GetRequiredService<TimerSignals>()
+        .Set(await TimerEndpoints.ListAsync(scope.ServiceProvider.GetRequiredService<HomeyDashDbContext>(), CancellationToken.None));
     await scope.ServiceProvider.GetRequiredService<DisplayDirectory>()
         .RefreshAsync(scope.ServiceProvider.GetRequiredService<HomeyDashDbContext>(), CancellationToken.None);
 }
