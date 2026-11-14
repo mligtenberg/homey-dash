@@ -20,7 +20,7 @@ public sealed class SharedTimer
 /// <summary>A timer as screens send and receive it. Mirrored in libs/api-client/src/lib/timers.ts.</summary>
 public sealed record TimerView(Guid Id, int Seconds, long End, long? Paused, string? Name, string Sound)
 {
-    public static readonly string[] Sounds = ["beep", "bell", "chime", "kitchen", "pulse", "siren", "musicbox", "piano", "marimba", "flute", "harp", "none"];
+    public static readonly string[] Sounds = ["beep", "bell", "chime", "kitchen", "pulse", "siren", "musicbox", "piano", "marimba", "flute", "harp", "ocarina", "fanfare", "fairy", "treasure", "village", "none"];
 
     public static TimerView Of(SharedTimer t) => new(t.Id, t.Seconds, t.End, t.Paused, t.Name, t.Sound);
 
