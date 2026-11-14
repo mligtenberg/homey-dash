@@ -17,8 +17,8 @@ const MAX_DRIVE = 4;
 const CEILING = 0.97;
 
 /** How loud each sound was first played (peak 0.9 times this), and how much of its room is heard. */
-const FIRST_LEVEL: Record<string, number> = { beep: 0.55, bell: 0.95, chime: 0.95, kitchen: 0.75, pulse: 0.6, siren: 0.5, musicbox: 0.95, piano: 0.95, marimba: 0.95, flute: 0.95, harp: 0.95 };
-const ROOM: Record<string, number> = { beep: 0, bell: 0.22, chime: 0.28, kitchen: 0.05, pulse: 0, siren: 0.05, musicbox: 0.2, piano: 0.2, marimba: 0.15, flute: 0.28, harp: 0.25 };
+const FIRST_LEVEL: Record<string, number> = { beep: 0.55, bell: 0.95, chime: 0.95, kitchen: 0.75, pulse: 0.6, siren: 0.5, musicbox: 0.95, piano: 0.95, marimba: 0.95, flute: 0.95, harp: 0.95, ocarina: 0.95, fanfare: 0.95, fairy: 0.95, treasure: 0.95, village: 0.95 };
+const ROOM: Record<string, number> = { beep: 0, bell: 0.22, chime: 0.28, kitchen: 0.05, pulse: 0, siren: 0.05, musicbox: 0.2, piano: 0.2, marimba: 0.15, flute: 0.28, harp: 0.25, ocarina: 0.3, fanfare: 0.25, fairy: 0.32, treasure: 0.28, village: 0.18 };
 
 const rms = (x: Float32Array) => Math.sqrt(x.reduce((sum, v) => sum + v * v, 0) / x.length);
 const db = (ratio: number) => 20 * Math.log10(ratio);

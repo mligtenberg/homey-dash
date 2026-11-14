@@ -2,9 +2,9 @@ import { inject, Injectable, signal } from '@angular/core';
 import { Realtime, TimerView } from '@homey-dash/api-client';
 
 /** What a timer plays while it rings. */
-export type TimerSound = 'beep' | 'bell' | 'chime' | 'kitchen' | 'pulse' | 'siren' | 'musicbox' | 'piano' | 'marimba' | 'flute' | 'harp' | 'none';
+export type TimerSound = 'beep' | 'bell' | 'chime' | 'kitchen' | 'pulse' | 'siren' | 'musicbox' | 'piano' | 'marimba' | 'flute' | 'harp' | 'ocarina' | 'fanfare' | 'fairy' | 'treasure' | 'village' | 'none';
 
-export const TIMER_SOUNDS: readonly TimerSound[] = ['beep', 'bell', 'chime', 'kitchen', 'pulse', 'siren', 'musicbox', 'piano', 'marimba', 'flute', 'harp', 'none'];
+export const TIMER_SOUNDS: readonly TimerSound[] = ['beep', 'bell', 'chime', 'kitchen', 'pulse', 'siren', 'musicbox', 'piano', 'marimba', 'flute', 'harp', 'ocarina', 'fanfare', 'fairy', 'treasure', 'village', 'none'];
 
 /** A timer: running, it ends at `end` (ms since the epoch), so it survives a reload; paused, `paused` is what is left (ms). */
 export interface Timer {
@@ -33,7 +33,8 @@ export interface TimerDraft {
 
 /** How often (in seconds) a ringing timer plays its sound again: a bell rings on for a few seconds, a beep is over at once. */
 const SOUND_REPEAT: Record<TimerSound, number> = {
-  beep: 1, bell: 3, chime: 3, kitchen: 2, pulse: 2, siren: 2, musicbox: 6, piano: 6, marimba: 5, flute: 6, harp: 5, none: 1,
+  beep: 1, bell: 3, chime: 3, kitchen: 2, pulse: 2, siren: 2, musicbox: 6, piano: 6, marimba: 5, flute: 6, harp: 5,
+  ocarina: 10, fanfare: 6, fairy: 6, treasure: 5, village: 7, none: 1,
 };
 
 const KEY = 'hd-timers';

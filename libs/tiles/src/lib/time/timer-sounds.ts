@@ -157,6 +157,115 @@ function flute(out: Float32Array, rate: number, at: number, hz: number, length: 
   }
 }
 
+/*
+ * The adventure set: five original tunes in the manner of a fantasy adventure game's music (an ocarina lullaby, a brass
+ * fanfare, a fairy's harp, a treasure jingle and a village dance). Their melodies are written for this app, not taken
+ * from any game.
+ */
+
+/** An ocarina: a vessel flute, so nearly a pure sine, with a breathy chiff that scoops up to the note and a vibrato that blooms on long notes. */
+function ocarina(out: Float32Array, rate: number, at: number, hz: number, length: number, o: { velocity?: number; seed?: number } = {}) {
+  const { velocity = 1, seed = 1 } = o;
+  const first = Math.floor(at * rate);
+  const rand = noise(seed);
+  const release = 0.08;
+  let [phase, breath, air] = [0, 0, 0];
+  for (let i = 0; i < Math.floor((length + release * 6) * rate) && first + i < out.length; i++) {
+    const t = i / rate;
+    const bloom = Math.min(1, Math.max(0, (t - 0.2) / 0.3));
+    const wobble = Math.sin(2 * Math.PI * 5.3 * t);
+    phase += (2 * Math.PI * hz * (1 - 0.011 * Math.exp(-t / 0.03) + 0.0045 * bloom * wobble)) / rate;
+    // Breath: noise twice smoothed, then voiced by the tone so it sounds at the note rather than as hiss.
+    breath += (rand() - breath) * 0.3;
+    air += (breath - air) * 0.3;
+    const env = (1 - Math.exp(-t / 0.022)) * (t > length ? Math.exp(-(t - length) / release) : 1) * (1 + 0.04 * bloom * wobble);
+    const tonal = Math.sin(phase) + 0.09 * Math.sin(2 * phase + 0.4) + 0.035 * Math.sin(3 * phase + 1.1) + 0.012 * Math.sin(4 * phase);
+    const chiff = 0.05 + 0.55 * Math.exp(-t / 0.025);
+    out[first + i] += velocity * env * (tonal + air * chiff * (1 + Math.sin(phase)) * 2.5);
+  }
+}
+
+/**
+ * A brass voice: a buzzing lip, so all harmonics, whose upper ones come in as it gets louder (the brightness follows the
+ * envelope), lifted by the bell's formant around 1.2 kHz. It starts a little flat and settles, and long notes get a vibrato.
+ * The harmonics are summed with the Chebyshev recurrence, so it costs one sine per sample.
+ */
+function brass(out: Float32Array, rate: number, at: number, hz: number, length: number, o: { velocity?: number; cents?: number } = {}) {
+  const { velocity = 1, cents = 0 } = o;
+  const first = Math.floor(at * rate);
+  const f0 = hz * 2 ** (cents / 1200);
+  const top = Math.max(1, Math.min(30, Math.floor(Math.min(rate * 0.45, 9000) / (f0 * 1.03))));
+  const formant = Array.from({ length: top + 1 }, (_, k) => (1 + 1.6 * Math.exp(-(((k * f0 - 1200) / 750) ** 2))) / (1 + 0.04 * k));
+  const release = 0.07;
+  let phase = 0;
+  for (let i = 0; i < Math.floor((length + release * 6) * rate) && first + i < out.length; i++) {
+    const t = i / rate;
+    const rise = t < 0.035 ? (t / 0.035) ** 1.6 : 0.82 + 0.18 * Math.exp(-(t - 0.035) / 0.09);
+    const env = rise * (t > length ? Math.exp(-(t - length) / release) : 1);
+    const vibrato = 0.0035 * Math.min(1, Math.max(0, (t - 0.3) / 0.3)) * Math.sin(2 * Math.PI * 5.5 * t);
+    phase += (2 * Math.PI * f0 * (1 - 0.018 * Math.exp(-t / 0.018) + vibrato)) / rate;
+    const bright = 0.2 + 0.52 * env * Math.min(1, velocity);
+    const c = 2 * Math.cos(phase);
+    let [prev, now, gain, sum] = [0, Math.sin(phase), 1, 0];
+    for (let k = 1; k <= top; k++) {
+      sum += gain * formant[k] * now;
+      [prev, now] = [now, c * now - prev];
+      gain *= bright;
+    }
+    out[first + i] += velocity * env * sum * 0.4;
+  }
+}
+
+/** A section: the same brass note played by a few players, a few cents and milliseconds apart. */
+function section(out: Float32Array, rate: number, at: number, note: number, length: number, velocity: number, players = 2) {
+  for (let p = 0; p < players; p++) brass(out, rate, at + p * 0.007, midi(note), length, { velocity: velocity / Math.sqrt(players), cents: (p - (players - 1) / 2) * 6 });
+}
+
+/** A string pad: three slightly detuned bowed voices per note, swelling in and dying away slowly. */
+function strings(out: Float32Array, rate: number, at: number, notes: readonly number[], length: number, level: number) {
+  const first = Math.floor(at * rate);
+  const [attack, release] = [0.35, 0.7];
+  for (const note of notes)
+    for (const cents of [-7, 0, 7]) {
+      const f0 = midi(note) * 2 ** (cents / 1200);
+      const top = Math.min(14, Math.floor(Math.min(rate * 0.45, 6000) / f0));
+      let phase = (cents + 7) * 0.31 + note;
+      for (let i = 0; i < Math.floor((length + release * 5) * rate) && first + i < out.length; i++) {
+        const t = i / rate;
+        const env = Math.min(1, t / attack) ** 2 * (t > length ? Math.exp(-(t - length) / release) : 1);
+        phase += (2 * Math.PI * f0 * (1 + 0.003 * Math.sin(2 * Math.PI * (4.6 + cents * 0.05) * t))) / rate;
+        const c = 2 * Math.cos(phase);
+        let [prev, now, gain, sum] = [0, Math.sin(phase), 1, 0];
+        for (let k = 1; k <= top; k++) {
+          sum += (gain / k) * now;
+          [prev, now] = [now, c * now - prev];
+          gain *= 0.78;
+        }
+        out[first + i] += (level / 3) * env * sum;
+      }
+    }
+}
+
+/** Timpani: a tuned kettle drum's membrane modes (near 1, 1.5, 2 and 2.5 times the pitch) with a soft mallet. */
+const TIMPANI: readonly Mode[] = [[1, 1, 1.4], [1.504, 0.55, 1.0], [1.742, 0.25, 0.7], [2.0, 0.3, 0.65], [2.245, 0.12, 0.5], [2.494, 0.1, 0.4], [2.8, 0.05, 0.3]];
+/** A celesta: steel plates over wooden resonators, so a nearly pure, sweet ring with faint inharmonic overtones. */
+const CELESTA: readonly Mode[] = [[1, 1, 1.6], [2.756, 0.1, 0.35], [4, 0.06, 0.22], [5.404, 0.03, 0.12]];
+
+/** A lute string, plucked near the bridge: bright, a little inharmonic, its upper harmonics gone in a moment. */
+function luteModes(f: number): Mode[] {
+  return Array.from({ length: 14 }, (_, i): Mode => {
+    const k = i + 1;
+    return [k * Math.sqrt(1 + 0.0004 * k * k), (1 / k ** 0.8) * (0.15 + Math.abs(Math.sin((Math.PI * k) / 5.5))), (2.4 / (1 + 0.45 * i)) * (196 / f) ** 0.35];
+  });
+}
+
+const harp = (out: Float32Array, rate: number, at: number, note: number, velocity: number, seed: number) =>
+  voice(out, rate, at, midi(note), harpModes(midi(note)), { beat: 0.4, click: 0.1, velocity, seed });
+const lute = (out: Float32Array, rate: number, at: number, note: number, velocity: number, seed: number) =>
+  voice(out, rate, at, midi(note), luteModes(midi(note)), { beat: 0.5, click: 0.18, velocity, seed });
+const celesta = (out: Float32Array, rate: number, at: number, note: number, velocity: number, seed: number) =>
+  voice(out, rate, at, midi(note), CELESTA, { beat: 0.6, click: 0.08, velocity, seed });
+
 type Tune = readonly (readonly [at: number, note: number, length?: number])[];
 
 /** "Twinkle, Twinkle" (Mozart's theme), high on a music box. */
@@ -174,9 +283,49 @@ const MORNING: Tune = [
   [1.8, 71, 0.3], [2.1, 68, 0.3], [2.4, 66, 0.3], [2.7, 64, 0.3], [3.0, 66, 0.3], [3.3, 68, 0.3], [3.6, 71, 0.5], [4.15, 73, 0.8],
 ];
 
+/** A lullaby in 3/4 for the ocarina (beat, MIDI note, beats), eight bars long; and the harp's chord in each bar. */
+const LULLABY_BEAT = 0.3;
+const LULLABY: Tune = [
+  [0, 76, 1], [1, 79, 1], [2, 81, 1], [3, 83, 2], [5, 81, 1], [6, 79, 1], [7, 76, 1], [8, 74, 1], [9, 76, 3],
+  [12, 76, 1], [13, 79, 1], [14, 81, 1], [15, 86, 2], [17, 84, 1], [18, 83, 1], [19, 81, 1], [20, 78, 1], [21, 79, 3.6],
+];
+/** C, G/B, Em7, Am, C, D7, D, G: root, fifth, octave, third. */
+const LULLABY_CHORDS = [[48, 55, 60, 64], [47, 55, 59, 62], [40, 52, 55, 59], [45, 52, 57, 60], [48, 55, 60, 64], [50, 57, 60, 66], [50, 57, 62, 66]];
+
+/** A fanfare for the brass (second, MIDI note, seconds): a triplet call, a rising answer and a high, held close. */
+const FANFARE: Tune = [
+  [0, 65, 0.1], [0.13, 65, 0.1], [0.26, 65, 0.1], [0.4, 70, 0.42], [0.85, 72, 0.1], [0.98, 74, 0.1], [1.11, 75, 0.1],
+  [1.25, 77, 0.72], [2.05, 74, 0.2], [2.3, 72, 0.2], [2.55, 75, 0.2], [2.8, 82, 1.35],
+];
+/** What the lower brass hold under it: the chord tones (and their bass) at each of its long notes and in the run home. */
+const FANFARE_HARMONY: readonly (readonly [at: number, notes: readonly number[], length: number])[] = [
+  [0.4, [46, 58, 62, 65], 0.42], [1.25, [39, 63, 67, 70], 0.72], [2.05, [43, 70], 0.2], [2.3, [41, 69], 0.2], [2.55, [41, 69, 63], 0.2],
+  [2.8, [34, 46, 53, 58, 62, 65, 74], 1.35],
+];
+
+/** A fairy's harp: maj7 and m7 chords drifting down by half steps, each swept up in one arpeggio, a celesta falling with them. */
+const FAIRY_CHORDS = [
+  [51, 58, 62, 67, 70, 74, 75, 79], // Ebmaj7
+  [50, 57, 60, 65, 69, 72, 74, 77], // Dm7
+  [49, 56, 60, 65, 68, 72, 73, 77], // Dbmaj7
+  [48, 55, 59, 62, 64, 67, 71, 74, 76, 79], // Cmaj9, where it comes to rest
+];
+
+/** A dance in 6/8 for the lute (quaver, MIDI note, quavers), four bars; and its chord on each half bar (bass, then the chord). */
+const VILLAGE_STEP = 0.17;
+const VILLAGE: Tune = [
+  [0, 74, 2], [2, 78, 1], [3, 81, 2], [5, 78, 1], [6, 79, 2], [8, 83, 1], [9, 81, 3],
+  [12, 78, 1], [13, 76, 1], [14, 74, 1], [15, 76, 1], [16, 78, 1], [17, 79, 1], [18, 76, 2], [20, 73, 1], [21, 74, 3],
+];
+const D = [50, [62, 66, 69]] as const;
+const G = [43, [62, 67, 71]] as const;
+const A7 = [45, [61, 64, 67]] as const;
+const VILLAGE_CHORDS = [D, [45, D[1]] as const, G, D, D, A7, A7];
+
 /** How long each sound is, in seconds. */
 const LENGTH: Record<Exclude<TimerSound, 'none'>, number> = {
   beep: 0.9, bell: 3.4, chime: 3.2, kitchen: 1.4, pulse: 1.4, siren: 1.6, musicbox: 5, piano: 5, marimba: 4.2, flute: 6, harp: 4,
+  ocarina: 9, fanfare: 5, fairy: 5.5, treasure: 4, village: 5.8,
 };
 
 /** What a sound is, as samples at the given rate, scaled to peak at 0.9; empty for silence. */
@@ -229,6 +378,66 @@ export function renderSound(sound: TimerSound, rate: number): Float32Array<Array
       // A run up the strings, then the chord it lands on.
       [72, 74, 76, 79, 81, 84, 86, 88, 91, 93, 96].forEach((note, n) => voice(out, rate, n * 0.075, midi(note), harpModes(midi(note)), { beat: 0.4, click: 0.1, velocity: 0.6, seed: n + 1 }));
       [72, 79, 84].forEach((note, n) => voice(out, rate, 1.05, midi(note), harpModes(midi(note)), { beat: 0.4, click: 0.12, seed: n + 20 }));
+      break;
+    }
+    case 'ocarina': {
+      const beat = LULLABY_BEAT;
+      LULLABY.forEach(([at, note, beats = 1], n) => ocarina(out, rate, at * beat, midi(note), beats * beat * 0.94, { seed: n + 1 }));
+      // The harp rocks in quavers under it: root, fifth, octave, third, octave, fifth.
+      LULLABY_CHORDS.forEach((chord, bar) =>
+        [0, 1, 2, 3, 2, 1].forEach((i, q) => harp(out, rate, (bar * 3 + q / 2) * beat, chord[i], q ? 0.2 : 0.3, bar * 6 + q + 1)),
+      );
+      // The last bar is one rolled G chord, let ring.
+      [43, 50, 55, 59, 62, 67, 71].forEach((note, n) => harp(out, rate, 21 * beat + n * 0.045, note, 0.26, n + 60));
+      strings(out, rate, 21 * beat, [55, 59, 62], 1.4, 0.05);
+      break;
+    }
+    case 'fanfare':
+      FANFARE.forEach(([at, note, length = 0.2]) => section(out, rate, at, note, length, 1, 3));
+      FANFARE_HARMONY.forEach(([at, notes, length]) => notes.forEach((note) => section(out, rate, at + 0.004, note, length, note < 50 ? 0.55 : 0.4)));
+      // The timpani: a stroke under the first two long notes, a roll on the dominant, and the last stroke on the tonic.
+      voice(out, rate, 0.4, midi(46), TIMPANI, { velocity: 0.9, beat: 0.6, click: 0.5, seed: 1 });
+      voice(out, rate, 1.25, midi(39), TIMPANI, { velocity: 0.8, beat: 0.6, click: 0.5, seed: 2 });
+      for (let k = 0; k < 8; k++) voice(out, rate, 2.42 + k * 0.045, midi(41), TIMPANI, { velocity: 0.25 + 0.06 * k, decay: 0.6, beat: 0.6, click: 0.4, seed: k + 3 });
+      voice(out, rate, 2.8, midi(46), TIMPANI, { velocity: 1.1, decay: 1.3, beat: 0.6, click: 0.6, seed: 20 });
+      break;
+    case 'fairy': {
+      const step = 0.085;
+      FAIRY_CHORDS.forEach((chord, c) => {
+        const start = c * 0.75;
+        chord.forEach((note, n) => harp(out, rate, start + n * step, note, 0.42 + (0.25 * n) / chord.length, c * 12 + n + 1));
+        // The celesta's line falls a half step with each chord: Bb, A, Ab, G.
+        celesta(out, rate, start, 82 - c, 0.55, c + 70);
+        strings(out, rate, start, [chord[0] + 12, chord[1] + 12, chord[3]], c < 3 ? 0.7 : 2.2, 0.035);
+      });
+      // A last sparkle at the top once the final arpeggio has climbed.
+      [88, 91, 95].forEach((note, n) => celesta(out, rate, 3.15 + n * 0.12, note, 0.4 - n * 0.05, n + 80));
+      break;
+    }
+    case 'treasure':
+      // A glissando up the strings, then a rising brass call that lands on a held, bell-crowned C major.
+      [67, 69, 72, 74, 76, 79, 81, 84, 86, 88, 91].forEach((note, n) => harp(out, rate, n * 0.032, note, 0.3 + n * 0.02, n + 1));
+      [[0.45, 79], [0.57, 81], [0.69, 83]].forEach(([at, note]) => section(out, rate, at, note, 0.09, 0.85));
+      [[0.45, 76], [0.57, 77], [0.69, 79]].forEach(([at, note]) => section(out, rate, at, note, 0.09, 0.55));
+      [84, 76, 72, 67, 60, 48].forEach((note) => section(out, rate, 0.82, note, 1.25, note === 84 ? 1 : 0.4));
+      voice(out, rate, 0.82, midi(84), BELL, { velocity: 0.35, decay: 1.2, seed: 30 });
+      voice(out, rate, 0.82, midi(48), TIMPANI, { velocity: 0.7, beat: 0.6, click: 0.5, seed: 31 });
+      [[1.0, 91], [1.16, 96], [1.32, 88], [1.48, 100], [1.64, 93]].forEach(([at, note], n) => celesta(out, rate, at, note, 0.32, n + 40));
+      break;
+    case 'village': {
+      const step = VILLAGE_STEP;
+      VILLAGE.forEach(([at, note, steps = 1], n) => {
+        lute(out, rate, at * step, note, 0.85, n + 1);
+        ocarina(out, rate, at * step, midi(note), steps * step * 0.85, { velocity: 0.22, seed: n + 100 });
+      });
+      // Oom-pah-pah: the bass on each dotted crotchet, the chord strummed on the two quavers after it.
+      VILLAGE_CHORDS.forEach(([bass, chord], half) => {
+        lute(out, rate, half * 3 * step, bass, 0.6, half + 200);
+        [1, 2].forEach((q) => chord.forEach((note, n) => lute(out, rate, (half * 3 + q) * step + n * 0.012, note, q === 1 ? 0.3 : 0.24, half * 10 + q * 3 + n + 300)));
+      });
+      // The last half bar is one full D chord, strummed slowly and let ring.
+      lute(out, rate, 21 * step, 38, 0.65, 400);
+      [50, 57, 62, 66, 69, 74].forEach((note, n) => lute(out, rate, 21 * step + n * 0.028, note, 0.38, n + 401));
       break;
     }
   }
