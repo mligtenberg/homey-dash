@@ -10,5 +10,6 @@ export * from './lib/dashboards';
 export * from './lib/displays';
 export * from './lib/rules';
 export * from './lib/timers';
+export * from './lib/sounds';
 export * from './lib/realtime';
 export * from './lib/problems';

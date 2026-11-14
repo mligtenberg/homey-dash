@@ -1,4 +1,4 @@
-import type { TimerSound } from './timers';
+import type { BuiltinSound } from './timers';
 
 /*
  * The timer sounds, synthesised: nothing here runs on a screen. `npm run sounds` renders them (see tools/render-sounds.mts)
@@ -389,13 +389,13 @@ const JIG_CHORDS: readonly (readonly [bass: number, chord: readonly number[]])[]
 ];
 
 /** How long each sound is, in seconds. */
-const LENGTH: Record<Exclude<TimerSound, 'none'>, number> = {
+const LENGTH: Record<Exclude<BuiltinSound, 'none'>, number> = {
   beep: 0.9, bell: 3.4, chime: 3.2, kitchen: 1.4, pulse: 1.4, siren: 1.6, musicbox: 5, piano: 5, marimba: 4.2, flute: 6, harp: 4,
   ocarina: 10.5, fanfare: 5, fairy: 5.5, treasure: 4, village: 6,
 };
 
 /** What a sound is, as samples at the given rate, scaled to peak at 0.9; empty for silence. */
-export function renderSound(sound: TimerSound, rate: number): Float32Array<ArrayBuffer> {
+export function renderSound(sound: BuiltinSound, rate: number): Float32Array<ArrayBuffer> {
   if (sound === 'none') return new Float32Array(0);
   const out = new Float32Array(Math.floor(rate * LENGTH[sound]));
   switch (sound) {

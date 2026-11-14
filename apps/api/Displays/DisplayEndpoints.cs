@@ -118,7 +118,7 @@ public static partial class DisplayEndpoints
         displays.MapPut("/{id:guid}/timer-sound", (Guid id, DisplayTimerSound body, [AsParameters] Services services, CancellationToken ct) =>
             Change(id, services, ct, display =>
             {
-                if (body.Sound is { } sound && !Timers.TimerView.Sounds.Contains(sound))
+                if (body.Sound is { } sound && !Timers.CustomSound.IsSound(sound))
                     return Task.FromResult<IResult?>(Results.ValidationProblem(
                         new Dictionary<string, string[]> { ["sound"] = ["That is not a timer sound."] }));
                 display.TimerSound = body.Sound;

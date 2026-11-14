@@ -277,6 +277,33 @@ namespace HomeyDash.Api.Migrations
                     b.ToTable("PlexAccounts");
                 });
 
+            modelBuilder.Entity("HomeyDash.Api.Timers.CustomSound", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CustomSounds");
+                });
+
             modelBuilder.Entity("HomeyDash.Api.Timers.SharedTimer", b =>
                 {
                     b.Property<Guid>("Id")

@@ -47,6 +47,7 @@ export const appRoutes: Route[] = [
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'accounts' },
           { path: 'accounts', loadComponent: () => import('./accounts-page').then((m) => m.AccountsPage) },
+          { path: 'sounds', loadComponent: () => import('./sounds-panel').then((m) => m.SoundsPanel) },
           { path: 'speech', loadComponent: () => import('./speech-panel').then((m) => m.SpeechPanel) },
           { path: 'language', loadComponent: () => import('./language-page').then((m) => m.LanguagePage) },
         ],

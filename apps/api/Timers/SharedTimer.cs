@@ -31,6 +31,6 @@ public sealed record TimerView(Guid Id, int Seconds, long End, long? Paused, str
         t.Paused = Paused;
         var name = Name?.Trim();
         t.Name = string.IsNullOrEmpty(name) ? null : name[..Math.Min(name.Length, SharedTimer.MaxNameLength)];
-        t.Sound = Sounds.Contains(Sound) ? Sound : "beep";
+        t.Sound = CustomSound.IsSound(Sound) ? Sound : "beep";
     }
 }

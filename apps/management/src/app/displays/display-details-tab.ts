@@ -1,8 +1,8 @@
 import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { DisplayInfo, FULLY_FUNCTIONS } from '@homey-dash/api-client';
-import { SOUND_LABELS, TIMER_SOUNDS } from '@homey-dash/tiles';
+import { DisplayInfo, FULLY_FUNCTIONS, Sounds } from '@homey-dash/api-client';
+import { soundOptions } from '@homey-dash/tiles';
 import { LOCALES, LOCALE_NAMES, t, TranslatePipe } from '@homey-dash/i18n';
 import { describeUserAgent } from './browser-text';
 import { DisplayContext } from './display-context';
@@ -44,7 +44,7 @@ import { DisplaysStore, isLuminanceSignal } from './displays-store';
         <div class="hd-field">
           <label class="hd-field__label" for="display-timer-sound">{{ 'Timer sound for voice' | t }}</label>
           <select class="hd-input" id="display-timer-sound" (change)="store.setTimerSound(display, sound.value || null)" #sound>
-            @for (s of sounds; track s.id) {
+            @for (s of sounds(); track s.id) {
               <option [value]="s.id" [selected]="s.id === (display.timerSound ?? 'beep')">{{ s.label | t }}</option>
             }
           </select>
@@ -194,7 +194,12 @@ export class DisplayDetailsTab {
   protected readonly t = t;
   protected readonly locales = LOCALES;
   protected readonly names = LOCALE_NAMES;
-  protected readonly sounds = TIMER_SOUNDS.map((id) => ({ id, label: SOUND_LABELS[id] }));
+  private readonly customSounds = inject(Sounds);
+  protected readonly sounds = computed(() => soundOptions(this.customSounds.custom()));
+
+  constructor() {
+    this.customSounds.refresh();
+  }
 
   // Every zone of every Homey, by name; the name of its Homey goes with it where there is more than one.
   protected readonly zones = computed(() => {

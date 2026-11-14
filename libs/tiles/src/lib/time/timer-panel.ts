@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { CustomSoundInfo, Sounds } from '@homey-dash/api-client';
 import { LucideMinus, LucidePause, LucidePlay, LucidePlus, LucideRotateCcw, LucideX } from '@homey-dash/design-system';
 import { TranslatePipe } from '@homey-dash/i18n';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { timerText } from './time-data';
-import { TIMER_SOUNDS, TimerDraft, timerLeft, Timers, TimerSound } from './timers';
+import { TIMER_SOUNDS, TimerDraft, timerLeft, Timers, BuiltinSound, TimerSound } from './timers';
 
 type Unit = 'hours' | 'minutes' | 'seconds';
 
@@ -14,11 +15,17 @@ const UNITS: readonly { unit: Unit; label: string; max: number; step: number }[]
 ];
 
 /** What each timer sound is called. */
-export const SOUND_LABELS: Record<TimerSound, string> = {
+export const SOUND_LABELS: Record<BuiltinSound, string> = {
   beep: 'Beep', bell: 'Bell', chime: 'Chime', kitchen: 'Kitchen timer', pulse: 'Pulse', siren: 'Siren', musicbox: 'Music box',
   piano: 'Piano', marimba: 'Marimba', flute: 'Flute', harp: 'Harp',
   ocarina: 'Clock tower song', fanfare: "Hero's fanfare", fairy: 'Fairy harp', treasure: 'Treasure found', village: 'Village dance', none: 'Silent',
 };
+
+/** What a timer can ring with: the built-in sounds, then the ones uploaded in Management, and silence last (their names are the uploader's own, not translated). */
+export function soundOptions(custom: readonly CustomSoundInfo[]): { id: TimerSound; label: string }[] {
+  const builtin = TIMER_SOUNDS.filter((id) => id !== 'none').map((id) => ({ id, label: SOUND_LABELS[id] }));
+  return [...builtin, ...custom.map((s) => ({ id: s.id as TimerSound, label: s.name })), { id: 'none' as TimerSound, label: SOUND_LABELS.none }];
+}
 
 /**
  * The timer tile's detail view, built like the device views: the dial for a new timer as the hero, the running timers beside it. In it you set a new timer's length, name and sound, and manage the running ones (pause, add a minute, restart, cancel).
@@ -50,7 +57,7 @@ export const SOUND_LABELS: Record<TimerSound, string> = {
         (input)="timers.setDraft({ name: $any($event.target).value })"
       />
       <select class="hd-timer-panel__name hd-timer-panel__sound" [attr.aria-label]="'Sound' | t" (change)="timers.setDraft({ sound: $any($event.target).value })">
-        @for (option of soundOptions; track option.id) {
+        @for (option of soundOptions(); track option.id) {
           <option [value]="option.id" [selected]="option.id === draft().sound">{{ option.label | t }}</option>
         }
       </select>
@@ -86,7 +93,13 @@ export const SOUND_LABELS: Record<TimerSound, string> = {
 export class TimerPanel {
   protected readonly timers = inject(Timers);
   protected readonly units = UNITS;
-  protected readonly soundOptions = TIMER_SOUNDS.map((id) => ({ id, label: SOUND_LABELS[id] }));
+  private readonly sounds = inject(Sounds);
+  protected readonly soundOptions = computed(() => soundOptions(this.sounds.custom()));
+
+  constructor() {
+    this.sounds.refresh();
+  }
+
   protected readonly plus = LucidePlus;
   protected readonly minus = LucideMinus;
   protected readonly pause = LucidePause;

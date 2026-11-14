@@ -21,6 +21,7 @@ public class HomeyDashDbContext(DbContextOptions<HomeyDashDbContext> options) : 
     public DbSet<TomTomAccount> TomTomAccounts => Set<TomTomAccount>();
     public DbSet<PhotoSet> PhotoSets => Set<PhotoSet>();
     public DbSet<SharedTimer> Timers => Set<SharedTimer>();
+    public DbSet<CustomSound> CustomSounds => Set<CustomSound>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -82,6 +83,7 @@ public class HomeyDashDbContext(DbContextOptions<HomeyDashDbContext> options) : 
         });
 
         model.Entity<SharedTimer>(timer => timer.Property(t => t.Name).HasMaxLength(SharedTimer.MaxNameLength));
+        model.Entity<CustomSound>(sound => sound.Property(s => s.Name).HasMaxLength(CustomSound.MaxNameLength));
 
         model.Entity<PhotoSet>(set =>
         {

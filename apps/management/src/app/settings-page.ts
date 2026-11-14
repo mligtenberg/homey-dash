@@ -25,6 +25,7 @@ export class SettingsPage {
   // Each tab says what it holds, as the display pages do.
   protected readonly tabs: PageTab[] = [
     { path: 'accounts', label: 'Accounts', hint: 'Homey, Immich, Plex, TomTom, AirPlay' },
+    { path: 'sounds', label: 'Sounds', hint: 'Your own timer sounds' },
     { path: 'speech', label: 'Speech recognition', hint: 'The model, and what was heard' },
     { path: 'language', label: 'Language', hint: 'For Management' },
   ];

@@ -1,10 +1,13 @@
 import { inject, Injectable, signal } from '@angular/core';
-import { Realtime, TimerView } from '@homey-dash/api-client';
+import { customSoundUrl, isCustomSound, Realtime, TimerView } from '@homey-dash/api-client';
 
-/** What a timer plays while it rings. */
-export type TimerSound = 'beep' | 'bell' | 'chime' | 'kitchen' | 'pulse' | 'siren' | 'musicbox' | 'piano' | 'marimba' | 'flute' | 'harp' | 'ocarina' | 'fanfare' | 'fairy' | 'treasure' | 'village' | 'none';
+/** The sounds HomeyDash ships with. */
+export type BuiltinSound = 'beep' | 'bell' | 'chime' | 'kitchen' | 'pulse' | 'siren' | 'musicbox' | 'piano' | 'marimba' | 'flute' | 'harp' | 'ocarina' | 'fanfare' | 'fairy' | 'treasure' | 'village' | 'none';
 
-export const TIMER_SOUNDS: readonly TimerSound[] = ['beep', 'bell', 'chime', 'kitchen', 'pulse', 'siren', 'musicbox', 'piano', 'marimba', 'flute', 'harp', 'ocarina', 'fanfare', 'fairy', 'treasure', 'village', 'none'];
+/** What a timer plays while it rings: one of those, or a sound uploaded in Management (`custom:` and its id). */
+export type TimerSound = BuiltinSound | `custom:${string}`;
+
+export const TIMER_SOUNDS: readonly BuiltinSound[] = ['beep', 'bell', 'chime', 'kitchen', 'pulse', 'siren', 'musicbox', 'piano', 'marimba', 'flute', 'harp', 'ocarina', 'fanfare', 'fairy', 'treasure', 'village', 'none'];
 
 /** A timer: running, it ends at `end` (ms since the epoch), so it survives a reload; paused, `paused` is what is left (ms). */
 export interface Timer {
@@ -32,7 +35,7 @@ export interface TimerDraft {
 }
 
 /** How often (in seconds) a ringing timer plays its sound again: a bell rings on for a few seconds, a beep is over at once. */
-const SOUND_REPEAT: Record<TimerSound, number> = {
+const SOUND_REPEAT: Record<BuiltinSound, number> = {
   beep: 1, bell: 3, chime: 3, kitchen: 2, pulse: 2, siren: 2, musicbox: 6, piano: 6, marimba: 5, flute: 6, harp: 5,
   ocarina: 11, fanfare: 6, fairy: 6, treasure: 5, village: 7, none: 1,
 };
@@ -51,7 +54,12 @@ function read<T>(key: string, fallback: T): T {
 /** The sound last picked on this screen, kept in its browser; a beep until one is, or if it is no longer a sound. */
 function lastSound(): TimerSound {
   const sound = read<TimerSound>(SOUND_KEY, 'beep');
-  return TIMER_SOUNDS.includes(sound) ? sound : 'beep';
+  return isSound(sound) ? sound : 'beep';
+}
+
+/** Whether this is a sound a timer can ring with; an uploaded one counts, though it may since have gone. */
+export function isSound(sound: unknown): sound is TimerSound {
+  return typeof sound === 'string' && (isCustomSound(sound) || TIMER_SOUNDS.includes(sound as BuiltinSound));
 }
 
 function write(key: string, value: unknown) {
@@ -71,7 +79,7 @@ function normalize(t: Partial<TimerView>): Timer | undefined {
     end: t.end,
     paused: t.paused ?? undefined,
     name: t.name ?? undefined,
-    sound: TIMER_SOUNDS.includes(t.sound as TimerSound) ? (t.sound as TimerSound) : 'beep',
+    sound: isSound(t.sound) ? t.sound : 'beep',
   };
 }
 
@@ -108,6 +116,7 @@ export class Timers {
   private readonly loading = new Map<TimerSound, Promise<void>>();
   private tick?: ReturnType<typeof setInterval>;
   /** The sounds playing now, by sound, so stopping a timer can cut them off instead of letting them play out. */
+  private previewing?: AudioBufferSourceNode;
   private readonly playing = new Map<TimerSound, Set<AudioBufferSourceNode>>();
 
   constructor() {
@@ -140,8 +149,22 @@ export class Timers {
       write(SOUND_KEY, patch.sound);
       this.unlock();
       const sound = patch.sound;
-      void this.load(sound).then(() => this.play(sound));
+      this.stopPreview();
+      void this.load(sound).then(() => {
+        // Only the latest pick previews; a slow load of an earlier one stays quiet.
+        if (this.draft().sound === sound) this.previewing = this.play(sound);
+      });
     }
+  }
+
+  /** Cuts off a sound still playing from the previous preview. */
+  private stopPreview() {
+    try {
+      this.previewing?.stop();
+    } catch {
+      /* already ended */
+    }
+    this.previewing = undefined;
   }
 
   remove(id: string) {
@@ -235,8 +258,15 @@ export class Timers {
     }
     void this.audio?.resume().catch(() => undefined);
     // A bell rings on for a few seconds, so it strikes less often than a beep.
-    for (const sound of new Set(ringing.map((t) => t.sound))) if (this.rung % SOUND_REPEAT[sound] === 0) this.play(sound);
+    for (const sound of new Set(ringing.map((t) => t.sound))) if (this.rung % this.repeat(sound) === 0) this.play(sound);
     this.rung++;
+  }
+
+  /** Seconds between plays: a built-in sound's own, an uploaded one's length and a second. */
+  private repeat(sound: TimerSound): number {
+    if (!isCustomSound(sound)) return SOUND_REPEAT[sound as BuiltinSound];
+    const buffer = this.buffers.get(sound);
+    return buffer ? Math.ceil(buffer.duration) + 1 : 5;
   }
 
   /** A touch lets the browser play sounds later, so what starts or sets a timer asks for it. */
@@ -252,7 +282,7 @@ export class Timers {
     if (!ctx || sound === 'none' || this.buffers.has(sound)) return Promise.resolve();
     let loading = this.loading.get(sound);
     if (!loading) {
-      loading = fetch(new URL(`sounds/${sound}.mp3`, document.baseURI))
+      loading = fetch(isCustomSound(sound) ? customSoundUrl(sound) : new URL(`sounds/${sound}.mp3`, document.baseURI))
         .then((response) => response.arrayBuffer())
         .then((bytes) => ctx.decodeAudioData(bytes))
         .then((buffer) => void this.buffers.set(sound, buffer))
@@ -264,14 +294,14 @@ export class Timers {
     return loading;
   }
 
-  private play(sound: TimerSound) {
+  private play(sound: TimerSound): AudioBufferSourceNode | undefined {
     const ctx = this.audio;
-    if (!ctx || ctx.state !== 'running' || sound === 'none') return;
+    if (!ctx || ctx.state !== 'running' || sound === 'none') return undefined;
     const buffer = this.buffers.get(sound);
     if (!buffer) {
       // Not here yet: it rings from the next second on.
       void this.load(sound);
-      return;
+      return undefined;
     }
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -281,5 +311,6 @@ export class Timers {
     sources.add(source);
     source.onended = () => sources.delete(source);
     source.start();
+    return source;
   }
 }

@@ -139,6 +139,7 @@ api.MapPresetBackgrounds();
 api.MapDisplays();
 api.MapRules();
 api.MapVoice();
+api.MapSounds();
 app.MapHub<RealtimeHub>(RealtimeHub.Path);
 app.MapMcp(ManagementTools.Path);
 // Everything outside /api and /mcp is a frontend: Management under /admin, the display app at the root.
