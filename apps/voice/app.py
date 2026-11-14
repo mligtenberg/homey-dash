@@ -74,15 +74,18 @@ def run_command(engine: str, text: str, zone: str | None):
 
 WAKE = os.environ.get("VOICE_WAKE", "homey,homie,homi")
 
-def prompt() -> str:
-    """Bias Whisper towards our vocabulary: it is a closed set of words and this helps a lot."""
+def prompt(wake_words: str = WAKE) -> str:
+    """Bias Whisper towards our vocabulary: it is a closed set of words and this helps a lot.
+    It opens with the wake phrase as it is spoken (the screens say "hey jarvis", not VOICE_WAKE), or Whisper spells it
+    its own way. No number in it may sound like the start of another: with "vijftig procent" in here, "een timer van
+    vijf seconden" came out as "voor vijftig seconden"."""
     try:
         zones = source.get()["zones"]
     except CatalogUnavailable:
         zones = []
-    return (WAKE.split(",")[0].capitalize() + ", zet de lichten aan. Commando's voor het huis: "
+    return (wake_words.split(",")[0].strip().title() + ", zet de lichten aan. Commando's voor het huis: "
             + ", ".join(sorted(set(zones)))
-            + ". Zet de lichten in de woonkamer aan. Doe het licht uit. Dim de lichten naar vijftig procent."
+            + ". Zet de lichten in de woonkamer aan. Doe het licht uit. Dim de lichten naar dertig procent."
               " Maak het warmer. Het licht is te koud."
               " Zet een timer voor vijf seconden. Zet een timer voor tien minuten. Stop de timer.")
 
@@ -251,6 +254,7 @@ async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, 
     seg, awake_until = wake.Segmenter(), 0.0
     held, held_until = None, 0.0
     last = None
+    armed_speech = False  # whether what is being said began while awake
     detector = WakeWord() if detect else None
     if detect:
         log.info("listening with the wake word detected here")
@@ -291,16 +295,17 @@ async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, 
                 if held is not None and time.time() < held_until:  # the rest of a sentence that was paused in
                     utt = np.concatenate([held, np.zeros(RATE_GAP, np.float32), utt])
                 held = None
+                # Before transcribing: that takes seconds on a small CPU, and the window would run out meanwhile.
+                armed, armed_speech = armed_speech or time.time() < awake_until, False
                 await state("thinking")
                 t0 = time.time()
                 try:
-                    text = await asyncio.to_thread(transcribe_audio, utt)
+                    text = await asyncio.to_thread(lambda: transcribe_audio(utt, prompt(phrase)))
                 except stt.Unavailable as e:  # no key, model gone, API down: say so in the log, keep the socket
                     log.warning("transcription failed: %s", e)
                     text = ""
                 stt_ms = round((time.time() - t0) * 1000)
                 woke, rest = wake.split_wake(text, phrase)
-                armed = time.time() < awake_until
                 await ws.send_json({"type": "heard", "text": text, "wake": woke, "armed": armed, "stt_ms": stt_ms})
                 if not (woke or armed):
                     await state("idle")
@@ -320,6 +325,7 @@ async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, 
                     await ws.send_json({"type": "result", **r})
                     await state("idle")
             if seg.speaking:
+                armed_speech = armed_speech or time.time() < awake_until
                 await state("speech")
             elif time.time() < awake_until:
                 await state("awake")
