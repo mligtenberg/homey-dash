@@ -37,6 +37,7 @@ builder.Services.AddTraffic(builder.Configuration);
 builder.Services.AddNews(builder.Configuration);
 builder.Services.AddRules();
 builder.Services.AddSingleton<TargetCatalog>();
+builder.Services.AddSingleton<HomeyDash.Api.Voice.VoiceLog>();
 builder.Services.AddRealtime();
 builder.Services.AddMcpServer()
     .WithHttpTransport(options => options.Stateless = true)

@@ -15,14 +15,18 @@ namespace HomeyDash.Api.Voice;
 /// </summary>
 public sealed class VoiceExecutor(Homeys homeys, HomeyDashDbContext db, RealtimeNotifier notifier, TimeProvider time, string? timerSound = null)
 {
-    /// <summary>The result as the screen should see it: unchanged when it was carried out in full, else a refusal saying how far it got.</summary>
-    public async Task<JsonNode> RunAsync(JsonNode result, CancellationToken ct)
+    /// <summary>
+    /// The result as the screen should see it: unchanged when it was carried out in full, else a refusal saying how far it
+    /// got. What was done, and whether each part went through, is added to <paramref name="steps"/>.
+    /// </summary>
+    public async Task<JsonNode> RunAsync(JsonNode result, CancellationToken ct, List<VoiceStep>? steps = null)
     {
         if (result["ok"]?.GetValue<bool>() != true) return result;
+        steps ??= [];
         try
         {
-            if (result["action"]?.GetValue<string>() == "timer") await SetTimerAsync(result["value"], ct);
-            else if (Commands(result) is { Count: > 0 } commands) return await ChangeAsync(result, commands, ct);
+            if (result["action"]?.GetValue<string>() == "timer") await SetTimerAsync(result["value"], steps, ct);
+            else if (Commands(result) is { Count: > 0 } commands) return await ChangeAsync(result, commands, steps, ct);
         }
         catch (Exception e) when (e is HomeyNotFoundException or HomeyUnavailableException or ArgumentException or HttpRequestException or HubException)
         {
@@ -31,19 +35,25 @@ public sealed class VoiceExecutor(Homeys homeys, HomeyDashDbContext db, Realtime
         return result;
     }
 
-    private async Task SetTimerAsync(JsonNode? value, CancellationToken ct)
+    private async Task SetTimerAsync(JsonNode? value, List<VoiceStep> steps, CancellationToken ct)
     {
         var seconds = value?["seconds"]?.GetValue<int>() ?? 0;
         var end = time.GetUtcNow().ToUnixTimeMilliseconds() + seconds * 1000L;
-        await TimerEndpoints.SaveAsync(db, new TimerView(Guid.NewGuid(), seconds, end, null, value?["name"]?.GetValue<string>(), timerSound ?? "beep"), ct);
+        var name = value?["name"]?.GetValue<string>();
+        await TimerEndpoints.SaveAsync(db, new TimerView(Guid.NewGuid(), seconds, end, null, name, timerSound ?? "beep"), ct);
         await notifier.TimersChangedAsync(db, ct);
+        steps.Add(new VoiceStep(null, name, "timer", seconds, true));
     }
 
-    private async Task<JsonNode> ChangeAsync(JsonNode result, List<VoiceCommand> commands, CancellationToken ct)
+    private async Task<JsonNode> ChangeAsync(JsonNode result, List<VoiceCommand> commands, List<VoiceStep> steps, CancellationToken ct)
     {
         var homey = homeys.Require(null); // the oldest account: the one the voice service's devices come from
         var changes = VoicePlan.Plan(commands, homey.State.FindDevice);
         var failures = new List<string>();
+        void Did(VoiceChange change, string? error)
+        {
+            lock (steps) steps.Add(new VoiceStep(change.Device, homey.State.FindDevice(change.Device)?.Name, change.Capability, change.Value, error is null, error));
+        }
         // One device's changes go in order (its mode before its temperature); the devices go at once.
         await Task.WhenAll(changes.GroupBy(c => c.Device).Select(async own =>
         {
@@ -52,9 +62,11 @@ public sealed class VoiceExecutor(Homeys homeys, HomeyDashDbContext db, Realtime
                 try
                 {
                     await homey.SetCapabilityValueAsync(change.Device, change.Capability, JsonSerializer.SerializeToElement(change.Value), ct);
+                    Did(change, null);
                 }
                 catch (Exception e) when (e is HomeyNotFoundException or HomeyUnavailableException or ArgumentException or HttpRequestException)
                 {
+                    Did(change, e.Message);
                     if (!change.Optional) lock (failures) failures.Add(e.Message);
                 }
             }

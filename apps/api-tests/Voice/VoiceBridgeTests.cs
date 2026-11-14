@@ -153,4 +153,44 @@ public class VoiceBridgeTests
 
         Assert.Contains($"zone={Uri.EscapeDataString(inZone.GetProperty("zoneName").GetString()!)}", voice.Query);
     }
+
+    [Fact]
+    public async Task WhatWasHeardAndDone_CanBeReadBack()
+    {
+        var answer = """{"type":"result","ok":true,"action":"timer","value":{"seconds":600,"name":"Pasta"},"zones":[],"reason":null,"command_text":"zet een timer van tien minuten","commands":[]}""";
+        await using var voice = new FakeVoiceService(() => answer);
+        await using var api = new VoiceApiFactory(voice.Address);
+        var client = api.CreateClient();
+        var screen = Guid.NewGuid();
+
+        await SpeakAsync(api, screen);
+        answer = """{"type":"result","ok":true,"action":"lights_off","value":null,"zones":["x"],"reason":null,"commands":[{"device":"d1","name":"l","zone":"x","capability":"onoff","value":false}]}""";
+        await SpeakAsync(api, screen);
+
+        var log = await client.GetFromJsonAsync<JsonElement>("/api/voice/log");
+        var failed = log[0];
+        Assert.Equal("failed", failed.GetProperty("outcome").GetString());
+        Assert.Equal("d1", failed.GetProperty("asked")[0].GetProperty("device").GetString());
+        var step = Assert.Single(failed.GetProperty("steps").EnumerateArray());
+        Assert.False(step.GetProperty("ok").GetBoolean());
+        Assert.Contains("d1", step.GetProperty("error").GetString());
+        var timer = log[1];
+        Assert.Equal("done", timer.GetProperty("outcome").GetString());
+        Assert.Equal(screen, timer.GetProperty("screen").GetGuid());
+        Assert.Equal("zet een timer van tien minuten", timer.GetProperty("command").GetString());
+        Assert.Equal("timer", timer.GetProperty("steps")[0].GetProperty("what").GetString());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync("/api/voice/log")).StatusCode);
+        Assert.Equal(0, (await client.GetFromJsonAsync<JsonElement>("/api/voice/log")).GetArrayLength());
+    }
+
+    [Fact]
+    public async Task AVoiceServiceThatIsGone_IsNoted()
+    {
+        await using var api = new VoiceApiFactory("http://127.0.0.1:9");
+        await Assert.ThrowsAnyAsync<Exception>(() => SpeakAsync(api, Guid.NewGuid()));
+
+        var log = await api.CreateClient().GetFromJsonAsync<JsonElement>("/api/voice/log");
+        Assert.Equal("unreachable", log[0].GetProperty("outcome").GetString());
+    }
 }

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, signal } from '@angular/core';
 import { TranslatePipe, t } from '@homey-dash/i18n';
 import { AccountPanel } from './account-panel';
+import { VoiceLogPanel } from './voice-log-panel';
 
 interface SpeechModel {
   id: string;
@@ -25,7 +26,8 @@ const BASE = '/voice/api/stt';
  */
 @Component({
   selector: 'hd-speech-panel',
-  imports: [AccountPanel, TranslatePipe],
+  imports: [AccountPanel, TranslatePipe, VoiceLogPanel],
+  host: { style: 'display: flex; flex-direction: column; gap: var(--space-5)' },
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <hd-account-panel key="speech" [title]="'Speech recognition' | t" [error]="error()">
@@ -77,6 +79,7 @@ const BASE = '/voice/api/stt';
         }
       }
     </hd-account-panel>
+    <hd-voice-log-panel />
   `,
 })
 export class SpeechPanel implements OnDestroy {

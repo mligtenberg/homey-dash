@@ -20,10 +20,18 @@ public static class VoiceEndpoints
     // How the voice service may hear the wake word written; the screen's on-device model is "hey jarvis".
     private const string WakeSpellings = "hey jarvis,jarvis,jervis,jarvas";
 
-    public static void MapVoice(this IEndpointRouteBuilder api) => api.Map(Path, ListenAsync);
+    public const string LogPath = "/voice/log";
+
+    public static void MapVoice(this IEndpointRouteBuilder api)
+    {
+        api.Map(Path, ListenAsync);
+        // What the screens heard lately and what was done with it, newest first; for Management.
+        api.MapGet(LogPath, (VoiceLog log) => log.Recent());
+        api.MapDelete(LogPath, (VoiceLog log) => { log.Clear(); return Results.NoContent(); });
+    }
 
     private static async Task ListenAsync(HttpContext context, IConfiguration configuration, HomeyDashDbContext db, Homeys homeys,
-        RealtimeNotifier notifier, TimeProvider time, ILoggerFactory logs)
+        RealtimeNotifier notifier, TimeProvider time, ILoggerFactory logs, VoiceLog voiceLog)
     {
         var log = logs.CreateLogger("HomeyDash.Api.Voice");
         if (!context.WebSockets.IsWebSocketRequest) { context.Response.StatusCode = StatusCodes.Status400BadRequest; return; }
@@ -43,6 +51,7 @@ public static class VoiceEndpoints
         var upstreamUri = new UriBuilder(address) { Path = "/ws/listen", Query = $"wake={Uri.EscapeDataString(WakeSpellings)}" + (zone is null ? "" : $"&zone={Uri.EscapeDataString(zone)}")
             + (context.Request.Query["detect"] == "1" ? "&detect=true" : "") };
         upstreamUri.Scheme = upstreamUri.Scheme == Uri.UriSchemeHttps ? "wss" : "ws";
+        var session = new VoiceSessionLog(voiceLog, outcome => new() { At = time.GetUtcNow(), Screen = screen, Display = display?.Name, Zone = zone, Outcome = outcome });
         using var upstream = new ClientWebSocket();
         try
         {
@@ -51,6 +60,7 @@ public static class VoiceEndpoints
         catch (Exception e) when (e is WebSocketException or HttpRequestException)
         {
             log.LogWarning("Voice service not reachable at {Address}: {Message}", address, e.Message);
+            session.Unreachable(e.Message);
             context.Response.StatusCode = StatusCodes.Status502BadGateway;
             return;
         }
@@ -59,10 +69,12 @@ public static class VoiceEndpoints
         var executor = new VoiceExecutor(homeys, db, notifier, time, display?.TimerSound);
         using var done = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
         var toService = Forward(browser, upstream, done.Token);
-        var toScreen = ForwardEvents(upstream, browser, executor, log, done.Token);
+        var toScreen = ForwardEvents(upstream, browser, executor, log, session, done.Token);
         await Task.WhenAny(toService, toScreen);
         await done.CancelAsync();
         try { await Task.WhenAll(toService, toScreen); } catch (Exception e) when (e is OperationCanceledException or WebSocketException) { }
+        // The screen heard the wake word and opened this, and then nothing was said that the voice service took for speech.
+        if (context.Request.Query["detect"] != "1") session.Closed();
     }
 
     // Audio and the arm message, as they come.
@@ -78,7 +90,7 @@ public static class VoiceEndpoints
     }
 
     // What the voice service says, whole messages; a result is carried out first and goes on with how it went.
-    private static async Task ForwardEvents(WebSocket service, WebSocket screen, VoiceExecutor executor, ILogger log, CancellationToken ct)
+    private static async Task ForwardEvents(WebSocket service, WebSocket screen, VoiceExecutor executor, ILogger log, VoiceSessionLog session, CancellationToken ct)
     {
         var buffer = new byte[16 * 1024];
         using var message = new MemoryStream();
@@ -90,9 +102,13 @@ public static class VoiceEndpoints
             if (!received.EndOfMessage) continue;
             var text = Encoding.UTF8.GetString(message.ToArray());
             message.SetLength(0);
-            if (JsonNode.Parse(text) is { } node && node["type"]?.GetValue<string>() == "result")
+            var node = JsonNode.Parse(text);
+            if (node is not null) session.Said(node);
+            if (node is not null && node["type"]?.GetValue<string>() == "result")
             {
-                node = await executor.RunAsync(node, ct);
+                var steps = new List<VoiceStep>();
+                node = await executor.RunAsync(node, ct, steps);
+                session.CarriedOut(node, steps);
                 log.LogInformation("Voice command {Text} -> {Action}, ok {Ok}", node["command_text"], node["action"], node["ok"]);
                 text = node.ToJsonString();
             }
