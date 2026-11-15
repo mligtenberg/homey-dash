@@ -54,4 +54,12 @@ describe('fittedCellSize', () => {
     expect(fittedCellSize(width(3, cell * 0.95), 800, 4, 2)).toBeCloseTo(cell);
     expect(fittedCellSize(width(3, cell * 0.95), 800, 4, 3)).toBeCloseTo(cell * 0.95);
   });
+
+  it('shrinks the cell to fit one whole section on a phone held upright', () => {
+    // An iPhone 15 Pro Max: 430 × 932, less the gutter of the dashboard tape.
+    const fitted = fittedCellSize(430 - 68, 932, 4);
+    expect(fitted).toBeLessThan(cellSize(932, 4));
+    expect(width(1, fitted)).toBeCloseTo(430 - 68);
+    expect(sectionsPerPage(430 - 68, fitted)).toBe(1);
+  });
 });

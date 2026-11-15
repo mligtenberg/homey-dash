@@ -374,8 +374,15 @@ export class App {
     if (this.state().kind === 'display' && this.realtime.connected()) {
       this.measuring = true;
       try {
-        const lux = this.externalLux() ?? (await this.lightMeter.measure());
-        if (lux === null) return;
+        const lux = this.externalLux() ?? (this.lightMeter.enabled() ? await this.lightMeter.measure() : null);
+        if (lux === null) {
+          // Turned off in the screen settings: back to the device's own theme, until it is turned on again.
+          if (!this.lightMeter.enabled()) {
+            this.theme = null;
+            delete document.documentElement.dataset['theme'];
+          }
+          return;
+        }
         this.theme = themeFor(lux, this.theme);
         document.documentElement.dataset['theme'] = this.theme;
         await this.realtime.brightness(lux);
