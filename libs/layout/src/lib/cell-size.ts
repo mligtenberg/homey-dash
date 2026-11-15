@@ -53,6 +53,10 @@ export function fittedCellSize(
   sectionCount: number = Infinity,
 ): number {
   const cell = cellSize(height, rows);
+  // A screen narrower than one section, such as a phone held upright: the cell shrinks until a whole section fits the
+  // width, rather than cutting its columns off. The rows then take less than the height; the rest stays empty.
+  const one = width / (2 * DASHBOARD_PADDING + SECTION_WIDTH);
+  if (one < cell && width > 0) return one;
   const next = sectionsPerPage(width, cell) + 1;
   // No extra section to take the room: keep the cell as large as the height allows.
   if (next > sectionCount) return cell;

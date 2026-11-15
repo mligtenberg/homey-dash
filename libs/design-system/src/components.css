@@ -388,6 +388,12 @@
 /* The one tab bar sits in the head, between the title and the close button. */
 .hd-details__head .hd-segmented { flex: none; --segment-height: .26; }
 .hd-details__head .hd-segmented button { flex: none; padding-inline: calc(var(--cell) * .2); }
+/* A phone held upright: the tab bar takes a row of its own under the title, and wide controls shrink to the screen. */
+@media (max-width: 640px) {
+  .hd-details__head { flex-wrap: wrap; }
+  .hd-details__head .hd-segmented { order: 3; flex: 1 1 100%; }
+  .hd-details__head .hd-segmented button { flex: 1 1 0; min-width: 0; padding-inline: calc(var(--cell) * .06); }
+}
 /* This view's own surface: the hue mixed into the theme's ground, so it is lighter in the light theme and darker in the dark one. */
 .hd-details--screen:has(:is(.hd-sonos__pane, .hd-stat__pane, .hd-dev)) {
   background:

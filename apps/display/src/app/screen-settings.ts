@@ -87,6 +87,18 @@ import { VoiceTest } from './voice-test';
         @case ('light') {
           <div class="pane">
             <div class="column">
+              @if (meter.available) {
+                <div class="setting">
+                  <div class="setting__text">
+                    <span id="light-label" class="setting__label">{{ 'Measure the light' | t }}</span>
+                    <span class="setting__hint">{{ 'Off keeps the camera and light sensor unused, and the theme as the device has it' | t }}</span>
+                  </div>
+                  <button id="screen-light" type="button" class="switch" role="switch" [attr.aria-checked]="meter.enabled()" aria-labelledby="light-label" (click)="enableLight(!meter.enabled())">
+                    <span class="switch__state">{{ (meter.enabled() ? 'On' : 'Off') | t }}</span>
+                    <span class="switch__track"><span class="switch__thumb"></span></span>
+                  </button>
+                </div>
+              }
               <div class="setting">
                 <div class="setting__text">
                   <span class="setting__label">{{ 'Light' | t }}</span>
@@ -157,6 +169,11 @@ import { VoiceTest } from './voice-test';
       --k-fill: var(--kind-neutral-fill);
     }
     hd-voice-test, .pane { flex: 1; min-height: 0; }
+    /* A phone: the tabs take a row of their own under the title, and each setting's text may shrink beside its control. */
+    @media (max-width: 640px) {
+      .setting__text { flex: 1; }
+      .switch__state { min-width: 0; }
+    }
     .pane { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: calc(var(--cell) * .3); }
     @media (max-aspect-ratio: 1 / 1) { .pane { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); } }
     .column { min-height: 0; overflow-y: auto; scrollbar-width: none; align-content: start; }
@@ -261,6 +278,12 @@ export class ScreenSettings {
   async open() {
     this.details().open();
     if (this.meter.hasCamera) this.cameras.set(await this.meter.cameras().catch(() => []));
+  }
+
+  protected enableLight(on: boolean) {
+    this.meter.enable(on);
+    if (!on) this.previewing.set(false);
+    this.cameraChanged.emit();
   }
 
   protected calibrate(scale: number) {

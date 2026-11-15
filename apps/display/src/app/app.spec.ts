@@ -549,9 +549,12 @@ describe('App', () => {
       levels = [];
       measured = 0;
       picked = [];
+      const enabled = signal(true);
       TestBed.overrideProvider(LightMeter, {
         useValue: {
           available: true,
+          enabled,
+          enable: (on: boolean) => enabled.set(on),
           camera: signal<string | null>(null),
           hasCamera: true,
           reading: signal(null),
@@ -622,6 +625,37 @@ describe('App', () => {
 
       await vi.advanceTimersByTimeAsync(BRIGHTNESS_MS);
       expect(realtime.brightnesses).toEqual([12, 64]);
+    });
+
+    it('measures no more once turned off in the screen settings, and again once turned on', async () => {
+      const root = await start(published(1));
+      await stable();
+      expect(measured).toBe(1);
+      for (let i = 0; i < SETTINGS_TAPS; i++) corner(root);
+      await vi.advanceTimersByTimeAsync(0);
+      await stable();
+
+      await lightTab(root);
+      const light = root.querySelector<HTMLButtonElement>('#screen-light');
+      expect(light?.getAttribute('aria-checked')).toBe('true');
+      light?.click();
+      await stable();
+      await vi.advanceTimersByTimeAsync(BRIGHTNESS_MS * 3);
+      expect(measured).toBe(1);
+      expect(document.documentElement.dataset['theme']).toBeUndefined();
+
+      // The sheet closes by itself while left alone; open it again.
+      for (let i = 0; i < SETTINGS_TAPS; i++) corner(root);
+      await vi.advanceTimersByTimeAsync(0);
+      await stable();
+      await lightTab(root);
+      const again = root.querySelector<HTMLButtonElement>('#screen-light');
+      expect(again?.getAttribute('aria-checked')).toBe('false');
+      again?.click();
+      await vi.advanceTimersByTimeAsync(0);
+      await stable();
+      expect(again?.getAttribute('aria-checked')).toBe('true');
+      expect(measured).toBe(2);
     });
 
     it('measures nothing during setup', async () => {

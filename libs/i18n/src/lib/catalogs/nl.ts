@@ -694,6 +694,8 @@ export const NL: Record<string, string> = {
   'Could not fetch the voice memos. Try again.': 'Spraaknotities ophalen mislukt. Probeer het opnieuw.',
   'Time is up': 'De tijd is om',
   'Listen for voice commands': 'Luister naar spraakopdrachten',
+  'Measure the light': 'Licht meten',
+  'Off keeps the camera and light sensor unused, and the theme as the device has it': 'Uit laat de camera en lichtsensor ongebruikt en het thema zoals het apparaat het heeft',
   'Detector on the server: {avg} ms for 80 ms of sound, {total} ms for the whole recording including the network.': 'Detector op de server: {avg} ms voor 80 ms geluid, {total} ms voor de hele opname inclusief netwerk.',
   'Noise and echo filters': 'Ruis- en echofilters',
   'Off saves a slow screen some work': 'Uit scheelt een traag scherm rekenwerk',

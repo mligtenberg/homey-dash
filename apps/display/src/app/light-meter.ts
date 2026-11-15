@@ -19,6 +19,9 @@ const CAMERA_KEY = 'homeydash.camera';
 // Where a screen remembers how much to scale the camera's estimate down, as a share of it (1 = as worked out).
 const SCALE_KEY = 'homeydash.lux-scale';
 
+// Where a screen remembers that its light meter was turned off in its screen settings.
+const OFF_KEY = 'homeydash.light-off';
+
 // The camera's error names that mean this screen can't measure at all, rather than not this time.
 const CANNOT = ['NotAllowedError', 'NotFoundError', 'SecurityError', 'OverconstrainedError'];
 
@@ -82,6 +85,8 @@ export class LightMeter {
    * frame and so reads high; 1 reports it as worked out. A light sensor's reading is never scaled.
    */
   readonly scale = signal(Number(this.storage?.getItem(SCALE_KEY)) || 1);
+  /** Whether this screen measures the light itself, with its sensor or camera; turned off in its screen settings. */
+  readonly enabled = signal(this.storage?.getItem(OFF_KEY) !== '1');
   /** What it measured last, since the screen loaded. */
   readonly reading = signal<Reading | null>(null);
 
@@ -90,6 +95,13 @@ export class LightMeter {
     this.camera.set(deviceId);
     if (deviceId) this.storage?.setItem(CAMERA_KEY, deviceId);
     else this.storage?.removeItem(CAMERA_KEY);
+  }
+
+  /** Turns this screen's own measuring on or off, kept on this screen. */
+  enable(on: boolean) {
+    this.enabled.set(on);
+    if (on) this.storage?.removeItem(OFF_KEY);
+    else this.storage?.setItem(OFF_KEY, '1');
   }
 
   /** Sets the share of the camera's estimate to report, kept on this screen. */
