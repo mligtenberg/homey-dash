@@ -269,6 +269,10 @@ export class Voice {
   private session?: ReturnType<typeof setTimeout>;
   private clear?: ReturnType<typeof setTimeout>;
   private stopped = true;
+  /** When the microphone last delivered audio; a screen that went idle can have it taken away without saying so. */
+  private lastBlock = 0;
+  private watchdog?: ReturnType<typeof setInterval>;
+  private revive?: ReturnType<typeof setTimeout>;
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.stop());
@@ -364,19 +368,26 @@ export class Voice {
   // The wake word is listened for here on the screen (microWakeWord's "hey jarvis", run in the browser), so no audio
   // leaves the screen until it is said. Then the last two seconds and what follows go to HomeyDash, which has the command
   // understood and carried out, and answers with how it went.
-  private async start() {
+  private async start(retry = false) {
     this.stopped = false;
     try {
       if (this.server()) return await this.startRemote();
       this.detector = await startDetector();
       if (this.stopped) return this.stop();
       const blocks: ((samples: Float32Array) => void)[] = [];
-      const opened = await openMicrophone((samples) => blocks[0]?.(samples), this.filters(), this.gain());
+      const opened = await openMicrophone((samples) => ((this.lastBlock = performance.now()), blocks[0]?.(samples)), this.filters(), this.gain());
       this.mic = opened.mic;
       this.ctx = opened.ctx;
       if (this.stopped) return this.stop();
+      this.watch();
       blocks[0] = this.listen(this.detector);
     } catch (e) {
+      if (retry) {
+        // Opening the microphone again can fail while the screen is off; stay switched on and try again later.
+        this.stop();
+        this.revive = setTimeout(() => this.enabled() && this.stopped && !this.muted() && void this.start(true), 10_000);
+        return;
+      }
       this.error.set((e instanceof Error ? `${e.name}: ${e.message}` : String(e)) + '\n' + (await diagnose().catch(() => '')));
       this.stop(); // no microphone, no permission or no voice service: the screen stays as it was
       this.enabled.set(false);
@@ -387,10 +398,11 @@ export class Voice {
   /** Streams everything the microphone hears to HomeyDash, which has the voice service listen for the wake word. */
   private async startRemote() {
     const blocks: ((samples: Float32Array) => void)[] = [];
-    const opened = await openMicrophone((samples) => blocks[0]?.(samples), this.filters(), this.gain());
+    const opened = await openMicrophone((samples) => ((this.lastBlock = performance.now()), blocks[0]?.(samples)), this.filters(), this.gain());
     this.mic = opened.mic;
     this.ctx = opened.ctx;
     if (this.stopped) return this.stop();
+    this.watch();
     let block: Float32Array[] = [];
     let n = 0;
     const connect = () => {
@@ -512,8 +524,28 @@ export class Voice {
     };
   }
 
+  /**
+   * Android may suspend the audio or take the microphone from a page while the screen idles (Fully's screen off, a
+   * slideshow), without an error; a touch then brings it back. Check that audio keeps coming, and open it again if not.
+   */
+  private watch() {
+    this.lastBlock = performance.now();
+    clearInterval(this.watchdog);
+    this.watchdog = setInterval(() => {
+      if (this.stopped) return;
+      if (this.ctx?.state !== 'running') void this.ctx?.resume().catch(() => undefined);
+      const ended = !!this.mic && this.mic.getTracks().every((track) => track.readyState === 'ended');
+      if (!ended && performance.now() - this.lastBlock < 6_000) return;
+      console.warn('The microphone went quiet, listening again.');
+      this.stop();
+      void this.start(true);
+    }, 3_000);
+  }
+
   private stop() {
     this.stopped = true;
+    clearInterval(this.watchdog);
+    clearTimeout(this.revive);
     this.phase.set({ kind: 'off' });
     clearTimeout(this.clear);
     clearTimeout(this.session);
