@@ -120,3 +120,34 @@ def test_api(mgr, monkeypatch, tmp_path):
     fake_download(tmp_path, mgr.option("base"))
     assert c.post("/api/stt/select", json={"id": "base"}).json()["selected"] == "base"
     assert c.delete("/api/stt/base").status_code == 409
+
+
+def fake_whistle(tmp_path, opt):
+    snap = tmp_path / "hub" / ("models--" + opt.repo.replace("/", "--")) / "snapshots" / "abc"
+    snap.mkdir(parents=True)
+    (snap / "whistle.cact").write_bytes(b"x")
+
+
+def test_whistle_is_listed_and_needs_only_its_one_file(mgr, tmp_path):
+    opt = mgr.option("whistle")
+    assert opt.engine == "whistle" and opt.patterns == ["whistle.cact"]
+    assert not mgr.installed(opt)
+    fake_whistle(tmp_path, opt)
+    assert mgr.installed(opt)
+    mgr.select("whistle")
+    assert mgr.selected == "whistle"
+
+
+def test_whistle_gets_keywords_and_no_prompt(mgr, tmp_path, monkeypatch):
+    fake_whistle(tmp_path, mgr.option("whistle"))
+    mgr.select("whistle")
+    seen = {}
+
+    class Fake:
+        def transcribe(self, audio, language=None, keywords=None):
+            seen.update(language=language, keywords=keywords)
+            return {"text": " zet het licht aan "}
+
+    monkeypatch.setattr(mgr, "_whistle", lambda opt: Fake())
+    assert mgr.transcribe([0.0], "a prompt", ["Keuken"]) == "zet het licht aan"
+    assert seen == {"language": "nl", "keywords": ["Keuken"]}

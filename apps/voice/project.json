@@ -26,7 +26,7 @@
       ],
       "options": {
         "cwd": "apps/voice",
-        "command": "HOMEY_DASH_URL=${HOMEY_DASH_URL:-http://localhost:5112} uv run uvicorn app:app --port {args.port} --reload",
+        "command": "VOICE_DATA=${VOICE_DATA:-.models} HOMEY_DASH_URL=${HOMEY_DASH_URL:-http://localhost:5112} uv run uvicorn app:app --port {args.port} --reload",
         "port": 8765
       }
     },

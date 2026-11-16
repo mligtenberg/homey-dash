@@ -4,6 +4,8 @@ The choice is kept in `<VOICE_DATA>/settings.json` (the /models volume), so it s
 page under Accounts. Until someone chooses, VOICE_MODEL (default "small") decides; it may also be a Hugging Face repository
 of a CTranslate2 Whisper model (a fine-tune), which then shows up on the page. Models are faster-whisper (CTranslate2,
 int8, CPU), downloaded into HF_HOME; `download` fetches one ahead of time so the first spoken command doesn't wait.
+Whistle (Cactus Compute, 17 MB, Apache-2.0, `cactus-compute` extra) is the odd one out: one `whistle.cact` file, run by the
+Cactus engine, and biased with keywords instead of a prompt.
 Only models that fit the 3 GB the container is given are offered.
 """
 from __future__ import annotations
@@ -23,6 +25,7 @@ DATA = Path(os.environ.get("VOICE_DATA", "/models"))
 SETTINGS = DATA / "settings.json"
 # What faster-whisper itself downloads for a model; the same patterns make `download` and WhisperModel share the cache.
 PATTERNS = ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"]
+WHISTLE_FILE = "whistle.cact"
 
 
 @dataclass(frozen=True)
@@ -32,6 +35,11 @@ class Option:
     repo: str  # Hugging Face repository of the CTranslate2 model, or a local directory
     size_mb: int = 0
     note: str = ""
+    engine: str = "whisper"  # "whisper" (faster-whisper) or "whistle" (Cactus)
+
+    @property
+    def patterns(self) -> list[str]:
+        return [WHISTLE_FILE] if self.engine == "whistle" else PATTERNS
 
 
 # Multilingual only (the speech is Dutch). Sizes are the download; at run time they are int8, so about half that in RAM.
@@ -40,6 +48,7 @@ OPTIONS: list[Option] = [
     Option("base", "Whisper base", "Systran/faster-whisper-base", 145, "Fast; the first thing to try on an N100."),
     Option("small", "Whisper small", "Systran/faster-whisper-small", 484, "The default: good Dutch, several seconds per command on an N100."),
     Option("medium", "Whisper medium", "Systran/faster-whisper-medium", 1530, "Accurate, about 1.7 GB of RAM and slow on a small CPU."),
+    Option("whistle", "Whistle", "Cactus-Compute/whistle", 17, "Tiny and quick, Dutch included; hears the room names from a word list.", engine="whistle"),
 ]
 
 
@@ -52,7 +61,7 @@ class Manager:
         self._lock = threading.RLock()
         self._default = default or os.environ.get("VOICE_MODEL", "small")
         self._selected = self._load().get("model") or self._default
-        self._loaded: tuple[str, object] | None = None  # (option id, WhisperModel)
+        self._loaded: tuple[str, object] | None = None  # (option id, WhisperModel or cactus.Whistle)
         self._jobs: dict[str, dict] = {}  # option id -> {"done", "total", "error", "running"}
         self.last_ms: dict[str, int] = {}
 
@@ -103,12 +112,17 @@ class Manager:
         return self._complete(opt)
 
     def _complete(self, opt: Option) -> bool:
-        """Whether every file faster-whisper needs is in the cache (an interrupted download leaves .incomplete blobs only)."""
+        """Whether every file the engine needs is in the cache (an interrupted download leaves .incomplete blobs only)."""
         snaps = self._cache_dir(opt) / "snapshots"
         try:
-            return any((s / "model.bin").exists() and (s / "config.json").exists() for s in snaps.iterdir())
+            return any(self._weights(s, opt) is not None for s in snaps.iterdir())
         except OSError:
             return False
+
+    @staticmethod
+    def _weights(snapshot: Path, opt: Option) -> Path | None:
+        need = [WHISTLE_FILE] if opt.engine == "whistle" else ["model.bin", "config.json"]
+        return snapshot / need[0] if all((snapshot / n).exists() for n in need) else None
 
     def available(self, opt: Option) -> tuple[bool, str]:
         return (True, "") if self.installed(opt) else (False, "not downloaded yet")
@@ -143,7 +157,7 @@ class Manager:
 
     # -- downloading ------------------------------------------------------------------------------------------
     def download(self, id: str) -> None:
-        """Start fetching a whisper model in the background; progress shows in state()."""
+        """Start fetching a model in the background; progress shows in state()."""
         with self._lock:
             opt = self.option(id)
             if Path(opt.repo).is_dir():
@@ -181,7 +195,7 @@ class Manager:
 
         try:
             t = time.time()
-            snapshot_download(opt.repo, allow_patterns=PATTERNS, tqdm_class=Progress)
+            snapshot_download(opt.repo, allow_patterns=opt.patterns, tqdm_class=Progress)
             log.info("downloaded %s in %.0fs", opt.id, time.time() - t)
             with lock:
                 job.update(running=False, error=None, done=job["total"])
@@ -219,13 +233,39 @@ class Manager:
             log.info("loaded whisper %s (threads=%s) in %.1fs", opt.id, threads or "auto", time.time() - t)
         return self._loaded[1]
 
-    def transcribe(self, audio, prompt: str) -> str:
-        """Callers serialise this (one transcription at a time)."""
+    def _whistle(self, opt: Option):
+        if self._loaded is None or self._loaded[0] != opt.id:
+            t = time.time()
+            try:
+                import cactus
+
+                os.environ.setdefault("CACTUS_TELEMETRY", "0")  # in-house: no usage pings
+                if not self.installed(opt):  # fetch it now, the same way `download` does
+                    from huggingface_hub import snapshot_download
+
+                    snapshot_download(opt.repo, allow_patterns=opt.patterns)
+                weights = next(w for s in (self._cache_dir(opt) / "snapshots").iterdir() if (w := self._weights(s, opt)))
+                model = cactus.Whistle(weights=weights)
+            except Exception as e:
+                raise Unavailable(f"{opt.label} could not be loaded: {e}") from e
+            self._loaded = (opt.id, model)
+            log.info("loaded whistle in %.1fs", time.time() - t)
+        return self._loaded[1]
+
+    def transcribe(self, audio, prompt: str, keywords: list[str] | None = None) -> str:
+        """Callers serialise this (one transcription at a time). Whisper leans on `prompt`, Whistle on `keywords`."""
         with self._lock:
             opt = self.option(self._selected)
         t = time.time()
         if not self.installed(opt):
             log.warning("%s is not downloaded; fetching it now (use the admin page to do this ahead of time)", opt.id)
+        if opt.engine == "whistle":
+            try:
+                text = self._whistle(opt).transcribe(audio, language="nl", keywords=keywords or None)["text"].strip()
+            except RuntimeError as e:
+                raise Unavailable(f"{opt.label} failed: {e}") from e
+            self.last_ms[opt.id] = round((time.time() - t) * 1000)
+            return text
         segments, _ = self._whisper(opt).transcribe(
             audio, language="nl", initial_prompt=prompt, beam_size=5, vad_filter=True, condition_on_previous_text=False
         )

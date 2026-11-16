@@ -46,7 +46,7 @@ def test_a_command_said_while_awake_counts_however_long_transcribing_takes(monke
     monkeypatch.setattr(app.wake, "AWAKE_S", 0.3)
     monkeypatch.setattr(app, "prompt", lambda wake_words=app.WAKE: wake_words)
 
-    def slow(audio, bias=None):
+    def slow(audio, bias=None, wake_words=app.WAKE):
         time.sleep(0.6)
         return "zet een timer van vijf seconden"
 

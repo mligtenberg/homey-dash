@@ -3,3 +3,4 @@ static/vendor/
 .venv/
 __pycache__/
 static/_test/
+.models/

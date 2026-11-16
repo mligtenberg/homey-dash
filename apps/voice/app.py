@@ -90,6 +90,15 @@ def prompt(wake_words: str = WAKE) -> str:
               " Zet een timer voor vijf seconden. Zet een timer voor tien minuten. Stop de timer.")
 
 
+def keywords(wake_words: str = WAKE) -> list[str]:
+    """What Whistle is biased towards (it takes words, not a prompt): the wake phrase, the rooms and the verbs."""
+    try:
+        zones = source.get()["zones"]
+    except CatalogUnavailable:
+        zones = []
+    return [wake_words.split(",")[0].strip().title(), *sorted(set(zones)), "timer", "dim", "warmer", "licht", "lichten", "procent"]
+
+
 models = stt.Manager()
 
 
@@ -112,13 +121,14 @@ def transcribe(path: str) -> str:
     return transcribe_audio(decode(path))
 
 
-def transcribe_audio(audio, bias: str | None = None) -> str:
+def transcribe_audio(audio, bias: str | None = None, wake_words: str = WAKE) -> str:
     with _stt_lock:
-        return _transcribe(audio, bias)
+        return _transcribe(audio, bias, wake_words)
 
 
-def _transcribe(audio, bias: str | None = None) -> str:
-    return models.transcribe(audio, prompt() if bias is None else bias)
+def _transcribe(audio, bias: str | None = None, wake_words: str = WAKE) -> str:
+    # A memo (bias given) is free speech: no keywords either.
+    return models.transcribe(audio, prompt(wake_words) if bias is None else bias, keywords(wake_words) if bias is None else None)
 
 
 app = FastAPI()
@@ -300,7 +310,7 @@ async def listen(ws: WebSocket, engine: str = "rules", zone: str | None = None, 
                 await state("thinking")
                 t0 = time.time()
                 try:
-                    text = await asyncio.to_thread(lambda: transcribe_audio(utt, prompt(phrase)))
+                    text = await asyncio.to_thread(lambda: transcribe_audio(utt, None, phrase))
                 except stt.Unavailable as e:  # no key, model gone, API down: say so in the log, keep the socket
                     log.warning("transcription failed: %s", e)
                     text = ""
