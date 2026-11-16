@@ -91,12 +91,12 @@ def prompt(wake_words: str = WAKE) -> str:
 
 
 def keywords(wake_words: str = WAKE) -> list[str]:
-    """What Whistle is biased towards (it takes words, not a prompt): the wake phrase, the rooms and the verbs."""
+    """What Whistle is biased towards (it takes words, not a prompt): the wake phrase, the rooms, the verbs and the timer units ("vijf seconden" came out as "waif schonden" without them)."""
     try:
         zones = source.get()["zones"]
     except CatalogUnavailable:
         zones = []
-    return [wake_words.split(",")[0].strip().title(), *sorted(set(zones)), "timer", "dim", "warmer", "licht", "lichten", "procent"]
+    return [wake_words.split(",")[0].strip().title(), *sorted(set(zones)), "timer", "dim", "warmer", "licht", "lichten", "procent", "seconden", "minuten", "uur"]
 
 
 models = stt.Manager()
